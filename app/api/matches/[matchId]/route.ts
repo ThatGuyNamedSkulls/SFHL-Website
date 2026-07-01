@@ -17,7 +17,7 @@ export async function GET(
       );
     }
 
-    const rows = getMatchesByMatchId(numericId);
+    const rows = await getMatchesByMatchId(numericId);
 
     if (rows.length === 0) {
       return NextResponse.json(
@@ -47,13 +47,13 @@ export async function GET(
       mvpRow && (mvpRow.mvps || 0) > 0 ? mvpRow.player_name : null;
 
     // Build player stats for each team
-    const buildPlayerStats = (
+    const buildPlayerStats = async (
       players: typeof rows,
       team: "A" | "B"
     ) =>
-      players.map((p) => {
+      Promise.all(players.map(async (p) => {
         // Look up the player's current rank from the players table
-        const playerData = getPlayer(p.player_name);
+        const playerData = await getPlayer(p.player_name);
         const rank = playerData ? mapRank(playerData.rank) : "UNRANKED";
 
         return {
@@ -76,7 +76,7 @@ export async function GET(
           plants: 0,
           defuses: 0,
         };
-      });
+      }));
 
     const firstRow = rows[0];
     const dateStr = firstRow.timestamp?.split(" ")[0] || "";
@@ -121,8 +121,8 @@ export async function GET(
       teamBRoundsSecondHalf: 0,
       duration: "",
       players: [
-        ...buildPlayerStats(teamAPlayers, "A"),
-        ...buildPlayerStats(teamBPlayers, "B"),
+        ...(await buildPlayerStats(teamAPlayers, "A")),
+        ...(await buildPlayerStats(teamBPlayers, "B")),
       ],
       rounds: [],
     };

@@ -3,7 +3,7 @@ import { getAggregateStats } from "@/lib/db";
 
 export async function GET() {
   try {
-    const stats = getAggregateStats();
+    const stats = await getAggregateStats();
 
     return NextResponse.json({
       activePlayers: stats.totalPlayers,

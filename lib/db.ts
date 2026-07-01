@@ -1,33 +1,14 @@
-/**
- * SQLite access layer for the SFHL website.
- *
- * Uses better-sqlite3 for synchronous, read-only access to the shared
- * player_database.db that the Discord bot also reads/writes.
- *
- * API routes call these helpers — the database is the single source of truth.
- */
+import { createClient } from "@libsql/client";
 
-import Database from "better-sqlite3";
-import path from "path";
-
-// Resolve DB path relative to the project root (hyperleague/) → ../../player_database.db
-const DB_PATH =
-  process.env.DATABASE_PATH ||
-  path.resolve(process.cwd(), "..", "..", "player_database.db");
-
-/** Get a read-only database connection. */
-function getDb(): Database.Database {
-  const db = new Database(DB_PATH, { readonly: true });
-  db.pragma("journal_mode = WAL");
-  return db;
+// Ensure we have a database URL
+if (!process.env.TURSO_DATABASE_URL) {
+  throw new Error("TURSO_DATABASE_URL is not set in environment variables");
 }
 
-/** Get a read-write database connection (for queue operations). */
-export function getDbReadWrite(): Database.Database {
-  const db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  return db;
-}
+export const client = createClient({
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
 // ---------------------------------------------------------------------------
 // Rank mapping: DB rank string → website tier letter
@@ -55,27 +36,6 @@ export function mapRank(dbRank: string): string {
 // Player queries
 // ---------------------------------------------------------------------------
 
-// Ensure the (website-added) country column exists. Runs once per process,
-// using a read-write connection; the ALTER is a no-op if it already exists.
-let countryColumnEnsured = false;
-function ensureCountryColumn(): void {
-  if (countryColumnEnsured) return;
-  try {
-    const db = getDbReadWrite();
-    try {
-      db.exec("ALTER TABLE players ADD COLUMN country TEXT DEFAULT ''");
-    } catch {
-      // Column already exists — fine.
-    } finally {
-      db.close();
-    }
-  } catch {
-    // DB not writable right now; try again next call.
-    return;
-  }
-  countryColumnEnsured = true;
-}
-
 export interface DbPlayer {
   id: number;
   name: string;
@@ -99,74 +59,42 @@ export interface DbPlayer {
   placement_games_played: number;
 }
 
-export function getAllPlayers(): DbPlayer[] {
-  ensureCountryColumn();
-  const db = getDb();
-  try {
-    return db
-      .prepare(
-        `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
-                kd_ratio, total_mvps, total_score, total_headshot_percentage,
-                avg_hs_percent, matches_played, matches_won, peak_elo,
-                total_play_time, roblox_avatar_image, placement_done,
-                placement_games_played
-         FROM players
-         ORDER BY elo DESC`
-      )
-      .all() as DbPlayer[];
-  } finally {
-    db.close();
-  }
+export async function getAllPlayers(): Promise<DbPlayer[]> {
+  const rs = await client.execute(
+    `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
+            kd_ratio, total_mvps, total_score, total_headshot_percentage,
+            avg_hs_percent, matches_played, matches_won, peak_elo,
+            total_play_time, roblox_avatar_image, placement_done,
+            placement_games_played
+     FROM players
+     ORDER BY elo DESC`
+  );
+  return rs.rows as unknown as DbPlayer[];
 }
 
-export function getPlayer(name: string): DbPlayer | undefined {
-  ensureCountryColumn();
-  const db = getDb();
-  try {
-    return db
-      .prepare(
-        `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
-                kd_ratio, total_mvps, total_score, total_headshot_percentage,
-                avg_hs_percent, matches_played, matches_won, peak_elo,
-                total_play_time, roblox_avatar_image, placement_done,
-                placement_games_played
-         FROM players
-         WHERE name = ?`
-      )
-      .get(name) as DbPlayer | undefined;
-  } finally {
-    db.close();
-  }
+export async function getPlayer(name: string): Promise<DbPlayer | undefined> {
+  const rs = await client.execute({
+    sql: `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
+                 kd_ratio, total_mvps, total_score, total_headshot_percentage,
+                 avg_hs_percent, matches_played, matches_won, peak_elo,
+                 total_play_time, roblox_avatar_image, placement_done,
+                 placement_games_played
+          FROM players
+          WHERE name = ?`,
+    args: [name]
+  });
+  return (rs.rows[0] as unknown as DbPlayer) || undefined;
 }
 
-/** Read a player's stored country code (lowercase alpha-2), or null. */
-export function getPlayerCountry(name: string): string | null {
-  ensureCountryColumn();
-  const db = getDb();
-  try {
-    const row = db.prepare("SELECT country FROM players WHERE name = ?").get(name) as
-      | { country: string | null }
-      | undefined;
-    return row?.country || null;
-  } catch {
-    return null;
-  } finally {
-    db.close();
-  }
+export async function getPlayerCountry(name: string): Promise<string | null> {
+  const rs = await client.execute({ sql: "SELECT country FROM players WHERE name = ?", args: [name] });
+  if (rs.rows.length === 0) return null;
+  return (rs.rows[0].country as string) || null;
 }
 
-/** Persist a player's country code. Returns false if the player doesn't exist. */
-export function setPlayerCountry(name: string, code: string): boolean {
-  ensureCountryColumn();
-  const db = getDbReadWrite();
-  try {
-    const res = db
-      .prepare("UPDATE players SET country = ? WHERE name = ?")
-      .run(code.toLowerCase(), name);
-    return res.changes > 0;
-  } finally {
-    db.close();
-  }
+export async function setPlayerCountry(name: string, code: string): Promise<boolean> {
+  const rs = await client.execute({ sql: "UPDATE players SET country = ? WHERE name = ?", args: [code.toLowerCase(), name] });
+  return rs.rowsAffected > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,127 +117,97 @@ export interface DbMatch {
   match_id: number | null;
   timestamp: string;
   executed_by: string | null;
-  /** Match-level team round score, e.g. "13,11" (winners,losers). May be null on legacy rows. */
   round_score: string | null;
 }
 
-export function getMatchesForPlayer(playerName: string): DbMatch[] {
-  const db = getDb();
-  try {
-    return db
-      .prepare(
-        `SELECT id, player_name, map_name, region, kills, deaths, assists,
-                hs_percentage, elo_change, result, points, mvps, match_id,
-                timestamp, executed_by, round_score
-         FROM match_history
-         WHERE player_name = ?
-         ORDER BY id DESC`
-      )
-      .all(playerName) as DbMatch[];
-  } finally {
-    db.close();
-  }
+export async function getMatchesForPlayer(playerName: string): Promise<DbMatch[]> {
+  const rs = await client.execute({
+    sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
+                 hs_percentage, elo_change, result, points, mvps, match_id,
+                 timestamp, executed_by, round_score
+          FROM match_history
+          WHERE player_name = ?
+          ORDER BY id DESC`,
+    args: [playerName]
+  });
+  return rs.rows as unknown as DbMatch[];
 }
 
-export function getMatchesByMatchId(matchId: number): DbMatch[] {
-  const db = getDb();
-  try {
-    return db
-      .prepare(
-        `SELECT id, player_name, map_name, region, kills, deaths, assists,
-                hs_percentage, elo_change, result, points, mvps, match_id,
-                timestamp, executed_by, round_score
-         FROM match_history
-         WHERE match_id = ?
-         ORDER BY points DESC`
-      )
-      .all(matchId) as DbMatch[];
-  } finally {
-    db.close();
-  }
+export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
+  const rs = await client.execute({
+    sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
+                 hs_percentage, elo_change, result, points, mvps, match_id,
+                 timestamp, executed_by, round_score
+          FROM match_history
+          WHERE match_id = ?
+          ORDER BY points DESC`,
+    args: [matchId]
+  });
+  return rs.rows as unknown as DbMatch[];
 }
 
-/** Get all distinct match IDs (for listing matches). */
-export function getAllMatchIds(): { match_id: number; timestamp: string; map_name: string; region: string }[] {
-  const db = getDb();
-  try {
-    return db
-      .prepare(
-        `SELECT DISTINCT match_id,
-                MIN(timestamp) as timestamp,
-                map_name,
-                region
-         FROM match_history
-         WHERE match_id IS NOT NULL
-         GROUP BY match_id
-         ORDER BY MIN(timestamp) DESC`
-      )
-      .all() as { match_id: number; timestamp: string; map_name: string; region: string }[];
-  } finally {
-    db.close();
-  }
+export async function getAllMatchIds(): Promise<{ match_id: number; timestamp: string; map_name: string; region: string }[]> {
+  const rs = await client.execute(
+    `SELECT DISTINCT match_id,
+            MIN(timestamp) as timestamp,
+            map_name,
+            region
+     FROM match_history
+     WHERE match_id IS NOT NULL
+     GROUP BY match_id
+     ORDER BY MIN(timestamp) DESC`
+  );
+  return rs.rows as unknown as { match_id: number; timestamp: string; map_name: string; region: string }[];
 }
 
-/**
- * Players this player has shared matches with most often (teammates or
- * opponents), derived from shared match_id values. Excludes the player.
- */
-export function getMostPlayedWith(
+export async function getMostPlayedWith(
   playerName: string,
   limit = 10
-): { name: string; count: number }[] {
-  const db = getDb();
+): Promise<{ name: string; count: number }[]> {
   try {
-    return db
-      .prepare(
-        `SELECT other.player_name AS name, COUNT(*) AS count
-           FROM match_history me
-           JOIN match_history other
-             ON me.match_id = other.match_id
-            AND other.player_name <> me.player_name
-          WHERE me.player_name = ?
-            AND me.match_id IS NOT NULL
-          GROUP BY other.player_name
-          ORDER BY count DESC
-          LIMIT ?`
-      )
-      .all(playerName, limit) as { name: string; count: number }[];
+    const rs = await client.execute({
+      sql: `SELECT other.player_name AS name, COUNT(*) AS count
+            FROM match_history me
+            JOIN match_history other
+              ON me.match_id = other.match_id
+             AND other.player_name <> me.player_name
+            WHERE me.player_name = ?
+              AND me.match_id IS NOT NULL
+            GROUP BY other.player_name
+            ORDER BY count DESC
+            LIMIT ?`,
+      args: [playerName, limit]
+    });
+    return rs.rows as unknown as { name: string; count: number }[];
   } catch {
     return [];
-  } finally {
-    db.close();
   }
 }
 
-/**
- * Each player's dominant match region (the server region they play on most
- * often), derived from match_history. Returns a name → raw-region map.
- */
-export function getPlayerRegions(): Record<string, string> {
-  const db = getDb();
+export async function getPlayerRegions(): Promise<Record<string, string>> {
   try {
-    const rows = db
-      .prepare(
-        `SELECT player_name, region, COUNT(*) AS c
-           FROM match_history
-          WHERE region IS NOT NULL AND region <> ''
-          GROUP BY player_name, region`
-      )
-      .all() as { player_name: string; region: string; c: number }[];
+    const rs = await client.execute(
+      `SELECT player_name, region, COUNT(*) AS c
+       FROM match_history
+       WHERE region IS NOT NULL AND region <> ''
+       GROUP BY player_name, region`
+    );
 
     const best: Record<string, string> = {};
     const bestCount: Record<string, number> = {};
-    for (const row of rows) {
-      if (bestCount[row.player_name] === undefined || row.c > bestCount[row.player_name]) {
-        best[row.player_name] = row.region;
-        bestCount[row.player_name] = row.c;
+    for (const row of rs.rows) {
+      const player_name = row.player_name as string;
+      const region = row.region as string;
+      const c = Number(row.c);
+      
+      if (bestCount[player_name] === undefined || c > bestCount[player_name]) {
+        best[player_name] = region;
+        bestCount[player_name] = c;
       }
     }
     return best;
   } catch {
     return {};
-  } finally {
-    db.close();
   }
 }
 
@@ -325,39 +223,20 @@ export interface AggregateStats {
   maps: string[];
 }
 
-export function getAggregateStats(): AggregateStats {
-  const db = getDb();
-  try {
-    const playerCount = db
-      .prepare("SELECT COUNT(*) as count FROM players")
-      .get() as { count: number };
+export async function getAggregateStats(): Promise<AggregateStats> {
+  const playerCount = await client.execute("SELECT COUNT(*) as count FROM players");
+  const matchCount = await client.execute("SELECT COUNT(DISTINCT match_id) as count FROM match_history WHERE match_id IS NOT NULL");
+  const totalKills = await client.execute("SELECT SUM(total_kills) as total FROM players");
+  const totalRows = await client.execute("SELECT COUNT(*) as count FROM match_history");
+  const maps = await client.execute("SELECT DISTINCT map_name FROM match_history WHERE map_name IS NOT NULL");
 
-    const matchCount = db
-      .prepare("SELECT COUNT(DISTINCT match_id) as count FROM match_history WHERE match_id IS NOT NULL")
-      .get() as { count: number };
-
-    const totalKills = db
-      .prepare("SELECT SUM(total_kills) as total FROM players")
-      .get() as { total: number };
-
-    const totalRows = db
-      .prepare("SELECT COUNT(*) as count FROM match_history")
-      .get() as { count: number };
-
-    const maps = db
-      .prepare("SELECT DISTINCT map_name FROM match_history WHERE map_name IS NOT NULL")
-      .all() as { map_name: string }[];
-
-    return {
-      totalPlayers: playerCount.count,
-      totalMatches: matchCount.count,
-      totalKills: totalKills.total || 0,
-      totalMatchRows: totalRows.count,
-      maps: maps.map((m) => m.map_name),
-    };
-  } finally {
-    db.close();
-  }
+  return {
+    totalPlayers: Number(playerCount.rows[0].count) || 0,
+    totalMatches: Number(matchCount.rows[0].count) || 0,
+    totalKills: Number(totalKills.rows[0].total) || 0,
+    totalMatchRows: Number(totalRows.rows[0].count) || 0,
+    maps: maps.rows.map((m) => m.map_name as string),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -372,69 +251,47 @@ export interface WebQueueEntry {
   joined_at: string;
 }
 
-export function getWebQueue(): WebQueueEntry[] {
-  const db = getDb();
+export async function getWebQueue(): Promise<WebQueueEntry[]> {
   try {
-    return db
-      .prepare("SELECT * FROM web_queue ORDER BY joined_at ASC")
-      .all() as WebQueueEntry[];
+    const rs = await client.execute("SELECT * FROM web_queue ORDER BY joined_at ASC");
+    return rs.rows as unknown as WebQueueEntry[];
   } catch {
-    // Table may not exist yet
     return [];
-  } finally {
-    db.close();
   }
 }
 
-export function joinWebQueue(
+export async function joinWebQueue(
   discordUserId: string,
   discordUsername: string,
   playerName: string | null
-): void {
-  const db = getDbReadWrite();
-  try {
-    // Ensure table exists
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS web_queue (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        discord_user_id TEXT NOT NULL UNIQUE,
-        discord_username TEXT NOT NULL,
-        player_name TEXT,
-        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    db.prepare(
-      `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name)
-       VALUES (?, ?, ?)`
-    ).run(discordUserId, discordUsername, playerName);
-  } finally {
-    db.close();
-  }
+): Promise<void> {
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS web_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      discord_user_id TEXT NOT NULL UNIQUE,
+      discord_username TEXT NOT NULL,
+      player_name TEXT,
+      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await client.execute({
+    sql: `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name)
+          VALUES (?, ?, ?)`,
+    args: [discordUserId, discordUsername, playerName]
+  });
 }
 
-export function leaveWebQueue(discordUserId: string): void {
-  const db = getDbReadWrite();
+export async function leaveWebQueue(discordUserId: string): Promise<void> {
   try {
-    db.prepare("DELETE FROM web_queue WHERE discord_user_id = ?").run(
-      discordUserId
-    );
-  } catch {
-    // Table may not exist
-  } finally {
-    db.close();
-  }
+    await client.execute({ sql: "DELETE FROM web_queue WHERE discord_user_id = ?", args: [discordUserId] });
+  } catch {}
 }
 
-export function isInWebQueue(discordUserId: string): boolean {
-  const db = getDb();
+export async function isInWebQueue(discordUserId: string): Promise<boolean> {
   try {
-    const row = db
-      .prepare("SELECT 1 FROM web_queue WHERE discord_user_id = ?")
-      .get(discordUserId);
-    return !!row;
+    const rs = await client.execute({ sql: "SELECT 1 FROM web_queue WHERE discord_user_id = ?", args: [discordUserId] });
+    return rs.rows.length > 0;
   } catch {
     return false;
-  } finally {
-    db.close();
   }
 }

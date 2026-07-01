@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       countries: body.countries,
       verifiedOnly: body.verifiedOnly,
       voiceRequired: body.voiceRequired,
-      leader: memberFromSession(session),
+      leader: await memberFromSession(session),
     });
     return NextResponse.json({ party });
   } catch (error) {

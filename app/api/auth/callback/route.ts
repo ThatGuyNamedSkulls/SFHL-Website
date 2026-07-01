@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { DISCORD_CONFIG, encodeSession, SESSION_COOKIE } from "@/lib/auth";
 import { getPlayer } from "@/lib/db";
+import { avatarUrl } from "@/lib/format";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -54,16 +55,26 @@ export async function GET(request: Request) {
 
     // Try to match Discord username to a player in the database
     const displayName = userData.global_name || userData.username;
-    const playerData = getPlayer(displayName);
+    let avatar = userData.avatar
+      ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
+      : null;
+    let rank = "UNRANKED";
+
+    const playerData = await getPlayer(displayName);
     const playerName = playerData ? playerData.name : null;
+    
+    if (playerData) {
+      if (playerData.roblox_avatar_image) {
+        avatar = avatarUrl(playerData.roblox_avatar_image);
+      }
+      rank = playerData.rank || "UNRANKED";
+    }
 
     // Create session
     const session = {
       discordId: userData.id,
       username: userData.global_name || userData.username,
-      avatar: userData.avatar
-        ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
-        : null,
+      avatar: avatar,
       discriminator: userData.discriminator || "0",
       playerName,
       inGuild,

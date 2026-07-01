@@ -5,8 +5,8 @@ import { countryName, flagPath, isValidCountry } from "@/lib/countries";
 
 export async function GET() {
   try {
-    const players = getAllPlayers();
-    const regions = getPlayerRegions();
+    const players = await getAllPlayers();
+    const regions = await getPlayerRegions();
 
     const mapped = players.map((p, idx) => {
       const region = regionMeta(regions[p.name]);

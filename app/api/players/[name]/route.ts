@@ -29,7 +29,7 @@ export async function GET(
   try {
     const { name } = await params;
     const decodedName = decodeURIComponent(name);
-    const player = getPlayer(decodedName);
+    const player = await getPlayer(decodedName);
 
     if (!player) {
       return NextResponse.json(
@@ -38,8 +38,8 @@ export async function GET(
       );
     }
 
-    // Get match history for ELO trend
-    const matches = getMatchesForPlayer(decodedName);
+    // Get their matches
+    const matches = await getMatchesForPlayer(decodedName);
 
     // Dominant server region for this player (most-played region across matches).
     const regionCounts: Record<string, number> = {};

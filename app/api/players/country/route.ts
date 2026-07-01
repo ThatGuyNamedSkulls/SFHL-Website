@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ country: null, linked: false });
   }
   return NextResponse.json({
-    country: getPlayerCountry(session.playerName),
+    country: await getPlayerCountry(session.playerName),
     linked: true,
   });
 }

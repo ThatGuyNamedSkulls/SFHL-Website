@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     const playerName = searchParams.get("player");
 
     if (playerName) {
-      const matches = getMatchesForPlayer(playerName);
+      const matches = await getMatchesForPlayer(playerName);
       const mapped = matches.map((m) => ({
         id: `M-${m.id}`,
         date: m.timestamp?.split(" ")[0] || "",
@@ -31,13 +31,15 @@ export async function GET(request: Request) {
     }
 
     // Return all distinct matches (most recent first), with clean labels.
-    const matchIds = getAllMatchIds().map((m) => ({
+    const allMatches = await getAllMatchIds();
+    const matchIds = allMatches.map((m) => ({
       matchId: m.match_id,
       date: m.timestamp?.split(" ")[0] || "",
       map: prettyMap(m.map_name),
       region: prettyRegion(m.region),
     }));
     return NextResponse.json(matchIds);
+    
   } catch (error) {
     console.error("Error fetching matches:", error);
     return NextResponse.json(

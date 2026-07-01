@@ -5,7 +5,7 @@ import { getWebQueue, joinWebQueue, leaveWebQueue, isInWebQueue } from "@/lib/db
 /** GET — returns current web queue state */
 export async function GET() {
   try {
-    const queue = getWebQueue();
+    const queue = await getWebQueue();
     return NextResponse.json({ queue, count: queue.length });
   } catch (error) {
     console.error("Error fetching queue:", error);
@@ -39,15 +39,15 @@ export async function POST() {
   }
 
   try {
-    if (isInWebQueue(session.discordId)) {
+    if (await isInWebQueue(session.discordId)) {
       return NextResponse.json(
         { error: "You are already in the queue" },
         { status: 409 }
       );
     }
 
-    joinWebQueue(session.discordId, session.username, session.playerName);
-    const queue = getWebQueue();
+    await joinWebQueue(session.discordId, session.username, session.playerName);
+    const queue = await getWebQueue();
     return NextResponse.json({
       message: "Joined queue successfully",
       queue,
@@ -74,8 +74,8 @@ export async function DELETE() {
   }
 
   try {
-    leaveWebQueue(session.discordId);
-    const queue = getWebQueue();
+    await leaveWebQueue(session.discordId);
+    const queue = await getWebQueue();
     return NextResponse.json({
       message: "Left queue",
       queue,

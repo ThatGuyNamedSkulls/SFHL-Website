@@ -12,7 +12,7 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/parties/[i
 
   try {
     const { id } = await ctx.params;
-    const result = joinParty(id, memberFromSession(session));
+    const result = joinParty(id, await memberFromSession(session));
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
