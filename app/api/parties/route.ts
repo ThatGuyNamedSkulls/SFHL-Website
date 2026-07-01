@@ -6,7 +6,7 @@ import { memberFromSession } from "@/lib/party-member";
 /** GET — list all live parties. */
 export async function GET() {
   try {
-    const parties = getParties();
+    const parties = await getParties();
     return NextResponse.json({ parties, count: parties.length });
   } catch (error) {
     console.error("Error listing parties:", error);
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const party = createParty({
+    const party = await createParty({
       name: body.name,
       game: body.game,
       gameMode: body.gameMode,

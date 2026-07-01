@@ -11,7 +11,7 @@ export async function DELETE(_request: Request, ctx: RouteContext<"/api/parties/
 
   try {
     const { id } = await ctx.params;
-    const parties = leaveParty(id, session.discordId);
+    const parties = await leaveParty(id, session.discordId);
     return NextResponse.json({ parties, count: parties.length });
   } catch (error) {
     console.error("Error leaving party:", error);
