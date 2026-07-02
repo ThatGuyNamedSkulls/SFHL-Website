@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { DISCORD_CONFIG, encodeSession, SESSION_COOKIE } from "@/lib/auth";
+import { DISCORD_CONFIG, encodeSession, isUserInGuildById, SESSION_COOKIE } from "@/lib/auth";
 import { getPlayer } from "@/lib/db";
 import { avatarUrl } from "@/lib/format";
 
@@ -43,15 +43,20 @@ export async function GET(request: Request) {
     });
     const userData = await userRes.json();
 
-    // Fetch user guilds to check SFHL membership
-    const guildsRes = await fetch("https://discord.com/api/users/@me/guilds", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    const guildsData = await guildsRes.json();
-    const inGuild = Array.isArray(guildsData) &&
-      guildsData.some(
-        (g: { id: string }) => g.id === DISCORD_CONFIG.guildId
-      );
+    // Determine SFHL membership by Discord user ID via the bot token — the
+    // guild tells us directly whether this account is a member, regardless of
+    // display name. Fall back to the user's OAuth guilds list only if the
+    // bot-token lookup is unavailable (e.g. DISCORD_BOT_TOKEN not set).
+    let inGuild = await isUserInGuildById(userData.id);
+    if (inGuild === null) {
+      const guildsRes = await fetch("https://discord.com/api/users/@me/guilds", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const guildsData = await guildsRes.json();
+      inGuild =
+        Array.isArray(guildsData) &&
+        guildsData.some((g: { id: string }) => g.id === DISCORD_CONFIG.guildId);
+    }
 
     // Try to match Discord username to a player in the database
     const displayName = userData.global_name || userData.username;

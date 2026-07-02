@@ -47,4 +47,28 @@ export const DISCORD_CONFIG = {
   scopes: ["identify", "guilds"],
 };
 
+/**
+ * Check guild membership by Discord user ID using the bot token.
+ *
+ * This is authoritative — it asks the guild directly whether that user ID is a
+ * member — instead of matching a display name or trusting the user's OAuth
+ * `guilds` scope. Returns `null` when it can't tell (no bot token configured or
+ * the API errored) so callers can fall back.
+ */
+export async function isUserInGuildById(userId: string): Promise<boolean | null> {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) return null;
+  try {
+    const res = await fetch(
+      `https://discord.com/api/v10/guilds/${DISCORD_CONFIG.guildId}/members/${userId}`,
+      { headers: { Authorization: `Bot ${token}` }, cache: "no-store" }
+    );
+    if (res.status === 404) return false; // definitively not a member
+    if (!res.ok) return null; // rate-limited / permission issue -> unknown
+    return true;
+  } catch {
+    return null;
+  }
+}
+
 export { SESSION_COOKIE };
