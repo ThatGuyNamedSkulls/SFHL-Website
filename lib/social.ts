@@ -188,25 +188,31 @@ export async function sendFriendRequest(
   return "sent";
 }
 
-/** Accept the request `fromName -> meName` (creates the friendship). */
+/** Accept the request `fromName -> meName` (creates the friendship). Idempotent:
+ *  only notifies/DMs the requester on the genuine first accept, and clears the
+ *  originating notification so it can't be re-actioned (which would re-DM). */
 export async function acceptFriendRequest(meName: string, fromName: string): Promise<void> {
   await ensureSocialSchema();
+  const pending = await requestExists(fromName, meName);
   const [x, y] = pair(meName, fromName);
   await client.batch([
     { sql: "INSERT OR IGNORE INTO friendships (user_a, user_b, created_at) VALUES (?, ?, ?)", args: [x, y, now()] },
     { sql: "DELETE FROM friend_requests WHERE from_id = ? AND to_id = ?", args: [fromName, meName] },
     { sql: "DELETE FROM friend_requests WHERE from_id = ? AND to_id = ?", args: [meName, fromName] },
+    { sql: "DELETE FROM notifications WHERE user_id = ? AND type = 'friend_request' AND actor_id = ?", args: [meName, fromName] },
   ]);
-  await addNotification(fromName, "friend_accepted", `${meName} accepted your friend request.`, meName);
-  await enqueueDM(fromName, `✅ **${meName}** accepted your friend request on HyperLeague.`);
+  if (pending) {
+    await addNotification(fromName, "friend_accepted", `${meName} accepted your friend request.`, meName);
+    await enqueueDM(fromName, `✅ **${meName}** accepted your friend request on HyperLeague.`);
+  }
 }
 
 export async function rejectFriendRequest(meName: string, fromName: string): Promise<void> {
   await ensureSocialSchema();
-  await client.execute({
-    sql: "DELETE FROM friend_requests WHERE from_id = ? AND to_id = ?",
-    args: [fromName, meName],
-  });
+  await client.batch([
+    { sql: "DELETE FROM friend_requests WHERE from_id = ? AND to_id = ?", args: [fromName, meName] },
+    { sql: "DELETE FROM notifications WHERE user_id = ? AND type = 'friend_request' AND actor_id = ?", args: [meName, fromName] },
+  ]);
 }
 
 export async function removeFriend(meName: string, otherName: string): Promise<void> {
@@ -250,17 +256,22 @@ export async function getOutgoingRequests(meName: string): Promise<FriendRequest
 
 // --- party invites ---------------------------------------------------------
 
-/** Record a party invite (target = player name) + notify/DM them. */
+/**
+ * Record a party invite (target = player name) + notify/DM them — but only if
+ * one isn't already pending, so re-inviting the same person doesn't spam them
+ * with duplicate notifications/DMs. Returns "sent" or "pending".
+ */
 export async function createPartyInvite(
   partyId: string,
   fromName: string,
   toName: string,
   partyName: string
-): Promise<void> {
+): Promise<"sent" | "pending"> {
   await ensureSocialSchema();
+  if (await hasPartyInvite(partyId, toName)) return "pending";
+
   await client.execute({
-    sql: `INSERT INTO party_invites (party_id, from_id, to_id, created_at) VALUES (?, ?, ?, ?)
-          ON CONFLICT(party_id, to_id) DO UPDATE SET from_id = excluded.from_id, created_at = excluded.created_at`,
+    sql: "INSERT INTO party_invites (party_id, from_id, to_id, created_at) VALUES (?, ?, ?, ?)",
     args: [partyId, fromName, toName, now()],
   });
   await addNotification(
@@ -274,6 +285,25 @@ export async function createPartyInvite(
     toName,
     `🎉 **${fromName}** invited you to their party "${partyName}" on HyperLeague. Join here: https://sf-hl.com/party-finder`
   );
+  return "sent";
+}
+
+/** Map of party id -> invited player names, for the parties currently listed. */
+export async function getInvitesForParties(partyIds: string[]): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (partyIds.length === 0) return map;
+  await ensureSocialSchema();
+  const placeholders = partyIds.map(() => "?").join(",");
+  const rs = await client.execute({
+    sql: `SELECT party_id, to_id FROM party_invites WHERE party_id IN (${placeholders})`,
+    args: partyIds,
+  });
+  for (const r of rs.rows) {
+    const pid = r.party_id as string;
+    if (!map.has(pid)) map.set(pid, []);
+    map.get(pid)!.push(r.to_id as string);
+  }
+  return map;
 }
 
 export async function hasPartyInvite(partyId: string, toName: string): Promise<boolean> {
@@ -287,10 +317,10 @@ export async function hasPartyInvite(partyId: string, toName: string): Promise<b
 
 export async function clearPartyInvite(partyId: string, toName: string): Promise<void> {
   await ensureSocialSchema();
-  await client.execute({
-    sql: "DELETE FROM party_invites WHERE party_id = ? AND to_id = ?",
-    args: [partyId, toName],
-  });
+  await client.batch([
+    { sql: "DELETE FROM party_invites WHERE party_id = ? AND to_id = ?", args: [partyId, toName] },
+    { sql: "DELETE FROM notifications WHERE user_id = ? AND type = 'party_invite' AND ref_id = ?", args: [toName, partyId] },
+  ]);
 }
 
 export async function getPartyInvitePartyIds(meName: string): Promise<string[]> {

@@ -69,7 +69,9 @@ function PartyFinderContent() {
         body: JSON.stringify({ toName: friendName }),
       });
       const data = await res.json();
-      setNotice(res.ok ? "Invite sent." : data.error || "Failed to invite.");
+      if (!res.ok) setNotice(data.error || "Failed to invite.");
+      else setNotice(data.status === "pending" ? "Invite already pending." : "Invite sent.");
+      load(); // refresh so the invite menu shows "Invited"
     } catch {
       setNotice("Failed to invite.");
     }

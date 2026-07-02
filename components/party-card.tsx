@@ -139,24 +139,32 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onIn
                       {(friends ?? []).length === 0 ? "No friends to invite yet." : "All friends are in the party."}
                     </div>
                   ) : (
-                    invitable.map((f) => (
-                      <button
-                        key={f.name}
-                        onClick={() => {
-                          onInvite(party.id, f.name);
-                          setInviteOpen(false);
-                        }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-hl-panel-light/60"
-                      >
-                        <Avatar className="w-6 h-6 border border-hl-border">
-                          {f.avatar ? <AvatarImage src={f.avatar} /> : null}
-                          <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
-                            {f.name.slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="truncate">{f.name}</span>
-                      </button>
-                    ))
+                    invitable.map((f) => {
+                      const invited = (party.invitedNames ?? []).includes(f.name);
+                      return (
+                        <button
+                          key={f.name}
+                          disabled={invited}
+                          onClick={() => {
+                            if (invited) return;
+                            onInvite(party.id, f.name);
+                            setInviteOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm ${
+                            invited ? "text-hl-muted cursor-default" : "text-white hover:bg-hl-panel-light/60"
+                          }`}
+                        >
+                          <Avatar className="w-6 h-6 border border-hl-border">
+                            {f.avatar ? <AvatarImage src={f.avatar} /> : null}
+                            <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
+                              {f.name.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="truncate flex-1">{f.name}</span>
+                          {invited && <span className="text-[10px] text-hl-muted shrink-0">Invited</span>}
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               )}

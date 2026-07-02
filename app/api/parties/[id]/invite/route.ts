@@ -40,8 +40,8 @@ export async function POST(
       return NextResponse.json({ error: "Party is full" }, { status: 409 });
     }
 
-    await createPartyInvite(party.id, me, toName, party.name);
-    return NextResponse.json({ ok: true });
+    const status = await createPartyInvite(party.id, me, toName, party.name);
+    return NextResponse.json({ ok: true, status });
   } catch (error) {
     console.error("Error inviting to party:", error);
     return NextResponse.json({ error: "Failed to invite" }, { status: 500 });

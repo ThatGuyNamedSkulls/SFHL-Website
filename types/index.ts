@@ -249,6 +249,8 @@ export interface PartyView {
   verifiedOnly: boolean;
   voiceRequired: boolean;
   isPrivate?: boolean;
+  /** Player names this party has pending invites out to (members' view only). */
+  invitedNames?: string[];
   createdAt: number;
   updatedAt: number;
 }

@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getParties, createParty } from "@/lib/parties";
 import { memberFromSession } from "@/lib/party-member";
-import { getPartyInvitePartyIds } from "@/lib/social";
+import { getPartyInvitePartyIds, getInvitesForParties } from "@/lib/social";
 
 /** GET — list live parties. Private parties are hidden unless you're a member
- *  or have a pending invite to them. */
+ *  or have a pending invite to them. Each party carries the names it has pending
+ *  invites out to, so members' invite menus can show "Invited". */
 export async function GET() {
   try {
     const session = await getSession();
@@ -21,7 +22,18 @@ export async function GET() {
       const isMember = p.members.some((m) => m.discordId === session.discordId);
       return isMember || invitedIds.has(p.id);
     });
-    return NextResponse.json({ parties: visible, count: visible.length });
+
+    // Attach pending-invite names to parties the viewer is a member of.
+    const myPartyIds = session
+      ? visible.filter((p) => p.members.some((m) => m.discordId === session.discordId)).map((p) => p.id)
+      : [];
+    const invitesByParty = await getInvitesForParties(myPartyIds);
+    const withInvites = visible.map((p) => ({
+      ...p,
+      invitedNames: invitesByParty.get(p.id) ?? [],
+    }));
+
+    return NextResponse.json({ parties: withInvites, count: withInvites.length });
   } catch (error) {
     console.error("Error listing parties:", error);
     return NextResponse.json({ parties: [], count: 0 });
