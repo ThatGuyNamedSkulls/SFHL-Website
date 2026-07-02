@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { DISCORD_CONFIG, encodeSession, isUserInGuildById, SESSION_COOKIE } from "@/lib/auth";
 import { getPlayer } from "@/lib/db";
+import { upsertWebUser } from "@/lib/social";
 import { avatarUrl } from "@/lib/format";
 
 export async function GET(request: Request) {
@@ -84,6 +85,13 @@ export async function GET(request: Request) {
       playerName,
       inGuild,
     };
+
+    // Remember this player's Discord id so the bot can DM them by id later.
+    try {
+      await upsertWebUser(session.discordId, session.playerName, session.username);
+    } catch (e) {
+      console.error("Failed to record web_user mapping:", e);
+    }
 
     const jwt = await encodeSession(session);
 

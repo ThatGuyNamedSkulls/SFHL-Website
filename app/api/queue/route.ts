@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getWebQueue, joinWebQueue, leaveWebQueue, isInWebQueue } from "@/lib/db";
 import { getPartyForMember } from "@/lib/parties";
+import { upsertWebUser } from "@/lib/social";
 
 /** GET — returns current web queue state */
 export async function GET() {
@@ -40,6 +41,9 @@ export async function POST() {
   }
 
   try {
+    // Remember this player's Discord id so the bot can DM them by id.
+    upsertWebUser(session.discordId, session.playerName, session.username).catch(() => {});
+
     if (await isInWebQueue(session.discordId)) {
       return NextResponse.json(
         { error: "You are already in the queue" },

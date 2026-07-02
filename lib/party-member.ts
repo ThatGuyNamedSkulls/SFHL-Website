@@ -1,5 +1,6 @@
 import { PartyMember } from "@/lib/parties";
 import { getPlayer, mapRank } from "@/lib/db";
+import { upsertWebUser } from "@/lib/social";
 import { avatarUrl } from "@/lib/format";
 import { isValidCountry } from "@/lib/countries";
 import { UserSession } from "@/types";
@@ -10,6 +11,9 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
   let elo = 0;
   let avatar = session.avatar ?? null;
   let country: string | null = null;
+
+  // Remember this player's Discord id so the bot can DM them by id.
+  upsertWebUser(session.discordId, session.playerName, session.username).catch(() => {});
 
   if (session.playerName) {
     const player = await getPlayer(session.playerName);

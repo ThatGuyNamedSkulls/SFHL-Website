@@ -49,6 +49,12 @@ export function ensureSocialSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
       await client.batch([
+        // Maps a player name -> their Discord id, captured whenever the website
+        // knows both (login/queue/party). Lets the bot DM by user id instead of
+        // guessing a member by display name.
+        `CREATE TABLE IF NOT EXISTS web_users (
+           discord_id TEXT PRIMARY KEY, player_name TEXT, username TEXT,
+           updated_at INTEGER )`,
         `CREATE TABLE IF NOT EXISTS friendships (
            user_a TEXT NOT NULL, user_b TEXT NOT NULL, created_at INTEGER,
            PRIMARY KEY (user_a, user_b) )`,
@@ -78,6 +84,38 @@ function pair(a: string, b: string): [string, string] {
 }
 
 const now = () => Date.now();
+
+// --- name <-> Discord id mapping -------------------------------------------
+
+/** Record that this Discord id is linked to this player name (call wherever a
+ *  session with both is available: login, queue join, party membership). */
+export async function upsertWebUser(
+  discordId: string,
+  playerName: string | null,
+  username: string | null
+): Promise<void> {
+  if (!playerName) return; // only useful once linked to a player
+  await ensureSocialSchema();
+  await client.execute({
+    sql: `INSERT INTO web_users (discord_id, player_name, username, updated_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(discord_id) DO UPDATE SET
+            player_name = excluded.player_name,
+            username = excluded.username,
+            updated_at = excluded.updated_at`,
+    args: [discordId, playerName, username, now()],
+  });
+}
+
+/** Look up a known Discord id for a player name, if we've ever seen them. */
+export async function getDiscordIdForPlayer(name: string): Promise<string | null> {
+  await ensureSocialSchema();
+  const rs = await client.execute({
+    sql: "SELECT discord_id FROM web_users WHERE player_name = ? ORDER BY updated_at DESC LIMIT 1",
+    args: [name],
+  });
+  return (rs.rows[0]?.discord_id as string) ?? null;
+}
 
 // --- player directory (from the real players table) ------------------------
 
@@ -383,12 +421,18 @@ export async function markNotificationsRead(meName: string): Promise<void> {
 
 // --- Discord DM outbox -----------------------------------------------------
 
-/** Queue a DM for the bot to deliver (target = player name; the bot resolves it
- *  to a guild member). See cogs/social.py. */
+/**
+ * Queue a DM for the bot to deliver. We store the target's Discord **user id**
+ * when we know it (so the bot can `fetch_user` reliably regardless of nickname
+ * or member-cache state); otherwise we fall back to the player name and let the
+ * bot resolve it by display name. `to_id` therefore holds either a numeric
+ * Discord id or a player name. See cogs/social.py.
+ */
 export async function enqueueDM(toName: string, message: string): Promise<void> {
   await ensureSocialSchema();
+  const discordId = await getDiscordIdForPlayer(toName);
   await client.execute({
     sql: "INSERT INTO discord_dm_outbox (to_id, message, sent, created_at) VALUES (?, ?, 0, ?)",
-    args: [toName, message, now()],
+    args: [discordId ?? toName, message, now()],
   });
 }
