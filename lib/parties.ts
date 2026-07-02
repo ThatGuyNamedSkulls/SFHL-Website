@@ -106,6 +106,12 @@ export async function getParty(id: string): Promise<Party | undefined> {
   return parties.find((p) => p.id === id);
 }
 
+/** Find the live party the given user belongs to, if any. */
+export async function getPartyForMember(discordId: string): Promise<Party | undefined> {
+  const parties = await getParties();
+  return parties.find((p) => p.members.some((m) => m.discordId === discordId));
+}
+
 /** Persist a single party (insert or update). */
 async function upsert(party: Party): Promise<void> {
   await ensureSchema();

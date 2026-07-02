@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getWebQueue, joinWebQueue, leaveWebQueue, isInWebQueue } from "@/lib/db";
+import { getPartyForMember } from "@/lib/parties";
 
 /** GET — returns current web queue state */
 export async function GET() {
@@ -46,10 +47,26 @@ export async function POST() {
       );
     }
 
-    await joinWebQueue(session.discordId, session.username, session.playerName);
+    // If the user is in a party, queue the whole party together — otherwise
+    // only the person who clicked would join. Matches the Discord behaviour
+    // where any party member joining queues everyone.
+    const party = await getPartyForMember(session.discordId);
+    const toQueue = party
+      ? party.members
+      : [
+          {
+            discordId: session.discordId,
+            username: session.username,
+            playerName: session.playerName,
+          },
+        ];
+    for (const m of toQueue) {
+      await joinWebQueue(m.discordId, m.username, m.playerName);
+    }
+
     const queue = await getWebQueue();
     return NextResponse.json({
-      message: "Joined queue successfully",
+      message: party ? "Party joined queue" : "Joined queue successfully",
       queue,
       count: queue.length,
     });
@@ -74,7 +91,17 @@ export async function DELETE() {
   }
 
   try {
-    await leaveWebQueue(session.discordId);
+    // Leaving as part of a party pulls the whole party out of the queue, the
+    // same way joining put them all in.
+    const party = await getPartyForMember(session.discordId);
+    if (party) {
+      for (const m of party.members) {
+        await leaveWebQueue(m.discordId);
+      }
+    } else {
+      await leaveWebQueue(session.discordId);
+    }
+
     const queue = await getWebQueue();
     return NextResponse.json({
       message: "Left queue",
