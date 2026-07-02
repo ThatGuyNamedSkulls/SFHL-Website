@@ -83,6 +83,62 @@ function ProfileContent() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<SubTab>("summary");
   const [filters, setFilters] = useState<MatchFilters>(DEFAULT_FILTERS);
+  const [myName, setMyName] = useState<string | null>(null);
+  const [friendState, setFriendState] = useState<"none" | "pending" | "friends">("none");
+  const [friendMsg, setFriendMsg] = useState<string | null>(null);
+
+  // Who am I, and is the profile I'm viewing already a friend / pending?
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const meRes = await fetch("/api/auth/me");
+        const me = (await meRes.json())?.user;
+        const name = me?.playerName ?? null;
+        setMyName(name);
+        if (!name || !playerNameParam || playerNameParam === name) return;
+        const fRes = await fetch("/api/friends");
+        if (!fRes.ok) return;
+        const data = await fRes.json();
+        if ((data.friends ?? []).some((f: { name: string }) => f.name === playerNameParam)) {
+          setFriendState("friends");
+        } else if ((data.outgoing ?? []).some((r: { name: string }) => r.name === playerNameParam)) {
+          setFriendState("pending");
+        } else {
+          setFriendState("none");
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    run();
+  }, [playerNameParam]);
+
+  const addFriend = async () => {
+    if (!player) return;
+    try {
+      const res = await fetch("/api/friends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toName: player.username }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFriendMsg(data.error || "Failed to add friend");
+      } else if (data.status === "friends") {
+        setFriendState("friends");
+        setFriendMsg("You're now friends!");
+      } else if (data.status === "exists") {
+        setFriendState("pending");
+        setFriendMsg("Request already sent.");
+      } else {
+        setFriendState("pending");
+        setFriendMsg("Friend request sent.");
+      }
+    } catch {
+      setFriendMsg("Failed to add friend");
+    }
+    setTimeout(() => setFriendMsg(null), 4000);
+  };
 
   useEffect(() => {
     const run = async () => {
@@ -225,13 +281,40 @@ function ProfileContent() {
             </div>
 
             <div className="flex items-center gap-2 w-full mt-4">
-              <button className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm hover:opacity-90 transition-opacity">
-                <UserPlus className="w-4 h-4" /> Add Friend
-              </button>
+              {myName && player.username === myName ? (
+                <Link
+                  href="/friends"
+                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg border border-hl-border text-white font-bold text-sm hover:bg-hl-panel-light transition-colors"
+                >
+                  <Users className="w-4 h-4" /> Your Friends
+                </Link>
+              ) : friendState === "friends" ? (
+                <button
+                  disabled
+                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-hl-green/15 text-hl-green border border-hl-green/30 font-bold text-sm cursor-default"
+                >
+                  <UserPlus className="w-4 h-4" /> Friends
+                </button>
+              ) : friendState === "pending" ? (
+                <button
+                  disabled
+                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg border border-hl-border text-hl-muted font-bold text-sm cursor-default"
+                >
+                  <UserPlus className="w-4 h-4" /> Requested
+                </button>
+              ) : (
+                <button
+                  onClick={addFriend}
+                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm hover:opacity-90 transition-opacity"
+                >
+                  <UserPlus className="w-4 h-4" /> Add Friend
+                </button>
+              )}
               <button className="p-2.5 rounded-lg border border-hl-border text-hl-muted hover:text-white hover:bg-hl-panel-light transition-colors">
                 <MoreHorizontal className="w-4 h-4" />
               </button>
             </div>
+            {friendMsg && <div className="mt-2 text-xs text-hl-gold">{friendMsg}</div>}
           </div>
 
           <div className="mt-5 pt-5 border-t border-hl-border">

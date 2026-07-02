@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getParties, createParty } from "@/lib/parties";
 import { memberFromSession } from "@/lib/party-member";
-import { getPartyInvitesFor } from "@/lib/social";
+import { getPartyInvitePartyIds } from "@/lib/social";
 
 /** GET — list live parties. Private parties are hidden unless you're a member
  *  or have a pending invite to them. */
@@ -10,9 +10,10 @@ export async function GET() {
   try {
     const session = await getSession();
     const parties = await getParties();
-    const invitedIds = session
-      ? new Set((await getPartyInvitesFor(session.discordId)).map((i) => i.partyId))
-      : new Set<string>();
+    const invitedIds =
+      session?.playerName
+        ? new Set(await getPartyInvitePartyIds(session.playerName))
+        : new Set<string>();
 
     const visible = parties.filter((p) => {
       if (!p.isPrivate) return true;

@@ -13,8 +13,8 @@ interface RailItem {
 const ITEMS: RailItem[] = [
   { href: "/queue", label: "Matchmaking", icon: Swords, accent: true },
   { href: "/party-finder", label: "Parties", icon: Users },
-  { href: "/matches", label: "Notifications", icon: Bell },
-  { href: "/leaderboards", label: "Add friend", icon: UserPlus },
+  { href: "/alerts", label: "Notifications", icon: Bell },
+  { href: "/friends", label: "Add friend", icon: UserPlus },
 ];
 
 /** Narrow right-edge icon rail (FACEIT-style). Hidden on small screens. */

@@ -14,10 +14,12 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/parties/[i
   try {
     const { id } = await ctx.params;
 
-    // Private parties are invite-only.
+    // Private parties are invite-only (invites are keyed on player name).
     const party = await getParty(id);
+    const myName = session.playerName;
     if (party?.isPrivate && !party.members.some((m) => m.discordId === session.discordId)) {
-      if (!(await hasPartyInvite(id, session.discordId))) {
+      const invited = myName ? await hasPartyInvite(id, myName) : false;
+      if (!invited) {
         return NextResponse.json(
           { error: "This party is private — you need an invite to join." },
           { status: 403 }
@@ -30,7 +32,7 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/parties/[i
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
     // Consume the invite once used.
-    await clearPartyInvite(id, session.discordId);
+    if (myName) await clearPartyInvite(id, myName);
     return NextResponse.json({ party: result });
   } catch (error) {
     console.error("Error joining party:", error);

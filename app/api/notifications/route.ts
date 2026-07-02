@@ -5,12 +5,12 @@ import { getNotifications, getUnreadCount, markNotificationsRead } from "@/lib/s
 /** GET — the current user's notifications + unread count. */
 export async function GET() {
   const session = await getSession();
-  if (!session) {
+  if (!session?.playerName) {
     return NextResponse.json({ notifications: [], unread: 0 });
   }
   const [notifications, unread] = await Promise.all([
-    getNotifications(session.discordId),
-    getUnreadCount(session.discordId),
+    getNotifications(session.playerName),
+    getUnreadCount(session.playerName),
   ]);
   return NextResponse.json({ notifications, unread });
 }
@@ -18,9 +18,9 @@ export async function GET() {
 /** POST — mark all of the current user's notifications as read. */
 export async function POST() {
   const session = await getSession();
-  if (!session) {
+  if (!session?.playerName) {
     return NextResponse.json({ error: "You must be logged in" }, { status: 401 });
   }
-  await markNotificationsRead(session.discordId);
+  await markNotificationsRead(session.playerName);
   return NextResponse.json({ ok: true });
 }

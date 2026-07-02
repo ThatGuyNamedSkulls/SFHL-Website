@@ -40,14 +40,10 @@ function PartyFinderContent() {
       if (!res.ok) return;
       const data = await res.json();
       setFriends(
-        (data.friends ?? []).map(
-          (f: { discord_id: string; username: string | null; player_name: string | null; avatar: string | null }) => ({
-            discordId: f.discord_id,
-            username: f.username,
-            playerName: f.player_name,
-            avatar: f.avatar,
-          })
-        )
+        (data.friends ?? []).map((f: { name: string; avatar: string | null }) => ({
+          name: f.name,
+          avatar: f.avatar,
+        }))
       );
     } catch {
       /* ignore */
@@ -65,12 +61,12 @@ function PartyFinderContent() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleInvite = async (partyId: string, friendId: string) => {
+  const handleInvite = async (partyId: string, friendName: string) => {
     try {
       const res = await fetch(`/api/parties/${partyId}/invite`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toId: friendId }),
+        body: JSON.stringify({ toName: friendName }),
       });
       const data = await res.json();
       setNotice(res.ok ? "Invite sent." : data.error || "Failed to invite.");

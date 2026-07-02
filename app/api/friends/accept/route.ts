@@ -2,16 +2,16 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { acceptFriendRequest } from "@/lib/social";
 
-/** POST { fromId } — accept the incoming friend request from `fromId`. */
+/** POST { fromName } — accept the incoming friend request from `fromName`. */
 export async function POST(request: Request) {
   const session = await getSession();
-  if (!session) {
+  if (!session?.playerName) {
     return NextResponse.json({ error: "You must be logged in" }, { status: 401 });
   }
-  const { fromId } = await request.json().catch(() => ({}));
-  if (!fromId || typeof fromId !== "string") {
-    return NextResponse.json({ error: "Missing requester id" }, { status: 400 });
+  const { fromName } = await request.json().catch(() => ({}));
+  if (!fromName || typeof fromName !== "string") {
+    return NextResponse.json({ error: "Missing requester" }, { status: 400 });
   }
-  await acceptFriendRequest(session.discordId, fromId);
+  await acceptFriendRequest(session.playerName, fromName);
   return NextResponse.json({ ok: true });
 }

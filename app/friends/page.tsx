@@ -5,53 +5,40 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserSession } from "@/types";
+import { RankBadge } from "@/components/rank-badge";
+import { UserSession, RankTierLetter } from "@/types";
 import { UserPlus, Users, Check, X, Search, UserMinus, Clock } from "lucide-react";
 
-interface WebUser {
-  discord_id: string;
-  username: string | null;
+interface Friend {
+  name: string;
   avatar: string | null;
-  player_name: string | null;
+  rank: string;
+  country: string | null;
 }
 interface RequestView {
-  id: string;
-  user: WebUser;
+  name: string;
+  friend: Friend;
   createdAt: number;
 }
 
-const label = (u: WebUser) => u.player_name || u.username || "Unknown";
-
-function UserRow({
-  user,
-  actions,
-}: {
-  user: WebUser;
-  actions: React.ReactNode;
-}) {
+function FriendRow({ friend, actions }: { friend: Friend; actions: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-hl-panel-light/40 transition-colors">
       <Avatar className="w-9 h-9 border border-hl-border shrink-0">
-        {user.avatar ? <AvatarImage src={user.avatar} /> : null}
+        {friend.avatar ? <AvatarImage src={friend.avatar} /> : null}
         <AvatarFallback className="bg-hl-panel-light text-xs font-bold text-hl-gold">
-          {label(user).slice(0, 2).toUpperCase()}
+          {friend.name.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
-        {user.player_name ? (
-          <Link
-            href={`/profile?player=${encodeURIComponent(user.player_name)}`}
-            className="text-sm font-semibold text-white truncate hover:text-hl-gold"
-          >
-            {user.player_name}
-          </Link>
-        ) : (
-          <span className="text-sm font-semibold text-white truncate">{label(user)}</span>
-        )}
-        {user.username && user.player_name && (
-          <div className="text-[11px] text-hl-muted truncate">@{user.username}</div>
-        )}
+        <Link
+          href={`/profile?player=${encodeURIComponent(friend.name)}`}
+          className="text-sm font-semibold text-white truncate hover:text-hl-gold"
+        >
+          {friend.name}
+        </Link>
       </div>
+      <RankBadge rank={(friend.rank || "UNRANKED") as RankTierLetter} size="sm" />
       <div className="flex items-center gap-2 shrink-0">{actions}</div>
     </div>
   );
@@ -59,11 +46,11 @@ function UserRow({
 
 export default function FriendsPage() {
   const [session, setSession] = useState<UserSession | null | undefined>(undefined);
-  const [friends, setFriends] = useState<WebUser[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [incoming, setIncoming] = useState<RequestView[]>([]);
   const [outgoing, setOutgoing] = useState<RequestView[]>([]);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<WebUser[]>([]);
+  const [results, setResults] = useState<Friend[]>([]);
   const [searching, setSearching] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -90,18 +77,20 @@ export default function FriendsPage() {
     return () => clearInterval(interval);
   }, [load]);
 
-  // Debounced user search.
+  // Debounced player search (all setState happens inside the timeout callback).
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    setSearching(true);
+    const q = query.trim();
     const t = setTimeout(async () => {
+      if (q.length < 2) {
+        setResults([]);
+        setSearching(false);
+        return;
+      }
+      setSearching(true);
       try {
-        const res = await fetch(`/api/friends/search?q=${encodeURIComponent(query.trim())}`);
+        const res = await fetch(`/api/friends/search?q=${encodeURIComponent(q)}`);
         const data = await res.json();
-        setResults(data.users ?? []);
+        setResults(data.players ?? []);
       } catch {
         setResults([]);
       } finally {
@@ -116,12 +105,11 @@ export default function FriendsPage() {
     setTimeout(() => setNotice(null), 4000);
   };
 
-  const sendRequest = async (toId: string) => {
-    const res = await fetch("/api/friends", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ toId }),
-    });
+  const post = (url: string, body: object) =>
+    fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+  const sendRequest = async (toName: string) => {
+    const res = await post("/api/friends", { toName });
     const data = await res.json();
     if (!res.ok) flash(data.error || "Failed to send request");
     else if (data.status === "friends") flash("You're now friends!");
@@ -130,50 +118,43 @@ export default function FriendsPage() {
     await load();
   };
 
-  const accept = async (fromId: string) => {
-    await fetch("/api/friends/accept", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fromId }),
-    });
+  const accept = async (fromName: string) => {
+    await post("/api/friends/accept", { fromName });
     await load();
   };
-
-  const reject = async (fromId: string) => {
-    await fetch("/api/friends/reject", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fromId }),
-    });
+  const reject = async (fromName: string) => {
+    await post("/api/friends/reject", { fromName });
     await load();
   };
-
-  const remove = async (id: string) => {
+  const remove = async (name: string) => {
     await fetch("/api/friends", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ name }),
     });
     await load();
   };
 
-  const outgoingIds = new Set(outgoing.map((r) => r.id));
-  const friendIds = new Set(friends.map((f) => f.discord_id));
+  const outgoingNames = new Set(outgoing.map((r) => r.name));
+  const friendNames = new Set(friends.map((f) => f.name));
 
   if (session === null) {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader icon={UserPlus} title="Friends" subtitle="Add friends and invite them to parties" />
-        <EmptyState
-          icon={UserPlus}
-          title="Log in to manage friends"
-          hint="Sign in with Discord to add friends and get party invites."
-        />
+        <EmptyState icon={UserPlus} title="Log in to manage friends" hint="Sign in with Discord to add friends and get party invites." />
         <div className="mt-4">
-          <Link href="/login" className="inline-flex px-5 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm">
-            Log in
-          </Link>
+          <Link href="/login" className="inline-flex px-5 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm">Log in</Link>
         </div>
+      </div>
+    );
+  }
+
+  if (session && !session.playerName) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <PageHeader icon={UserPlus} title="Friends" subtitle="Add friends and invite them to parties" />
+        <EmptyState icon={UserPlus} title="Link your player first" hint="Your Discord account isn't linked to an SFHL player yet. Ask an admin to add you, then you can add friends." />
       </div>
     );
   }
@@ -183,9 +164,7 @@ export default function FriendsPage() {
       <PageHeader icon={UserPlus} title="Friends" subtitle="Add friends and invite them to parties" />
 
       {notice && (
-        <div className="mb-4 px-4 py-3 rounded-lg bg-hl-gold/10 border border-hl-gold/30 text-hl-gold text-sm">
-          {notice}
-        </div>
+        <div className="mb-4 px-4 py-3 rounded-lg bg-hl-gold/10 border border-hl-gold/30 text-hl-gold text-sm">{notice}</div>
       )}
 
       {/* Add friends */}
@@ -207,17 +186,17 @@ export default function FriendsPage() {
               <div className="px-4 py-3 text-sm text-hl-muted">No players found.</div>
             ) : (
               results.map((u) => (
-                <UserRow
-                  key={u.discord_id}
-                  user={u}
+                <FriendRow
+                  key={u.name}
+                  friend={u}
                   actions={
-                    friendIds.has(u.discord_id) ? (
+                    friendNames.has(u.name) ? (
                       <span className="text-xs text-hl-muted">Friends</span>
-                    ) : outgoingIds.has(u.discord_id) ? (
+                    ) : outgoingNames.has(u.name) ? (
                       <span className="flex items-center gap-1 text-xs text-hl-muted"><Clock className="w-3.5 h-3.5" /> Pending</span>
                     ) : (
                       <button
-                        onClick={() => sendRequest(u.discord_id)}
+                        onClick={() => sendRequest(u.name)}
                         className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-md bg-gold-gradient text-hl-base hover:opacity-90"
                       >
                         <UserPlus className="w-3.5 h-3.5" /> Add
@@ -237,21 +216,15 @@ export default function FriendsPage() {
           <h2 className="text-sm font-bold text-white header-caps mb-2">Requests ({incoming.length})</h2>
           <div className="rounded-lg border border-hl-border bg-hl-panel divide-y divide-hl-border overflow-hidden">
             {incoming.map((r) => (
-              <UserRow
-                key={r.id}
-                user={r.user}
+              <FriendRow
+                key={r.name}
+                friend={r.friend}
                 actions={
                   <>
-                    <button
-                      onClick={() => accept(r.id)}
-                      className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-md bg-hl-green/15 text-hl-green border border-hl-green/30 hover:bg-hl-green/25"
-                    >
+                    <button onClick={() => accept(r.name)} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-md bg-hl-green/15 text-hl-green border border-hl-green/30 hover:bg-hl-green/25">
                       <Check className="w-3.5 h-3.5" /> Accept
                     </button>
-                    <button
-                      onClick={() => reject(r.id)}
-                      className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-md bg-hl-red/10 text-hl-red border border-hl-red/30 hover:bg-hl-red/20"
-                    >
+                    <button onClick={() => reject(r.name)} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-md bg-hl-red/10 text-hl-red border border-hl-red/30 hover:bg-hl-red/20">
                       <X className="w-3.5 h-3.5" /> Decline
                     </button>
                   </>
@@ -272,14 +245,11 @@ export default function FriendsPage() {
         ) : (
           <div className="rounded-lg border border-hl-border bg-hl-panel divide-y divide-hl-border overflow-hidden">
             {friends.map((f) => (
-              <UserRow
-                key={f.discord_id}
-                user={f}
+              <FriendRow
+                key={f.name}
+                friend={f}
                 actions={
-                  <button
-                    onClick={() => remove(f.discord_id)}
-                    className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-md border border-hl-border text-hl-muted hover:text-hl-red hover:border-hl-red/40"
-                  >
+                  <button onClick={() => remove(f.name)} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-md border border-hl-border text-hl-muted hover:text-hl-red hover:border-hl-red/40">
                     <UserMinus className="w-3.5 h-3.5" /> Remove
                   </button>
                 }
@@ -295,11 +265,7 @@ export default function FriendsPage() {
           <h2 className="text-sm font-bold text-white header-caps mb-2">Sent ({outgoing.length})</h2>
           <div className="rounded-lg border border-hl-border bg-hl-panel divide-y divide-hl-border overflow-hidden">
             {outgoing.map((r) => (
-              <UserRow
-                key={r.id}
-                user={r.user}
-                actions={<span className="flex items-center gap-1 text-xs text-hl-muted"><Clock className="w-3.5 h-3.5" /> Pending</span>}
-              />
+              <FriendRow key={r.name} friend={r.friend} actions={<span className="flex items-center gap-1 text-xs text-hl-muted"><Clock className="w-3.5 h-3.5" /> Pending</span>} />
             ))}
           </div>
         </section>

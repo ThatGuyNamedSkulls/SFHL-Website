@@ -71,7 +71,7 @@ export function NotificationsBell() {
       await fetch("/api/friends/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fromId: n.actorId }),
+        body: JSON.stringify({ fromName: n.actorId }),
       });
       await load();
     } finally {
@@ -86,7 +86,7 @@ export function NotificationsBell() {
       await fetch("/api/friends/reject", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fromId: n.actorId }),
+        body: JSON.stringify({ fromName: n.actorId }),
       });
       await load();
     } finally {

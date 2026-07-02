@@ -10,9 +10,7 @@ import { flagPath, countryName } from "@/lib/countries";
 import { Crown, Plus, Globe, Gamepad2, Mic, ShieldCheck, Users, Lock, UserPlus } from "lucide-react";
 
 export interface FriendOption {
-  discordId: string;
-  username: string | null;
-  playerName: string | null;
+  name: string;
   avatar: string | null;
 }
 
@@ -23,7 +21,7 @@ interface PartyCardProps {
   onLeave?: (id: string) => void;
   /** Friends the current user can invite (party-finder supplies these). */
   friends?: FriendOption[];
-  onInvite?: (partyId: string, friendId: string) => void;
+  onInvite?: (partyId: string, friendName: string) => void;
   busy?: boolean;
 }
 
@@ -68,7 +66,7 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onIn
 
   // Friends not already in this party — the invitable set.
   const invitable = (friends ?? []).filter(
-    (f) => !party.members.some((m) => m.discordId === f.discordId)
+    (f) => !party.members.some((m) => m.playerName === f.name)
   );
 
   return (
@@ -143,9 +141,9 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onIn
                   ) : (
                     invitable.map((f) => (
                       <button
-                        key={f.discordId}
+                        key={f.name}
                         onClick={() => {
-                          onInvite(party.id, f.discordId);
+                          onInvite(party.id, f.name);
                           setInviteOpen(false);
                         }}
                         className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-hl-panel-light/60"
@@ -153,10 +151,10 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onIn
                         <Avatar className="w-6 h-6 border border-hl-border">
                           {f.avatar ? <AvatarImage src={f.avatar} /> : null}
                           <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
-                            {(f.playerName || f.username || "?").slice(0, 2).toUpperCase()}
+                            {f.name.slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="truncate">{f.playerName || f.username || "Unknown"}</span>
+                        <span className="truncate">{f.name}</span>
                       </button>
                     ))
                   )}
