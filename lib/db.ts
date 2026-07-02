@@ -97,6 +97,25 @@ export async function setPlayerCountry(name: string, code: string): Promise<bool
   return rs.rowsAffected > 0;
 }
 
+/** The DB rank string for a brand-new (Elo 0) player — mirrors the bot's
+ *  get_rank(0). Reverse of RANK_DB_MAP["[?] Unranked"]. */
+const UNRANKED_DB_RANK = "[?] Unranked";
+
+/**
+ * Ensure a player row exists for this name, creating a fresh unranked one if
+ * not (same shape the bot's /addplayer produces: Elo 0, everything else
+ * defaulted). Returns the player row. Safe to call on every login.
+ */
+export async function ensurePlayer(name: string): Promise<DbPlayer | undefined> {
+  const existing = await getPlayer(name);
+  if (existing) return existing;
+  await client.execute({
+    sql: "INSERT OR IGNORE INTO players (name, elo, rank) VALUES (?, 0, ?)",
+    args: [name, UNRANKED_DB_RANK],
+  });
+  return getPlayer(name);
+}
+
 // ---------------------------------------------------------------------------
 // Match history queries
 // ---------------------------------------------------------------------------

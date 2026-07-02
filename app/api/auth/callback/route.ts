@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { DISCORD_CONFIG, encodeSession, isUserInGuildById, SESSION_COOKIE } from "@/lib/auth";
-import { getPlayer } from "@/lib/db";
+import { getPlayer, ensurePlayer } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
 import { avatarUrl } from "@/lib/format";
 
@@ -59,16 +59,25 @@ export async function GET(request: Request) {
         guildsData.some((g: { id: string }) => g.id === DISCORD_CONFIG.guildId);
     }
 
-    // Try to match Discord username to a player in the database
+    // Match the Discord display name to a player, creating a fresh unranked
+    // player on first login if none exists — so signing in auto-registers them
+    // in the SFHL database (matching how the bot keys players by display name).
     const displayName = userData.global_name || userData.username;
     let avatar = userData.avatar
       ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
       : null;
     let rank = "UNRANKED";
 
-    const playerData = await getPlayer(displayName);
+    let playerData = await getPlayer(displayName);
+    if (!playerData) {
+      try {
+        playerData = await ensurePlayer(displayName);
+      } catch (e) {
+        console.error("Failed to auto-create player on login:", e);
+      }
+    }
     const playerName = playerData ? playerData.name : null;
-    
+
     if (playerData) {
       if (playerData.roblox_avatar_image) {
         avatar = avatarUrl(playerData.roblox_avatar_image);
