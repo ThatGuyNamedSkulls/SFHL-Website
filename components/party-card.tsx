@@ -1,18 +1,29 @@
 "use client";
 
+import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { Flag } from "@/components/flag";
 import { PartyView, PartyMemberView, RankTierLetter } from "@/types";
 import { getRankForElo } from "@/data/ranks";
 import { flagPath, countryName } from "@/lib/countries";
-import { Crown, Plus, Globe, Gamepad2, Mic, ShieldCheck, Users } from "lucide-react";
+import { Crown, Plus, Globe, Gamepad2, Mic, ShieldCheck, Users, Lock, UserPlus } from "lucide-react";
+
+export interface FriendOption {
+  discordId: string;
+  username: string | null;
+  playerName: string | null;
+  avatar: string | null;
+}
 
 interface PartyCardProps {
   party: PartyView;
   currentUserId?: string;
   onJoin?: (id: string) => void;
   onLeave?: (id: string) => void;
+  /** Friends the current user can invite (party-finder supplies these). */
+  friends?: FriendOption[];
+  onInvite?: (partyId: string, friendId: string) => void;
   busy?: boolean;
 }
 
@@ -49,10 +60,16 @@ function MemberSlot({ member, isLeader }: { member: PartyMemberView; isLeader: b
   );
 }
 
-export function PartyCard({ party, currentUserId, onJoin, onLeave, busy }: PartyCardProps) {
+export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onInvite, busy }: PartyCardProps) {
   const inParty = !!currentUserId && party.members.some((m) => m.discordId === currentUserId);
   const full = party.members.length >= party.maxSize;
   const emptySlots = Math.max(0, party.maxSize - party.members.length);
+  const [inviteOpen, setInviteOpen] = useState(false);
+
+  // Friends not already in this party — the invitable set.
+  const invitable = (friends ?? []).filter(
+    (f) => !party.members.some((m) => m.discordId === f.discordId)
+  );
 
   return (
     <div className="party-card p-4">
@@ -60,6 +77,7 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, busy }: Party
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-bold text-white truncate flex items-center gap-2">
           <Users className="w-4 h-4 text-hl-muted" /> {party.name}
+          {party.isPrivate && <Lock className="w-3.5 h-3.5 text-hl-gold shrink-0" />}
         </h3>
         <span className="flex items-center gap-1.5 text-[10px] header-caps text-hl-muted border border-hl-border rounded-full pl-1.5 pr-2 py-0.5">
           <RankBadge rank={avgRank(party)} size="sm" className="!w-5 !h-5" />
@@ -108,6 +126,44 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, busy }: Party
 
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs text-hl-muted">{party.members.length}/{party.maxSize}</span>
+          {inParty && onInvite && !full && (
+            <div className="relative">
+              <button
+                onClick={() => setInviteOpen((o) => !o)}
+                className="flex items-center gap-1 text-xs font-bold px-3 py-2 rounded-lg border border-hl-border text-white hover:bg-hl-panel-light transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Invite
+              </button>
+              {inviteOpen && (
+                <div className="absolute right-0 bottom-full mb-2 w-56 max-h-64 overflow-y-auto rounded-lg border border-hl-border bg-hl-panel shadow-xl z-20 py-1">
+                  {invitable.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-hl-muted">
+                      {(friends ?? []).length === 0 ? "No friends to invite yet." : "All friends are in the party."}
+                    </div>
+                  ) : (
+                    invitable.map((f) => (
+                      <button
+                        key={f.discordId}
+                        onClick={() => {
+                          onInvite(party.id, f.discordId);
+                          setInviteOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-hl-panel-light/60"
+                      >
+                        <Avatar className="w-6 h-6 border border-hl-border">
+                          {f.avatar ? <AvatarImage src={f.avatar} /> : null}
+                          <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
+                            {(f.playerName || f.username || "?").slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate">{f.playerName || f.username || "Unknown"}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {inParty ? (
             <button
               onClick={() => onLeave?.(party.id)}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PartyCard } from "@/components/party-card";
+import { PartyCard, FriendOption } from "@/components/party-card";
 import { CreatePartyModal } from "@/components/create-party-modal";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -19,6 +19,8 @@ function PartyFinderContent() {
   const [gameFilter, setGameFilter] = useState("All");
   const [premiumOnly, setPremiumOnly] = useState(false);
   const [joinableOnly, setJoinableOnly] = useState(false);
+  const [friends, setFriends] = useState<FriendOption[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -32,8 +34,29 @@ function PartyFinderContent() {
     }
   };
 
+  const loadFriends = async () => {
+    try {
+      const res = await fetch("/api/friends");
+      if (!res.ok) return;
+      const data = await res.json();
+      setFriends(
+        (data.friends ?? []).map(
+          (f: { discord_id: string; username: string | null; player_name: string | null; avatar: string | null }) => ({
+            discordId: f.discord_id,
+            username: f.username,
+            playerName: f.player_name,
+            avatar: f.avatar,
+          })
+        )
+      );
+    } catch {
+      /* ignore */
+    }
+  };
+
   useEffect(() => {
     load();
+    loadFriends();
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((d) => setSession(d.user ?? null))
@@ -41,6 +64,21 @@ function PartyFinderContent() {
     const interval = setInterval(load, 8000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleInvite = async (partyId: string, friendId: string) => {
+    try {
+      const res = await fetch(`/api/parties/${partyId}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toId: friendId }),
+      });
+      const data = await res.json();
+      setNotice(res.ok ? "Invite sent." : data.error || "Failed to invite.");
+    } catch {
+      setNotice("Failed to invite.");
+    }
+    setTimeout(() => setNotice(null), 4000);
+  };
 
   // Open the create modal when arriving via the sidebar "Create" link.
   useEffect(() => {
@@ -84,6 +122,12 @@ function PartyFinderContent() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <PageHeader icon={Users} title="Party Finder" subtitle="Find teammates and squad up before you queue" />
+
+      {notice && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-hl-gold/10 border border-hl-gold/30 text-hl-gold text-sm">
+          {notice}
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -141,6 +185,8 @@ function PartyFinderContent() {
               currentUserId={session?.discordId}
               onJoin={handleJoin}
               onLeave={handleLeave}
+              friends={friends}
+              onInvite={handleInvite}
               busy={busyId === party.id}
             />
           ))}

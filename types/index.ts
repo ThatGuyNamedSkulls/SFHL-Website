@@ -248,6 +248,7 @@ export interface PartyView {
   countries: string;
   verifiedOnly: boolean;
   voiceRequired: boolean;
+  isPrivate?: boolean;
   createdAt: number;
   updatedAt: number;
 }

@@ -45,6 +45,8 @@ export interface Party {
   countries: string;
   verifiedOnly: boolean;
   voiceRequired: boolean;
+  /** Invite-only: hidden from the public party list, joinable only via invite. */
+  isPrivate: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -139,6 +141,7 @@ export interface CreatePartyInput {
   countries?: string;
   verifiedOnly?: boolean;
   voiceRequired?: boolean;
+  isPrivate?: boolean;
   leader: PartyMember;
 }
 
@@ -173,6 +176,7 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
     countries: input.countries || "Any",
     verifiedOnly: !!input.verifiedOnly,
     voiceRequired: !!input.voiceRequired,
+    isPrivate: !!input.isPrivate,
     createdAt: now,
     updatedAt: now,
   };

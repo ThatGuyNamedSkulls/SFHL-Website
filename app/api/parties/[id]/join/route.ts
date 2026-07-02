@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { joinParty } from "@/lib/parties";
+import { getParty, joinParty } from "@/lib/parties";
 import { memberFromSession } from "@/lib/party-member";
+import { clearPartyInvite, hasPartyInvite } from "@/lib/social";
 
-/** POST — join a party (requires auth). */
+/** POST — join a party (requires auth). Private parties require an invite. */
 export async function POST(_request: Request, ctx: RouteContext<"/api/parties/[id]/join">) {
   const session = await getSession();
   if (!session) {
@@ -12,10 +13,24 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/parties/[i
 
   try {
     const { id } = await ctx.params;
+
+    // Private parties are invite-only.
+    const party = await getParty(id);
+    if (party?.isPrivate && !party.members.some((m) => m.discordId === session.discordId)) {
+      if (!(await hasPartyInvite(id, session.discordId))) {
+        return NextResponse.json(
+          { error: "This party is private — you need an invite to join." },
+          { status: 403 }
+        );
+      }
+    }
+
     const result = await joinParty(id, await memberFromSession(session));
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
+    // Consume the invite once used.
+    await clearPartyInvite(id, session.discordId);
     return NextResponse.json({ party: result });
   } catch (error) {
     console.error("Error joining party:", error);

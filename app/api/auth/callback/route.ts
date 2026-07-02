@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { DISCORD_CONFIG, encodeSession, isUserInGuildById, SESSION_COOKIE } from "@/lib/auth";
 import { getPlayer } from "@/lib/db";
+import { upsertWebUser } from "@/lib/social";
 import { avatarUrl } from "@/lib/format";
 
 export async function GET(request: Request) {
@@ -84,6 +85,19 @@ export async function GET(request: Request) {
       playerName,
       inGuild,
     };
+
+    // Keep the user directory current so friend search / friend & party lists
+    // can resolve this user's name and avatar. Non-fatal if it fails.
+    try {
+      await upsertWebUser({
+        discord_id: session.discordId,
+        username: session.username,
+        avatar: session.avatar,
+        player_name: session.playerName,
+      });
+    } catch (e) {
+      console.error("Failed to upsert web_user:", e);
+    }
 
     const jwt = await encodeSession(session);
 

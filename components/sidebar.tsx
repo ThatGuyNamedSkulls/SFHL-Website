@@ -5,16 +5,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserSession } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { NotificationsBell } from "@/components/notifications-bell";
 import {
   Search,
   Users,
+  UserPlus,
   Play,
   BarChart3,
   TrendingUp,
   Rss,
   Building2,
   Plus,
-  Bell,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -34,6 +35,7 @@ interface NavItem {
 const TOP_NAV: NavItem[] = [
   { href: "/leaderboards", label: "Search", icon: Search, owns: false },
   { href: "/party-finder", label: "Party Finder", icon: Users, owns: true },
+  { href: "/friends", label: "Friends", icon: UserPlus, owns: true },
   { href: "/queue", label: "Play", icon: Play, owns: true },
   { href: "/leaderboards", label: "Rank", icon: BarChart3, owns: true },
   { href: "/profile", label: "Track", icon: TrendingUp, owns: true },
@@ -125,15 +127,7 @@ export function Sidebar() {
 
       {/* Bottom section: notifications + user */}
       <div className="shrink-0 border-t border-hl-border py-3 flex flex-col gap-0.5">
-        <button
-          className="hl-nav-item flex items-center gap-4 h-11 px-4 rounded-md mx-1 text-hl-muted hover:text-white hover:bg-hl-panel-light/40"
-          title="Notifications"
-        >
-          <Bell className="w-5 h-5 shrink-0" />
-          <span className="text-sm font-semibold whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-150">
-            Alerts
-          </span>
-        </button>
+        <NotificationsBell />
 
         <Link
           href="/settings"

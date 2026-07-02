@@ -38,6 +38,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
   const [countries, setCountries] = useState("Any");
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [voiceRequired, setVoiceRequired] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +61,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
           countries,
           verifiedOnly,
           voiceRequired,
+          isPrivate,
         }),
       });
       const data = await res.json();
@@ -212,6 +214,10 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
               <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
                 <input type="checkbox" checked={voiceRequired} onChange={(e) => setVoiceRequired(e.target.checked)} className="accent-hl-gold" />
                 Voice required
+              </label>
+              <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="accent-hl-gold" />
+                Private (invite-only)
               </label>
             </div>
 

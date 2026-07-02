@@ -93,13 +93,26 @@ function ProfileContent() {
       try {
         let target = playerNameParam;
         if (!target) {
-          const topRes = await fetch("/api/players?limit=1");
-          const top = await topRes.json();
-          if (Array.isArray(top) && top.length > 0) target = top[0].username;
-          else {
-            setError("No players found");
+          // No ?player= → show the logged-in user's own tracker, not the #1 player.
+          const meRes = await fetch("/api/auth/me");
+          const me = await meRes.json();
+          if (me?.user?.playerName) {
+            target = me.user.playerName;
+          } else if (me?.user) {
+            // Logged in but Discord account isn't linked to an SFHL player yet.
+            setError("Your Discord account isn't linked to an SFHL player yet. Ask an admin to add you.");
             setLoading(false);
             return;
+          } else {
+            // Not logged in — fall back to the top player so the page still shows something.
+            const topRes = await fetch("/api/players?limit=1");
+            const top = await topRes.json();
+            if (Array.isArray(top) && top.length > 0) target = top[0].username;
+            else {
+              setError("No players found");
+              setLoading(false);
+              return;
+            }
           }
         }
         const res = await fetch(`/api/players/${encodeURIComponent(target!)}`);
