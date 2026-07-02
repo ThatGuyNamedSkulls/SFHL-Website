@@ -25,6 +25,23 @@ interface PlayerInfo {
   country: string | null;
 }
 
+// Minimal shape of the party API response (avoids importing lib/parties, which
+// pulls in server-only deps).
+interface PartyMemberLite {
+  discordId: string;
+  username: string;
+  playerName: string | null;
+  avatar: string | null;
+  rank: string;
+  elo: number;
+  country: string | null;
+}
+interface PartyLite {
+  id: string;
+  leaderId: string;
+  members: PartyMemberLite[];
+}
+
 const MATCH_TYPES = [
   { id: "standard", label: "Standard", desc: "Balanced 5v5 ranked" },
   { id: "super", label: "Super", desc: "Higher ELO stakes" },
@@ -34,6 +51,7 @@ const MATCH_TYPES = [
 export default function QueuePage() {
   const [session, setSession] = useState<UserSession | null>(null);
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
+  const [party, setParty] = useState<PartyLite | null>(null);
   const [queue, setQueue] = useState<WebQueueEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -43,11 +61,24 @@ export default function QueuePage() {
   useEffect(() => {
     const fetchQueue = async () => {
       try {
-        const [qRes, sRes] = await Promise.all([fetch("/api/queue"), fetch("/api/auth/me")]);
+        const [qRes, sRes, pRes] = await Promise.all([
+          fetch("/api/queue"),
+          fetch("/api/auth/me"),
+          fetch("/api/parties"),
+        ]);
         const qData = await qRes.json();
         setQueue(qData.queue || []);
         const sData = await sRes.json();
-        if (sData.user) setSession(sData.user);
+        const me = sData.user as UserSession | undefined;
+        if (me) setSession(me);
+        // Find the party this user belongs to, so we can show teammates in the lobby.
+        const pData = await pRes.json();
+        const mine = me
+          ? (pData.parties as PartyLite[] | undefined)?.find((p) =>
+              p.members.some((m) => m.discordId === me.discordId)
+            )
+          : null;
+        setParty(mine ?? null);
         setLoading(false);
       } catch (err) {
         console.error("Queue poll error:", err);
@@ -102,7 +133,9 @@ export default function QueuePage() {
     }
   };
 
-  // Build the lobby: you in the center slot + any other web-queue players.
+  // Build the lobby. If the user is in a party, show the whole party (leader
+  // first); otherwise just show the logged-in user. Your own slot prefers your
+  // freshly-fetched rank/avatar over the (possibly stale) party snapshot.
   const you: LobbyMember | null = session
     ? {
       username: session.playerName || session.username,
@@ -113,7 +146,24 @@ export default function QueuePage() {
     }
     : null;
 
-  const lobbyMembers: LobbyMember[] = you ? [you] : [];
+  let lobbyMembers: LobbyMember[];
+  if (party && session) {
+    const ordered = [...party.members].sort((a, b) =>
+      a.discordId === party.leaderId ? -1 : b.discordId === party.leaderId ? 1 : 0
+    );
+    lobbyMembers = ordered.map((m) => {
+      const isMe = m.discordId === session.discordId;
+      return {
+        username: m.playerName || m.username,
+        avatar: (isMe ? player?.avatarUrl || session.avatar : m.avatar) ?? null,
+        rank: ((isMe ? player?.rank : undefined) ?? m.rank) as RankTierLetter,
+        leader: m.discordId === party.leaderId,
+        country: (isMe ? player?.country ?? m.country : m.country) ?? null,
+      };
+    });
+  } else {
+    lobbyMembers = you ? [you] : [];
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
