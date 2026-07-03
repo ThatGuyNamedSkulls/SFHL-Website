@@ -12,16 +12,19 @@ import { ConsistencyDonut } from "@/components/consistency-donut";
 import { EloGraphFaceit } from "@/components/elo-graph-faceit";
 import { ActivityHeatmap } from "@/components/activity-heatmap";
 import { MapStatsTable } from "@/components/map-stats-table";
+import { MetricChart } from "@/components/metric-chart";
+import { ProfileInventory } from "@/components/profile-inventory";
 import { EmptyState } from "@/components/empty-state";
 import { Flag } from "@/components/flag";
+import { flagPath, countryName as countryLabel } from "@/lib/countries";
 import {
   StatsFilters,
   DEFAULT_FILTERS,
   applyMatchFilters,
   MatchFilters,
 } from "@/components/stats-filters";
-import { RANK_TIERS } from "@/data/ranks";
-import { Player, Match, RankTierLetter, ProfileCosmetics } from "@/types";
+import { RANK_TIERS, getRankByLetter, getNextRank } from "@/data/ranks";
+import { Player, Match, RankTierLetter, ProfileCosmetics, InventoryItem } from "@/types";
 import {
   Settings,
   MoreHorizontal,
@@ -33,9 +36,18 @@ import {
   ListChecks,
   ArrowUpRight,
   Award,
+  Globe,
 } from "lucide-react";
 
+type MainTab = "games" | "friends" | "inventory";
 type SubTab = "summary" | "matches" | "stats";
+
+interface ProfileFriend {
+  name: string;
+  avatar: string | null;
+  rank: string;
+  country: string | null;
+}
 
 interface ProfilePlayer extends Player {
   playedWith?: { name: string; count: number }[];
@@ -45,6 +57,9 @@ interface ProfilePlayer extends Player {
   countryName?: string | null;
   countryFlag?: string | null;
   cosmetics?: ProfileCosmetics;
+  friends?: ProfileFriend[];
+  inventory?: InventoryItem[];
+  rankings?: { overall: number | null; country: number | null };
 }
 
 /** Equipped badge icon with a lucide fallback when the asset is missing. */
@@ -62,7 +77,7 @@ function ProfileBadgeIcon({
         src={badge.asset}
         alt={badge.name}
         title={tooltip}
-        className="w-7 h-7 object-contain"
+        className="w-8 h-8 object-contain"
         onError={() => setBroken(true)}
       />
     );
@@ -70,26 +85,30 @@ function ProfileBadgeIcon({
   return (
     <span
       title={tooltip}
-      className="w-7 h-7 rounded-full bg-hl-gold/10 border border-hl-gold/30 flex items-center justify-center"
+      className="w-8 h-8 rounded-full bg-hl-gold/10 border border-hl-gold/30 flex items-center justify-center"
     >
       <Award className="w-4 h-4 text-hl-gold" />
     </span>
   );
 }
 
-interface LbPlayer {
-  username: string;
-  stats: { kd: number; winPercent: number; headshotPercent: number; scorePerGame: number };
-}
+/** Ladder of ranked tiers shown on the Stats tab (with elo thresholds). */
+const LADDER = RANK_TIERS.filter((t) =>
+  ["D", "C", "B", "A1", "A2", "A3", "S1", "S2", "S3"].includes(t.letter)
+);
 
-const ICON_TIERS: RankTierLetter[] = ["D", "C", "B", "A1", "A2", "A3", "S1", "S2", "S3"];
-
-/** percentile (0–100) of `value` within `all`. */
-function percentile(value: number, all: number[]): number {
-  if (all.length === 0) return 50;
-  const below = all.filter((v) => v < value).length;
-  return Math.round((below / all.length) * 100);
-}
+/** FACEIT-style ladder progression colors: white → green → yellow → orange → red. */
+const LADDER_COLORS: Record<string, string> = {
+  D: "#e8e8e8",
+  C: "#4ade80",
+  B: "#22c55e",
+  A1: "#facc15",
+  A2: "#eab308",
+  A3: "#f59e0b",
+  S1: "#f97316",
+  S2: "#ef4444",
+  S3: "#dc2626",
+};
 
 function ProfileSkeleton() {
   return (
@@ -110,9 +129,9 @@ function ProfileContent() {
 
   const [player, setPlayer] = useState<ProfilePlayer | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [allPlayers, setAllPlayers] = useState<LbPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mainTab, setMainTab] = useState<MainTab>("games");
   const [tab, setTab] = useState<SubTab>("summary");
   const [filters, setFilters] = useState<MatchFilters>(DEFAULT_FILTERS);
   const [myName, setMyName] = useState<string | null>(null);
@@ -145,26 +164,25 @@ function ProfileContent() {
     run();
   }, [playerNameParam]);
 
-  const addFriend = async () => {
-    if (!player) return;
+  const addFriendByName = async (toName: string, updateHeader: boolean) => {
     try {
       const res = await fetch("/api/friends", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toName: player.username }),
+        body: JSON.stringify({ toName }),
       });
       const data = await res.json();
       if (!res.ok) {
         setFriendMsg(data.error || "Failed to add friend");
       } else if (data.status === "friends") {
-        setFriendState("friends");
-        setFriendMsg("You're now friends!");
+        if (updateHeader) setFriendState("friends");
+        setFriendMsg(`You're now friends with ${toName}!`);
       } else if (data.status === "exists") {
-        setFriendState("pending");
+        if (updateHeader) setFriendState("pending");
         setFriendMsg("Request already sent.");
       } else {
-        setFriendState("pending");
-        setFriendMsg("Friend request sent.");
+        if (updateHeader) setFriendState("pending");
+        setFriendMsg(`Friend request sent to ${toName}.`);
       }
     } catch {
       setFriendMsg("Failed to add friend");
@@ -177,6 +195,7 @@ function ProfileContent() {
       setLoading(true);
       setError(null);
       setFilters(DEFAULT_FILTERS);
+      setMainTab("games");
       setTab("summary");
       try {
         let target = playerNameParam;
@@ -220,10 +239,6 @@ function ProfileContent() {
       }
     };
     run();
-    fetch("/api/players")
-      .then((r) => r.json())
-      .then((d) => Array.isArray(d) && setAllPlayers(d))
-      .catch(() => { });
   }, [playerNameParam]);
 
   const mapsList = useMemo(() => Array.from(new Set(matches.map((m) => m.map))).sort(), [matches]);
@@ -255,25 +270,9 @@ function ProfileContent() {
     }
 
     const avgSwing = n > 0 ? swingSeries.reduce((a, b) => a + Math.abs(b), 0) / n : 0;
-    const lastKd = kdSeries.length ? kdSeries[kdSeries.length - 1] : 0;
 
-    return { kdSeries, swingSeries, consistency, longestWin, avgSwing, lastKd };
+    return { kdSeries, swingSeries, consistency, longestWin, avgSwing };
   }, [matches]);
-
-  // Percentile comparisons against the whole player base.
-  const percentiles = useMemo(() => {
-    if (!player) return null;
-    const kds = allPlayers.map((p) => p.stats.kd).filter((v) => v > 0);
-    const wins = allPlayers.map((p) => p.stats.winPercent);
-    const hs = allPlayers.map((p) => p.stats.headshotPercent).filter((v) => v > 0);
-    const scores = allPlayers.map((p) => p.stats.scorePerGame).filter((v) => v > 0);
-    return {
-      kd: percentile(player.stats.kd, kds),
-      winPercent: percentile(player.stats.winPercent, wins),
-      headshotPercent: percentile(player.stats.headshotPercent, hs),
-      scorePerGame: percentile(player.stats.scorePerGame, scores),
-    };
-  }, [player, allPlayers]);
 
   if (loading) return <ProfileSkeleton />;
 
@@ -287,118 +286,181 @@ function ProfileContent() {
   }
 
   const s = player.stats;
+  const isOwn = !!myName && player.username === myName;
   const krRatio = s.matchesPlayed > 0 ? s.kills / (s.matchesPlayed * 24) : 0; // approx kills/round
-  const killsPerMatch = s.matchesPlayed > 0 ? s.kills / s.matchesPlayed : 0;
-  const currentTierIdx = ICON_TIERS.indexOf(player.rank);
+  const cardArt = player.cosmetics?.card?.asset ?? null;
+  const memberSince = matches.length > 0 ? matches[matches.length - 1].date : null;
+  // Ladder position: STAR sits above the whole ladder, UNRANKED below it (-1).
+  const currentTierIdx =
+    player.rank === "STAR" ? LADDER.length : LADDER.findIndex((t) => t.letter === player.rank);
+  const tierColor = getRankByLetter(player.rank).color;
+  const nextTier = getNextRank(player.rank);
+  const eloNeeded =
+    currentTierIdx >= 0 && nextTier && nextTier.minElo > player.elo
+      ? nextTier.minElo - player.elo
+      : null;
+  const overallRank = player.rankings?.overall ?? null;
+  const countryRank = player.rankings?.country ?? null;
+  const friends = player.friends ?? [];
+  const inventory = player.inventory ?? [];
+
+  const statTiles = [
+    { label: "Wins %", value: `${s.winPercent.toFixed(0)}%` },
+    { label: "K/D/A", value: `${Math.round(s.kills / Math.max(1, s.matchesPlayed))}/${Math.round(s.deaths / Math.max(1, s.matchesPlayed))}/${Math.round(s.assists / Math.max(1, s.matchesPlayed))}` },
+    { label: "K/D", value: s.kd.toFixed(2) },
+    { label: "K/R", value: krRatio.toFixed(2) },
+    { label: "HS %", value: `${s.headshotPercent.toFixed(0)}%` },
+    { label: "Score", value: s.scorePerGame.toString() },
+  ];
+
+  const performanceRow = (
+    <div className="grid sm:grid-cols-3 gap-4">
+      <PerformanceCard label="K/D" value={s.kd.toFixed(2)} series={derived.kdSeries} accent="teal" />
+      <PerformanceCard label="Avg Swing" value={`±${derived.avgSwing.toFixed(0)}`} series={derived.swingSeries} accent="gold" />
+      <Card className="bg-hl-panel border-hl-border p-4 flex items-center justify-center">
+        <ConsistencyDonut percent={derived.consistency} />
+      </Card>
+    </div>
+  );
+
+  const statTileRow = (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {statTiles.map((stat) => (
+        <div key={stat.label} className="bg-hl-panel border border-hl-border rounded-xl p-3 text-center">
+          <div className="stat-number text-lg text-white">{stat.value}</div>
+          <div className="text-[10px] text-hl-muted header-caps mt-0.5">{stat.label}</div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid lg:grid-cols-[300px_1fr] gap-6 items-start">
-      {/* ================= LEFT SIDEBAR CARD ================= */}
+      {/* ================= LEFT SIDEBAR ================= */}
       <div className="space-y-4">
-        <Card className="bg-hl-panel border-hl-border p-5 relative overflow-hidden">
-          {/* Header + badges sit on the full-bleed equipped card art, which
-              fades into the panel right where the bio starts (FACEIT-style). */}
-          <div className="relative -mx-5 -mt-5 px-5 pt-5">
-          {player.cosmetics?.card?.asset && (
-            <div className="absolute inset-0 pointer-events-none">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={player.cosmetics.card.asset}
-                alt=""
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.currentTarget.parentElement as HTMLElement).style.display = "none";
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-hl-panel/40 to-hl-panel" />
-            </div>
-          )}
-          <div
-            className={`flex flex-col items-center text-center relative z-10 ${
-              player.cosmetics?.card?.asset ? "pt-10" : ""
-            }`}
-          >
-            <Avatar className="w-28 h-28 border-4 border-hl-border shadow-xl mb-4">
-              {player.avatarUrl ? <AvatarImage src={player.avatarUrl} alt={player.username} /> : null}
-              <AvatarFallback className="bg-hl-panel-light text-2xl font-bold text-hl-gold">
-                {player.username.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex items-center gap-2">
-              {player.countryFlag && <Flag src={player.countryFlag} name={player.countryName} className="w-6 h-4" />}
-              <h1 className="text-xl font-black text-white">{player.username}</h1>
-              <Link href="/settings" className="text-hl-muted hover:text-white"><Settings className="w-4 h-4" /></Link>
-            </div>
-            {/* Equipped title */}
-            {player.cosmetics?.title && (
-              <div className="text-xs font-semibold italic text-hl-gold mt-0.5">
-                {player.cosmetics.title}
-              </div>
+        {/* Portrait profile card (equipped card art as full background) */}
+        <Card className="bg-hl-panel border-hl-border p-0 overflow-hidden">
+          <div className="relative aspect-[3/4]">
+            {cardArt ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={cardArt}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-hl-panel" />
+              </>
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-b from-hl-panel-light to-hl-base" />
             )}
-            <div className="flex items-center gap-1.5 text-xs text-hl-muted mt-1">
-              <MapPin className="w-3.5 h-3.5" /> {player.countryName || player.region} · HyperLeague
-            </div>
-
-            <div className="flex items-center gap-2 w-full mt-4">
-              {myName && player.username === myName ? (
-                <Link
-                  href="/friends"
-                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg border border-hl-border text-white font-bold text-sm hover:bg-hl-panel-light transition-colors"
-                >
-                  <Users className="w-4 h-4" /> Your Friends
-                </Link>
-              ) : friendState === "friends" ? (
-                <button
-                  disabled
-                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-hl-green/15 text-hl-green border border-hl-green/30 font-bold text-sm cursor-default"
-                >
-                  <UserPlus className="w-4 h-4" /> Friends
-                </button>
-              ) : friendState === "pending" ? (
-                <button
-                  disabled
-                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg border border-hl-border text-hl-muted font-bold text-sm cursor-default"
-                >
-                  <UserPlus className="w-4 h-4" /> Requested
-                </button>
-              ) : (
-                <button
-                  onClick={addFriend}
-                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm hover:opacity-90 transition-opacity"
-                >
-                  <UserPlus className="w-4 h-4" /> Add Friend
-                </button>
+            <div className="relative h-full flex flex-col items-center justify-center px-4 text-center">
+              <Avatar className="w-28 h-28 border-4 border-hl-base/70 shadow-xl">
+                {player.avatarUrl ? <AvatarImage src={player.avatarUrl} alt={player.username} /> : null}
+                <AvatarFallback className="bg-hl-panel-light text-2xl font-bold text-hl-gold">
+                  {player.username.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2 mt-4">
+                <h1 className="text-xl font-black text-white drop-shadow">{player.username}</h1>
+                {isOwn && (
+                  <Link href="/settings" className="text-hl-muted hover:text-white">
+                    <Settings className="w-4 h-4" />
+                  </Link>
+                )}
+              </div>
+              {player.cosmetics?.title && (
+                <div className="text-xs font-semibold italic text-hl-gold mt-1 drop-shadow">
+                  {player.cosmetics.title}
+                </div>
               )}
-              <button className="p-2.5 rounded-lg border border-hl-border text-hl-muted hover:text-white hover:bg-hl-panel-light transition-colors">
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
             </div>
-            {friendMsg && <div className="mt-2 text-xs text-hl-gold">{friendMsg}</div>}
           </div>
 
-          {/* Equipped badges */}
-          {player.cosmetics && player.cosmetics.badges.length > 0 && (
-            <div className="mt-5 pt-5 border-t border-hl-border relative z-10">
-              <div className="text-[11px] header-caps text-hl-muted mb-2">Badges</div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {player.cosmetics.badges.map((b) => (
-                  <ProfileBadgeIcon key={b.slug} badge={b} />
-                ))}
-              </div>
+          {/* Action row */}
+          <div className="p-4 flex items-center gap-2 border-t border-hl-border">
+            {isOwn ? (
+              <Link
+                href="/friends"
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg border border-hl-border text-white font-bold text-sm hover:bg-hl-panel-light transition-colors"
+              >
+                <Users className="w-4 h-4" /> Your Friends
+              </Link>
+            ) : friendState === "friends" ? (
+              <button
+                disabled
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-hl-green/15 text-hl-green border border-hl-green/30 font-bold text-sm cursor-default"
+              >
+                <UserPlus className="w-4 h-4" /> Friends
+              </button>
+            ) : friendState === "pending" ? (
+              <button
+                disabled
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg border border-hl-border text-hl-muted font-bold text-sm cursor-default"
+              >
+                <UserPlus className="w-4 h-4" /> Requested
+              </button>
+            ) : (
+              <button
+                onClick={() => addFriendByName(player.username, true)}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm hover:opacity-90 transition-opacity"
+              >
+                <UserPlus className="w-4 h-4" /> Add Friend
+              </button>
+            )}
+            <button className="p-2.5 rounded-lg border border-hl-border text-hl-muted hover:text-white hover:bg-hl-panel-light transition-colors">
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </div>
+          {friendMsg && <div className="px-4 pb-3 text-xs text-hl-gold">{friendMsg}</div>}
+        </Card>
+
+        {/* Member info */}
+        <Card className="bg-hl-panel border-hl-border p-5 space-y-3">
+          <div className="text-sm font-bold text-white">
+            {memberSince ? `Member since ${memberSince}` : "Member of Season 1"}
+          </div>
+          <p className="text-sm text-hl-muted">
+            Competing in HyperLeague Season 1. Grinding the ladder one match at a time.
+          </p>
+          {player.countryFlag && (
+            <div className="flex items-center gap-2 text-sm text-hl-muted">
+              <Flag src={player.countryFlag} name={player.countryName} className="w-5 h-3.5" />
+              {player.countryName}
             </div>
           )}
-          </div>
+        </Card>
 
-          <div className="mt-5 pt-5 border-t border-hl-border">
-            <div className="text-[11px] header-caps text-hl-muted mb-1">Bio</div>
-            <p className="text-sm text-hl-muted">
-              Competing in HyperLeague Season 1. Grinding the ladder one match at a time.
-            </p>
-          </div>
+        {/* Equipped badges */}
+        {player.cosmetics && player.cosmetics.badges.length > 0 && (
+          <Card className="bg-hl-panel border-hl-border p-5">
+            <div className="flex items-center gap-2 flex-wrap">
+              {player.cosmetics.badges.map((b) => (
+                <ProfileBadgeIcon key={b.slug} badge={b} />
+              ))}
+            </div>
+            <button
+              onClick={() => setMainTab("inventory")}
+              className="mt-3 text-[11px] header-caps text-hl-muted hover:text-white transition-colors"
+            >
+              View all
+            </button>
+          </Card>
+        )}
 
-          <div className="mt-4 flex items-center justify-between text-sm">
-            <span className="text-hl-muted">Matches Played</span>
-            <span className="font-bold text-white stat-number">{s.matchesPlayed}</span>
+        {/* Activity heatmap */}
+        <Card className="bg-hl-panel border-hl-border p-5">
+          <h3 className="text-sm font-bold text-white mb-1">
+            Recent Activity <span className="text-hl-muted font-normal text-xs">Last 90 days</span>
+          </h3>
+          <div className="mt-3">
+            <ActivityHeatmap dates={matches.map((m) => m.date)} />
+          </div>
+          <div className="mt-3 text-xs text-hl-muted">
+            <b className="text-white stat-number">{s.matchesPlayed}</b> Matches Played
           </div>
         </Card>
 
@@ -431,269 +493,399 @@ function ProfileContent() {
             <p className="text-sm text-hl-muted">No shared matches recorded yet.</p>
           )}
         </Card>
-
-        {/* Activity heatmap */}
-        <Card className="bg-hl-panel border-hl-border p-5">
-          <h3 className="text-sm font-bold text-white header-caps mb-4">Recent Activity</h3>
-          <ActivityHeatmap dates={matches.map((m) => m.date)} />
-        </Card>
       </div>
 
       {/* ================= RIGHT CONTENT ================= */}
       <div className="space-y-6 min-w-0">
-        {/* Sub-tabs + game selector */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hl-border">
-          <div className="flex items-center gap-6">
-            {(["summary", "matches", "stats"] as SubTab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`pb-3 text-sm header-caps border-b-2 transition-colors ${tab === t ? "text-hl-gold border-hl-gold" : "text-hl-muted border-transparent hover:text-white"
-                  }`}
-              >
-                {t === "summary" ? "Summary" : t === "matches" ? "Match History" : "Stats"}
-              </button>
-            ))}
-          </div>
-          <span className="text-sm text-hl-muted pb-3">Blox Strike</span>
+        {/* Top-level tabs (FACEIT: GAMES / FRIENDS / INVENTORY) */}
+        <div className="flex items-center gap-6 border-b border-hl-border">
+          {(
+            [
+              { id: "games", label: "Games" },
+              { id: "friends", label: `Friends` },
+              { id: "inventory", label: "Inventory" },
+            ] as { id: MainTab; label: string }[]
+          ).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setMainTab(t.id)}
+              className={`pb-3 text-sm header-caps border-b-2 transition-colors ${
+                mainTab === t.id ? "text-hl-gold border-hl-gold" : "text-hl-muted border-transparent hover:text-white"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {/* ---------------- SUMMARY ---------------- */}
-        {tab === "summary" && (
-          <div className="space-y-6">
-            {/* Season + skill level */}
-            <Card className="relative overflow-hidden bg-hl-panel border-hl-border p-6">
-              <div className="absolute left-6 top-5 text-xs header-caps text-hl-muted">Season 1</div>
-              {/* radial glow behind the badge */}
-              <div className="absolute left-1/2 top-6 -translate-x-1/2 w-44 h-44 bg-hl-gold/10 blur-3xl rounded-full pointer-events-none" />
-              <div className="relative flex flex-col items-center pt-5">
-                <RankBadge rank={player.rank} size="lg" />
-                <div className="stat-number text-4xl text-hl-gold mt-2">{player.elo}</div>
-              </div>
-              <div className="relative flex flex-wrap items-center justify-between gap-3 mt-5 pt-4 border-t border-hl-border">
-                <span className="text-sm text-hl-muted">
-                  <b className="text-white">{s.matchesPlayed}</b> matches ·{" "}
-                  <b className="text-white">{s.winPercent.toFixed(0)}%</b> wins
-                </span>
-                <div className="flex items-center gap-4">
-                  {player.countryFlag && (
-                    <span className="flex items-center gap-1.5 text-sm text-hl-muted">
-                      <Flag src={player.countryFlag} name={player.countryName} className="w-5 h-3.5" />
-                      {player.countryName}
-                    </span>
-                  )}
-                  <span className="text-sm text-hl-muted">
-                    Peak <b className="text-white stat-number">{player.peakElo}</b>
-                  </span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Recent performance */}
-            <div className="grid sm:grid-cols-3 gap-4">
-              <PerformanceCard label="K/D" value={s.kd.toFixed(2)} series={derived.kdSeries} accent="teal" />
-              <PerformanceCard label="Avg Swing" value={`±${derived.avgSwing.toFixed(0)}`} series={derived.swingSeries} accent="gold" />
-              <Card className="bg-hl-panel border-hl-border p-4 flex items-center justify-center">
-                <ConsistencyDonut percent={derived.consistency} />
-              </Card>
-            </div>
-
-            {/* ELO graph */}
-            <Card className="bg-hl-panel border-hl-border p-5">
-              <h2 className="text-sm font-bold text-white header-caps mb-4">Rating Progression</h2>
-              {player.eloHistory && player.eloHistory.length > 1 ? (
-                <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} />
-              ) : (
-                <p className="text-sm text-hl-muted py-8 text-center">Not enough matches to chart yet.</p>
-              )}
-            </Card>
-
-            {/* Stat summary row */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {[
-                { label: "Wins %", value: `${s.winPercent.toFixed(0)}%` },
-                { label: "K/D/A", value: `${Math.round(s.kills / Math.max(1, s.matchesPlayed))}/${Math.round(s.deaths / Math.max(1, s.matchesPlayed))}/${Math.round(s.assists / Math.max(1, s.matchesPlayed))}` },
-                { label: "K/D", value: s.kd.toFixed(2) },
-                { label: "K/R", value: krRatio.toFixed(2) },
-                { label: "HS %", value: `${s.headshotPercent.toFixed(0)}%` },
-                { label: "Score", value: s.scorePerGame.toString() },
-              ].map((stat) => (
-                <div key={stat.label} className="bg-hl-panel border border-hl-border rounded-xl p-3 text-center">
-                  <div className="stat-number text-lg text-white">{stat.value}</div>
-                  <div className="text-[10px] text-hl-muted header-caps mt-0.5">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ---------------- MATCH HISTORY ---------------- */}
-        {tab === "matches" && (
-          <div>
-            <StatsFilters maps={mapsList} value={filters} onChange={setFilters} count={filteredMatches.length} />
-            <Card className="bg-hl-panel border-hl-border p-0 overflow-hidden">
-              {matches.length === 0 ? (
-                <EmptyState icon={ListChecks} title="No match history" hint="This player hasn't played any recorded matches yet." />
-              ) : filteredMatches.length === 0 ? (
-                <EmptyState icon={ListChecks} title="No matches match your filters" hint="Try widening the map, result, or time-range filters." />
-              ) : (
-                <div className="divide-y divide-hl-border">
-                  {/* header row */}
-                  <div className="hidden md:grid grid-cols-[110px_120px_130px_1fr_70px_80px] gap-3 px-4 py-2.5 text-[10px] header-caps text-hl-muted">
-                    <span>Date</span><span>Score</span><span>Rating</span><span>K / D / A</span><span className="text-right">K/D</span><span className="text-right">Score</span>
-                  </div>
-                  {filteredMatches.map((m) => {
-                    const win = m.result === "W";
-                    return (
-                      <Link
-                        key={m.id}
-                        href={m.matchId ? `/match/${m.matchId}` : "#"}
-                        className={`grid md:grid-cols-[110px_120px_130px_1fr_70px_80px] grid-cols-2 gap-3 px-4 py-3 items-center hover:bg-hl-panel-light/40 transition-colors border-l-4 ${win ? "border-l-hl-green" : "border-l-hl-red"
-                          }`}
-                      >
-                        <span className="text-xs text-hl-muted">{m.date}</span>
-                        <span className={`inline-flex items-center gap-2 text-sm font-bold ${win ? "text-hl-green" : "text-hl-red"}`}>
-                          <span className={`w-5 text-center rounded ${win ? "bg-hl-green/15" : "bg-hl-red/15"}`}>{m.result}</span>
-                          {m.rounds || (win ? "13:—" : "—:13")}
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <RankBadge rank={player.rank} size="sm" />
-                          <span className={`text-xs font-bold flex items-center ${m.eloChange >= 0 ? "text-hl-green" : "text-hl-red"}`}>
-                            {m.eloChange >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                            {Math.abs(m.eloChange)}
-                          </span>
-                        </span>
-                        <span className="hidden md:block text-sm font-mono text-white">
-                          {m.kills} <span className="text-hl-muted">/</span> <span className="text-hl-red">{m.deaths}</span> <span className="text-hl-muted">/</span> <span className="text-hl-teal">{m.assists}</span>
-                        </span>
-                        <span className={`hidden md:block text-right text-sm font-mono font-semibold ${m.kdr >= 1 ? "text-hl-green" : "text-hl-red"}`}>{m.kdr.toFixed(2)}</span>
-                        <span className="hidden md:flex items-center justify-end gap-1 text-right text-sm text-hl-gold font-semibold">
-                          {m.score}
-                          {m.matchId ? <ArrowUpRight className="w-3.5 h-3.5 text-hl-muted" /> : null}
-                        </span>
-                        <span className="md:hidden text-right text-sm text-white">{m.map}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </Card>
-          </div>
-        )}
-
-        {/* ---------------- STATS ---------------- */}
-        {tab === "stats" && (
-          <div className="space-y-6">
-            {/* Skill level progress across tiers */}
-            <Card className="bg-hl-panel border-hl-border p-5">
-              <h2 className="text-sm font-bold text-white header-caps mb-4">Skill Level</h2>
-              <div className="flex items-end justify-between gap-1">
-                {ICON_TIERS.map((tier, i) => (
-                  <div key={tier} className="flex flex-col items-center gap-2 flex-1">
-                    <RankBadge rank={tier} size={i === currentTierIdx ? "md" : "sm"} showGlow={i === currentTierIdx} className={i > currentTierIdx ? "opacity-30" : ""} />
-                    <span className={`text-[10px] ${i === currentTierIdx ? "text-hl-gold font-bold" : "text-hl-muted"}`}>{tier}</span>
-                  </div>
+        {/* ================= GAMES ================= */}
+        {mainTab === "games" && (
+          <>
+            {/* Sub-tabs + game label */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hl-border">
+              <div className="flex items-center gap-6">
+                {(["summary", "matches", "stats"] as SubTab[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTab(t)}
+                    className={`pb-3 text-sm border-b-2 transition-colors font-semibold ${
+                      tab === t ? "text-hl-gold border-hl-gold" : "text-hl-muted border-transparent hover:text-white"
+                    }`}
+                  >
+                    {t === "summary" ? "Summary" : t === "matches" ? "Match history" : "Stats"}
+                  </button>
                 ))}
               </div>
-              <div className="mt-4 w-full bg-hl-base rounded-full h-2">
-                <div className="bg-hl-green h-2 rounded-full" style={{ width: `${((currentTierIdx + 1) / ICON_TIERS.length) * 100}%` }} />
-              </div>
-            </Card>
+              <span className="text-sm text-hl-muted pb-3">Blox Strike</span>
+            </div>
 
-            {/* Overview cards */}
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { label: "Matches", value: s.matchesPlayed.toString() },
-                { label: "Longest Win Streak", value: derived.longestWin.toString() },
-                { label: "Win Rate", value: `${s.winPercent.toFixed(0)}%` },
-              ].map((c) => (
-                <Card key={c.label} className="bg-hl-panel border-hl-border p-4 text-center">
-                  <div className="stat-number text-2xl text-hl-gold">{c.value}</div>
-                  <div className="text-[10px] text-hl-muted header-caps mt-1">{c.label}</div>
+            {/* ---------------- SUMMARY ---------------- */}
+            {tab === "summary" && (
+              <div className="space-y-6">
+                {/* Season banner — glow tinted with the rank's own color */}
+                <Card className="relative overflow-hidden bg-hl-panel border-hl-border p-6">
+                  <div
+                    className="absolute inset-x-0 top-0 h-32 pointer-events-none"
+                    style={{ background: `linear-gradient(to bottom, ${tierColor}2b, transparent)` }}
+                  />
+                  <div
+                    className="absolute left-1/2 top-4 -translate-x-1/2 w-56 h-56 blur-3xl rounded-full pointer-events-none"
+                    style={{ backgroundColor: `${tierColor}26` }}
+                  />
+                  <div className="relative text-xs header-caps text-hl-muted">Season 1</div>
+                  <div className="relative flex flex-col items-center pt-2 pb-1">
+                    <RankBadge rank={player.rank} size="lg" />
+                    <div className="stat-number text-4xl text-white mt-2">{player.elo}</div>
+                  </div>
+                  <div className="relative flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-hl-border">
+                    <span className="text-sm text-hl-muted">
+                      <b className="text-white">{s.matchesPlayed}</b> matches ·{" "}
+                      <b className="text-white">{s.winPercent.toFixed(1)}%</b> wins
+                    </span>
+                    <div className="flex items-center gap-4">
+                      {player.countryFlag && countryRank && (
+                        <span
+                          className="flex items-center gap-1.5 text-sm text-hl-muted"
+                          title={`#${countryRank} in ${player.countryName}`}
+                        >
+                          <Flag src={player.countryFlag} name={player.countryName} className="w-5 h-3.5" />
+                          <b className="text-white stat-number">{countryRank.toLocaleString()}</b>
+                        </span>
+                      )}
+                      {overallRank && (
+                        <span
+                          className="flex items-center gap-1.5 text-sm text-hl-muted"
+                          title={`#${overallRank} overall`}
+                        >
+                          <Globe className="w-4 h-4 text-hl-gold" />
+                          <b className="text-white stat-number">{overallRank.toLocaleString()}</b>
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </Card>
-              ))}
-            </div>
 
-            {/* Performance statistics */}
-            <div className="grid sm:grid-cols-3 gap-4">
-              <PerformanceCard label="K/D" value={s.kd.toFixed(2)} series={derived.kdSeries} accent="teal" />
-              <PerformanceCard label="Avg Swing" value={`±${derived.avgSwing.toFixed(0)}`} series={derived.swingSeries} accent="gold" />
-              <Card className="bg-hl-panel border-hl-border p-4 flex items-center justify-center">
-                <ConsistencyDonut percent={derived.consistency} />
-              </Card>
-            </div>
+                {/* Recent performance */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h2 className="text-sm font-bold text-white">Recent performance</h2>
+                    <button
+                      onClick={() => setTab("stats")}
+                      className="text-[11px] header-caps text-hl-gold hover:underline"
+                    >
+                      See more stats
+                    </button>
+                  </div>
+                  <div className="text-xs text-hl-muted mb-4">
+                    Last {Math.min(30, matches.length)} Matches
+                  </div>
+                  {performanceRow}
+                </div>
 
-            {/* ELO graph */}
-            <Card className="bg-hl-panel border-hl-border p-5">
-              <h2 className="text-sm font-bold text-white header-caps mb-4">Rating Progression</h2>
-              {player.eloHistory && player.eloHistory.length > 1 ? (
-                <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} />
-              ) : (
-                <p className="text-sm text-hl-muted py-8 text-center">Not enough matches to chart yet.</p>
-              )}
-            </Card>
+                {/* ELO graph */}
+                <Card className="bg-hl-panel border-hl-border p-5">
+                  {player.eloHistory && player.eloHistory.length > 1 ? (
+                    <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} />
+                  ) : (
+                    <p className="text-sm text-hl-muted py-8 text-center">Not enough matches to chart yet.</p>
+                  )}
+                </Card>
 
-            {/* Performance grid 3x2 with percentiles */}
-            {percentiles && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <PercentileStat label="Win Rate" value={`${s.winPercent.toFixed(0)}%`} pct={percentiles.winPercent} />
-                <PercentileStat label="Score / Match" value={s.scorePerGame.toString()} pct={percentiles.scorePerGame} />
-                <PercentileStat label="K/R" value={krRatio.toFixed(2)} pct={percentiles.kd} />
-                <PercentileStat label="K/D" value={s.kd.toFixed(2)} pct={percentiles.kd} />
-                <PercentileStat label="Headshot %" value={`${s.headshotPercent.toFixed(0)}%`} pct={percentiles.headshotPercent} />
-                <PercentileStat label="Kills / Match" value={killsPerMatch.toFixed(0)} pct={percentiles.scorePerGame} />
+                {statTileRow}
+
+                {/* Recent matches */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-bold text-white">Recent matches</h2>
+                    <button
+                      onClick={() => setTab("matches")}
+                      className="text-[11px] header-caps text-hl-gold hover:underline"
+                    >
+                      Full match history
+                    </button>
+                  </div>
+                  <Card className="bg-hl-panel border-hl-border p-0 overflow-hidden">
+                    {matches.length === 0 ? (
+                      <EmptyState icon={ListChecks} title="No match history" hint="This player hasn't played any recorded matches yet." />
+                    ) : (
+                      <div className="divide-y divide-hl-border">
+                        <div className="hidden md:grid grid-cols-[100px_100px_110px_1fr_60px_70px_110px] gap-3 px-4 py-2.5 text-[10px] header-caps text-hl-muted">
+                          <span>Date</span><span>Score</span><span>Rating</span><span>K / D / A</span><span className="text-right">K/D</span><span className="text-right">Score</span><span className="text-right">Map</span>
+                        </div>
+                        {matches.slice(0, 5).map((m) => {
+                          const win = m.result === "W";
+                          return (
+                            <Link
+                              key={m.id}
+                              href={m.matchId ? `/match/${m.matchId}` : "#"}
+                              className={`grid md:grid-cols-[100px_100px_110px_1fr_60px_70px_110px] grid-cols-2 gap-3 px-4 py-3 items-center hover:bg-hl-panel-light/40 transition-colors border-l-4 ${
+                                win ? "border-l-hl-green" : "border-l-hl-red"
+                              }`}
+                            >
+                              <span className="text-xs text-hl-muted">{m.date}</span>
+                              <span className={`inline-flex items-center gap-2 text-sm font-bold ${win ? "text-hl-green" : "text-hl-red"}`}>
+                                <span className={`w-5 text-center rounded ${win ? "bg-hl-green/15" : "bg-hl-red/15"}`}>{m.result}</span>
+                                {m.rounds || (win ? "13:—" : "—:13")}
+                              </span>
+                              <span className={`text-xs font-bold flex items-center ${m.eloChange >= 0 ? "text-hl-green" : "text-hl-red"}`}>
+                                {m.eloChange >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                                {Math.abs(m.eloChange)}
+                                <span className={`ml-2 px-1.5 rounded text-[10px] ${m.kdr >= 1 ? "bg-hl-green/15 text-hl-green" : "bg-hl-red/15 text-hl-red"}`}>
+                                  {m.kdr.toFixed(2)}
+                                </span>
+                              </span>
+                              <span className="hidden md:block text-sm font-mono text-white">
+                                {m.kills} <span className="text-hl-muted">/</span> <span className="text-hl-red">{m.deaths}</span> <span className="text-hl-muted">/</span> <span className="text-hl-teal">{m.assists}</span>
+                              </span>
+                              <span className={`hidden md:block text-right text-sm font-mono font-semibold ${m.kdr >= 1 ? "text-hl-green" : "text-hl-red"}`}>{m.kdr.toFixed(2)}</span>
+                              <span className="hidden md:block text-right text-sm text-hl-gold font-semibold">{m.score}</span>
+                              <span className="flex items-center justify-end gap-1 text-right text-sm text-white">
+                                {m.map}
+                                {m.matchId ? <ArrowUpRight className="w-3.5 h-3.5 text-hl-muted" /> : null}
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Card>
+                </div>
               </div>
             )}
 
-            {/* Other stats */}
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { label: "Total Wins", value: s.wins.toString() },
-                { label: "Total Kills", value: s.kills.toLocaleString() },
-                { label: "MVPs", value: Math.round(s.avgMvp * s.matchesPlayed).toString() },
-              ].map((c) => (
-                <Card key={c.label} className="bg-hl-panel border-hl-border p-4 text-center">
-                  <div className="stat-number text-xl text-white">{c.value}</div>
-                  <div className="text-[10px] text-hl-muted header-caps mt-1">{c.label}</div>
+            {/* ---------------- MATCH HISTORY ---------------- */}
+            {tab === "matches" && (
+              <div>
+                <StatsFilters maps={mapsList} value={filters} onChange={setFilters} count={filteredMatches.length} />
+                <Card className="bg-hl-panel border-hl-border p-0 overflow-hidden">
+                  {matches.length === 0 ? (
+                    <EmptyState icon={ListChecks} title="No match history" hint="This player hasn't played any recorded matches yet." />
+                  ) : filteredMatches.length === 0 ? (
+                    <EmptyState icon={ListChecks} title="No matches match your filters" hint="Try widening the map, result, or time-range filters." />
+                  ) : (
+                    <div className="divide-y divide-hl-border">
+                      {/* header row */}
+                      <div className="hidden md:grid grid-cols-[110px_120px_130px_1fr_70px_80px] gap-3 px-4 py-2.5 text-[10px] header-caps text-hl-muted">
+                        <span>Date</span><span>Score</span><span>Rating</span><span>K / D / A</span><span className="text-right">K/D</span><span className="text-right">Score</span>
+                      </div>
+                      {filteredMatches.map((m) => {
+                        const win = m.result === "W";
+                        return (
+                          <Link
+                            key={m.id}
+                            href={m.matchId ? `/match/${m.matchId}` : "#"}
+                            className={`grid md:grid-cols-[110px_120px_130px_1fr_70px_80px] grid-cols-2 gap-3 px-4 py-3 items-center hover:bg-hl-panel-light/40 transition-colors border-l-4 ${win ? "border-l-hl-green" : "border-l-hl-red"
+                              }`}
+                          >
+                            <span className="text-xs text-hl-muted">{m.date}</span>
+                            <span className={`inline-flex items-center gap-2 text-sm font-bold ${win ? "text-hl-green" : "text-hl-red"}`}>
+                              <span className={`w-5 text-center rounded ${win ? "bg-hl-green/15" : "bg-hl-red/15"}`}>{m.result}</span>
+                              {m.rounds || (win ? "13:—" : "—:13")}
+                            </span>
+                            <span className="flex items-center gap-2">
+                              <RankBadge rank={player.rank} size="sm" />
+                              <span className={`text-xs font-bold flex items-center ${m.eloChange >= 0 ? "text-hl-green" : "text-hl-red"}`}>
+                                {m.eloChange >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                                {Math.abs(m.eloChange)}
+                              </span>
+                            </span>
+                            <span className="hidden md:block text-sm font-mono text-white">
+                              {m.kills} <span className="text-hl-muted">/</span> <span className="text-hl-red">{m.deaths}</span> <span className="text-hl-muted">/</span> <span className="text-hl-teal">{m.assists}</span>
+                            </span>
+                            <span className={`hidden md:block text-right text-sm font-mono font-semibold ${m.kdr >= 1 ? "text-hl-green" : "text-hl-red"}`}>{m.kdr.toFixed(2)}</span>
+                            <span className="hidden md:flex items-center justify-end gap-1 text-right text-sm text-hl-gold font-semibold">
+                              {m.score}
+                              {m.matchId ? <ArrowUpRight className="w-3.5 h-3.5 text-hl-muted" /> : null}
+                            </span>
+                            <span className="md:hidden text-right text-sm text-white">{m.map}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
                 </Card>
-              ))}
-            </div>
-
-            {/* Map stats */}
-            <Card className="bg-hl-panel border-hl-border p-0 overflow-hidden">
-              <div className="px-5 py-4 border-b border-hl-border">
-                <h2 className="text-sm font-bold text-white header-caps">Map Stats</h2>
               </div>
-              {mapsList.length === 0 ? (
-                <EmptyState icon={MapPin} title="No map data" hint="Map performance appears once this player has recorded matches." />
-              ) : (
-                <MapStatsTable matches={matches} />
-              )}
-            </Card>
+            )}
+
+            {/* ---------------- STATS ---------------- */}
+            {tab === "stats" && (
+              <div className="space-y-6">
+                {/* Elo + skill-level ladder */}
+                <Card className="bg-hl-panel border-hl-border p-5">
+                  <div className="flex items-center justify-between gap-3 mb-5">
+                    <div className="flex items-center gap-3">
+                      <RankBadge rank={player.rank} size="md" />
+                      <div>
+                        <div className="stat-number text-2xl text-white">{player.elo}</div>
+                        <div className="text-xs text-hl-muted">Season 1</div>
+                      </div>
+                    </div>
+                    {eloNeeded !== null && (
+                      <div className="text-right">
+                        <div className="stat-number text-lg text-white">{eloNeeded}</div>
+                        <div className="text-xs text-hl-muted">Elo needed to next skill rank</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-end justify-between gap-1.5">
+                    {LADDER.map((tier, i) => {
+                      const achieved = i < currentTierIdx;
+                      const isCurrent = i === currentTierIdx;
+                      // Fill: full for passed tiers, partial for the current one
+                      // (progress toward the next threshold), empty beyond.
+                      const span = tier.maxElo + 1 - tier.minElo;
+                      const fillPct = achieved
+                        ? 100
+                        : isCurrent
+                          ? Math.max(6, Math.min(100, ((player.elo - tier.minElo) / span) * 100))
+                          : 0;
+                      return (
+                        <div key={tier.letter} className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
+                          <RankBadge
+                            rank={tier.letter}
+                            size={isCurrent ? "md" : "sm"}
+                            showGlow={isCurrent}
+                            className={!achieved && !isCurrent ? "opacity-30 grayscale" : ""}
+                          />
+                          <span className={`text-[10px] stat-number ${isCurrent ? "text-white font-bold" : "text-hl-muted"}`}>
+                            {tier.minElo}
+                          </span>
+                          <span className="h-1 w-full rounded-full bg-hl-border overflow-hidden">
+                            {fillPct > 0 && (
+                              <span
+                                className="block h-full rounded-full"
+                                style={{ width: `${fillPct}%`, backgroundColor: LADDER_COLORS[tier.letter] }}
+                              />
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+
+                {/* Overview tiles */}
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: "Matches", value: s.matchesPlayed.toString() },
+                    { label: "Longest Win Streak", value: derived.longestWin.toString() },
+                    { label: "Win Rate %", value: s.winPercent.toFixed(0) },
+                  ].map((c) => (
+                    <Card key={c.label} className="bg-hl-panel border-hl-border p-4 text-center">
+                      <div className="stat-number text-2xl text-hl-gold">{c.value}</div>
+                      <div className="text-[10px] text-hl-muted header-caps mt-1">{c.label}</div>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Performance statistics */}
+                <div>
+                  <h2 className="text-sm font-bold text-white mb-4">Performance statistics</h2>
+                  {performanceRow}
+                </div>
+
+                {/* ELO graph */}
+                <Card className="bg-hl-panel border-hl-border p-5">
+                  {player.eloHistory && player.eloHistory.length > 1 ? (
+                    <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} />
+                  ) : (
+                    <p className="text-sm text-hl-muted py-8 text-center">Not enough matches to chart yet.</p>
+                  )}
+                </Card>
+
+                {statTileRow}
+
+                {/* Per-match metric chart */}
+                <Card className="bg-hl-panel border-hl-border p-5">
+                  <MetricChart matches={matches} />
+                </Card>
+
+                {/* Map stats */}
+                <Card className="bg-hl-panel border-hl-border p-0 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-hl-border">
+                    <h2 className="text-sm font-bold text-white header-caps">Map Stats</h2>
+                  </div>
+                  {mapsList.length === 0 ? (
+                    <EmptyState icon={MapPin} title="No map data" hint="Map performance appears once this player has recorded matches." />
+                  ) : (
+                    <MapStatsTable matches={matches} />
+                  )}
+                </Card>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ================= FRIENDS ================= */}
+        {mainTab === "friends" && (
+          <div>
+            <span className="inline-block bg-gold-gradient text-hl-base rounded-full px-3 py-1 text-xs font-bold mb-4">
+              All ({friends.length})
+            </span>
+            {friends.length === 0 ? (
+              <EmptyState icon={Users} title="No friends yet" hint="Friends added on HyperLeague will show up here." />
+            ) : (
+              <div className="grid md:grid-cols-2 gap-2">
+                {friends.map((f) => (
+                  <div
+                    key={f.name}
+                    className="flex items-center gap-3 rounded-lg bg-hl-panel border border-hl-border px-3 py-2.5 hover:bg-hl-panel-light/40 transition-colors"
+                  >
+                    <Link href={`/profile?player=${encodeURIComponent(f.name)}`} className="flex items-center gap-3 flex-1 min-w-0">
+                      <Avatar className="w-9 h-9 border border-hl-border">
+                        {f.avatar ? <AvatarImage src={f.avatar} /> : null}
+                        <AvatarFallback className="bg-hl-panel-light text-[11px] font-bold text-hl-gold">
+                          {f.name.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-bold text-white truncate">{f.name}</span>
+                      {f.country && (
+                        <Flag src={flagPath(f.country)} name={countryLabel(f.country)} className="w-4 h-3 shrink-0" />
+                      )}
+                    </Link>
+                    <RankBadge rank={(f.rank || "UNRANKED") as RankTierLetter} size="sm" showGlow={false} />
+                    {myName && f.name !== myName && (
+                      <button
+                        onClick={() => addFriendByName(f.name, false)}
+                        title={`Add ${f.name} as a friend`}
+                        className="p-1.5 rounded-lg border border-hl-border text-hl-muted hover:text-hl-gold hover:border-hl-gold/40 transition-colors"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+        )}
+
+        {/* ================= INVENTORY ================= */}
+        {mainTab === "inventory" && (
+          <ProfileInventory key={player.username} items={inventory} isOwn={isOwn} />
         )}
       </div>
     </div>
-  );
-}
-
-/** Stat card with percentile arrow + progress bar (used in the Stats grid). */
-function PercentileStat({ label, value, pct }: { label: string; value: string; pct: number }) {
-  const above = pct >= 50;
-  return (
-    <Card className="bg-hl-panel border-hl-border p-4">
-      <div className="flex items-center justify-between">
-        <div className="text-[10px] text-hl-muted header-caps">{label}</div>
-        <span className={`flex items-center text-[10px] font-bold ${above ? "text-hl-green" : "text-hl-red"}`}>
-          {above ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-          {pct}%
-        </span>
-      </div>
-      <div className="stat-number text-2xl text-white mt-1">{value}</div>
-      <div className="mt-2 w-full bg-hl-base rounded-full h-1.5">
-        <div className={`h-1.5 rounded-full ${above ? "bg-hl-green" : "bg-hl-gold"}`} style={{ width: `${Math.max(4, pct)}%` }} />
-      </div>
-    </Card>
   );
 }
 

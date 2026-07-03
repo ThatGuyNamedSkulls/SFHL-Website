@@ -97,6 +97,36 @@ export async function setPlayerCountry(name: string, code: string): Promise<bool
   return rs.rowsAffected > 0;
 }
 
+/** Leaderboard positions by elo: overall, and within the player's country
+ *  (null when they have no country set). */
+export async function getPlayerRankings(
+  name: string
+): Promise<{ overall: number | null; country: number | null }> {
+  const rs = await client.execute({
+    sql: "SELECT elo, country FROM players WHERE name = ?",
+    args: [name],
+  });
+  if (rs.rows.length === 0) return { overall: null, country: null };
+  const elo = Number(rs.rows[0].elo);
+  const ctry = (rs.rows[0].country as string) || null;
+
+  const o = await client.execute({
+    sql: "SELECT COUNT(*) AS c FROM players WHERE elo > ?",
+    args: [elo],
+  });
+  const overall = Number(o.rows[0].c) + 1;
+
+  let country: number | null = null;
+  if (ctry) {
+    const c = await client.execute({
+      sql: "SELECT COUNT(*) AS c FROM players WHERE elo > ? AND LOWER(country) = LOWER(?)",
+      args: [elo, ctry],
+    });
+    country = Number(c.rows[0].c) + 1;
+  }
+  return { overall, country };
+}
+
 /** The DB rank string for a brand-new (Elo 0) player — mirrors the bot's
  *  get_rank(0). Reverse of RANK_DB_MAP["[?] Unranked"]. */
 const UNRANKED_DB_RANK = "[?] Unranked";

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPlayer, getMatchesForPlayer, getMostPlayedWith, mapRank } from "@/lib/db";
-import { getEquippedCosmetics } from "@/lib/cosmetics";
+import { getPlayer, getMatchesForPlayer, getMostPlayedWith, getPlayerRankings, mapRank } from "@/lib/db";
+import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
+import { getFriends } from "@/lib/social";
 import { resolvePlayerAvatar } from "@/lib/avatar";
 import { prettyMap, prettyRegion, regionMeta } from "@/lib/format";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
@@ -99,7 +100,11 @@ export async function GET(
       placementDone: player.placement_done === 1,
       placementGamesPlayed: player.placement_games_played,
       playedWith: await getMostPlayedWith(decodedName, 10),
+      rankings: await getPlayerRankings(decodedName).catch(() => ({ overall: null, country: null })),
       cosmetics: await getEquippedCosmetics(decodedName),
+      // Public social/inventory data for the FACEIT-style profile tabs.
+      friends: await getFriends(decodedName).catch(() => []),
+      inventory: await getInventory(decodedName).catch(() => []),
       matchHistory: matches.map((m) => ({
         id: `M-${m.id}`,
         date: m.timestamp?.split(" ")[0] || "",
