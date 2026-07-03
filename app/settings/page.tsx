@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserSession } from "@/types";
 import { PageHeader } from "@/components/page-header";
 import { CountrySelect } from "@/components/country-select";
+import { LogoutButton } from "@/components/logout-button";
 import { Flag } from "@/components/flag";
 import { countryName, flagPath } from "@/lib/countries";
 import {
@@ -239,12 +240,9 @@ export default function SettingsPage() {
         >
           <User className="w-4 h-4" /> View my profile
         </Link>
-        <Link
-          href="/api/auth/logout"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-hl-red/30 bg-hl-red/10 hover:bg-hl-red/20 transition-colors text-sm font-semibold text-hl-red"
-        >
+        <LogoutButton className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-hl-red/30 bg-hl-red/10 hover:bg-hl-red/20 transition-colors text-sm font-semibold text-hl-red">
           <LogOut className="w-4 h-4" /> Log out
-        </Link>
+        </LogoutButton>
       </div>
     </div>
   );

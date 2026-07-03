@@ -8,6 +8,7 @@ import { UserSession } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlayerSearch } from "@/components/player-search";
 import { QueuePill } from "@/components/queue-pill";
+import { LogoutButton } from "@/components/logout-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -139,10 +140,10 @@ export function Navbar() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-hl-border" />
                   <DropdownMenuItem className="hover:bg-hl-panel-light focus:bg-hl-panel-light cursor-pointer text-hl-red focus:text-hl-red">
-                    <Link href="/api/auth/logout" className="flex w-full items-center">
+                    <LogoutButton className="flex w-full items-center">
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Log out</span>
-                    </Link>
+                    </LogoutButton>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -211,13 +212,12 @@ export function Navbar() {
                   <Settings className="w-5 h-5" />
                   Settings
                 </Link>
-                <Link
-                  href="/api/auth/logout"
-                  onClick={() => setIsOpen(false)}
-                  className="text-lg font-bold text-hl-red mt-2"
+                <LogoutButton
+                  onBeforeLogout={() => setIsOpen(false)}
+                  className="text-left text-lg font-bold text-hl-red mt-2"
                 >
                   Log out
-                </Link>
+                </LogoutButton>
               </>
             ) : (
               <Link

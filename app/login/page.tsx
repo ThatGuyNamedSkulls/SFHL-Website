@@ -65,13 +65,15 @@ function LoginContent() {
           )}
 
           <div className="space-y-6">
-            <Link
+            {/* Plain anchor (not <Link>): this hits an API route that 302s to
+                Discord, and we must not let the router prefetch it. */}
+            <a
               href="/api/auth/discord"
               className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl font-medium transition-colors bg-[#5865F2] hover:bg-[#4752C4] text-white"
             >
               <SiDiscord className="w-5 h-5" />
               Sign in with Discord
-            </Link>
+            </a>
 
             <div className="text-center text-xs text-hl-muted mt-6">
               <p>
