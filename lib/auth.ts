@@ -94,4 +94,35 @@ export async function isUserInGuildById(userId: string): Promise<boolean | null>
   }
 }
 
+/** Per-instance cache of Discord avatar URLs (the queue page polls every 5s;
+ *  without this every poll would hit the Discord API and burn rate limit). */
+const avatarCache = new Map<string, { url: string | null; at: number }>();
+const AVATAR_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Resolve a user's Discord profile picture by user ID using the bot token.
+ * Falls back to Discord's default embed avatar when the user has no custom
+ * one, and returns `null` when it can't tell (no bot token / API error).
+ */
+export async function getDiscordAvatarById(userId: string): Promise<string | null> {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) return null;
+  const hit = avatarCache.get(userId);
+  if (hit && Date.now() - hit.at < AVATAR_CACHE_TTL_MS) return hit.url;
+  try {
+    const res = await fetch(`https://discord.com/api/v10/users/${userId}`, {
+      headers: { Authorization: `Bot ${token}` },
+    });
+    if (!res.ok) return hit?.url ?? null;
+    const user = (await res.json()) as { avatar?: string | null };
+    const url = user.avatar
+      ? `https://cdn.discordapp.com/avatars/${userId}/${user.avatar}.png?size=256`
+      : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(userId) >> BigInt(22)) % BigInt(6))}.png`;
+    avatarCache.set(userId, { url, at: Date.now() });
+    return url;
+  } catch {
+    return hit?.url ?? null;
+  }
+}
+
 export { SESSION_COOKIE, OAUTH_STATE_COOKIE };

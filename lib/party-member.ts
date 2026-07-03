@@ -1,6 +1,7 @@
 import { PartyMember } from "@/lib/parties";
 import { getPlayer, mapRank } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
+import { getEquippedCosmetics } from "@/lib/cosmetics";
 import { avatarUrl } from "@/lib/format";
 import { isValidCountry } from "@/lib/countries";
 import { UserSession } from "@/types";
@@ -11,6 +12,7 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
   let elo = 0;
   let avatar = session.avatar ?? null;
   let country: string | null = null;
+  let card: string | null = null;
 
   // Remember this player's Discord id so the bot can DM them by id.
   upsertWebUser(session.discordId, session.playerName, session.username).catch(() => {});
@@ -24,6 +26,11 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
       const dbAvatar = avatarUrl(player.roblox_avatar_image);
       if (dbAvatar) avatar = dbAvatar;
     }
+    try {
+      card = (await getEquippedCosmetics(session.playerName)).card?.asset ?? null;
+    } catch {
+      /* cosmetics schema not ready — no card */
+    }
   }
 
   return {
@@ -34,5 +41,6 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
     rank,
     elo,
     country,
+    card,
   };
 }

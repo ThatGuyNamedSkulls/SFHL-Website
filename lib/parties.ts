@@ -28,6 +28,8 @@ export interface PartyMember {
   rank: string;
   elo: number;
   country: string | null;
+  /** Equipped profile-card art at join time (absent on older stored parties). */
+  card?: string | null;
 }
 
 export interface Party {

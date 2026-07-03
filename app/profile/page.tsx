@@ -296,9 +296,11 @@ function ProfileContent() {
       {/* ================= LEFT SIDEBAR CARD ================= */}
       <div className="space-y-4">
         <Card className="bg-hl-panel border-hl-border p-5 relative overflow-hidden">
-          {/* Equipped profile card: banner behind the header (FACEIT-style). */}
+          {/* Header + badges sit on the full-bleed equipped card art, which
+              fades into the panel right where the bio starts (FACEIT-style). */}
+          <div className="relative -mx-5 -mt-5 px-5 pt-5">
           {player.cosmetics?.card?.asset && (
-            <div className="absolute inset-x-0 top-0 h-28 pointer-events-none">
+            <div className="absolute inset-0 pointer-events-none">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={player.cosmetics.card.asset}
@@ -308,7 +310,7 @@ function ProfileContent() {
                   (e.currentTarget.parentElement as HTMLElement).style.display = "none";
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-hl-panel/60 to-hl-panel" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-hl-panel/40 to-hl-panel" />
             </div>
           )}
           <div
@@ -376,7 +378,7 @@ function ProfileContent() {
 
           {/* Equipped badges */}
           {player.cosmetics && player.cosmetics.badges.length > 0 && (
-            <div className="mt-5 pt-5 border-t border-hl-border">
+            <div className="mt-5 pt-5 border-t border-hl-border relative z-10">
               <div className="text-[11px] header-caps text-hl-muted mb-2">Badges</div>
               <div className="flex items-center gap-2 flex-wrap">
                 {player.cosmetics.badges.map((b) => (
@@ -385,6 +387,7 @@ function ProfileContent() {
               </div>
             </div>
           )}
+          </div>
 
           <div className="mt-5 pt-5 border-t border-hl-border">
             <div className="text-[11px] header-caps text-hl-muted mb-1">Bio</div>

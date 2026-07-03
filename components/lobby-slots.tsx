@@ -14,6 +14,8 @@ export interface LobbyMember {
   rank?: RankTierLetter;
   leader?: boolean;
   country?: string | null;
+  /** Equipped profile-card art, rendered as the slot background. */
+  card?: string | null;
 }
 
 interface LobbySlotsProps {
@@ -35,8 +37,23 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
 
         if (member) {
           return (
-            <div key={i} className="lobby-slot filled flex flex-col items-center justify-center py-6 px-3 gap-3">
-              <div className="relative">
+            <div key={i} className="lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center py-6 px-3 gap-3">
+              {/* Equipped profile card as the slot background */}
+              {member.card && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={member.card}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget.parentElement as HTMLElement).style.display = "none";
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/55 to-hl-panel" />
+                </div>
+              )}
+              <div className="relative z-10">
                 <Avatar className="w-16 h-16 border-2 border-hl-gold/40">
                   {member.avatar ? <AvatarImage src={member.avatar} /> : null}
                   <AvatarFallback className="bg-hl-panel-light text-hl-gold font-bold">
@@ -47,11 +64,11 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
                   <Crown className="w-4 h-4 text-hl-gold absolute -top-1 -right-1" />
                 )}
               </div>
-              <div className="flex items-center gap-1.5 max-w-full">
+              <div className="relative z-10 flex items-center gap-1.5 max-w-full">
                 <span className="text-sm font-bold text-white truncate">{member.username}</span>
                 {member.country && <Flag src={flagPath(member.country)} name={countryName(member.country)} className="w-4 h-3 shrink-0" />}
               </div>
-              {member.rank && <RankBadge rank={member.rank} size="sm" />}
+              {member.rank && <RankBadge rank={member.rank} size="sm" className="relative z-10" />}
             </div>
           );
         }

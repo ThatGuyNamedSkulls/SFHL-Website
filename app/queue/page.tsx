@@ -23,6 +23,7 @@ interface PlayerInfo {
   elo: number;
   avatarUrl: string;
   country: string | null;
+  card: string | null;
 }
 
 // Minimal shape of the party API response (avoids importing lib/parties, which
@@ -35,6 +36,7 @@ interface PartyMemberLite {
   rank: string;
   elo: number;
   country: string | null;
+  card?: string | null;
 }
 interface PartyLite {
   id: string;
@@ -99,7 +101,7 @@ export default function QueuePage() {
     if (session?.playerName) {
       fetch(`/api/players/${encodeURIComponent(session.playerName)}`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => d && setPlayer({ rank: d.rank, elo: d.elo, avatarUrl: d.avatarUrl, country: d.country }))
+        .then((d) => d && setPlayer({ rank: d.rank, elo: d.elo, avatarUrl: d.avatarUrl, country: d.country, card: d.cosmetics?.card?.asset ?? null }))
         .catch(() => { });
     }
   }, [session?.playerName]);
@@ -151,6 +153,7 @@ export default function QueuePage() {
       rank: player?.rank,
       leader: true,
       country: player?.country ?? null,
+      card: player?.card ?? null,
     }
     : null;
 
@@ -167,6 +170,7 @@ export default function QueuePage() {
         rank: ((isMe ? player?.rank : undefined) ?? m.rank) as RankTierLetter,
         leader: m.discordId === party.leaderId,
         country: (isMe ? player?.country ?? m.country : m.country) ?? null,
+        card: (isMe ? player?.card ?? m.card : m.card) ?? null,
       };
     });
   } else {
