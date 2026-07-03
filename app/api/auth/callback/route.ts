@@ -9,7 +9,7 @@ import {
 } from "@/lib/auth";
 import { getPlayer, ensurePlayer } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
-import { avatarUrl } from "@/lib/format";
+import { resolvePlayerAvatar } from "@/lib/avatar";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -100,9 +100,10 @@ export async function GET(request: Request) {
     const playerName = playerData ? playerData.name : null;
 
     if (playerData) {
-      if (playerData.roblox_avatar_image) {
-        avatar = avatarUrl(playerData.roblox_avatar_image);
-      }
+      // Only override the Discord avatar when the stored one actually serves
+      // (on Vercel the bot's local avatar files don't exist).
+      const dbAvatar = await resolvePlayerAvatar(playerData.name, playerData.roblox_avatar_image);
+      if (dbAvatar) avatar = dbAvatar;
       rank = playerData.rank || "UNRANKED";
     }
 

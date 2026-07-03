@@ -2,7 +2,7 @@ import { PartyMember } from "@/lib/parties";
 import { getPlayer, mapRank } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
 import { getEquippedCosmetics } from "@/lib/cosmetics";
-import { avatarUrl } from "@/lib/format";
+import { resolvePlayerAvatar } from "@/lib/avatar";
 import { isValidCountry } from "@/lib/countries";
 import { UserSession } from "@/types";
 
@@ -23,7 +23,7 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
       rank = mapRank(player.rank);
       elo = player.elo;
       country = isValidCountry(player.country) ? player.country!.toLowerCase() : null;
-      const dbAvatar = avatarUrl(player.roblox_avatar_image);
+      const dbAvatar = await resolvePlayerAvatar(session.playerName, player.roblox_avatar_image);
       if (dbAvatar) avatar = dbAvatar;
     }
     try {

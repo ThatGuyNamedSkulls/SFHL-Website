@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { getPlayer, getMatchesForPlayer, getMostPlayedWith, mapRank } from "@/lib/db";
 import { getEquippedCosmetics } from "@/lib/cosmetics";
-import { getDiscordIdForPlayer } from "@/lib/social";
-import { getDiscordAvatarById } from "@/lib/auth";
-import { avatarUrl, prettyMap, prettyRegion, regionMeta } from "@/lib/format";
+import { resolvePlayerAvatar } from "@/lib/avatar";
+import { prettyMap, prettyRegion, regionMeta } from "@/lib/format";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
 
 /**
@@ -61,23 +60,10 @@ export async function GET(
       eloHistory.unshift(currentElo);
     }
 
-    // Prefer the stored game avatar; if there is none, fall back to the
-    // player's Discord profile picture (resolved via their linked Discord id)
-    // instead of letting the UI degrade to initials.
-    let avatar = avatarUrl(player.roblox_avatar_image);
-    if (!avatar) {
-      try {
-        const discordId = await getDiscordIdForPlayer(decodedName);
-        if (discordId) avatar = (await getDiscordAvatarById(discordId)) ?? "";
-      } catch {
-        /* best-effort — initials fallback still applies */
-      }
-    }
-
     const mapped = {
       id: `p${player.id}`,
       username: player.name,
-      avatarUrl: avatar,
+      avatarUrl: await resolvePlayerAvatar(decodedName, player.roblox_avatar_image),
       rank: mapRank(player.rank),
       elo: player.elo,
       peakElo: player.peak_elo,
