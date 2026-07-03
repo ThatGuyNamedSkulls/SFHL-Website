@@ -46,9 +46,12 @@ export default function LeaderboardsPage() {
   useEffect(() => {
     setLoading(true);
     fetch("/api/players")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        setPlayers(data);
+        // The API returns a bare array; on error (e.g. 500) it returns an
+        // { error } object. Guard so a failed fetch can't crash the table
+        // rendering (players.map / filter) with a non-array.
+        setPlayers(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((err) => {

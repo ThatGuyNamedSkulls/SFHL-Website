@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     if (!isValidCountry(code)) {
       return NextResponse.json({ error: "Invalid country" }, { status: 400 });
     }
-    const ok = setPlayerCountry(session.playerName, code);
+    const ok = await setPlayerCountry(session.playerName, code);
     if (!ok) {
       return NextResponse.json({ error: "Player not found" }, { status: 404 });
     }

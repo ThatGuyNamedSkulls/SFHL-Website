@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,10 @@ export default function QueuePage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [matchType, setMatchType] = useState("standard");
+  // While a join/leave POST is in flight (and briefly after), ignore the 5s
+  // poll's queue snapshot so a poll that started before the action can't land
+  // afterwards and revert the button's optimistic result.
+  const actionInFlight = useRef(false);
 
   useEffect(() => {
     const fetchQueue = async () => {
@@ -67,7 +71,7 @@ export default function QueuePage() {
           fetch("/api/parties"),
         ]);
         const qData = await qRes.json();
-        setQueue(qData.queue || []);
+        if (!actionInFlight.current) setQueue(qData.queue || []);
         const sData = await sRes.json();
         const me = sData.user as UserSession | undefined;
         if (me) setSession(me);
@@ -105,6 +109,7 @@ export default function QueuePage() {
 
   const handleJoin = async () => {
     setActionLoading(true);
+    actionInFlight.current = true;
     setError(null);
     try {
       const res = await fetch("/api/queue", { method: "POST" });
@@ -115,11 +120,13 @@ export default function QueuePage() {
       setError("An error occurred");
     } finally {
       setActionLoading(false);
+      actionInFlight.current = false;
     }
   };
 
   const handleLeave = async () => {
     setActionLoading(true);
+    actionInFlight.current = true;
     setError(null);
     try {
       const res = await fetch("/api/queue", { method: "DELETE" });
@@ -130,6 +137,7 @@ export default function QueuePage() {
       setError("An error occurred");
     } finally {
       setActionLoading(false);
+      actionInFlight.current = false;
     }
   };
 

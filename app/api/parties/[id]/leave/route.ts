@@ -11,8 +11,11 @@ export async function DELETE(_request: Request, ctx: RouteContext<"/api/parties/
 
   try {
     const { id } = await ctx.params;
-    const parties = await leaveParty(id, session.discordId);
-    return NextResponse.json({ parties, count: parties.length });
+    // NOTE: leaveParty returns the raw unfiltered party list (incl. private
+    // parties + members' Discord IDs). Do NOT return it — the client re-fetches
+    // the visibility-filtered GET /api/parties instead.
+    await leaveParty(id, session.discordId);
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Error leaving party:", error);
     return NextResponse.json({ error: "Failed to leave party" }, { status: 500 });

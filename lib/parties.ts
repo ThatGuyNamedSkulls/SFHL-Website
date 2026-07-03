@@ -15,6 +15,7 @@
 
 import { randomUUID } from "crypto";
 import { client } from "@/lib/db";
+import { clearInvitesForParties } from "@/lib/social";
 
 /** 30 minutes of inactivity before a party is auto-disbanded. */
 const PARTY_TTL_MS = 30 * 60 * 1000;
@@ -99,6 +100,14 @@ export async function getParties(): Promise<Party[]> {
         args: [id],
       }))
     );
+    // Tidy up any invites/notifications pointing at the now-dead parties so
+    // they can't linger as un-joinable invites. Best-effort: the social tables
+    // may not exist yet on a brand-new DB.
+    try {
+      await clearInvitesForParties(expiredIds);
+    } catch {
+      /* social schema not ready — nothing to clean */
+    }
   }
   return live;
 }
@@ -185,49 +194,118 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
   return party;
 }
 
+/** Remove a member from every party except `exceptId` (best-effort cleanup). */
+async function removeMemberFromOtherParties(discordId: string, exceptId: string): Promise<void> {
+  const parties = await getParties();
+  for (const p of parties) {
+    if (p.id === exceptId) continue;
+    if (!p.members.some((m) => m.discordId === discordId)) continue;
+    const members = p.members.filter((m) => m.discordId !== discordId);
+    if (members.length === 0) {
+      await remove(p.id);
+    } else {
+      const leaderId = p.leaderId === discordId ? members[0].discordId : p.leaderId;
+      await upsert({ ...p, members, leaderId, updatedAt: Date.now() });
+    }
+  }
+}
+
+/**
+ * Join a party under optimistic concurrency. On Vercel each request is a
+ * separate serverless instance with no shared lock, so a naive read-all →
+ * modify → write-back loses updates when two people join at once (both read the
+ * same members list, both write their own +1, last write wins). We instead read
+ * just this party's row with its `updated_at` token and commit with
+ * `WHERE updated_at = <token>`; if someone else changed the row first the update
+ * affects 0 rows and we re-read and retry.
+ */
 export async function joinParty(
   id: string,
   member: PartyMember
 ): Promise<Party | { error: string }> {
-  const parties = await getParties();
-  const party = parties.find((p) => p.id === id);
-  if (!party) return { error: "Party not found or expired" };
-  if (party.members.some((m) => m.discordId === member.discordId)) return party;
-  if (party.members.length >= party.maxSize) return { error: "Party is full" };
-
-  // Remove the joining member from any other party first.
-  for (const p of parties) {
-    if (p.id === id) continue;
-    if (!p.members.some((m) => m.discordId === member.discordId)) continue;
-    const members = p.members.filter((m) => m.discordId !== member.discordId);
-    if (members.length === 0) {
-      await remove(p.id);
-    } else {
-      const leaderId = p.leaderId === member.discordId ? members[0].discordId : p.leaderId;
-      await upsert({ ...p, members, leaderId, updatedAt: Date.now() });
+  await ensureSchema();
+  const cutoff = Date.now() - PARTY_TTL_MS;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const rs = await client.execute({
+      sql: "SELECT data, updated_at FROM web_parties WHERE id = ?",
+      args: [id],
+    });
+    if (rs.rows.length === 0) return { error: "Party not found or expired" };
+    let party: Party;
+    try {
+      party = JSON.parse(rs.rows[0].data as string) as Party;
+    } catch {
+      return { error: "Party not found or expired" };
     }
-  }
+    const prevToken = Number(rs.rows[0].updated_at);
+    if (party.members.length === 0 || party.updatedAt < cutoff) {
+      return { error: "Party not found or expired" };
+    }
+    if (party.members.some((m) => m.discordId === member.discordId)) return party;
+    if (party.members.length >= party.maxSize) return { error: "Party is full" };
 
-  party.members.push(member);
-  party.updatedAt = Date.now();
-  await upsert(party);
-  return party;
+    party.members.push(member);
+    // Strictly-increasing token so the compare-and-set below can never collide
+    // with the value we just read.
+    party.updatedAt = Math.max(Date.now(), prevToken + 1);
+    const upd = await client.execute({
+      sql: "UPDATE web_parties SET data = ?, updated_at = ? WHERE id = ? AND updated_at = ?",
+      args: [JSON.stringify(party), party.updatedAt, id, prevToken],
+    });
+    if (upd.rowsAffected > 0) {
+      // Committed; now drop this member from any other party they were in.
+      await removeMemberFromOtherParties(member.discordId, id);
+      return party;
+    }
+    // Lost the race — another writer touched the row. Re-read and retry.
+  }
+  return { error: "Party is busy — please try again." };
 }
 
 export async function leaveParty(id: string, discordId: string): Promise<Party[]> {
-  const parties = await getParties();
-  const party = parties.find((p) => p.id === id);
-  if (!party) return parties;
+  await ensureSchema();
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const rs = await client.execute({
+      sql: "SELECT data, updated_at FROM web_parties WHERE id = ?",
+      args: [id],
+    });
+    if (rs.rows.length === 0) return getParties();
+    let party: Party;
+    try {
+      party = JSON.parse(rs.rows[0].data as string) as Party;
+    } catch {
+      return getParties();
+    }
+    const prevToken = Number(rs.rows[0].updated_at);
+    if (!party.members.some((m) => m.discordId === discordId)) return getParties();
 
-  party.members = party.members.filter((m) => m.discordId !== discordId);
-  party.updatedAt = Date.now();
+    party.members = party.members.filter((m) => m.discordId !== discordId);
 
-  // If the leader left, promote the next member; if empty, drop the party.
-  if (party.members.length === 0) {
-    await remove(party.id);
-  } else {
-    if (party.leaderId === discordId) party.leaderId = party.members[0].discordId;
-    await upsert(party);
+    if (party.members.length === 0) {
+      // Guard the delete on the token so we don't drop a party someone just
+      // joined between our read and write.
+      const del = await client.execute({
+        sql: "DELETE FROM web_parties WHERE id = ? AND updated_at = ?",
+        args: [id, prevToken],
+      });
+      if (del.rowsAffected > 0) {
+        try {
+          await clearInvitesForParties([id]);
+        } catch {
+          /* social schema not ready */
+        }
+        return getParties();
+      }
+    } else {
+      if (party.leaderId === discordId) party.leaderId = party.members[0].discordId;
+      party.updatedAt = Math.max(Date.now(), prevToken + 1);
+      const upd = await client.execute({
+        sql: "UPDATE web_parties SET data = ?, updated_at = ? WHERE id = ? AND updated_at = ?",
+        args: [JSON.stringify(party), party.updatedAt, id, prevToken],
+      });
+      if (upd.rowsAffected > 0) return getParties();
+    }
+    // Lost the race — re-read and retry.
   }
   return getParties();
 }

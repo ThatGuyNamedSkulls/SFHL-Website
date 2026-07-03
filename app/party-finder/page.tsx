@@ -99,6 +99,10 @@ function PartyFinderContent() {
       const data = await res.json();
       if (res.ok && data.party) {
         setParties((prev) => prev.map((p) => (p.id === id ? data.party : p)));
+      } else if (!res.ok) {
+        // Surface the reason (full, private, expired…) instead of failing silently.
+        setNotice(data.error || "Failed to join party.");
+        setTimeout(() => setNotice(null), 4000);
       }
       await load();
     } finally {
@@ -110,8 +114,8 @@ function PartyFinderContent() {
     setBusyId(id);
     try {
       const res = await fetch(`/api/parties/${id}/leave`, { method: "DELETE" });
-      const data = await res.json();
-      if (res.ok) setParties(data.parties || []);
+      // Re-fetch the visibility-filtered list rather than trusting the response.
+      if (res.ok) await load();
     } finally {
       setBusyId(null);
     }

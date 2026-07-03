@@ -232,17 +232,23 @@ export async function sendFriendRequest(
 export async function acceptFriendRequest(meName: string, fromName: string): Promise<void> {
   await ensureSocialSchema();
   const pending = await requestExists(fromName, meName);
-  const [x, y] = pair(meName, fromName);
+  // Always clear any stale request/notification for this pair.
   await client.batch([
-    { sql: "INSERT OR IGNORE INTO friendships (user_a, user_b, created_at) VALUES (?, ?, ?)", args: [x, y, now()] },
     { sql: "DELETE FROM friend_requests WHERE from_id = ? AND to_id = ?", args: [fromName, meName] },
     { sql: "DELETE FROM friend_requests WHERE from_id = ? AND to_id = ?", args: [meName, fromName] },
     { sql: "DELETE FROM notifications WHERE user_id = ? AND type = 'friend_request' AND actor_id = ?", args: [meName, fromName] },
   ]);
-  if (pending) {
-    await addNotification(fromName, "friend_accepted", `${meName} accepted your friend request.`, meName);
-    await enqueueDM(fromName, `✅ **${meName}** accepted your friend request on HyperLeague.`);
-  }
+  // Only actually befriend + notify when there was a real request to accept —
+  // otherwise POST /api/friends/accept could conjure a friendship (and a DM to
+  // the target) with no handshake.
+  if (!pending) return;
+  const [x, y] = pair(meName, fromName);
+  await client.execute({
+    sql: "INSERT OR IGNORE INTO friendships (user_a, user_b, created_at) VALUES (?, ?, ?)",
+    args: [x, y, now()],
+  });
+  await addNotification(fromName, "friend_accepted", `${meName} accepted your friend request.`, meName);
+  await enqueueDM(fromName, `✅ **${meName}** accepted your friend request on HyperLeague.`);
 }
 
 export async function rejectFriendRequest(meName: string, fromName: string): Promise<void> {
@@ -361,6 +367,25 @@ export async function clearPartyInvite(partyId: string, toName: string): Promise
   ]);
 }
 
+/**
+ * Drop all invites (and their party_invite notifications) for parties that no
+ * longer exist — called when the party store prunes expired/empty parties, so a
+ * notification can't outlive its party and leave the user with an un-joinable
+ * invite forever.
+ */
+export async function clearInvitesForParties(partyIds: string[]): Promise<void> {
+  if (partyIds.length === 0) return;
+  await ensureSocialSchema();
+  const placeholders = partyIds.map(() => "?").join(",");
+  await client.batch([
+    { sql: `DELETE FROM party_invites WHERE party_id IN (${placeholders})`, args: partyIds },
+    {
+      sql: `DELETE FROM notifications WHERE type = 'party_invite' AND ref_id IN (${placeholders})`,
+      args: partyIds,
+    },
+  ]);
+}
+
 export async function getPartyInvitePartyIds(meName: string): Promise<string[]> {
   await ensureSocialSchema();
   const rs = await client.execute({
@@ -425,14 +450,17 @@ export async function markNotificationsRead(meName: string): Promise<void> {
  * Queue a DM for the bot to deliver. We store the target's Discord **user id**
  * when we know it (so the bot can `fetch_user` reliably regardless of nickname
  * or member-cache state); otherwise we fall back to the player name and let the
- * bot resolve it by display name. `to_id` therefore holds either a numeric
- * Discord id or a player name. See cogs/social.py.
+ * bot resolve it by display name.
+ *
+ * `to_id` is explicitly tagged — `id:<discord id>` or `name:<player name>` — so
+ * an all-numeric player name can never be mistaken for a Discord id (and vice
+ * versa). See cogs/social.py (which also still accepts legacy untagged rows).
  */
 export async function enqueueDM(toName: string, message: string): Promise<void> {
   await ensureSocialSchema();
   const discordId = await getDiscordIdForPlayer(toName);
   await client.execute({
     sql: "INSERT INTO discord_dm_outbox (to_id, message, sent, created_at) VALUES (?, ?, 0, ?)",
-    args: [discordId ?? toName, message, now()],
+    args: [discordId ? `id:${discordId}` : `name:${toName}`, message, now()],
   });
 }

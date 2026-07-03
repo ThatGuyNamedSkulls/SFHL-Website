@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { DISCORD_CONFIG, encodeSession, isUserInGuildById, SESSION_COOKIE } from "@/lib/auth";
+import { cookies } from "next/headers";
+import {
+  DISCORD_CONFIG,
+  encodeSession,
+  isUserInGuildById,
+  SESSION_COOKIE,
+  OAUTH_STATE_COOKIE,
+} from "@/lib/auth";
 import { getPlayer, ensurePlayer } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
 import { avatarUrl } from "@/lib/format";
@@ -7,11 +14,25 @@ import { avatarUrl } from "@/lib/format";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
+  const state = searchParams.get("state");
 
   if (!code) {
     return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/login?error=no_code`
     );
+  }
+
+  // CSRF check: the `state` echoed back by Discord must match the one we set in
+  // the httpOnly cookie when starting the flow. A missing/mismatched state means
+  // this callback wasn't initiated by us in this browser — reject it.
+  const cookieStore = await cookies();
+  const expectedState = cookieStore.get(OAUTH_STATE_COOKIE)?.value;
+  if (!state || !expectedState || state !== expectedState) {
+    const res = NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/login?error=bad_state`
+    );
+    res.cookies.delete(OAUTH_STATE_COOKIE);
+    return res;
   }
 
   try {
@@ -114,6 +135,8 @@ export async function GET(request: Request) {
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: "/",
     });
+    // Consume the one-time state cookie now that the flow completed.
+    response.cookies.delete(OAUTH_STATE_COOKIE);
 
     return response;
   } catch (error) {

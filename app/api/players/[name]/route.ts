@@ -96,7 +96,7 @@ export async function GET(
       eloHistory,
       placementDone: player.placement_done === 1,
       placementGamesPlayed: player.placement_games_played,
-      playedWith: getMostPlayedWith(decodedName, 10),
+      playedWith: await getMostPlayedWith(decodedName, 10),
       matchHistory: matches.map((m) => ({
         id: `M-${m.id}`,
         date: m.timestamp?.split(" ")[0] || "",
