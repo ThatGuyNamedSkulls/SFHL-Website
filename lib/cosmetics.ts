@@ -180,6 +180,21 @@ export async function setEquipped(
   return "ok";
 }
 
+/** player_name → equipped profile-card asset, for list views (single query). */
+export async function getEquippedCardMap(): Promise<Map<string, string>> {
+  await ensureCosmeticsSchema();
+  const rs = await client.execute(
+    `SELECT inv.player_name AS name, i.asset AS asset
+     FROM cosmetic_inventory inv JOIN cosmetic_items i ON i.id = inv.item_id
+     WHERE inv.equipped = 1 AND i.type = 'card' AND i.asset IS NOT NULL`
+  );
+  const map = new Map<string, string>();
+  for (const r of rs.rows as unknown as { name: string; asset: string }[]) {
+    if (!map.has(r.name)) map.set(r.name, r.asset);
+  }
+  return map;
+}
+
 /** The equipped cosmetics for a public profile (card, title text, ≤5 badges). */
 export async function getEquippedCosmetics(playerName: string): Promise<ProfileCosmetics> {
   await ensureCosmeticsSchema();

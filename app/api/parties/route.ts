@@ -62,6 +62,9 @@ export async function POST(request: Request) {
       verifiedOnly: body.verifiedOnly,
       voiceRequired: body.voiceRequired,
       isPrivate: body.isPrivate,
+      vibe: body.vibe,
+      // Party size follows the match type (Super caps at 3, Premium at 2).
+      maxSize: [2, 3, 5].includes(body.maxSize) ? body.maxSize : 5,
       leader: await memberFromSession(session),
     });
     return NextResponse.json({ party });

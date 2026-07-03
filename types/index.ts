@@ -255,6 +255,8 @@ export interface PartyMemberView {
   rank: string;
   elo: number;
   country: string | null;
+  /** Equipped profile-card art, shown as the member slot background. */
+  card?: string | null;
 }
 
 export interface PartyView {
@@ -274,6 +276,8 @@ export interface PartyView {
   verifiedOnly: boolean;
   voiceRequired: boolean;
   isPrivate?: boolean;
+  /** Vibe tag (Chill / Fun / Balanced / Serious / Intense). */
+  vibe?: string;
   /** Player names this party has pending invites out to (members' view only). */
   invitedNames?: string[];
   createdAt: number;

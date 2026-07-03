@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAllPlayers, getPlayerRegions, mapRank } from "@/lib/db";
+import { getEquippedCardMap } from "@/lib/cosmetics";
 import { avatarUrl, regionMeta } from "@/lib/format";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
 
@@ -7,6 +8,7 @@ export async function GET() {
   try {
     const players = await getAllPlayers();
     const regions = await getPlayerRegions();
+    const cards = await getEquippedCardMap().catch(() => new Map<string, string>());
 
     const mapped = players.map((p, idx) => {
       const region = regionMeta(regions[p.name]);
@@ -15,6 +17,7 @@ export async function GET() {
       id: `p${p.id}`,
       username: p.name,
       avatarUrl: avatarUrl(p.roblox_avatar_image),
+      cardAsset: cards.get(p.name) ?? null,
       rank: mapRank(p.rank),
       elo: p.elo,
       peakElo: p.peak_elo,

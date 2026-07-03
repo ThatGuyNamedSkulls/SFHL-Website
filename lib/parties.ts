@@ -50,6 +50,8 @@ export interface Party {
   voiceRequired: boolean;
   /** Invite-only: hidden from the public party list, joinable only via invite. */
   isPrivate: boolean;
+  /** Vibe tag (Chill / Fun / Balanced / Serious / Intense). */
+  vibe?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -153,6 +155,7 @@ export interface CreatePartyInput {
   verifiedOnly?: boolean;
   voiceRequired?: boolean;
   isPrivate?: boolean;
+  vibe?: string;
   leader: PartyMember;
 }
 
@@ -188,6 +191,7 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
     verifiedOnly: !!input.verifiedOnly,
     voiceRequired: !!input.voiceRequired,
     isPrivate: !!input.isPrivate,
+    vibe: input.vibe || "Balanced",
     createdAt: now,
     updatedAt: now,
   };

@@ -5,9 +5,22 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { Flag } from "@/components/flag";
 import { PartyView, PartyMemberView, RankTierLetter } from "@/types";
-import { getRankForElo } from "@/data/ranks";
+import { getRankForElo, getRankByLetter } from "@/data/ranks";
 import { flagPath, countryName } from "@/lib/countries";
-import { Crown, Plus, Globe, Gamepad2, Mic, ShieldCheck, Users, Lock, UserPlus } from "lucide-react";
+import {
+  Crown,
+  Plus,
+  Globe,
+  Gamepad2,
+  Mic,
+  ShieldCheck,
+  Users,
+  Lock,
+  UserPlus,
+  Swords,
+  Languages,
+  Sparkles,
+} from "lucide-react";
 
 export interface FriendOption {
   name: string;
@@ -36,27 +49,47 @@ function avgRank(party: PartyView): RankTierLetter {
 function MemberSlot({ member, isLeader }: { member: PartyMemberView; isLeader: boolean }) {
   const rank = (member.rank || "UNRANKED") as RankTierLetter;
   return (
-    <div className="lobby-slot filled flex flex-col items-center justify-center py-4 px-2 gap-2 min-h-[150px]">
-      <div className="relative">
-        <Avatar className="w-14 h-14 border-2 border-hl-gold/30">
+    <div className="lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center py-4 px-2 gap-2 min-h-[160px] rounded-xl">
+      {/* Equipped profile card as the slot background */}
+      {member.card && (
+        <div className="absolute inset-0 pointer-events-none">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={member.card}
+            alt=""
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.currentTarget.parentElement as HTMLElement).style.display = "none";
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/55 to-hl-panel" />
+        </div>
+      )}
+      {isLeader && <Crown className="relative z-10 w-4 h-4 text-hl-gold -mb-1" />}
+      <div className="relative z-10">
+        <Avatar className="w-14 h-14 border-2 border-hl-border">
           {member.avatar ? <AvatarImage src={member.avatar} /> : null}
           <AvatarFallback className="bg-hl-panel-light text-xs font-bold text-hl-gold">
             {member.username.slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        {isLeader && <Crown className="w-4 h-4 text-hl-gold absolute -top-1.5 -right-1.5" />}
       </div>
-      <div className="flex items-center gap-1 max-w-full">
+      <div className="relative z-10 flex items-center gap-1 max-w-full">
         <span className="text-xs font-bold text-white truncate">{member.username}</span>
         {member.country && <Flag src={flagPath(member.country)} name={countryName(member.country)} className="w-4 h-3 shrink-0" />}
       </div>
-      <div className="flex items-center gap-1.5">
-        <RankBadge rank={rank} size="sm" />
-        {member.elo > 0 && <span className="text-xs text-hl-muted stat-number">{member.elo}</span>}
+      <div className="relative z-10 flex items-center gap-1.5">
+        <RankBadge rank={rank} size="sm" showGlow={false} className="!w-6 !h-6" />
+        <span className="text-xs text-hl-muted stat-number">
+          {member.elo > 0 ? member.elo.toLocaleString() : "Unranked"}
+        </span>
       </div>
     </div>
   );
 }
+
+const CHIP_CLS =
+  "inline-flex items-center gap-1 rounded-md bg-hl-panel-light/60 border border-hl-border/60 px-2 py-1 text-[11px] text-hl-muted";
 
 export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onInvite, busy }: PartyCardProps) {
   const inParty = !!currentUserId && party.members.some((m) => m.discordId === currentUserId);
@@ -64,63 +97,62 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onIn
   const emptySlots = Math.max(0, party.maxSize - party.members.length);
   const [inviteOpen, setInviteOpen] = useState(false);
 
+  const avg = avgRank(party);
+  const avgColor = getRankByLetter(avg).color;
+
   // Friends not already in this party — the invitable set.
   const invitable = (friends ?? []).filter(
     (f) => !party.members.some((m) => m.playerName === f.name)
   );
 
   return (
-    <div className="party-card p-4">
-      {/* Avg skill level badge */}
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="font-bold text-white truncate flex items-center gap-2">
-          <Users className="w-4 h-4 text-hl-muted" /> {party.name}
-          {party.isPrivate && <Lock className="w-3.5 h-3.5 text-hl-gold shrink-0" />}
-        </h3>
-        <span className="flex items-center gap-1.5 text-[10px] header-caps text-hl-muted border border-hl-border rounded-full pl-1.5 pr-2 py-0.5">
-          <RankBadge rank={avgRank(party)} size="sm" className="!w-5 !h-5" />
-          Avg Skill
-        </span>
-      </div>
+    <div className="party-card relative p-4 pt-5">
+      {/* Avg skill level chip, floating on the card edge (FACEIT-style) */}
+      <span
+        className="absolute -top-3 right-4 z-10 inline-flex items-center gap-1.5 rounded-full bg-hl-base px-2 py-0.5 text-[10px] header-caps text-white border"
+        style={{ borderColor: avgColor }}
+      >
+        <RankBadge rank={avg} size="sm" showGlow={false} className="!w-4 !h-4" />
+        Avg Skill Level
+      </span>
 
-      {/* 5-slot row */}
+      {/* Member slots */}
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         {party.members.map((m) => (
           <MemberSlot key={m.discordId} member={m} isLeader={m.discordId === party.leaderId} />
         ))}
         {Array.from({ length: emptySlots }).map((_, i) => (
-          <div
+          <button
             key={`e${i}`}
-            className="lobby-slot empty flex items-center justify-center min-h-[150px]"
+            onClick={() => !inParty && !busy && onJoin?.(party.id)}
+            disabled={inParty || busy}
+            className="lobby-slot empty flex items-center justify-center min-h-[160px] rounded-xl hover:border-hl-gold/40 transition-colors disabled:cursor-default"
+            title={inParty ? "Open slot" : "Join this party"}
           >
-            <div className="w-12 h-12 rounded-full border-2 border-dashed border-hl-border flex items-center justify-center">
-              <Plus className="w-5 h-5 text-hl-muted" />
-            </div>
-          </div>
+            <Plus className="w-8 h-8 text-hl-muted/60" />
+          </button>
         ))}
       </div>
 
-      {/* Footer: tags + join/leave */}
-      <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-hl-border">
-        <span className="flex items-center gap-1 text-[11px] text-hl-muted">
-          <Gamepad2 className="w-3.5 h-3.5" /> {party.game}
+      {/* Footer: chips + actions */}
+      <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-hl-border">
+        <span className={`${CHIP_CLS} !text-white font-bold`}>
+          <Users className="w-3 h-3" /> {party.name}
+          {party.isPrivate && <Lock className="w-3 h-3 text-hl-gold" />}
         </span>
-        <span className="flex items-center gap-1 text-[11px] text-hl-muted">
-          <Globe className="w-3.5 h-3.5" /> {party.region}
+        <span className={CHIP_CLS}><Gamepad2 className="w-3 h-3" /> {party.game}</span>
+        <span className={CHIP_CLS}><Globe className="w-3 h-3" /> {party.region}</span>
+        <span className={`${CHIP_CLS} !text-hl-gold`}><Swords className="w-3 h-3" /> {party.matchType} · {party.gameMode}</span>
+        <span className={CHIP_CLS}>
+          <RankBadge rank={party.minSkill as RankTierLetter} size="sm" showGlow={false} className="!w-4 !h-4" />
+          –
+          <RankBadge rank={party.maxSkill as RankTierLetter} size="sm" showGlow={false} className="!w-4 !h-4" />
         </span>
-        <span className="text-[11px] text-hl-gold font-semibold">{party.matchType}</span>
-        <span className="text-[11px] text-hl-muted">{party.gameMode}</span>
-        {party.voiceRequired && (
-          <span className="flex items-center gap-1 text-[11px] text-hl-muted">
-            <Mic className="w-3.5 h-3.5" /> Voice
-          </span>
-        )}
-        {party.verifiedOnly && (
-          <span className="flex items-center gap-1 text-[11px] text-hl-teal">
-            <ShieldCheck className="w-3.5 h-3.5" /> Verified
-          </span>
-        )}
-        <span className="text-[11px] text-hl-muted">{party.language}</span>
+        {party.vibe && <span className={CHIP_CLS}><Sparkles className="w-3 h-3 text-hl-gold" /> {party.vibe}</span>}
+        {party.language !== "Any" && <span className={CHIP_CLS}><Languages className="w-3 h-3" /> {party.language}</span>}
+        {party.countries !== "Any" && <span className={CHIP_CLS}><Globe className="w-3 h-3" /> {party.countries}</span>}
+        {party.voiceRequired && <span className={CHIP_CLS}><Mic className="w-3 h-3" /> Voice</span>}
+        {party.verifiedOnly && <span className={`${CHIP_CLS} !text-hl-teal`}><ShieldCheck className="w-3 h-3" /> Verified</span>}
 
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs text-hl-muted">{party.members.length}/{party.maxSize}</span>
