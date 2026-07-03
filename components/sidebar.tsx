@@ -76,11 +76,20 @@ export function Sidebar() {
   const pathname = usePathname();
   const [session, setSession] = useState<UserSession | null>(null);
 
+  // Only update on a definitive 200; a transient error keeps the last known
+  // session so the sidebar doesn't flip to "Log in" at random.
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => setSession(d.user ?? null))
+    let cancelled = false;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || d === null) return;
+        setSession(d.user ?? null);
+      })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
   const isActive = (item: NavItem) => {

@@ -22,15 +22,24 @@ export function Navbar() {
   const [session, setSession] = useState<UserSession | null>(null);
   const pathname = usePathname();
 
-  // Fetch session
+  // Fetch session. Only change the UI on a definitive answer (a 200 telling us
+  // who the user is, or that they're logged out). On a transient error/non-OK
+  // response we keep the current state instead of flipping to "logged out" —
+  // that flip was what made login appear to drop at random.
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
+    let cancelled = false;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data.user) setSession(data.user);
-        else setSession(null);
+        if (cancelled || data === null) return;
+        setSession(data.user ?? null);
       })
-      .catch(console.error);
+      .catch(() => {
+        /* transient — keep the last known session */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
   const navLinks = [
