@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPlayer, getMatchesForPlayer, getMostPlayedWith, mapRank } from "@/lib/db";
+import { getEquippedCosmetics } from "@/lib/cosmetics";
 import { avatarUrl, prettyMap, prettyRegion, regionMeta } from "@/lib/format";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
 
@@ -97,6 +98,7 @@ export async function GET(
       placementDone: player.placement_done === 1,
       placementGamesPlayed: player.placement_games_played,
       playedWith: await getMostPlayedWith(decodedName, 10),
+      cosmetics: await getEquippedCosmetics(decodedName),
       matchHistory: matches.map((m) => ({
         id: `M-${m.id}`,
         date: m.timestamp?.split(" ")[0] || "",

@@ -21,7 +21,7 @@ import {
   MatchFilters,
 } from "@/components/stats-filters";
 import { RANK_TIERS } from "@/data/ranks";
-import { Player, Match, RankTierLetter } from "@/types";
+import { Player, Match, RankTierLetter, ProfileCosmetics } from "@/types";
 import {
   Settings,
   MoreHorizontal,
@@ -32,6 +32,7 @@ import {
   ArrowDown,
   ListChecks,
   ArrowUpRight,
+  Award,
 } from "lucide-react";
 
 type SubTab = "summary" | "matches" | "stats";
@@ -43,6 +44,37 @@ interface ProfilePlayer extends Player {
   country?: string | null;
   countryName?: string | null;
   countryFlag?: string | null;
+  cosmetics?: ProfileCosmetics;
+}
+
+/** Equipped badge icon with a lucide fallback when the asset is missing. */
+function ProfileBadgeIcon({
+  badge,
+}: {
+  badge: { slug: string; name: string; description: string; asset: string | null };
+}) {
+  const [broken, setBroken] = useState(false);
+  const tooltip = badge.description ? `${badge.name} — ${badge.description}` : badge.name;
+  if (badge.asset && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={badge.asset}
+        alt={badge.name}
+        title={tooltip}
+        className="w-7 h-7 object-contain"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  return (
+    <span
+      title={tooltip}
+      className="w-7 h-7 rounded-full bg-hl-gold/10 border border-hl-gold/30 flex items-center justify-center"
+    >
+      <Award className="w-4 h-4 text-hl-gold" />
+    </span>
+  );
 }
 
 interface LbPlayer {
@@ -263,8 +295,27 @@ function ProfileContent() {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid lg:grid-cols-[300px_1fr] gap-6 items-start">
       {/* ================= LEFT SIDEBAR CARD ================= */}
       <div className="space-y-4">
-        <Card className="bg-hl-panel border-hl-border p-5">
-          <div className="flex flex-col items-center text-center">
+        <Card className="bg-hl-panel border-hl-border p-5 relative overflow-hidden">
+          {/* Equipped profile card: banner behind the header (FACEIT-style). */}
+          {player.cosmetics?.card?.asset && (
+            <div className="absolute inset-x-0 top-0 h-28 pointer-events-none">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={player.cosmetics.card.asset}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget.parentElement as HTMLElement).style.display = "none";
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-hl-panel/60 to-hl-panel" />
+            </div>
+          )}
+          <div
+            className={`flex flex-col items-center text-center relative z-10 ${
+              player.cosmetics?.card?.asset ? "pt-10" : ""
+            }`}
+          >
             <Avatar className="w-28 h-28 border-4 border-hl-border shadow-xl mb-4">
               {player.avatarUrl ? <AvatarImage src={player.avatarUrl} alt={player.username} /> : null}
               <AvatarFallback className="bg-hl-panel-light text-2xl font-bold text-hl-gold">
@@ -276,6 +327,12 @@ function ProfileContent() {
               <h1 className="text-xl font-black text-white">{player.username}</h1>
               <Link href="/settings" className="text-hl-muted hover:text-white"><Settings className="w-4 h-4" /></Link>
             </div>
+            {/* Equipped title */}
+            {player.cosmetics?.title && (
+              <div className="text-xs font-semibold italic text-hl-gold mt-0.5">
+                {player.cosmetics.title}
+              </div>
+            )}
             <div className="flex items-center gap-1.5 text-xs text-hl-muted mt-1">
               <MapPin className="w-3.5 h-3.5" /> {player.countryName || player.region} · HyperLeague
             </div>
@@ -316,6 +373,18 @@ function ProfileContent() {
             </div>
             {friendMsg && <div className="mt-2 text-xs text-hl-gold">{friendMsg}</div>}
           </div>
+
+          {/* Equipped badges */}
+          {player.cosmetics && player.cosmetics.badges.length > 0 && (
+            <div className="mt-5 pt-5 border-t border-hl-border">
+              <div className="text-[11px] header-caps text-hl-muted mb-2">Badges</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {player.cosmetics.badges.map((b) => (
+                  <ProfileBadgeIcon key={b.slug} badge={b} />
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-5 pt-5 border-t border-hl-border">
             <div className="text-[11px] header-caps text-hl-muted mb-1">Bio</div>

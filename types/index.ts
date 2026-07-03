@@ -74,6 +74,31 @@ export interface Player {
   placementGamesPlayed?: number;
 }
 
+/** Cosmetic item types (profile customization inventory). */
+export type CosmeticType = "card" | "title" | "badge";
+
+/** An owned cosmetic item, as returned by /api/inventory. */
+export interface InventoryItem {
+  id: number;
+  slug: string;
+  type: CosmeticType;
+  name: string;
+  description: string;
+  asset: string | null;
+  category: string | null;
+  season: string | null;
+  rarity: string;
+  grantedAt: number;
+  equipped: boolean;
+}
+
+/** Equipped cosmetics rendered on a public profile. */
+export interface ProfileCosmetics {
+  card: { slug: string; name: string; asset: string | null } | null;
+  title: string | null;
+  badges: { slug: string; name: string; description: string; asset: string | null }[];
+}
+
 /** Single match record */
 export interface Match {
   id: string;

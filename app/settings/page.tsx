@@ -9,6 +9,7 @@ import { UserSession } from "@/types";
 import { PageHeader } from "@/components/page-header";
 import { CountrySelect } from "@/components/country-select";
 import { LogoutButton } from "@/components/logout-button";
+import { InventoryPanel } from "@/components/inventory-panel";
 import { Flag } from "@/components/flag";
 import { countryName, flagPath } from "@/lib/countries";
 import {
@@ -21,6 +22,7 @@ import {
   ArrowUpRight,
   Info,
   MapPin,
+  Sparkles,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -217,6 +219,19 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </Card>
+      )}
+
+      {/* Inventory & profile customization (only when linked to a player) */}
+      {session.playerName && (
+        <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+          <h2 className="text-sm font-bold text-white header-caps mb-1 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-hl-gold" /> Inventory &amp; Customization
+          </h2>
+          <p className="text-xs text-hl-muted mb-4">
+            Equip a profile card, title and up to 5 badges — they show on your public profile.
+          </p>
+          <InventoryPanel />
         </Card>
       )}
 
