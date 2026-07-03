@@ -8,7 +8,20 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { LobbySlots, LobbyMember } from "@/components/lobby-slots";
 import { UserSession, RankTierLetter } from "@/types";
-import { AlertCircle, Users, Loader2, Search } from "lucide-react";
+import {
+  AlertCircle,
+  Users,
+  Loader2,
+  Search,
+  Swords,
+  Info,
+  ShieldCheck,
+  Activity,
+  Medal,
+  Star,
+  Coins,
+  Zap,
+} from "lucide-react";
 
 interface WebQueueEntry {
   id: number;
@@ -21,9 +34,13 @@ interface WebQueueEntry {
 interface PlayerInfo {
   rank: RankTierLetter;
   elo: number;
+  peakElo: number;
+  wins: number;
   avatarUrl: string;
   country: string | null;
   card: string | null;
+  placementDone: boolean;
+  placementGamesPlayed: number;
 }
 
 // Minimal shape of the party API response (avoids importing lib/parties, which
@@ -44,11 +61,61 @@ interface PartyLite {
   members: PartyMemberLite[];
 }
 
-const MATCH_TYPES = [
-  { id: "standard", label: "Standard", desc: "Balanced 5v5 ranked" },
-  { id: "super", label: "Super", desc: "Higher ELO stakes" },
-  { id: "premium", label: "Premium", desc: "Verified players only" },
+interface MatchTypeFeature {
+  icon: typeof Users;
+  text: string;
+  star?: boolean;
+}
+
+/** FACEIT-style match-type cards: header + a grid of requirement chips. */
+const MATCH_TYPES: {
+  id: string;
+  label: string;
+  green?: boolean;
+  features: MatchTypeFeature[];
+}[] = [
+  {
+    id: "standard",
+    label: "Standard Match",
+    features: [
+      { icon: Users, text: "All party sizes" },
+      { icon: ShieldCheck, text: "Verified Matching", star: true },
+      { icon: Activity, text: "No Elo restrictions" },
+      { icon: Medal, text: "Veteran Matching", star: true },
+    ],
+  },
+  {
+    id: "super",
+    label: "Super Match",
+    green: true,
+    features: [
+      { icon: Users, text: "Solo, duo, trio" },
+      { icon: ShieldCheck, text: "Verified Matching", star: true },
+      { icon: Activity, text: "400 Elo range" },
+      { icon: Medal, text: "Veteran Matching", star: true },
+      { icon: Star, text: "Premium flex" },
+    ],
+  },
+  {
+    id: "premium",
+    label: "Premium Match",
+    green: true,
+    features: [
+      { icon: Users, text: "Solo or duo" },
+      { icon: ShieldCheck, text: "Verified required" },
+      { icon: Activity, text: "400 Elo range" },
+      { icon: Medal, text: "Veteran required" },
+      { icon: Star, text: "Premium Required" },
+      { icon: Coins, text: "High stakes" },
+    ],
+  },
 ];
+
+/** Ranked tier ladder for the skill-level segments in the header. */
+const TIER_LADDER: RankTierLetter[] = ["D", "C", "B", "A1", "A2", "A3", "S1", "S2", "S3"];
+
+/** Placement games required before a rank is assigned (matches the bot). */
+const PLACEMENT_GAMES = 3;
 
 export default function QueuePage() {
   const [session, setSession] = useState<UserSession | null>(null);
@@ -101,7 +168,17 @@ export default function QueuePage() {
     if (session?.playerName) {
       fetch(`/api/players/${encodeURIComponent(session.playerName)}`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => d && setPlayer({ rank: d.rank, elo: d.elo, avatarUrl: d.avatarUrl, country: d.country, card: d.cosmetics?.card?.asset ?? null }))
+        .then((d) => d && setPlayer({
+          rank: d.rank,
+          elo: d.elo,
+          peakElo: d.peakElo ?? d.elo,
+          wins: d.stats?.wins ?? 0,
+          avatarUrl: d.avatarUrl,
+          country: d.country,
+          card: d.cosmetics?.card?.asset ?? null,
+          placementDone: !!d.placementDone,
+          placementGamesPlayed: d.placementGamesPlayed ?? 0,
+        }))
         .catch(() => { });
     }
   }, [session?.playerName]);
@@ -154,6 +231,7 @@ export default function QueuePage() {
       leader: true,
       country: player?.country ?? null,
       card: player?.card ?? null,
+      self: true,
     }
     : null;
 
@@ -171,11 +249,18 @@ export default function QueuePage() {
         leader: m.discordId === party.leaderId,
         country: (isMe ? player?.country ?? m.country : m.country) ?? null,
         card: (isMe ? player?.card ?? m.card : m.card) ?? null,
+        self: isMe,
       };
     });
   } else {
     lobbyMembers = you ? [you] : [];
   }
+
+  // Header banner state: placement progress until ranked, tier ladder after.
+  const placed = !!player?.placementDone;
+  const placementPlayed = Math.min(player?.placementGamesPlayed ?? 0, PLACEMENT_GAMES);
+  const tierIdx = player ? TIER_LADDER.indexOf(player.rank) : -1;
+  const wins = player?.wins ?? 0;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -187,35 +272,94 @@ export default function QueuePage() {
         </div>
       </div>
 
-      {/* Season + rank display */}
-      <Card className="bg-hl-panel border-hl-border p-5 mb-6 flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-3">
-          {player ? <RankBadge rank={player.rank} size="lg" /> : <RankBadge rank="UNRANKED" size="lg" />}
-          <div>
-            <div className="text-xs text-hl-muted header-caps">Season 1</div>
-            <div className="stat-number text-2xl text-hl-gold">{player?.elo ?? "—"}</div>
+      {/* Queue region pill */}
+      <div className="flex justify-center mb-5">
+        <span className="bg-gold-gradient text-hl-base rounded-full px-4 py-1.5 text-xs font-black header-caps">
+          Europe 5v5 Queue
+        </span>
+      </div>
+
+      {/* Season / skill-level banner (FACEIT-style) */}
+      <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+        <div className="flex flex-wrap items-center gap-5">
+          <RankBadge rank={player?.rank ?? "UNRANKED"} size="lg" />
+          <div className="min-w-0">
+            <span className="inline-block bg-hl-panel-light text-hl-muted rounded-full px-3 py-0.5 text-[11px] font-bold mb-1.5">
+              Season 1
+            </span>
+            <div className="text-3xl font-black text-white leading-tight">
+              {placed && player ? player.rank : "Unranked"}
+            </div>
+            {placed && player ? (
+              <>
+                <div className="flex items-center gap-1.5 mt-2">
+                  {TIER_LADDER.map((t, i) => (
+                    <span
+                      key={t}
+                      className={`w-7 h-1 rounded-full ${i <= tierIdx ? "bg-hl-gold" : "bg-hl-border"}`}
+                    />
+                  ))}
+                </div>
+                <div className="text-[11px] text-hl-muted mt-1.5">
+                  ELO <b className="text-white stat-number">{player.elo}</b> · Peak{" "}
+                  <b className="text-white stat-number">{player.peakElo}</b>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5 mt-2">
+                  {Array.from({ length: PLACEMENT_GAMES }).map((_, i) => (
+                    <span
+                      key={i}
+                      className={`w-7 h-1 rounded-full ${i < placementPlayed ? "bg-hl-gold" : "bg-hl-border"}`}
+                    />
+                  ))}
+                </div>
+                <div className="text-[11px] text-hl-muted mt-1.5">
+                  <b className="text-hl-gold">{PLACEMENT_GAMES - placementPlayed} matches left</b> to get your{" "}
+                  <span className="text-hl-gold">Skill Level</span>
+                </div>
+              </>
+            )}
           </div>
-        </div>
-        <div className="ml-auto text-right">
-          <div className="text-xs text-hl-muted header-caps">Region</div>
-          <div className="text-sm font-bold text-white">EU · Blox Strike</div>
+
+          {/* Prestige path */}
+          <div className="ml-auto flex items-center gap-4 rounded-xl border border-hl-border bg-hl-panel-light/40 p-4 w-full sm:w-auto sm:min-w-[300px]">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] header-caps text-hl-gold">Season 1 Prestige Path</div>
+              <div className="text-sm font-bold text-white mt-1">Get 20 wins</div>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-hl-base rounded-full">
+                  <div
+                    className="h-1.5 bg-gold-gradient rounded-full"
+                    style={{ width: `${Math.min(100, (wins / 20) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-xs text-hl-muted">
+                  <b className="text-white stat-number">{Math.min(wins, 20)}</b> /20
+                </span>
+              </div>
+            </div>
+            <div className="w-12 h-12 shrink-0 rounded-lg bg-hl-base border border-hl-gold/40 flex items-center justify-center text-hl-gold font-black text-sm">
+              S1
+            </div>
+          </div>
         </div>
       </Card>
 
       {/* Lobby slots */}
       <Card className="bg-hl-panel border-hl-border p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-white header-caps flex items-center gap-2">
-            <Users className="w-4 h-4 text-hl-gold" /> Your Lobby
-          </h2>
-          {inQueue && (
+        {inQueue && (
+          <div className="flex justify-end mb-3">
             <Badge className="bg-hl-green/15 text-hl-green border-hl-green/30 animate-pulse-glow">
               <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Searching…
             </Badge>
-          )}
-        </div>
+          </div>
+        )}
 
-        <LobbySlots members={lobbyMembers} size={5} findPartiesHref="/party-finder" />
+        <div className="py-3">
+          <LobbySlots members={lobbyMembers} size={5} findPartiesHref="/party-finder" />
+        </div>
 
         {/* Warning banner */}
         {session && !canQueue && (
@@ -257,23 +401,58 @@ export default function QueuePage() {
         </div>
       </Card>
 
-      {/* Match type selector */}
-      <div className="grid sm:grid-cols-3 gap-3 mb-6">
-        {MATCH_TYPES.map((mt) => (
-          <button
-            key={mt.id}
-            onClick={() => setMatchType(mt.id)}
-            className={`text-left p-4 rounded-xl border transition-colors ${matchType === mt.id
-                ? "border-hl-gold/50 bg-hl-gold/10"
-                : "border-hl-border bg-hl-panel hover:border-hl-gold/30"
-              }`}
-          >
-            <div className={`text-sm font-bold ${matchType === mt.id ? "text-hl-gold" : "text-white"}`}>
-              {mt.label}
-            </div>
-            <div className="text-xs text-hl-muted mt-0.5">{mt.desc}</div>
-          </button>
-        ))}
+      {/* Match type selector (FACEIT-style requirement cards) */}
+      <div className="mb-6">
+        <div className="border-b border-hl-border mb-4">
+          <div className="inline-flex items-center gap-2 pb-3 border-b-2 border-hl-gold">
+            <Swords className="w-4 h-4 text-hl-gold" />
+            <span className="text-sm font-bold text-hl-gold header-caps">Match Type</span>
+          </div>
+        </div>
+        <div className="grid md:grid-cols-3 gap-4 items-start">
+          {MATCH_TYPES.map((mt) => {
+            const active = matchType === mt.id;
+            return (
+              <button
+                key={mt.id}
+                onClick={() => setMatchType(mt.id)}
+                className={`relative w-full text-left p-4 rounded-xl border transition-colors overflow-hidden bg-hl-panel ${
+                  active ? "border-white/60" : "border-hl-border hover:border-hl-gold/40"
+                }`}
+              >
+                {mt.green && (
+                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-hl-green/15 to-transparent pointer-events-none" />
+                )}
+                <div className="relative flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {mt.green ? (
+                      <Zap className="w-4 h-4 text-hl-green shrink-0" />
+                    ) : (
+                      <Swords className="w-4 h-4 text-white shrink-0" />
+                    )}
+                    <span className={`text-sm font-bold truncate ${mt.green ? "text-hl-green" : "text-white"}`}>
+                      {mt.label}
+                    </span>
+                    <span className="text-xs text-hl-muted shrink-0">· 5v5</span>
+                  </div>
+                  <Info className="w-4 h-4 text-hl-muted shrink-0" />
+                </div>
+                <div className="relative grid grid-cols-2 gap-2">
+                  {mt.features.map(({ icon: FeatIcon, text, star }) => (
+                    <div
+                      key={text}
+                      className="flex items-center gap-1.5 rounded-md bg-hl-base/70 border border-hl-border/60 px-2 py-2"
+                    >
+                      <FeatIcon className="w-3.5 h-3.5 text-hl-muted shrink-0" />
+                      <span className="text-[10px] font-semibold text-white/85 leading-tight min-w-0">{text}</span>
+                      {star && <Star className="w-3 h-3 text-hl-green fill-current ml-auto shrink-0" />}
+                    </div>
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Web queue list */}
@@ -309,6 +488,11 @@ export default function QueuePage() {
           )}
         </div>
       </Card>
+
+      {/* Footer stat strip */}
+      <div className="mt-6 border-t border-hl-border pt-4 text-center text-xs text-hl-muted">
+        Players queueing: <b className="text-white stat-number">{queue.length}</b>
+      </div>
     </div>
   );
 }
