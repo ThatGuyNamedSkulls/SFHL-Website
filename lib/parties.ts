@@ -17,9 +17,9 @@ import { randomUUID } from "crypto";
 import { client } from "@/lib/db";
 import { clearInvitesForParties } from "@/lib/social";
 
-/** 10 minutes without any party operation (create/join/leave) before a party
+/** 30 minutes without any party operation (create/join/leave) before a party
  *  is auto-disbanded. */
-const PARTY_TTL_MS = 10 * 60 * 1000;
+const PARTY_TTL_MS = 30 * 60 * 1000;
 
 export interface PartyMember {
   discordId: string;

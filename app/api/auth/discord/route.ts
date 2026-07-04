@@ -25,7 +25,7 @@ export async function GET() {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 60 * 10, // 10 minutes to complete the flow
+    maxAge: 60 * 30, // 30 minutes to complete the flow
     path: "/",
   });
   return response;
