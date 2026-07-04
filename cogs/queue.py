@@ -10,6 +10,7 @@ import itertools
 import json
 import logging
 import random
+import time
 
 import discord
 from discord import app_commands
@@ -43,6 +44,55 @@ async def _save_queue_message_ref(channel_id: int, message_id: int) -> None:
         "INSERT OR REPLACE INTO bot_state (key, value) VALUES ('queue_message', ?)",
         (f"{channel_id}:{message_id}",),
     )
+
+
+async def _persist_web_lobby(channel, guild, team1, team2) -> None:
+    """Write a post-queue lobby row the website reads to show matched players
+    their teams + a link to this Discord channel. Supersedes any older lobby
+    that still lists one of these players (they can only be in one match)."""
+    try:
+        members = [
+            {"discordId": str(p.id), "name": p.display_name, "team": team_no}
+            for team_no, team in ((1, team1), (2, team2))
+            for p in team
+        ]
+        data = {
+            "id": str(channel.id),
+            "channelId": str(channel.id),
+            "channelName": channel.name,
+            "guildId": str(guild.id),
+            "map": None,
+            "createdAt": int(time.time() * 1000),
+            "members": members,
+        }
+        await db.execute(
+            "CREATE TABLE IF NOT EXISTS web_lobbies "
+            "(id TEXT PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL)"
+        )
+        new_ids = {m["discordId"] for m in members}
+        rows = await db.fetchall("SELECT id, data FROM web_lobbies")
+        for row in rows:
+            try:
+                old = json.loads(row[1])
+            except (json.JSONDecodeError, TypeError):
+                await db.execute("DELETE FROM web_lobbies WHERE id = ?", (row[0],))
+                continue
+            if any(m.get("discordId") in new_ids for m in old.get("members", [])):
+                await db.execute("DELETE FROM web_lobbies WHERE id = ?", (row[0],))
+        await db.execute(
+            "INSERT OR REPLACE INTO web_lobbies (id, data, created_at) VALUES (?, ?, ?)",
+            (data["id"], json.dumps(data), data["createdAt"]),
+        )
+    except Exception:
+        logger.exception("Failed to persist web lobby")
+
+
+async def _clear_web_lobbies() -> None:
+    """Drop all post-queue lobby rows (used by /resetqueue and /resetdb)."""
+    try:
+        await db.execute("DELETE FROM web_lobbies")
+    except Exception:
+        logger.exception("Failed to clear web_lobbies")
 
 
 async def _save_queue_mode(team_size: int) -> None:
@@ -164,9 +214,12 @@ class QueueView(View):
             if e.code == 50027 and hasattr(self.message, "channel"):
                 await self.recreate_queue_message(self.message.channel)
 
-    async def create_game_channel(self, interaction: discord.Interaction, players):
-        """Create the private game channel, balance teams, and start the map veto."""
-        guild = interaction.guild
+    async def create_game_channel(self, guild: discord.Guild, players):
+        """Create the private game channel, balance teams, and start the map veto.
+
+        Takes a ``guild`` directly (not an ``interaction``) so both the Join
+        button and the web-queue poll loop can start a match the same way.
+        """
         # Empty the queue that just filled and start a fresh one. We must NOT use
         # get_current_queue().clear() here: the filled queue has len ==
         # queue_size, so get_current_queue() would roll over to a new empty queue
@@ -291,6 +344,10 @@ class QueueView(View):
         )
         await channel.send(embed=teams_embed)
 
+        # Persist a post-queue lobby so website players see their match (teams +
+        # a link to this Discord channel) after the queue fills.
+        await _persist_web_lobby(channel, guild, team1, team2)
+
         coin_flip = random.choice([captain1, captain2])
         await channel.send(f"🎲 **Coin flip result:** {coin_flip.mention} will start the map selection!")
         if coin_flip == captain1:
@@ -364,7 +421,7 @@ class QueueView(View):
                 for item in self.children:
                     item.disabled = True
                 await self.message.edit(embed=self.get_queue_embed(), view=self)
-                await self.create_game_channel(interaction, current_queue[: GAME.queue_size])
+                await self.create_game_channel(interaction.guild, current_queue[: GAME.queue_size])
         except discord.InteractionResponded:
             await self.recreate_queue_message(interaction.channel)
             try:
@@ -603,10 +660,20 @@ class QueueCog(commands.Cog):
 
             if queue_changed:
                 await self._refresh_queue_message()
-                if len(current_queue) >= GAME.queue_size:
+                # Auto-start a web-filled queue the same way the Join button
+                # does — but only when staff have an open queue message (so a
+                # match never spawns out of nowhere). create_game_channel empties
+                # the filled queue and persists the post-queue lobby.
+                if len(current_queue) >= GAME.queue_size and self.queue_view.message is not None:
+                    players = current_queue[: GAME.queue_size]
+                    for item in self.queue_view.children:
+                        item.disabled = True
+                    await self._refresh_queue_message()
+                    await self.queue_view.create_game_channel(guild, players)
+                elif len(current_queue) >= GAME.queue_size:
                     logger.info(
-                        "Queue filled from the website. Run /queue in Discord to "
-                        "start the match (web-initiated auto-start isn't supported)."
+                        "Queue filled from the website but no open queue message; "
+                        "run /queue in Discord to start the match."
                     )
 
         except Exception as e:
@@ -702,6 +769,7 @@ class QueueCog(commands.Cog):
             await db.execute("DELETE FROM web_queue")
         except Exception:
             logger.exception("Failed to clear web_queue on /resetqueue")
+        await _clear_web_lobbies()
         # Re-enable buttons in case a match start left them disabled.
         for item in self.queue_view.children:
             item.disabled = False

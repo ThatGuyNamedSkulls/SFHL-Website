@@ -395,6 +395,12 @@ class MatchflowCog(commands.Cog):
                    placement_games_played = 0, placement_done = 0"""
             )
 
+            # Drop any stale post-queue lobbies from last season.
+            try:
+                await db.execute("DELETE FROM web_lobbies")
+            except Exception:
+                logger.exception("Failed to clear web_lobbies on /resetdb")
+
             # Everyone is at 0 Elo now — revoke the dynamic Top 10 badge from
             # last season's holders right away instead of waiting for the task.
             try:
