@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { LobbySlots, LobbyMember } from "@/components/lobby-slots";
 import { UserSession, RankTierLetter } from "@/types";
@@ -21,7 +21,25 @@ import {
   Star,
   Coins,
   Zap,
+  PartyPopper,
+  ExternalLink,
 } from "lucide-react";
+
+interface MatchLobbyMember {
+  discordId: string;
+  name: string;
+  team: number;
+  avatar: string | null;
+  rank: RankTierLetter;
+}
+interface MatchLobby {
+  channelId: string;
+  channelName: string;
+  channelUrl: string;
+  map: string | null;
+  createdAt: number;
+  members: MatchLobbyMember[];
+}
 
 interface WebQueueEntry {
   id: number;
@@ -129,6 +147,9 @@ export default function QueuePage() {
   // Global queue format (5 = 5v5, 1 = 1v1), toggled by the bot's /gamemode
   // command and mirrored here from the bot_state table via /api/queue.
   const [teamSize, setTeamSize] = useState(5);
+  // The private post-queue match this user is in (set by the bot when the
+  // queue fills). Shown as a "Match Found" lobby above everything else.
+  const [lobby, setLobby] = useState<MatchLobby | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,10 +162,11 @@ export default function QueuePage() {
   useEffect(() => {
     const fetchQueue = async () => {
       try {
-        const [qRes, sRes, pRes] = await Promise.all([
+        const [qRes, sRes, pRes, lRes] = await Promise.all([
           fetch("/api/queue"),
           fetch("/api/auth/me"),
           fetch("/api/parties"),
+          fetch("/api/lobby"),
         ]);
         const qData = await qRes.json();
         if (!actionInFlight.current) setQueue(qData.queue || []);
@@ -152,6 +174,8 @@ export default function QueuePage() {
         const sData = await sRes.json();
         const me = sData.user as UserSession | undefined;
         if (me) setSession(me);
+        const lData = await lRes.json();
+        setLobby((lData?.lobby as MatchLobby | null) ?? null);
         // Find the party this user belongs to, so we can show teammates in the lobby.
         const pData = await pRes.json();
         const mine = me
@@ -291,6 +315,9 @@ export default function QueuePage() {
           <span className="text-sm font-bold text-hl-gold header-caps">Matchmaking</span>
         </div>
       </div>
+
+      {/* Post-queue lobby (match found) — shown above the queue when active */}
+      {lobby && <MatchLobbyPanel lobby={lobby} />}
 
       {/* Queue region pill */}
       <div className="flex justify-center mb-5">
@@ -520,5 +547,69 @@ export default function QueuePage() {
         Players queueing: <b className="text-white stat-number">{queue.length}</b>
       </div>
     </div>
+  );
+}
+
+/** One team column in the match-found lobby. */
+function LobbyTeam({ label, members }: { label: string; members: MatchLobbyMember[] }) {
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="text-[11px] header-caps text-hl-muted mb-3 text-center">{label}</div>
+      <div className="space-y-2">
+        {members.map((m) => (
+          <div key={m.discordId} className="flex items-center gap-2.5 rounded-lg bg-hl-base/60 border border-hl-border px-3 py-2">
+            <Avatar className="w-8 h-8 border border-hl-border shrink-0">
+              {m.avatar ? <AvatarImage src={m.avatar} /> : null}
+              <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
+                {m.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-bold text-white truncate flex-1">{m.name}</span>
+            <RankBadge rank={m.rank} size="sm" showGlow={false} className="!w-6 !h-6 shrink-0" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** FACEIT-style "Match Found" panel: the private post-queue lobby the bot
+ *  created when the queue filled, with teams and a jump to the Discord channel. */
+function MatchLobbyPanel({ lobby }: { lobby: MatchLobby }) {
+  const team1 = lobby.members.filter((m) => m.team === 1);
+  const team2 = lobby.members.filter((m) => m.team === 2);
+  return (
+    <Card className="relative overflow-hidden bg-hl-panel border-hl-gold/50 p-6 mb-6 shadow-[0_0_30px_rgba(255,85,0,0.15)]">
+      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-hl-gold/15 to-transparent pointer-events-none" />
+      <div className="relative flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-2">
+          <PartyPopper className="w-5 h-5 text-hl-gold" />
+          <h2 className="text-lg font-black text-white header-caps">Match Found</h2>
+          <span className="text-xs text-hl-muted">#{lobby.channelName}</span>
+        </div>
+        <a
+          href={lobby.channelUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm hover:opacity-90 transition-opacity"
+        >
+          Open match channel <ExternalLink className="w-4 h-4" />
+        </a>
+      </div>
+      <div className="relative flex items-stretch gap-3">
+        <LobbyTeam label="Team 1" members={team1} />
+        <div className="flex items-center">
+          <span className="text-sm font-black text-hl-muted">VS</span>
+        </div>
+        <LobbyTeam label="Team 2" members={team2} />
+      </div>
+      <div className="relative mt-4 text-center text-xs text-hl-muted">
+        {lobby.map ? (
+          <>Map: <b className="text-white">{lobby.map}</b></>
+        ) : (
+          "Head to the Discord channel to veto maps and play."
+        )}
+      </div>
+    </Card>
   );
 }
