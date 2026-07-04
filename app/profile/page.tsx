@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarFrame } from "@/components/avatar-frame";
 import { RankBadge } from "@/components/rank-badge";
 import { PerformanceCard } from "@/components/performance-card";
 import { ConsistencyDonut } from "@/components/consistency-donut";
@@ -358,12 +359,14 @@ function ProfileContent() {
               <div className="absolute inset-0 bg-gradient-to-b from-hl-panel-light to-hl-base" />
             )}
             <div className="relative h-full flex flex-col items-center justify-center px-4 text-center">
-              <Avatar className="w-28 h-28 border-4 border-hl-base/70 shadow-xl">
-                {player.avatarUrl ? <AvatarImage src={player.avatarUrl} alt={player.username} /> : null}
-                <AvatarFallback className="bg-hl-panel-light text-2xl font-bold text-hl-gold">
-                  {player.username.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <AvatarFrame frame={player.cosmetics?.frame?.asset}>
+                <Avatar className="w-28 h-28 border-4 border-hl-base/70 shadow-xl">
+                  {player.avatarUrl ? <AvatarImage src={player.avatarUrl} alt={player.username} /> : null}
+                  <AvatarFallback className="bg-hl-panel-light text-2xl font-bold text-hl-gold">
+                    {player.username.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </AvatarFrame>
               <div className="flex items-center gap-2 mt-4">
                 <h1 className="text-xl font-black text-white drop-shadow">{player.username}</h1>
                 {isOwn && (

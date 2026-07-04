@@ -2,17 +2,19 @@
 
 import { useState } from "react";
 import { InventoryItem, CosmeticType } from "@/types";
-import { Award, Check } from "lucide-react";
+import { Award, Check, UserRound } from "lucide-react";
 
 const FILTERS: { id: CosmeticType | "all"; label: string }[] = [
   { id: "all", label: "All" },
   { id: "card", label: "Profile cards" },
+  { id: "frame", label: "Avatar frames" },
   { id: "title", label: "Titles" },
   { id: "badge", label: "Badges" },
 ];
 
 const TYPE_LABEL: Record<CosmeticType, string> = {
   card: "Profile card",
+  frame: "Avatar frame",
   title: "Title",
   badge: "Badge",
 };
@@ -36,6 +38,27 @@ function ItemPreview({ item }: { item: InventoryItem }) {
         className="w-full h-full object-cover"
         onError={() => setBroken(true)}
       />
+    );
+  }
+  if (item.type === "frame") {
+    // Frame preview: the ring overlaid on a placeholder avatar (FACEIT-style).
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="relative w-24 h-24">
+          <div className="w-full h-full rounded-full bg-hl-panel-light border border-hl-border flex items-center justify-center">
+            <UserRound className="w-10 h-10 text-hl-muted" />
+          </div>
+          {item.asset && !broken && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.asset}
+              alt={item.name}
+              className="absolute -inset-[14%] w-[128%] h-[128%] max-w-none object-contain pointer-events-none"
+              onError={() => setBroken(true)}
+            />
+          )}
+        </div>
+      </div>
     );
   }
   if (item.type === "badge") {

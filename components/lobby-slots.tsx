@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarFrame } from "@/components/avatar-frame";
 import { RankBadge } from "@/components/rank-badge";
 import { Flag } from "@/components/flag";
 import { flagPath, countryName } from "@/lib/countries";
@@ -16,6 +17,8 @@ export interface LobbyMember {
   country?: string | null;
   /** Equipped profile-card art, rendered as the slot background. */
   card?: string | null;
+  /** Equipped avatar-frame art, rendered around the avatar. */
+  frame?: string | null;
   /** The logged-in user — rendered in the raised center slot (FACEIT-style). */
   self?: boolean;
 }
@@ -83,14 +86,16 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
                 </div>
               )}
               <div className="relative z-10">
-                <Avatar className={`border-2 border-hl-border shadow-xl ${isCenter ? "w-24 h-24" : "w-16 h-16"}`}>
-                  {member.avatar ? <AvatarImage src={member.avatar} /> : null}
-                  <AvatarFallback className="bg-hl-panel-light text-hl-gold font-bold">
-                    {member.username.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <AvatarFrame frame={member.frame}>
+                  <Avatar className={`border-2 border-hl-border shadow-xl ${isCenter ? "w-24 h-24" : "w-16 h-16"}`}>
+                    {member.avatar ? <AvatarImage src={member.avatar} /> : null}
+                    <AvatarFallback className="bg-hl-panel-light text-hl-gold font-bold">
+                      {member.username.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </AvatarFrame>
                 {member.leader && (
-                  <Crown className="w-4 h-4 text-hl-gold absolute -top-1 -right-1" />
+                  <Crown className="w-4 h-4 text-hl-gold absolute -top-1 -right-1 z-20" />
                 )}
               </div>
               <div className="relative z-10 flex items-center gap-1.5 max-w-full">

@@ -17,8 +17,9 @@ import { randomUUID } from "crypto";
 import { client } from "@/lib/db";
 import { clearInvitesForParties } from "@/lib/social";
 
-/** 30 minutes of inactivity before a party is auto-disbanded. */
-const PARTY_TTL_MS = 30 * 60 * 1000;
+/** 10 minutes without any party operation (create/join/leave) before a party
+ *  is auto-disbanded. */
+const PARTY_TTL_MS = 10 * 60 * 1000;
 
 export interface PartyMember {
   discordId: string;
@@ -28,8 +29,11 @@ export interface PartyMember {
   rank: string;
   elo: number;
   country: string | null;
-  /** Equipped profile-card art at join time (absent on older stored parties). */
+  /** Equipped profile-card art at join time. Display paths re-resolve this at
+   *  read time (withFreshCosmetics), so the snapshot is only a fallback. */
   card?: string | null;
+  /** Equipped avatar-frame art at join time (same read-time refresh applies). */
+  frame?: string | null;
 }
 
 export interface Party {

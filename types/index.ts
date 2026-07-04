@@ -75,7 +75,7 @@ export interface Player {
 }
 
 /** Cosmetic item types (profile customization inventory). */
-export type CosmeticType = "card" | "title" | "badge";
+export type CosmeticType = "card" | "title" | "badge" | "frame";
 
 /** An owned cosmetic item, as returned by /api/inventory. */
 export interface InventoryItem {
@@ -95,6 +95,8 @@ export interface InventoryItem {
 /** Equipped cosmetics rendered on a public profile. */
 export interface ProfileCosmetics {
   card: { slug: string; name: string; asset: string | null } | null;
+  /** Decorative ring PNG rendered around the avatar. */
+  frame: { slug: string; name: string; asset: string | null } | null;
   title: string | null;
   badges: { slug: string; name: string; description: string; asset: string | null }[];
 }
@@ -257,6 +259,8 @@ export interface PartyMemberView {
   country: string | null;
   /** Equipped profile-card art, shown as the member slot background. */
   card?: string | null;
+  /** Equipped avatar-frame art, rendered around the avatar. */
+  frame?: string | null;
 }
 
 export interface PartyView {

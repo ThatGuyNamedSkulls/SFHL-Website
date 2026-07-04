@@ -1,7 +1,7 @@
-import { PartyMember } from "@/lib/parties";
+import { Party, PartyMember } from "@/lib/parties";
 import { getPlayer, mapRank } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
-import { getEquippedCosmetics } from "@/lib/cosmetics";
+import { getEquippedCosmetics, getEquippedVisualsMap, EquippedVisuals } from "@/lib/cosmetics";
 import { resolvePlayerAvatar } from "@/lib/avatar";
 import { isValidCountry } from "@/lib/countries";
 import { UserSession } from "@/types";
@@ -13,6 +13,7 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
   let avatar = session.avatar ?? null;
   let country: string | null = null;
   let card: string | null = null;
+  let frame: string | null = null;
 
   // Remember this player's Discord id so the bot can DM them by id.
   upsertWebUser(session.discordId, session.playerName, session.username).catch(() => {});
@@ -27,9 +28,11 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
       if (dbAvatar) avatar = dbAvatar;
     }
     try {
-      card = (await getEquippedCosmetics(session.playerName)).card?.asset ?? null;
+      const cosmetics = await getEquippedCosmetics(session.playerName);
+      card = cosmetics.card?.asset ?? null;
+      frame = cosmetics.frame?.asset ?? null;
     } catch {
-      /* cosmetics schema not ready — no card */
+      /* cosmetics schema not ready — no card/frame */
     }
   }
 
@@ -42,5 +45,28 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
     elo,
     country,
     card,
+    frame,
   };
+}
+
+/**
+ * Replace each member's stored card/frame snapshot with their *currently*
+ * equipped ones (single query for all members). Without this, a cosmetic
+ * change after joining would never show up in the party finder or queue
+ * lobby, because parties store members as JSON snapshots.
+ */
+export async function withFreshCosmetics<T extends Party>(parties: T[]): Promise<T[]> {
+  let visuals: Map<string, EquippedVisuals>;
+  try {
+    visuals = await getEquippedVisualsMap();
+  } catch {
+    return parties; // cosmetics schema not ready — keep the snapshots
+  }
+  return parties.map((p) => ({
+    ...p,
+    members: p.members.map((m) => {
+      const v = m.playerName ? visuals.get(m.playerName) : undefined;
+      return { ...m, card: v?.card ?? null, frame: v?.frame ?? null };
+    }),
+  }));
 }

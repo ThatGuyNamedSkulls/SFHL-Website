@@ -15,7 +15,7 @@
 
 import { client } from "@/lib/db";
 
-export type CosmeticType = "card" | "title" | "badge";
+export type CosmeticType = "card" | "title" | "badge" | "frame";
 
 export interface InventoryItem {
   id: number; // catalog item id (what equip endpoints take)
@@ -34,6 +34,7 @@ export interface InventoryItem {
 /** Equipped cosmetics as rendered on a public profile. */
 export interface ProfileCosmetics {
   card: { slug: string; name: string; asset: string | null } | null;
+  frame: { slug: string; name: string; asset: string | null } | null;
   title: string | null;
   badges: { slug: string; name: string; description: string; asset: string | null }[];
 }
@@ -180,17 +181,26 @@ export async function setEquipped(
   return "ok";
 }
 
-/** player_name → equipped profile-card asset, for list views (single query). */
-export async function getEquippedCardMap(): Promise<Map<string, string>> {
+/** Equipped card + frame assets for one player, as used by list/lobby views. */
+export interface EquippedVisuals {
+  card: string | null;
+  frame: string | null;
+}
+
+/** player_name → equipped card/frame assets, for list views (single query). */
+export async function getEquippedVisualsMap(): Promise<Map<string, EquippedVisuals>> {
   await ensureCosmeticsSchema();
   const rs = await client.execute(
-    `SELECT inv.player_name AS name, i.asset AS asset
+    `SELECT inv.player_name AS name, i.type AS type, i.asset AS asset
      FROM cosmetic_inventory inv JOIN cosmetic_items i ON i.id = inv.item_id
-     WHERE inv.equipped = 1 AND i.type = 'card' AND i.asset IS NOT NULL`
+     WHERE inv.equipped = 1 AND i.type IN ('card', 'frame') AND i.asset IS NOT NULL`
   );
-  const map = new Map<string, string>();
-  for (const r of rs.rows as unknown as { name: string; asset: string }[]) {
-    if (!map.has(r.name)) map.set(r.name, r.asset);
+  const map = new Map<string, EquippedVisuals>();
+  for (const r of rs.rows as unknown as { name: string; type: string; asset: string }[]) {
+    const v = map.get(r.name) ?? { card: null, frame: null };
+    if (r.type === "card" && !v.card) v.card = r.asset;
+    if (r.type === "frame" && !v.frame) v.frame = r.asset;
+    map.set(r.name, v);
   }
   return map;
 }
@@ -205,11 +215,17 @@ export async function getEquippedCosmetics(playerName: string): Promise<ProfileC
           ORDER BY inv.equipped_at ASC`,
     args: [playerName],
   });
-  const out: ProfileCosmetics = { card: null, title: null, badges: [] };
+  const out: ProfileCosmetics = { card: null, frame: null, title: null, badges: [] };
   for (const r of rs.rows as unknown as Record<string, unknown>[]) {
     const type = r.type as CosmeticType;
     if (type === "card" && !out.card) {
       out.card = {
+        slug: r.slug as string,
+        name: r.name as string,
+        asset: (r.asset as string) ?? null,
+      };
+    } else if (type === "frame" && !out.frame) {
+      out.frame = {
         slug: r.slug as string,
         name: r.name as string,
         asset: (r.asset as string) ?? null,

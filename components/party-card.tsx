@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarFrame } from "@/components/avatar-frame";
 import { RankBadge } from "@/components/rank-badge";
 import { Flag } from "@/components/flag";
 import { PartyView, PartyMemberView, RankTierLetter } from "@/types";
@@ -67,12 +68,14 @@ function MemberSlot({ member, isLeader }: { member: PartyMemberView; isLeader: b
       )}
       {isLeader && <Crown className="relative z-10 w-4 h-4 text-hl-gold -mb-1" />}
       <div className="relative z-10">
-        <Avatar className="w-14 h-14 border-2 border-hl-border">
-          {member.avatar ? <AvatarImage src={member.avatar} /> : null}
-          <AvatarFallback className="bg-hl-panel-light text-xs font-bold text-hl-gold">
-            {member.username.slice(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <AvatarFrame frame={member.frame}>
+          <Avatar className="w-14 h-14 border-2 border-hl-border">
+            {member.avatar ? <AvatarImage src={member.avatar} /> : null}
+            <AvatarFallback className="bg-hl-panel-light text-xs font-bold text-hl-gold">
+              {member.username.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </AvatarFrame>
       </div>
       <div className="relative z-10 flex items-center gap-1 max-w-full">
         <span className="text-xs font-bold text-white truncate">{member.username}</span>

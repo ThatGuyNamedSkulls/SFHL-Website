@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { InventoryItem, CosmeticType } from "@/types";
-import { CreditCard, Type, Award, Check } from "lucide-react";
+import { CreditCard, Type, Award, Check, CircleUserRound, UserRound } from "lucide-react";
 
 const TABS: { id: CosmeticType; label: string; icon: typeof Award }[] = [
   { id: "card", label: "Cards", icon: CreditCard },
+  { id: "frame", label: "Frames", icon: CircleUserRound },
   { id: "title", label: "Titles", icon: Type },
   { id: "badge", label: "Badges", icon: Award },
 ];
@@ -21,6 +22,7 @@ const RARITY_COLORS: Record<string, string> = {
 
 const EMPTY_HINTS: Record<CosmeticType, string> = {
   card: "No profile cards yet — cards are granted by admins and events.",
+  frame: "No avatar frames yet — frames are granted by admins and events.",
   title: "No titles yet — titles are granted by admins and events.",
   badge: "No badges yet — earn them through seasons, top placements and events.",
 };
@@ -42,6 +44,27 @@ function CardPreview({ item }: { item: InventoryItem }) {
         <div className="w-full h-full flex items-center justify-center text-xs font-bold text-hl-muted header-caps">
           {item.name}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Avatar-frame preview: the ring overlaid on a placeholder avatar. */
+function FramePreview({ item }: { item: InventoryItem }) {
+  const [broken, setBroken] = useState(false);
+  return (
+    <div className="relative w-14 h-14 shrink-0">
+      <div className="w-full h-full rounded-full bg-hl-panel-light border border-hl-border flex items-center justify-center">
+        <UserRound className="w-6 h-6 text-hl-muted" />
+      </div>
+      {item.asset && !broken && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.asset}
+          alt={item.name}
+          className="absolute -inset-[14%] w-[128%] h-[128%] max-w-none object-contain pointer-events-none"
+          onError={() => setBroken(true)}
+        />
       )}
     </div>
   );
@@ -167,6 +190,7 @@ export function InventoryPanel() {
               {item.type === "card" && <CardPreview item={item} />}
               <div className={`flex items-center gap-3 ${item.type === "card" ? "mt-3" : ""}`}>
                 {item.type === "badge" && <BadgeIcon item={item} />}
+                {item.type === "frame" && <FramePreview item={item} />}
                 {item.type === "title" && (
                   <span className="px-2.5 py-1 rounded-md bg-hl-gold/10 border border-hl-gold/30 text-hl-gold text-sm font-bold italic shrink-0">
                     {item.name}

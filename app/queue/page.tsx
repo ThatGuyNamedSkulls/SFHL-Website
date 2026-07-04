@@ -39,6 +39,7 @@ interface PlayerInfo {
   avatarUrl: string;
   country: string | null;
   card: string | null;
+  frame: string | null;
   placementDone: boolean;
   placementGamesPlayed: number;
 }
@@ -54,6 +55,7 @@ interface PartyMemberLite {
   elo: number;
   country: string | null;
   card?: string | null;
+  frame?: string | null;
 }
 interface PartyLite {
   id: string;
@@ -176,6 +178,7 @@ export default function QueuePage() {
           avatarUrl: d.avatarUrl,
           country: d.country,
           card: d.cosmetics?.card?.asset ?? null,
+          frame: d.cosmetics?.frame?.asset ?? null,
           placementDone: !!d.placementDone,
           placementGamesPlayed: d.placementGamesPlayed ?? 0,
         }))
@@ -231,6 +234,7 @@ export default function QueuePage() {
       leader: true,
       country: player?.country ?? null,
       card: player?.card ?? null,
+      frame: player?.frame ?? null,
       self: true,
     }
     : null;
@@ -249,6 +253,7 @@ export default function QueuePage() {
         leader: m.discordId === party.leaderId,
         country: (isMe ? player?.country ?? m.country : m.country) ?? null,
         card: (isMe ? player?.card ?? m.card : m.card) ?? null,
+        frame: (isMe ? player?.frame ?? m.frame : m.frame) ?? null,
         self: isMe,
       };
     });

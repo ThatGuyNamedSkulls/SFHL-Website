@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getParty, joinParty } from "@/lib/parties";
-import { memberFromSession } from "@/lib/party-member";
+import { memberFromSession, withFreshCosmetics } from "@/lib/party-member";
 import { clearPartyInvite, hasPartyInvite } from "@/lib/social";
 
 /** POST — join a party (requires auth). Private parties require an invite. */
@@ -33,7 +33,8 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/parties/[i
     }
     // Consume the invite once used.
     if (myName) await clearPartyInvite(id, myName);
-    return NextResponse.json({ party: result });
+    const [freshParty] = await withFreshCosmetics([result]);
+    return NextResponse.json({ party: freshParty });
   } catch (error) {
     console.error("Error joining party:", error);
     return NextResponse.json({ error: "Failed to join party" }, { status: 500 });
