@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, isUserInGuildCached } from "@/lib/auth";
 import { getWebQueue, joinWebQueue, leaveWebQueue, isInWebQueue } from "@/lib/db";
 import { getPartyForMember } from "@/lib/parties";
 import { upsertWebUser } from "@/lib/social";
@@ -26,7 +26,11 @@ export async function POST() {
     );
   }
 
-  if (!session.inGuild) {
+  // Verified = currently in the guild. Re-check live (cached) rather than
+  // trusting the login-time session flag — someone who left the server since
+  // logging in must not be able to queue.
+  const liveInGuild = await isUserInGuildCached(session.discordId);
+  if (liveInGuild === false || (!session.inGuild && liveInGuild !== true)) {
     return NextResponse.json(
       { error: "You must be a member of the SFHL Discord server to join the queue" },
       { status: 403 }
@@ -55,6 +59,29 @@ export async function POST() {
     // only the person who clicked would join. Matches the Discord behaviour
     // where any party member joining queues everyone.
     const party = await getPartyForMember(session.discordId);
+
+    // Every party member must meet the requirements (verified + linked) —
+    // one unverified member blocks the whole party, FACEIT-style.
+    if (party) {
+      const blocked: string[] = [];
+      for (const m of party.members) {
+        if (!m.playerName) {
+          blocked.push(m.username);
+          continue;
+        }
+        const verified = await isUserInGuildCached(m.discordId);
+        if (verified === false) blocked.push(m.playerName || m.username);
+      }
+      if (blocked.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Your party can't queue — these members don't meet the requirements: ${blocked.join(", ")}`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const toQueue = party
       ? party.members
       : [

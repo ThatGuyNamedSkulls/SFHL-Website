@@ -56,6 +56,8 @@ interface PartyMemberLite {
   country: string | null;
   card?: string | null;
   frame?: string | null;
+  verified?: boolean | null;
+  canQueue?: boolean;
 }
 interface PartyLite {
   id: string;
@@ -236,6 +238,8 @@ export default function QueuePage() {
       card: player?.card ?? null,
       frame: player?.frame ?? null,
       self: true,
+      verified: session.inGuild,
+      canQueue,
     }
     : null;
 
@@ -255,11 +259,16 @@ export default function QueuePage() {
         card: (isMe ? player?.card ?? m.card : m.card) ?? null,
         frame: (isMe ? player?.frame ?? m.frame : m.frame) ?? null,
         self: isMe,
+        verified: isMe ? session.inGuild : m.verified ?? null,
+        canQueue: isMe ? canQueue : m.canQueue,
       };
     });
   } else {
     lobbyMembers = you ? [you] : [];
   }
+
+  // One ineligible party member blocks the whole party from queueing.
+  const partyBlocked = lobbyMembers.some((m) => m.canQueue === false);
 
   // Header banner state: placement progress until ranked, tier ladder after.
   const placed = !!player?.placementDone;
@@ -375,6 +384,12 @@ export default function QueuePage() {
               : "Your Discord account is not linked to a HyperLeague player. Contact an admin."}
           </div>
         )}
+        {session && canQueue && partyBlocked && (
+          <div className="mt-5 p-4 rounded-xl bg-hl-gold/10 border border-hl-gold/30 text-hl-gold flex items-center gap-2 text-sm">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            There are requirements one or more party members don&apos;t meet — check the warning icon above their card.
+          </div>
+        )}
 
         {error && (
           <div className="mt-5 p-4 rounded-xl bg-hl-red/10 border border-hl-red/20 text-hl-red flex items-center gap-2 text-sm">
@@ -394,11 +409,11 @@ export default function QueuePage() {
           ) : (
             <button
               onClick={inQueue ? handleLeave : handleJoin}
-              disabled={actionLoading || loading || (!canQueue && !inQueue)}
+              disabled={actionLoading || loading || ((!canQueue || partyBlocked) && !inQueue)}
               className={`inline-flex items-center gap-2 px-12 py-4 rounded-xl font-black text-lg header-caps transition-all ${inQueue
                   ? "bg-hl-red/10 text-hl-red border border-hl-red/30 hover:bg-hl-red/20"
                   : "find-match-btn text-hl-base"
-                } ${(actionLoading || loading || (!canQueue && !inQueue)) && "opacity-50 cursor-not-allowed"}`}
+                } ${(actionLoading || loading || ((!canQueue || partyBlocked) && !inQueue)) && "opacity-50 cursor-not-allowed"}`}
             >
               {actionLoading ? "Processing…" : inQueue ? "Cancel" : "Find Match"}
             </button>

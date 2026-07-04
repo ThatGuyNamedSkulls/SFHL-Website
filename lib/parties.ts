@@ -34,6 +34,10 @@ export interface PartyMember {
   card?: string | null;
   /** Equipped avatar-frame art at join time (same read-time refresh applies). */
   frame?: string | null;
+  /** Live guild-membership check, attached at read time (withMemberStatus). */
+  verified?: boolean | null;
+  /** Whether this member currently meets queue requirements (read time). */
+  canQueue?: boolean;
 }
 
 export interface Party {
@@ -86,6 +90,7 @@ export async function getParties(): Promise<Party[]> {
 
   const live: Party[] = [];
   const expiredIds: string[] = [];
+  const expiredMembers: PartyMember[] = [];
   for (const row of rs.rows) {
     let party: Party;
     try {
@@ -98,10 +103,13 @@ export async function getParties(): Promise<Party[]> {
       live.push(party);
     } else {
       expiredIds.push(row.id as string);
+      expiredMembers.push(...party.members);
     }
   }
 
   if (expiredIds.length > 0) {
+    // A disbanded party's members must not linger in the matchmaking queue.
+    await dequeueMembers(expiredMembers);
     await client.batch(
       expiredIds.map((id) => ({
         sql: "DELETE FROM web_parties WHERE id = ?",
@@ -145,6 +153,23 @@ async function remove(id: string): Promise<void> {
   await client.execute({ sql: "DELETE FROM web_parties WHERE id = ?", args: [id] });
 }
 
+/** Best-effort: pull these members out of the web queue. Any roster change
+ *  (leave/disband/expiry) invalidates the party's queue entry, so the whole
+ *  party is dequeued together. */
+async function dequeueMembers(members: PartyMember[]): Promise<void> {
+  if (members.length === 0) return;
+  try {
+    await client.batch(
+      members.map((m) => ({
+        sql: "DELETE FROM web_queue WHERE discord_user_id = ?",
+        args: [m.discordId],
+      }))
+    );
+  } catch {
+    /* web_queue table may not exist yet */
+  }
+}
+
 export interface CreatePartyInput {
   name: string;
   game?: string;
@@ -169,6 +194,8 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
   // A user can only lead / belong to one party at a time — remove them elsewhere.
   for (const p of parties) {
     if (!p.members.some((m) => m.discordId === input.leader.discordId)) continue;
+    // Leaving invalidates the old party's queue entry for everyone in it.
+    await dequeueMembers(p.members);
     const members = p.members.filter((m) => m.discordId !== input.leader.discordId);
     if (members.length === 0 || p.leaderId === input.leader.discordId) {
       await remove(p.id);
@@ -210,6 +237,8 @@ async function removeMemberFromOtherParties(discordId: string, exceptId: string)
   for (const p of parties) {
     if (p.id === exceptId) continue;
     if (!p.members.some((m) => m.discordId === discordId)) continue;
+    // Leaving invalidates the old party's queue entry for everyone in it.
+    await dequeueMembers(p.members);
     const members = p.members.filter((m) => m.discordId !== discordId);
     if (members.length === 0) {
       await remove(p.id);
@@ -289,6 +318,9 @@ export async function leaveParty(id: string, discordId: string): Promise<Party[]
     const prevToken = Number(rs.rows[0].updated_at);
     if (!party.members.some((m) => m.discordId === discordId)) return getParties();
 
+    // A member leaving invalidates the whole party's queue entry — dequeue
+    // the full pre-leave roster (leaver included) once the write commits.
+    const prevMembers = [...party.members];
     party.members = party.members.filter((m) => m.discordId !== discordId);
 
     if (party.members.length === 0) {
@@ -299,6 +331,7 @@ export async function leaveParty(id: string, discordId: string): Promise<Party[]
         args: [id, prevToken],
       });
       if (del.rowsAffected > 0) {
+        await dequeueMembers(prevMembers);
         try {
           await clearInvitesForParties([id]);
         } catch {
@@ -313,7 +346,10 @@ export async function leaveParty(id: string, discordId: string): Promise<Party[]
         sql: "UPDATE web_parties SET data = ?, updated_at = ? WHERE id = ? AND updated_at = ?",
         args: [JSON.stringify(party), party.updatedAt, id, prevToken],
       });
-      if (upd.rowsAffected > 0) return getParties();
+      if (upd.rowsAffected > 0) {
+        await dequeueMembers(prevMembers);
+        return getParties();
+      }
     }
     // Lost the race — re-read and retry.
   }

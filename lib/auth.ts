@@ -94,6 +94,21 @@ export async function isUserInGuildById(userId: string): Promise<boolean | null>
   }
 }
 
+/** Per-instance cache of guild-membership checks. The parties/queue endpoints
+ *  are polled every few seconds, so raw per-member Discord API calls would
+ *  burn rate limit; definitive answers are cached for a few minutes. */
+const guildCache = new Map<string, { val: boolean; at: number }>();
+const GUILD_CACHE_TTL_MS = 5 * 60 * 1000;
+
+/** isUserInGuildById with a short-lived cache. Unknown (null) is not cached. */
+export async function isUserInGuildCached(userId: string): Promise<boolean | null> {
+  const hit = guildCache.get(userId);
+  if (hit && Date.now() - hit.at < GUILD_CACHE_TTL_MS) return hit.val;
+  const val = await isUserInGuildById(userId);
+  if (val !== null) guildCache.set(userId, { val, at: Date.now() });
+  return val;
+}
+
 /** Per-instance cache of Discord avatar URLs (the queue page polls every 5s;
  *  without this every poll would hit the Discord API and burn rate limit). */
 const avatarCache = new Map<string, { url: string | null; at: number }>();

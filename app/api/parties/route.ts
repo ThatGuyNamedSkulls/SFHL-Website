@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getParties, createParty } from "@/lib/parties";
-import { memberFromSession, withFreshCosmetics } from "@/lib/party-member";
+import { memberFromSession, withFreshCosmetics, withMemberStatus } from "@/lib/party-member";
 import { getPartyInvitePartyIds, getInvitesForParties } from "@/lib/social";
 
 /** GET — list live parties. Private parties are hidden unless you're a member
@@ -29,8 +29,9 @@ export async function GET() {
       : [];
     const invitesByParty = await getInvitesForParties(myPartyIds);
     // Re-resolve each member's equipped card/frame so cosmetic changes made
-    // after joining show up without re-joining the party.
-    const fresh = await withFreshCosmetics(visible);
+    // after joining show up without re-joining the party, and attach live
+    // verified/canQueue status for the badges and warnings.
+    const fresh = await withMemberStatus(await withFreshCosmetics(visible));
     const withInvites = fresh.map((p) => ({
       ...p,
       invitedNames: invitesByParty.get(p.id) ?? [],

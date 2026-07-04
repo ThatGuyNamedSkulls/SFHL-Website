@@ -2,6 +2,7 @@ import { Party, PartyMember } from "@/lib/parties";
 import { getPlayer, mapRank } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
 import { getEquippedCosmetics, getEquippedVisualsMap, EquippedVisuals } from "@/lib/cosmetics";
+import { isUserInGuildCached } from "@/lib/auth";
 import { resolvePlayerAvatar } from "@/lib/avatar";
 import { isValidCountry } from "@/lib/countries";
 import { UserSession } from "@/types";
@@ -67,6 +68,25 @@ export async function withFreshCosmetics<T extends Party>(parties: T[]): Promise
     members: p.members.map((m) => {
       const v = m.playerName ? visuals.get(m.playerName) : undefined;
       return { ...m, card: v?.card ?? null, frame: v?.frame ?? null };
+    }),
+  }));
+}
+
+/**
+ * Attach live queue-eligibility to every member: `verified` (currently in the
+ * Discord guild, cached bot-token check; null when it can't be determined) and
+ * `canQueue` (verified isn't false AND linked to a player). Drives the
+ * verified badges and per-slot warnings on the queue and party-finder views.
+ */
+export async function withMemberStatus<T extends Party>(parties: T[]): Promise<T[]> {
+  const ids = Array.from(new Set(parties.flatMap((p) => p.members.map((m) => m.discordId))));
+  const status = new Map<string, boolean | null>();
+  await Promise.all(ids.map(async (id) => status.set(id, await isUserInGuildCached(id))));
+  return parties.map((p) => ({
+    ...p,
+    members: p.members.map((m) => {
+      const verified = status.get(m.discordId) ?? null;
+      return { ...m, verified, canQueue: verified !== false && !!m.playerName };
     }),
   }));
 }

@@ -261,6 +261,10 @@ export interface PartyMemberView {
   card?: string | null;
   /** Equipped avatar-frame art, rendered around the avatar. */
   frame?: string | null;
+  /** Live guild-membership check (null when it can't be determined). */
+  verified?: boolean | null;
+  /** Whether this member currently meets the queue requirements. */
+  canQueue?: boolean;
 }
 
 export interface PartyView {

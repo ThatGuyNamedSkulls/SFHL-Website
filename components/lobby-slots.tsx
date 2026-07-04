@@ -7,7 +7,7 @@ import { RankBadge } from "@/components/rank-badge";
 import { Flag } from "@/components/flag";
 import { flagPath, countryName } from "@/lib/countries";
 import { RankTierLetter } from "@/types";
-import { Plus, Search, Crown } from "lucide-react";
+import { Plus, Search, Crown, BadgeCheck, CircleAlert } from "lucide-react";
 
 export interface LobbyMember {
   username: string;
@@ -21,6 +21,10 @@ export interface LobbyMember {
   frame?: string | null;
   /** The logged-in user — rendered in the raised center slot (FACEIT-style). */
   self?: boolean;
+  /** Live guild-membership check: green badge (true), red badge (false). */
+  verified?: boolean | null;
+  /** False → this member blocks the queue; shows the warning on their slot. */
+  canQueue?: boolean;
 }
 
 interface LobbySlotsProps {
@@ -70,6 +74,15 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
                   : "py-8"
               }`}
             >
+              {/* Queue-requirement warning (FACEIT-style, floating on the slot) */}
+              {member.canQueue === false && (
+                <span
+                  title="This player can't queue — not in the Discord server or not linked to a player."
+                  className="absolute top-2 left-1/2 -translate-x-1/2 z-20"
+                >
+                  <CircleAlert className="w-4 h-4 text-[#f5c518]" />
+                </span>
+              )}
               {/* Equipped profile card as the slot background */}
               {member.card && (
                 <div className="absolute inset-0 pointer-events-none">
@@ -100,6 +113,11 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
               </div>
               <div className="relative z-10 flex items-center gap-1.5 max-w-full">
                 <span className="text-sm font-bold text-white truncate">{member.username}</span>
+                {member.verified !== null && member.verified !== undefined && (
+                  <span title={member.verified ? "Verified — in the Discord server" : "Not verified — not in the Discord server"}>
+                    <BadgeCheck className={`w-3.5 h-3.5 shrink-0 ${member.verified ? "text-hl-green" : "text-hl-red"}`} />
+                  </span>
+                )}
                 {member.country && <Flag src={flagPath(member.country)} name={countryName(member.country)} className="w-4 h-3 shrink-0" />}
               </div>
               {/* Skill-level chip under the name, like FACEIT */}

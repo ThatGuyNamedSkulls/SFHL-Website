@@ -21,6 +21,8 @@ import {
   Swords,
   Languages,
   Sparkles,
+  BadgeCheck,
+  CircleAlert,
 } from "lucide-react";
 
 export interface FriendOption {
@@ -51,6 +53,15 @@ function MemberSlot({ member, isLeader }: { member: PartyMemberView; isLeader: b
   const rank = (member.rank || "UNRANKED") as RankTierLetter;
   return (
     <div className="lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center py-4 px-2 gap-2 min-h-[160px] rounded-xl">
+      {/* Queue-requirement warning */}
+      {member.canQueue === false && (
+        <span
+          title="This player can't queue — not in the Discord server or not linked to a player."
+          className="absolute top-1.5 left-1/2 -translate-x-1/2 z-20"
+        >
+          <CircleAlert className="w-4 h-4 text-[#f5c518]" />
+        </span>
+      )}
       {/* Equipped profile card as the slot background */}
       {member.card && (
         <div className="absolute inset-0 pointer-events-none">
@@ -79,6 +90,11 @@ function MemberSlot({ member, isLeader }: { member: PartyMemberView; isLeader: b
       </div>
       <div className="relative z-10 flex items-center gap-1 max-w-full">
         <span className="text-xs font-bold text-white truncate">{member.username}</span>
+        {member.verified !== null && member.verified !== undefined && (
+          <span title={member.verified ? "Verified — in the Discord server" : "Not verified — not in the Discord server"}>
+            <BadgeCheck className={`w-3.5 h-3.5 shrink-0 ${member.verified ? "text-hl-green" : "text-hl-red"}`} />
+          </span>
+        )}
         {member.country && <Flag src={flagPath(member.country)} name={countryName(member.country)} className="w-4 h-3 shrink-0" />}
       </div>
       <div className="relative z-10 flex items-center gap-1.5">
