@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 import { getSession, isUserInGuildCached } from "@/lib/auth";
-import { getWebQueue, joinWebQueue, leaveWebQueue, isInWebQueue } from "@/lib/db";
+import { getWebQueue, joinWebQueue, leaveWebQueue, isInWebQueue, getQueueTeamSize } from "@/lib/db";
 import { getPartyForMember } from "@/lib/parties";
 import { upsertWebUser } from "@/lib/social";
 
-/** GET — returns current web queue state */
+/** GET — returns current web queue state + the global queue format (5v5/1v1,
+ *  toggled by the bot's /gamemode command via the bot_state table). */
 export async function GET() {
   try {
-    const queue = await getWebQueue();
-    return NextResponse.json({ queue, count: queue.length });
+    const [queue, teamSize] = await Promise.all([getWebQueue(), getQueueTeamSize()]);
+    return NextResponse.json({ queue, count: queue.length, teamSize });
   } catch (error) {
     console.error("Error fetching queue:", error);
-    return NextResponse.json({ queue: [], count: 0 });
+    return NextResponse.json({ queue: [], count: 0, teamSize: 5 });
   }
 }
 

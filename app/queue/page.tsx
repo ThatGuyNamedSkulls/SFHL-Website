@@ -126,6 +126,9 @@ export default function QueuePage() {
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
   const [party, setParty] = useState<PartyLite | null>(null);
   const [queue, setQueue] = useState<WebQueueEntry[]>([]);
+  // Global queue format (5 = 5v5, 1 = 1v1), toggled by the bot's /gamemode
+  // command and mirrored here from the bot_state table via /api/queue.
+  const [teamSize, setTeamSize] = useState(5);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +148,7 @@ export default function QueuePage() {
         ]);
         const qData = await qRes.json();
         if (!actionInFlight.current) setQueue(qData.queue || []);
+        if (qData.teamSize === 1 || qData.teamSize === 5) setTeamSize(qData.teamSize);
         const sData = await sRes.json();
         const me = sData.user as UserSession | undefined;
         if (me) setSession(me);
@@ -270,6 +274,8 @@ export default function QueuePage() {
   // One ineligible party member blocks the whole party from queueing.
   const partyBlocked = lobbyMembers.some((m) => m.canQueue === false);
 
+  const modeLabel = `${teamSize}v${teamSize}`;
+
   // Header banner state: placement progress until ranked, tier ladder after.
   const placed = !!player?.placementDone;
   const placementPlayed = Math.min(player?.placementGamesPlayed ?? 0, PLACEMENT_GAMES);
@@ -289,7 +295,7 @@ export default function QueuePage() {
       {/* Queue region pill */}
       <div className="flex justify-center mb-5">
         <span className="bg-gold-gradient text-hl-base rounded-full px-4 py-1.5 text-xs font-black header-caps">
-          Europe 5v5 Queue
+          Europe {modeLabel} Queue
         </span>
       </div>
 
@@ -372,7 +378,7 @@ export default function QueuePage() {
         )}
 
         <div className="py-3">
-          <LobbySlots members={lobbyMembers} size={5} findPartiesHref="/party-finder" />
+          <LobbySlots members={lobbyMembers} size={teamSize} findPartiesHref="/party-finder" />
         </div>
 
         {/* Warning banner */}
@@ -453,7 +459,7 @@ export default function QueuePage() {
                     <span className={`text-sm font-bold truncate ${mt.green ? "text-hl-green" : "text-white"}`}>
                       {mt.label}
                     </span>
-                    <span className="text-xs text-hl-muted shrink-0">· 5v5</span>
+                    <span className="text-xs text-hl-muted shrink-0">· {modeLabel}</span>
                   </div>
                   <Info className="w-4 h-4 text-hl-muted shrink-0" />
                 </div>

@@ -336,6 +336,20 @@ export async function leaveWebQueue(discordUserId: string): Promise<void> {
   } catch {}
 }
 
+/** The bot's global queue format (team size), set by the /gamemode command
+ *  (bot_state key 'queue_mode'). Defaults to 5 (5v5) when unset. */
+export async function getQueueTeamSize(): Promise<number> {
+  try {
+    const rs = await client.execute(
+      "SELECT value FROM bot_state WHERE key = 'queue_mode'"
+    );
+    const v = Number(rs.rows[0]?.value);
+    return v === 1 ? 1 : 5;
+  } catch {
+    return 5; // bot_state table may not exist yet
+  }
+}
+
 export async function isInWebQueue(discordUserId: string): Promise<boolean> {
   try {
     const rs = await client.execute({ sql: "SELECT 1 FROM web_queue WHERE discord_user_id = ?", args: [discordUserId] });

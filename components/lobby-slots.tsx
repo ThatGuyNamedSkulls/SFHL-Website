@@ -58,21 +58,29 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
     positions[idx] = rest.shift();
   }
 
+  // 1v1 mode renders a single centered card instead of the 5-slot grid.
+  const slotW = size === 1 ? "w-full max-w-[240px]" : "";
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-center">
+    <div
+      className={
+        size === 1
+          ? "flex justify-center gap-3 items-center"
+          : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-center"
+      }
+    >
       {positions.map((member, i) => {
         const isCenter = i === center;
-        const isLast = i === size - 1;
+        const isLast = i === size - 1 && size > 1;
 
         if (member) {
           return (
             <div
               key={i}
-              className={`lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center px-3 gap-3 rounded-xl ${
-                isCenter
-                  ? "py-10 lg:-my-3 border-hl-gold/60 shadow-[0_0_24px_rgba(255,85,0,0.12)] z-10"
+              className={`lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center px-3 gap-3 rounded-xl ${slotW} ${isCenter
+                  ? `py-10 border-hl-gold/60 shadow-[0_0_24px_rgba(255,85,0,0.12)] z-10 ${size > 1 ? "lg:-my-3" : ""}`
                   : "py-8"
-              }`}
+                }`}
             >
               {/* Queue-requirement warning (FACEIT-style, floating on the slot) */}
               {member.canQueue === false && (
@@ -134,7 +142,7 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
             <Link
               key={i}
               href={findPartiesHref}
-              className="lobby-slot empty flex flex-col items-center justify-center py-8 px-3 gap-3 rounded-xl hover:border-hl-gold/40 transition-colors"
+              className={`lobby-slot empty flex flex-col items-center justify-center py-8 px-3 gap-3 rounded-xl hover:border-hl-gold/40 transition-colors ${slotW}`}
             >
               <div className="w-16 h-16 rounded-full bg-hl-panel-light flex items-center justify-center">
                 <Search className="w-6 h-6 text-hl-muted" />
@@ -145,7 +153,7 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
         }
 
         return (
-          <div key={i} className="lobby-slot empty flex flex-col items-center justify-center py-8 px-3 gap-3 rounded-xl">
+          <div key={i} className={`lobby-slot empty flex flex-col items-center justify-center py-8 px-3 gap-3 rounded-xl ${slotW}`}>
             <div className="w-16 h-16 rounded-full flex items-center justify-center">
               <Plus className="w-8 h-8 text-hl-muted/60" />
             </div>
