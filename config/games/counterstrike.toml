@@ -1,0 +1,175 @@
+# Game profile: Counter-Strike (the bot's original game).
+#
+# This single file is the source of truth for everything game-specific. To
+# support a different game, copy this file, edit the values, and point the bot
+# at it (config/settings.py -> ACTIVE_GAME_PROFILE). No code changes required.
+
+[meta]
+name = "Counter-Strike"
+team_size = 5      # players per team
+queue_size = 10    # players needed to start a match (team_size * 2)
+
+[match]
+win_label = "W"
+loss_label = "L"
+win_condition = "First team to 15 rounds wins"
+
+[scoreboard]
+# Option A (fixed superset): list which of the supported stat columns this game
+# uses. Supported keys: kills, deaths, assists, mvps, score, hs_percent.
+stats = ["kills", "deaths", "assists", "mvps", "score", "hs_percent"]
+
+[maps]
+pool = ["Inferno", "Dust II", "Overpass", "Mirage", "Vertigo", "Cache", "Nuke"]
+# Side/faction names picked after the map veto. Empty list = no side selection.
+sides = ["CT", "T"]
+
+[elo]
+# Elo model:
+#   "performance"   — original: each player's Elo change comes from their OWN
+#                     points vs their rank's expected range (ignores opponents).
+#   "team_expected" — opponent-aware: expected score from the team Elo difference
+#                     + dynamic K-factor + a small performance bonus. More balanced
+#                     (beating a stronger team gains more; stomping a weaker one
+#                     gains less). Flip this to enable it.
+#   "glicko2"       — full Glicko-2: tracks per-player rating deviation (RD) and
+#                     volatility; RD widens during inactivity (decay). Each player's
+#                     opponents are the other team. The most principled option.
+model = "team_expected"
+tau = 0.5                    # glicko2: system constant constraining volatility change
+
+base = 20                    # neutral win gain / loss magnitude (performance model)
+win_min = 5                  # clamp: smallest Elo a win can grant
+win_max = 30                 # clamp: largest Elo a win can grant
+loss_min = 5                 # clamp: smallest Elo magnitude a loss can cost
+loss_max = 30                # clamp: largest Elo magnitude a loss can cost
+overperform_ratio = 1.7      # points/expected at/above which you hit the win_max edge / +bonus
+underperform_ratio = 0.5     # points/expected at/below which you hit the loss_max edge / -bonus
+unranked_effective_elo = 1000  # treat 0-Elo players as this for team balancing / expected score
+
+# --- team_expected model parameters (only used when model = "team_expected") ---
+divisor = 400                # standard Elo logistic divisor
+perf_bonus_max = 6           # +/- cap for the performance bonus layered on top
+k_new = 40                   # K-factor while matches_played < k_new_games (climb fast)
+k_new_games = 30
+k_mid = 24                   # K-factor for everyone else
+k_top = 10                   # K-factor once Elo >= k_top_elo (stable at the top)
+k_top_elo = 2200
+
+[unranked]
+name = "[?] Unranked"
+elo_min = 0
+elo_max = 0
+
+# Ranks ordered low -> high.
+#   elo_min/elo_max     : Elo band that maps to this rank.
+#   expected_min/max    : expected per-match points for someone at this rank
+#                         (drives the over/under-performance Elo scaling).
+#   placement_min/max   : avg placement-match points that graduate INTO this
+#                         rank (optional; only the placement-reachable ranks).
+#   placement_elo       : starting Elo when a player graduates into this rank.
+#
+# NOTE: expected_* and placement_* are intentionally different bands (preserved
+# from the original code). expected_* is always looked up by rank name, never
+# reverse-searched, so the historical overlap at S2/S3 is harmless.
+
+[[ranks]]
+name = "[D | 1-799]"
+elo_min = 1
+elo_max = 799
+expected_min = 0
+expected_max = 10
+tie_points = 5            # assumed points for a ranked tie (/ranktie)
+placement_min = 0
+placement_max = 10
+placement_elo = 650
+
+[[ranks]]
+name = "[C | 800-949]"
+elo_min = 800
+elo_max = 949
+expected_min = 11
+expected_max = 20
+tie_points = 13            # assumed points for a ranked tie (/ranktie)
+placement_min = 11
+placement_max = 20
+placement_elo = 850
+
+[[ranks]]
+name = "[B | 950-1099]"
+elo_min = 950
+elo_max = 1099
+expected_min = 21
+expected_max = 27
+tie_points = 20            # assumed points for a ranked tie (/ranktie)
+placement_min = 21
+placement_max = 27
+placement_elo = 1000
+
+[[ranks]]
+name = "[A1 | 1100-1249]"
+elo_min = 1100
+elo_max = 1249
+expected_min = 28
+expected_max = 35
+tie_points = 28            # assumed points for a ranked tie (/ranktie)
+placement_min = 28
+placement_max = 35
+placement_elo = 1175
+
+[[ranks]]
+name = "[A2 | 1250-1449]"
+elo_min = 1250
+elo_max = 1449
+expected_min = 36
+expected_max = 43
+tie_points = 37            # assumed points for a ranked tie (/ranktie)
+placement_min = 36
+placement_max = 49
+placement_elo = 1325
+
+[[ranks]]
+name = "[A3 | 1450-1649]"
+elo_min = 1450
+elo_max = 1649
+expected_min = 44
+expected_max = 50
+tie_points = 46            # assumed points for a ranked tie (/ranktie)
+placement_min = 50
+placement_max = 60
+placement_elo = 1500
+
+[[ranks]]
+name = "[S1 | 1650-1899]"
+elo_min = 1650
+elo_max = 1899
+expected_min = 51
+expected_max = 55
+tie_points = 55            # assumed points for a ranked tie (/ranktie)
+placement_min = 61
+placement_max = 999999   # top placement band (was float('inf'))
+placement_elo = 1750
+
+[[ranks]]
+name = "[S2 | 1900-2199]"
+elo_min = 1900
+elo_max = 2199
+expected_min = 56
+expected_max = 60
+tie_points = 63            # assumed points for a ranked tie (/ranktie)
+
+[[ranks]]
+name = "[S3 | 2200-2499]"
+elo_min = 2200
+elo_max = 2499
+expected_min = 58
+expected_max = 62
+tie_points = 68            # assumed points for a ranked tie (/ranktie)
+
+[[ranks]]
+name = "[★ | 2500+]"
+elo_min = 2500
+elo_max = 9999
+expected_min = 62
+expected_max = 70
+tie_points = 68            # assumed points for a ranked tie (/ranktie)

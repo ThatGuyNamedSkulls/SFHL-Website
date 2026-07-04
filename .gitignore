@@ -1,0 +1,39 @@
+# Secrets / environment
+.env
+
+# Database & backups
+*.db
+*.db.bak*
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Generated images / caches
+output_image.png
+elo_graph.png
+avatars/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Nested website repo (has its own git history / remote)
+HL website/
+
+# Agent & tooling state
+.claude/
+.playwright-mcp/
+.mcp.json
+
+# Runtime state written by the website/bot
+web_parties.json
+
+# Reference screenshots
+faceitscreenshots/

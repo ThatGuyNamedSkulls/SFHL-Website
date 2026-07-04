@@ -1,0 +1,19 @@
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+exclude = [
+    # Standalone helper scripts kept for reference, not part of the bot package.
+    "testgrafico.py",
+    "test_stats_image.py",
+    "Neontexto.py",
+    "finalocr.py",
+]
+
+[tool.ruff.lint]
+# Pyflakes (real errors: undefined names, redefinitions) + a few safe pycodestyle.
+select = ["F", "E9", "W6"]
+# Allow unused imports in __init__.py (re-exports) and tolerate a few patterns.
+ignore = ["F401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F841"]  # tests sometimes bind values just to assert structure

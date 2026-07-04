@@ -1,0 +1,117 @@
+# Game profile: Valorant.
+#
+# Demonstrates that the bot is genuinely game-agnostic — different maps, sides,
+# stat columns, win condition and rank ladder, with NO code changes. To run the
+# bot as Valorant instead of CS, set ACTIVE_GAME_PROFILE in config/settings.py
+# to this file.
+
+[meta]
+name = "Valorant"
+team_size = 5
+queue_size = 10
+
+[match]
+win_label = "W"
+loss_label = "L"
+win_condition = "First team to 13 rounds wins"
+
+[scoreboard]
+# Valorant has no "MVP" column; it uses ACS (mapped to `score`) and keeps HS%.
+stats = ["kills", "deaths", "assists", "score", "hs_percent"]
+
+[maps]
+pool = ["Ascent", "Bind", "Haven", "Split", "Icebox", "Breeze", "Lotus", "Sunset"]
+sides = ["Attack", "Defense"]
+
+[elo]
+base = 20
+win_min = 5
+win_max = 30
+loss_min = 5
+loss_max = 30
+overperform_ratio = 1.7
+underperform_ratio = 0.5
+unranked_effective_elo = 1000
+
+[unranked]
+name = "Unranked"
+elo_min = 0
+elo_max = 0
+
+[[ranks]]
+name = "Iron"
+elo_min = 1
+elo_max = 799
+expected_min = 0
+expected_max = 12
+placement_min = 0
+placement_max = 12
+placement_elo = 650
+
+[[ranks]]
+name = "Bronze"
+elo_min = 800
+elo_max = 1099
+expected_min = 13
+expected_max = 22
+placement_min = 13
+placement_max = 22
+placement_elo = 950
+
+[[ranks]]
+name = "Silver"
+elo_min = 1100
+elo_max = 1399
+expected_min = 23
+expected_max = 32
+placement_min = 23
+placement_max = 32
+placement_elo = 1250
+
+[[ranks]]
+name = "Gold"
+elo_min = 1400
+elo_max = 1699
+expected_min = 33
+expected_max = 42
+placement_min = 33
+placement_max = 42
+placement_elo = 1550
+
+[[ranks]]
+name = "Platinum"
+elo_min = 1700
+elo_max = 1999
+expected_min = 43
+expected_max = 52
+placement_min = 43
+placement_max = 999999
+placement_elo = 1850
+
+[[ranks]]
+name = "Diamond"
+elo_min = 2000
+elo_max = 2299
+expected_min = 53
+expected_max = 62
+
+[[ranks]]
+name = "Ascendant"
+elo_min = 2300
+elo_max = 2599
+expected_min = 63
+expected_max = 72
+
+[[ranks]]
+name = "Immortal"
+elo_min = 2600
+elo_max = 2899
+expected_min = 73
+expected_max = 82
+
+[[ranks]]
+name = "Radiant"
+elo_min = 2900
+elo_max = 9999
+expected_min = 83
+expected_max = 95

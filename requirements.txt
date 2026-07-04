@@ -1,0 +1,15 @@
+# SFHL bot dependencies (pinned to versions verified on Python 3.13)
+discord.py==2.6.4
+aiohttp==3.13.2
+numpy==2.2.6
+matplotlib==3.10.7
+Pillow>=10.0.0
+better_profanity>=0.7.0
+python-dotenv>=1.0.0
+google-generativeai>=0.8.0
+# Pure-Python async libsql client for the Turso cloud database (no Rust toolchain
+# required, unlike libsql-experimental).
+libsql-client>=0.3.1
+
+# Note: TOML config is read with the stdlib `tomllib` module (Python 3.11+),
+# so no extra TOML dependency is required.
