@@ -17,6 +17,7 @@ import {
   Building2,
   Plus,
   Settings,
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,6 +44,7 @@ const TOP_NAV: NavItem[] = [
 ];
 
 const BOTTOM_NAV: NavItem[] = [
+  { href: "/shop", label: "Shop", icon: ShoppingBag, owns: true },
   { href: "/tournaments", label: "Clubs", icon: Building2, owns: true },
   { href: "/party-finder?create=1", label: "Create", icon: Plus, owns: false },
 ];

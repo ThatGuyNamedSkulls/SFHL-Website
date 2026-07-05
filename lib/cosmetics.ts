@@ -13,7 +13,7 @@
  * embed keeps showing it.
  */
 
-import { client } from "@/lib/db";
+import { client, ensurePlayerCoinsColumn } from "@/lib/db";
 
 export type CosmeticType = "card" | "title" | "badge" | "frame";
 
@@ -59,7 +59,8 @@ function ensureCosmeticsSchema(): Promise<void> {
            category    TEXT DEFAULT NULL,
            season      TEXT DEFAULT NULL,
            rarity      TEXT DEFAULT 'common',
-           created_at  INTEGER )`,
+           created_at  INTEGER,
+           price       INTEGER DEFAULT 0 )`,
         `CREATE TABLE IF NOT EXISTS cosmetic_inventory (
            id          INTEGER PRIMARY KEY AUTOINCREMENT,
            player_name TEXT NOT NULL,
@@ -73,6 +74,10 @@ function ensureCosmeticsSchema(): Promise<void> {
         `CREATE INDEX IF NOT EXISTS idx_cosmetic_inventory_player
            ON cosmetic_inventory(player_name)`,
       ]);
+      // Back-fill the shop price column on DBs created before it existed.
+      await client
+        .execute("ALTER TABLE cosmetic_items ADD COLUMN price INTEGER DEFAULT 0")
+        .catch(() => undefined); // already exists — fine
     })();
   }
   return schemaReady;
@@ -242,4 +247,120 @@ export async function getEquippedCosmetics(playerName: string): Promise<ProfileC
     }
   }
   return out;
+}
+
+// --- shop ------------------------------------------------------------------
+
+/** A purchasable catalog item, plus whether this player already owns it. */
+export interface ShopItem {
+  id: number;
+  slug: string;
+  type: CosmeticType;
+  name: string;
+  description: string;
+  asset: string | null;
+  rarity: string;
+  price: number;
+  owned: boolean;
+}
+
+/** Everything for the shop page: the player's balance + the purchasable
+ *  catalog (price > 0), each flagged with whether they already own it. */
+export async function getShop(
+  playerName: string
+): Promise<{ coins: number; items: ShopItem[] }> {
+  await ensureCosmeticsSchema();
+  await ensurePlayerCoinsColumn();
+  const [balanceRs, itemsRs] = await Promise.all([
+    client.execute({ sql: "SELECT coins FROM players WHERE name = ?", args: [playerName] }),
+    client.execute({
+      sql: `SELECT i.id, i.slug, i.type, i.name, i.description, i.asset, i.rarity, i.price,
+                   EXISTS(SELECT 1 FROM cosmetic_inventory inv
+                          WHERE inv.player_name = ? AND inv.item_id = i.id) AS owned
+            FROM cosmetic_items i
+            WHERE i.price > 0
+            ORDER BY i.price ASC, i.type`,
+      args: [playerName],
+    }),
+  ]);
+  const coins = Number(balanceRs.rows[0]?.coins ?? 0);
+  const items = (itemsRs.rows as unknown as Record<string, unknown>[]).map((r) => ({
+    id: Number(r.id),
+    slug: r.slug as string,
+    type: r.type as CosmeticType,
+    name: r.name as string,
+    description: (r.description as string) ?? "",
+    asset: (r.asset as string) ?? null,
+    rarity: (r.rarity as string) || "common",
+    price: Number(r.price ?? 0),
+    owned: Number(r.owned) === 1,
+  }));
+  return { coins, items };
+}
+
+export type PurchaseResult =
+  | { status: "ok"; coins: number }
+  | { status: "not_for_sale" | "already_owned" | "insufficient" | "no_such_item" | "no_such_player"; coins: number };
+
+/**
+ * Buy a catalog item with HL Coins. Atomicity without a real transaction:
+ * deduct with a `WHERE coins >= price` guard (so a concurrent/insufficient
+ * spend affects 0 rows), then insert the inventory row; if that insert loses a
+ * race (unique index → 0 rows), refund the coins. Balances can't go negative.
+ */
+export async function purchaseItem(
+  playerName: string,
+  itemId: number
+): Promise<PurchaseResult> {
+  await ensureCosmeticsSchema();
+  await ensurePlayerCoinsColumn();
+
+  const itemRs = await client.execute({
+    sql: "SELECT price FROM cosmetic_items WHERE id = ?",
+    args: [itemId],
+  });
+  if (itemRs.rows.length === 0) return { status: "no_such_item", coins: 0 };
+  const price = Number(itemRs.rows[0].price ?? 0);
+
+  const balRs = await client.execute({
+    sql: "SELECT coins FROM players WHERE name = ?",
+    args: [playerName],
+  });
+  if (balRs.rows.length === 0) return { status: "no_such_player", coins: 0 };
+  const coins = Number(balRs.rows[0].coins ?? 0);
+
+  if (price <= 0) return { status: "not_for_sale", coins };
+
+  const alreadyRs = await client.execute({
+    sql: "SELECT 1 FROM cosmetic_inventory WHERE player_name = ? AND item_id = ?",
+    args: [playerName, itemId],
+  });
+  if (alreadyRs.rows.length > 0) return { status: "already_owned", coins };
+  if (coins < price) return { status: "insufficient", coins };
+
+  // Guarded deduct: 0 rows means the balance changed under us / went too low.
+  const deduct = await client.execute({
+    sql: "UPDATE players SET coins = coins - ? WHERE name = ? AND coins >= ?",
+    args: [price, playerName, price],
+  });
+  if (deduct.rowsAffected === 0) {
+    const fresh = Number((await client.execute({ sql: "SELECT coins FROM players WHERE name = ?", args: [playerName] })).rows[0]?.coins ?? 0);
+    return { status: "insufficient", coins: fresh };
+  }
+
+  const insert = await client.execute({
+    sql: `INSERT OR IGNORE INTO cosmetic_inventory (player_name, item_id, granted_by, granted_at)
+          VALUES (?, ?, 'shop', ?)`,
+    args: [playerName, itemId, Date.now()],
+  });
+  if (insert.rowsAffected === 0) {
+    // Lost the ownership race — refund the deducted coins.
+    await client.execute({
+      sql: "UPDATE players SET coins = coins + ? WHERE name = ?",
+      args: [price, playerName],
+    });
+    return { status: "already_owned", coins };
+  }
+
+  return { status: "ok", coins: coins - price };
 }

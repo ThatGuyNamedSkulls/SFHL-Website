@@ -92,6 +92,19 @@ export interface InventoryItem {
   equipped: boolean;
 }
 
+/** A purchasable shop item (catalog item with price > 0). */
+export interface ShopItem {
+  id: number;
+  slug: string;
+  type: CosmeticType;
+  name: string;
+  description: string;
+  asset: string | null;
+  rarity: string;
+  price: number;
+  owned: boolean;
+}
+
 /** Equipped cosmetics rendered on a public profile. */
 export interface ProfileCosmetics {
   card: { slug: string; name: string; asset: string | null } | null;

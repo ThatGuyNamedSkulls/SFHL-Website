@@ -97,6 +97,26 @@ export async function setPlayerCountry(name: string, code: string): Promise<bool
   return rs.rowsAffected > 0;
 }
 
+/** Lazily add the shop-currency column if the bot hasn't migrated it yet
+ *  (idempotent; ignores the "duplicate column" error on already-migrated DBs). */
+let coinsColumnReady: Promise<void> | null = null;
+export function ensurePlayerCoinsColumn(): Promise<void> {
+  if (!coinsColumnReady) {
+    coinsColumnReady = client
+      .execute("ALTER TABLE players ADD COLUMN coins INTEGER DEFAULT 0")
+      .then(() => undefined)
+      .catch(() => undefined); // already exists — fine
+  }
+  return coinsColumnReady;
+}
+
+/** A player's HL Coin balance (0 when unset / no such player). */
+export async function getPlayerCoins(name: string): Promise<number> {
+  await ensurePlayerCoinsColumn();
+  const rs = await client.execute({ sql: "SELECT coins FROM players WHERE name = ?", args: [name] });
+  return Number(rs.rows[0]?.coins ?? 0);
+}
+
 /** Leaderboard positions by elo: overall, and within the player's country
  *  (null when they have no country set). */
 export async function getPlayerRankings(
