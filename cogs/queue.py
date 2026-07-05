@@ -95,6 +95,36 @@ async def _clear_web_lobbies() -> None:
         logger.exception("Failed to clear web_lobbies")
 
 
+async def _active_lobby_member_ids() -> set[int]:
+    """Discord ids of everyone currently in a live match lobby (across all
+    lobbies). A player is "in a match" until their match channel is deleted,
+    which drops the row — see the on_guild_channel_delete listener."""
+    try:
+        rows = await db.fetchall("SELECT data FROM web_lobbies")
+    except Exception:
+        return set()
+    ids: set[int] = set()
+    for row in rows:
+        try:
+            data = json.loads(row[0])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        for m in data.get("members", []):
+            try:
+                ids.add(int(m["discordId"]))
+            except (KeyError, ValueError, TypeError):
+                continue
+    return ids
+
+
+async def _delete_web_lobby(channel_id: int) -> None:
+    """Remove the lobby row tied to a match channel (called when it's deleted)."""
+    try:
+        await db.execute("DELETE FROM web_lobbies WHERE id = ?", (str(channel_id),))
+    except Exception:
+        logger.exception("Failed to delete web_lobby for channel %s", channel_id)
+
+
 async def _save_queue_mode(team_size: int) -> None:
     """Persist the /gamemode choice so it survives bot restarts."""
     await db.execute(
@@ -373,13 +403,29 @@ class QueueView(View):
                 return
 
             party_members, is_party_member = [], False
+            party_member_ids = [interaction.user.id]
             for leader_id, party in parties.items():
                 if interaction.user.id in party["members"]:
                     is_party_member = True
+                    party_member_ids = list(party["members"])
                     party_members = [
                         interaction.guild.get_member(mid) for mid in party["members"]
                     ]
                     break
+
+            # Can't queue while still in a live match — the web_lobby row exists
+            # until that match's channel is deleted. Blocks the whole party if
+            # any member is still in a match.
+            active_lobby = await _active_lobby_member_ids()
+            blocked_ids = [i for i in party_member_ids if i in active_lobby]
+            if blocked_ids:
+                mentions = ", ".join(f"<@{i}>" for i in blocked_ids)
+                await interaction.response.send_message(
+                    f"Cannot join queue: {mentions} still in a match. "
+                    "Finish it (or wait for the match channel to be closed) first.",
+                    ephemeral=True,
+                )
+                return
 
             def is_blacklisted(member):
                 return member is not None and discord.utils.get(member.roles, name=BLACKLIST_ROLE) is not None
@@ -544,6 +590,18 @@ class QueueCog(commands.Cog):
 
     def cog_unload(self):
         self.poll_web_queue.cancel()
+
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
+        """When a match channel is deleted, free its players: drop the web_lobby
+        row (so they can queue again) and forget the in-memory game state. This
+        is the signal that a match is over."""
+        if channel.id in queue_players:
+            queue_players.pop(channel.id, None)
+            for idx, ch in list(queue_channels.items()):
+                if getattr(ch, "id", None) == channel.id:
+                    queue_channels.pop(idx, None)
+        await _delete_web_lobby(channel.id)
 
     @tasks.loop(seconds=5.0)
     async def poll_web_queue(self):
