@@ -222,12 +222,18 @@ export interface DbMatch {
 }
 
 export async function getMatchesForPlayer(playerName: string): Promise<DbMatch[]> {
+  // Exclude placement games (is_placement=1): they don't count toward stats, so
+  // they're kept out of the profile match list, the region tally, and the ELO
+  // graph — the graph then starts at the player's post-placement ELO instead of
+  // reconstructing the 0 → 0 → 0 → <graduation ELO> placement climb. COALESCE
+  // covers legacy rows written before the column existed. Mirrors the bot's
+  // /matchhistory + /checkperformance filters.
   const rs = await client.execute({
     sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
                  hs_percentage, elo_change, result, points, mvps, match_id,
                  timestamp, executed_by, round_score
           FROM match_history
-          WHERE player_name = ?
+          WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
           ORDER BY id DESC`,
     args: [playerName]
   });
