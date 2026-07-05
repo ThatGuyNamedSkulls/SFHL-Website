@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession, isUserInGuildCached } from "@/lib/auth";
 import { getWebQueue, joinWebQueue, leaveWebQueue, isInWebQueue, getQueueTeamSize } from "@/lib/db";
 import { getPartyForMember } from "@/lib/parties";
+import { getActiveLobbyMemberIds } from "@/lib/lobby";
 import { upsertWebUser } from "@/lib/social";
 
 /** GET — returns current web queue state + the global queue format (5v5/1v1,
@@ -60,6 +61,23 @@ export async function POST() {
     // only the person who clicked would join. Matches the Discord behaviour
     // where any party member joining queues everyone.
     const party = await getPartyForMember(session.discordId);
+
+    // Block re-queueing while a match is still live: a player already in a
+    // match channel (their web_lobby row exists until that channel is deleted)
+    // can't join a new queue. One member in a match blocks the whole party.
+    const inMatch = await getActiveLobbyMemberIds();
+    const toCheck = party ? party.members.map((m) => m.discordId) : [session.discordId];
+    if (toCheck.some((id) => inMatch.has(id))) {
+      const self = inMatch.has(session.discordId);
+      return NextResponse.json(
+        {
+          error: self
+            ? "You're already in a match. Finish it before queueing again."
+            : "A party member is still in a match. Wait for it to finish before queueing.",
+        },
+        { status: 409 }
+      );
+    }
 
     // Every party member must meet the requirements (verified + linked) —
     // one unverified member blocks the whole party, FACEIT-style.

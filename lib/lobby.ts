@@ -80,6 +80,46 @@ async function enrich(raw: RawLobby): Promise<LobbyView> {
 }
 
 /**
+ * The set of Discord ids currently in a live match lobby (across all lobbies),
+ * pruning expired rows as it scans. Used to block re-queueing while a player's
+ * match is still open. One query, so it's cheap to call on every queue join.
+ */
+export async function getActiveLobbyMemberIds(): Promise<Set<string>> {
+  const ids = new Set<string>();
+  let rows;
+  try {
+    const rs = await client.execute("SELECT id, data, created_at FROM web_lobbies");
+    rows = rs.rows;
+  } catch {
+    return ids; // table not created yet
+  }
+  const cutoff = Date.now() - LOBBY_TTL_MS;
+  const expired: string[] = [];
+  for (const row of rows) {
+    if (Number(row.created_at) < cutoff) {
+      expired.push(row.id as string);
+      continue;
+    }
+    try {
+      const data = JSON.parse(row.data as string) as RawLobby;
+      for (const m of data.members ?? []) ids.add(m.discordId);
+    } catch {
+      expired.push(row.id as string);
+    }
+  }
+  if (expired.length > 0) {
+    try {
+      await client.batch(
+        expired.map((id) => ({ sql: "DELETE FROM web_lobbies WHERE id = ?", args: [id] }))
+      );
+    } catch {
+      /* best-effort prune */
+    }
+  }
+  return ids;
+}
+
+/**
  * The active lobby the given Discord user is in, or null. Prunes rows older
  * than the TTL as it scans (best-effort). The bot owns creation; the website
  * only reads and expires.

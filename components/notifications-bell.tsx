@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Bell, UserPlus, Users, Check, X } from "lucide-react";
 
@@ -22,7 +23,15 @@ export function NotificationsBell() {
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  // Fixed-viewport coords for the dropdown. The sidebar is `overflow-hidden`
+  // (for its width animation), which would clip an absolutely-positioned menu,
+  // so we portal the dropdown to <body> and position it next to the bell.
+  const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => setMounted(true), []);
 
   const load = useCallback(async () => {
     try {
@@ -42,10 +51,13 @@ export function NotificationsBell() {
     return () => clearInterval(interval);
   }, [load]);
 
-  // Close on outside click.
+  // Close on outside click — the dropdown is portaled outside the button, so
+  // check both the button and the dropdown before closing.
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (buttonRef.current?.contains(t) || dropdownRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -53,6 +65,11 @@ export function NotificationsBell() {
 
   const toggle = async () => {
     const next = !open;
+    // Anchor the dropdown just to the right of the bell, aligned to its bottom.
+    if (next && buttonRef.current) {
+      const r = buttonRef.current.getBoundingClientRect();
+      setPos({ left: r.right + 8, bottom: window.innerHeight - r.bottom });
+    }
     setOpen(next);
     if (next && unread > 0) {
       setUnread(0);
@@ -110,8 +127,9 @@ export function NotificationsBell() {
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       <button
+        ref={buttonRef}
         onClick={toggle}
         className="hl-nav-item flex items-center gap-4 h-11 px-4 rounded-md mx-1 w-[calc(100%-8px)] text-hl-muted hover:text-white hover:bg-hl-panel-light/40"
         title="Notifications"
@@ -129,8 +147,12 @@ export function NotificationsBell() {
         </span>
       </button>
 
-      {open && (
-        <div className="absolute left-full bottom-0 ml-2 w-80 max-h-[70vh] overflow-y-auto rounded-xl border border-hl-border bg-hl-panel shadow-2xl z-50">
+      {mounted && open && pos && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ position: "fixed", left: pos.left, bottom: pos.bottom }}
+          className="w-80 max-h-[70vh] overflow-y-auto rounded-xl border border-hl-border bg-hl-panel shadow-2xl z-[60]"
+        >
           <div className="px-4 py-3 border-b border-hl-border">
             <span className="text-sm font-bold text-white header-caps">Notifications</span>
           </div>
@@ -181,7 +203,8 @@ export function NotificationsBell() {
               ))}
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
