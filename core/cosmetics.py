@@ -55,17 +55,49 @@ async def ensure_item(
     category: str | None = None,
     season: str | None = None,
     rarity: str = "common",
+    price: int = 0,
 ) -> int | None:
     """Create a catalog item if it doesn't exist (idempotent by slug).
-    Returns the item id, or None if the insert raced and the lookup failed."""
+    ``price`` > 0 lists the item in the website shop. Returns the item id, or
+    None if the insert raced and the lookup failed."""
     await db.execute(
         """INSERT OR IGNORE INTO cosmetic_items
-           (slug, type, name, description, asset, category, season, rarity, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (slug, item_type, name, description, asset, category, season, rarity, now_ms()),
+           (slug, type, name, description, asset, category, season, rarity, created_at, price)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (slug, item_type, name, description, asset, category, season, rarity, now_ms(), max(0, price)),
     )
     row = await db.fetchone("SELECT id FROM cosmetic_items WHERE slug = ?", (slug,))
     return row[0] if row else None
+
+
+async def set_price(slug: str, price: int) -> bool:
+    """Set an item's shop price (0 = not for sale). Returns False if no such item."""
+    if await get_item(slug) is None:
+        return False
+    await db.execute(
+        "UPDATE cosmetic_items SET price = ? WHERE slug = ?", (max(0, price), slug)
+    )
+    return True
+
+
+async def get_coins(player_name: str) -> int | None:
+    """A player's HL Coin balance, or None if the player doesn't exist."""
+    row = await db.fetchone("SELECT coins FROM players WHERE name = ?", (player_name,))
+    return int(row[0] or 0) if row else None
+
+
+async def grant_coins(player_name: str, amount: int) -> int | None:
+    """Add ``amount`` HL Coins to a player (negative to remove; balance floored
+    at 0). Returns the new balance, or None if the player doesn't exist. This is
+    the ONLY source of coins for now."""
+    current = await get_coins(player_name)
+    if current is None:
+        return None
+    new_balance = max(0, current + amount)
+    await db.execute(
+        "UPDATE players SET coins = ? WHERE name = ?", (new_balance, player_name)
+    )
+    return new_balance
 
 
 async def ensure_builtin_items() -> None:

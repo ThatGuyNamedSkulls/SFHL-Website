@@ -28,7 +28,7 @@ EXPECTED = {
     "setcolor", "checkperformance", "matchhistory",
     # cosmetics
     "createitem", "deleteitem", "giveitem", "revokeitem", "listitems",
-    "checkinventory",
+    "checkinventory", "givecoins", "setprice",
     # ranking
     "rank", "ranktie", "ocr2rank", "addelo", "removeelo", "refresh_top10",
     "update_roles", "undolastmatch", "recentmatches",

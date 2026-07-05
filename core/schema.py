@@ -100,7 +100,8 @@ async def ensure_schema() -> None:
             dynamic_flair TEXT DEFAULT '',
             glicko_rd REAL DEFAULT 350.0,
             glicko_vol REAL DEFAULT 0.06,
-            last_played TEXT DEFAULT NULL
+            last_played TEXT DEFAULT NULL,
+            coins INTEGER DEFAULT 0
         )
         """
     )
@@ -115,6 +116,8 @@ async def ensure_schema() -> None:
     await _safe_alter("ALTER TABLE players ADD COLUMN glicko_rd REAL DEFAULT 350.0")
     await _safe_alter("ALTER TABLE players ADD COLUMN glicko_vol REAL DEFAULT 0.06")
     await _safe_alter("ALTER TABLE players ADD COLUMN last_played TEXT DEFAULT NULL")
+    # HL Coins: shop currency, granted by /givecoins (only source for now).
+    await _safe_alter("ALTER TABLE players ADD COLUMN coins INTEGER DEFAULT 0")
 
     # --- match_history -----------------------------------------------------
     await db.execute(
@@ -339,10 +342,13 @@ async def ensure_schema() -> None:
             category    TEXT DEFAULT NULL,
             season      TEXT DEFAULT NULL,
             rarity      TEXT DEFAULT 'common',
-            created_at  INTEGER
+            created_at  INTEGER,
+            price       INTEGER DEFAULT 0
         )
         """
     )
+    # price > 0 makes an item purchasable in the website shop (0 = grant-only).
+    await _safe_alter("ALTER TABLE cosmetic_items ADD COLUMN price INTEGER DEFAULT 0")
     await db.execute(
         """
         CREATE TABLE IF NOT EXISTS cosmetic_inventory (

@@ -16,11 +16,14 @@ from discord.ext import commands
 from core.cosmetics import (
     delete_item,
     ensure_item,
+    get_coins,
     get_inventory,
     get_item,
+    grant_coins,
     grant_item,
     list_items,
     revoke_item,
+    set_price,
     valid_slug,
 )
 from cogs.shared import item_slug_choices, player_name_choices
@@ -77,6 +80,7 @@ class CosmeticsCog(commands.Cog):
         asset_filename="Image filename (e.g. gold.png) in the site's asset folder for this type.",
         category="Badge category (admin/seasonal/team).",
         rarity="Rarity accent shown in the inventory.",
+        price="Shop price in HL Coins (0 = not for sale, grant-only).",
     )
     @app_commands.choices(item_type=_TYPE_CHOICES, rarity=_RARITY_CHOICES, category=_CATEGORY_CHOICES)
     async def create_item(
@@ -89,6 +93,7 @@ class CosmeticsCog(commands.Cog):
         asset_filename: str = None,
         category: str = None,
         rarity: str = "common",
+        price: int = 0,
     ):
         if not _is_admin(interaction):
             await _deny(interaction)
@@ -114,12 +119,14 @@ class CosmeticsCog(commands.Cog):
         prefix = _ASSET_PREFIX[item_type]
         if asset_filename and prefix:
             asset = prefix + asset_filename.strip().lstrip("/")
+        price = max(0, price)
         await ensure_item(
             slug, item_type, name,
             description=description.strip(),
             asset=asset,
             category=category if item_type == "badge" else None,
             rarity=rarity,
+            price=price,
         )
         embed = discord.Embed(
             title="Item Created",
@@ -132,7 +139,15 @@ class CosmeticsCog(commands.Cog):
                 value=f"`{asset}` (put the file in the website's `public{prefix}` folder)",
                 inline=False,
             )
-        embed.set_footer(text=f"Grant it with /giveitem <player> {slug}")
+        embed.add_field(
+            name="Shop price",
+            value=f"{price} HL Coins" if price > 0 else "Not for sale (grant-only)",
+            inline=False,
+        )
+        embed.set_footer(
+            text=(f"In the shop for {price} coins." if price > 0
+                  else f"Grant it with /giveitem <player> {slug}, or set a price with /setprice {slug} <coins>")
+        )
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(
@@ -173,6 +188,60 @@ class CosmeticsCog(commands.Cog):
         await interaction.response.send_message(
             messages[result], ephemeral=result != "granted"
         )
+
+    @app_commands.command(
+        name="givecoins",
+        description="Give (or remove) HL Coins to a player — the shop currency. Admin only.",
+    )
+    @app_commands.describe(
+        player_name="The player to adjust.",
+        amount="Coins to add (use a negative number to remove).",
+    )
+    async def give_coins(
+        self, interaction: discord.Interaction, player_name: str, amount: int
+    ):
+        if not _is_admin(interaction):
+            await _deny(interaction)
+            return
+        new_balance = await grant_coins(player_name.strip(), amount)
+        if new_balance is None:
+            await interaction.response.send_message(
+                f"Player '{player_name}' not found in the database.", ephemeral=True
+            )
+            return
+        verb = "Gave" if amount >= 0 else "Removed"
+        await interaction.response.send_message(
+            f"🪙 {verb} **{abs(amount)}** HL Coins {'to' if amount >= 0 else 'from'} "
+            f"**{player_name}**. New balance: **{new_balance}** coins. "
+            "They can spend it at sf-hl.com/shop."
+        )
+
+    @app_commands.command(
+        name="setprice",
+        description="Set a cosmetic item's shop price in HL Coins (0 = not for sale). Admin only.",
+    )
+    @app_commands.describe(
+        item_slug="The item to price.",
+        price="Price in HL Coins (0 removes it from the shop).",
+    )
+    async def set_price_cmd(
+        self, interaction: discord.Interaction, item_slug: str, price: int
+    ):
+        if not _is_admin(interaction):
+            await _deny(interaction)
+            return
+        slug = item_slug.strip().lower()
+        if not await set_price(slug, price):
+            await interaction.response.send_message(
+                f"No item with slug `{slug}` (see /listitems).", ephemeral=True
+            )
+            return
+        price = max(0, price)
+        if price > 0:
+            msg = f"🏷️ `{slug}` is now in the shop for **{price}** HL Coins."
+        else:
+            msg = f"`{slug}` removed from the shop (grant-only)."
+        await interaction.response.send_message(msg)
 
     @app_commands.command(
         name="revokeitem", description="Take a cosmetic item away from a player. Admin only."
@@ -232,14 +301,18 @@ class CosmeticsCog(commands.Cog):
             await _deny(interaction)
             return
         rows = await get_inventory(player_name.strip())
+        coins = await get_coins(player_name.strip())
         if not rows:
+            balance = f" (balance: {coins} HL Coins)" if coins is not None else ""
             await interaction.response.send_message(
-                f"**{player_name}** owns no cosmetic items.", ephemeral=True
+                f"**{player_name}** owns no cosmetic items{balance}.", ephemeral=True
             )
             return
         embed = discord.Embed(
             title=f"Inventory — {player_name}", color=discord.Color.gold()
         )
+        if coins is not None:
+            embed.description = f"🪙 **{coins}** HL Coins"
         for slug, itype, name, rarity, equipped, granted_by in rows[:25]:
             marker = " ✅ equipped" if equipped else ""
             embed.add_field(
