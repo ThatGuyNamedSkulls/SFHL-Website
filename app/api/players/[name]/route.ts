@@ -64,6 +64,7 @@ export async function GET(
     const mapped = {
       id: `p${player.id}`,
       username: player.name,
+      discordUsername: player.discord_username ?? null,
       avatarUrl: await resolvePlayerAvatar(decodedName, player.roblox_avatar_image),
       rank: mapRank(player.rank),
       elo: player.elo,

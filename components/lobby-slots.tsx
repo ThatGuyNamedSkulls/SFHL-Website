@@ -8,9 +8,11 @@ import { Flag } from "@/components/flag";
 import { flagPath, countryName } from "@/lib/countries";
 import { RankTierLetter } from "@/types";
 import { Plus, Search, Crown, BadgeCheck, CircleAlert } from "lucide-react";
+import { formatUsername } from "@/lib/format";
 
 export interface LobbyMember {
   username: string;
+  discordUsername?: string | null;
   avatar?: string | null;
   rank?: RankTierLetter;
   leader?: boolean;
@@ -120,7 +122,7 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
                 )}
               </div>
               <div className="relative z-10 flex items-center gap-1.5 max-w-full">
-                <span className="text-sm font-bold text-white truncate">{member.username}</span>
+                <span className="text-sm font-bold text-white truncate">{formatUsername(member.username, member.discordUsername)}</span>
                 {member.verified !== null && member.verified !== undefined && (
                   <span title={member.verified ? "Verified — in the Discord server" : "Not verified — not in the Discord server"}>
                     <BadgeCheck className={`w-3.5 h-3.5 shrink-0 ${member.verified ? "text-hl-green" : "text-hl-red"}`} />

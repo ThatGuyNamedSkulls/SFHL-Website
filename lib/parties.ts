@@ -25,6 +25,8 @@ export interface PartyMember {
   discordId: string;
   username: string;
   playerName: string | null;
+  /** Discord @handle for "name (@handle)" display (absent on old snapshots). */
+  discordUsername?: string | null;
   avatar: string | null;
   rank: string;
   elo: number;

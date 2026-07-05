@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { UserSession } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationsBell } from "@/components/notifications-bell";
+import { formatUsername } from "@/lib/format";
 import {
   Search,
   Users,
@@ -157,7 +158,7 @@ export function Sidebar() {
         <Link
           href={profileHref}
           className="flex items-center gap-3 h-12 px-4 mx-1 rounded-md hover:bg-hl-panel-light/40"
-          title={session ? session.username : "Log in"}
+          title={session ? formatUsername(session.username, session.discordUsername) : "Log in"}
         >
           <Avatar className="w-8 h-8 border border-hl-border shrink-0">
             {session?.avatar ? <AvatarImage src={session.avatar} /> : null}
@@ -166,7 +167,7 @@ export function Sidebar() {
             </AvatarFallback>
           </Avatar>
           <span className="text-sm font-semibold text-white truncate whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-150">
-            {session ? session.username : "Log in"}
+            {session ? formatUsername(session.username, session.discordUsername) : "Log in"}
           </span>
         </Link>
       </div>

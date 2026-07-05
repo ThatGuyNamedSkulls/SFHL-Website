@@ -266,6 +266,8 @@ export interface PartyMemberView {
   discordId: string;
   username: string;
   playerName: string | null;
+  /** Discord @handle for "name (@handle)" display. */
+  discordUsername?: string | null;
   avatar: string | null;
   rank: string;
   elo: number;
@@ -308,7 +310,10 @@ export interface PartyView {
 /** Auth session stored in cookie */
 export interface UserSession {
   discordId: string;
+  /** Discord display name (the "roblox username" the bot keys players on). */
   username: string;
+  /** Discord @handle, shown as "username (@discordUsername)". */
+  discordUsername?: string | null;
   avatar: string | null;
   discriminator: string;
   /** Player name in the SFHL database (matched by Discord username) */

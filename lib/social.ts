@@ -21,6 +21,8 @@ export interface Friend {
   /** Rank tier letter (mapped from the DB rank string). */
   rank: string;
   country: string | null;
+  /** Discord @handle for "name (@handle)" display (null until synced). */
+  discordUsername: string | null;
 }
 
 export interface FriendRequestView {
@@ -125,6 +127,7 @@ function rowToFriend(r: Record<string, unknown>): Friend {
     rank: mapRank((r.rank as string) || ""),
     avatar: avatarUrl(r.roblox_avatar_image as string | null),
     country: (r.country as string) ?? null,
+    discordUsername: (r.discord_username as string) ?? null,
   };
 }
 
@@ -133,7 +136,7 @@ async function resolvePlayers(names: string[]): Promise<Map<string, Friend>> {
   if (names.length === 0) return map;
   const placeholders = names.map(() => "?").join(",");
   const rs = await client.execute({
-    sql: `SELECT name, rank, roblox_avatar_image, country FROM players WHERE name IN (${placeholders})`,
+    sql: `SELECT name, rank, roblox_avatar_image, country, discord_username FROM players WHERE name IN (${placeholders})`,
     args: names,
   });
   for (const r of rs.rows as unknown as Record<string, unknown>[]) {
@@ -141,7 +144,7 @@ async function resolvePlayers(names: string[]): Promise<Map<string, Friend>> {
   }
   // Fill unknowns so callers always have something to render.
   for (const n of names) {
-    if (!map.has(n)) map.set(n, { name: n, rank: "UNRANKED", avatar: null, country: null });
+    if (!map.has(n)) map.set(n, { name: n, rank: "UNRANKED", avatar: null, country: null, discordUsername: null });
   }
   return map;
 }
@@ -155,7 +158,7 @@ export async function playerExists(name: string): Promise<boolean> {
 /** Search the player base by name to add friends (excludes yourself). */
 export async function searchPlayers(query: string, selfName: string): Promise<Friend[]> {
   const rs = await client.execute({
-    sql: `SELECT name, rank, roblox_avatar_image, country FROM players
+    sql: `SELECT name, rank, roblox_avatar_image, country, discord_username FROM players
           WHERE name != ? AND name LIKE ? ORDER BY name LIMIT 20`,
     args: [selfName, `%${query.trim()}%`],
   });

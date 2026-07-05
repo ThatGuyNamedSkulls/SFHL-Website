@@ -60,6 +60,23 @@ export function regionMeta(raw: string | null | undefined): { label: string; fla
 }
 
 /**
+ * Website display name: "Roblox name (@discord handle)". The roblox name is the
+ * player's Discord display name (players.name); the handle is their Discord
+ * @username, synced by the bot. Falls back to just the roblox name when the
+ * handle is unknown. Purely presentational — never use this as a lookup key.
+ */
+export function formatUsername(
+  robloxName: string,
+  discordUsername?: string | null
+): string {
+  const handle = (discordUsername ?? "").trim();
+  if (!handle) return robloxName;
+  // Guard against the handle duplicating the display name (nothing to add).
+  if (handle.toLowerCase() === robloxName.toLowerCase()) return robloxName;
+  return `${robloxName} (@${handle})`;
+}
+
+/**
  * Convert the avatar value the bot stores (e.g. "avatars/2474682029.png")
  * into a URL the website can actually serve. Returns "" when there is none.
  */

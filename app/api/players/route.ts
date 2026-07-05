@@ -16,6 +16,7 @@ export async function GET() {
       return {
       id: `p${p.id}`,
       username: p.name,
+      discordUsername: p.discord_username ?? null,
       avatarUrl: avatarUrl(p.roblox_avatar_image),
       cardAsset: cards.get(p.name)?.card ?? null,
       frameAsset: cards.get(p.name)?.frame ?? null,

@@ -15,6 +15,7 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
   let country: string | null = null;
   let card: string | null = null;
   let frame: string | null = null;
+  let discordUsername: string | null = session.discordUsername ?? null;
 
   // Remember this player's Discord id so the bot can DM them by id.
   upsertWebUser(session.discordId, session.playerName, session.username).catch(() => {});
@@ -25,6 +26,7 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
       rank = mapRank(player.rank);
       elo = player.elo;
       country = isValidCountry(player.country) ? player.country!.toLowerCase() : null;
+      discordUsername = player.discord_username ?? discordUsername;
       const dbAvatar = await resolvePlayerAvatar(session.playerName, player.roblox_avatar_image);
       if (dbAvatar) avatar = dbAvatar;
     }
@@ -41,6 +43,7 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
     discordId: session.discordId,
     username: session.username,
     playerName: session.playerName,
+    discordUsername,
     avatar,
     rank,
     elo,

@@ -6,10 +6,12 @@ import { Search } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadgeInline } from "@/components/rank-badge";
 import { RankTierLetter } from "@/types";
+import { formatUsername } from "@/lib/format";
 
 interface SearchPlayer {
   id: string;
   username: string;
+  discordUsername?: string | null;
   avatarUrl: string;
   rank: string;
   elo: number;
@@ -144,7 +146,7 @@ export function PlayerSearch({
                   </AvatarFallback>
                 </Avatar>
                 <span className="flex-1 min-w-0 truncate text-sm font-medium text-white">
-                  {p.username}
+                  {formatUsername(p.username, p.discordUsername)}
                 </span>
                 <RankBadgeInline rank={p.rank as RankTierLetter} />
                 <span className="text-xs stat-number text-hl-gold w-12 text-right">

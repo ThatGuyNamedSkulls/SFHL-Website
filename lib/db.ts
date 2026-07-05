@@ -57,15 +57,32 @@ export interface DbPlayer {
   roblox_avatar_image: string | null;
   placement_done: number;
   placement_games_played: number;
+  /** Discord @handle, synced from the guild by the bot (null until synced). */
+  discord_username: string | null;
+}
+
+/** Lazily add the Discord-identity columns if the bot hasn't migrated them yet
+ *  (idempotent; ignores "duplicate column"). Guards the SELECTs below so a
+ *  pre-migration DB can't 500 the leaderboard/profile. */
+let discordColsReady: Promise<void> | null = null;
+export function ensurePlayerDiscordColumns(): Promise<void> {
+  if (!discordColsReady) {
+    discordColsReady = (async () => {
+      await client.execute("ALTER TABLE players ADD COLUMN discord_id INTEGER DEFAULT NULL").catch(() => {});
+      await client.execute("ALTER TABLE players ADD COLUMN discord_username TEXT DEFAULT NULL").catch(() => {});
+    })();
+  }
+  return discordColsReady;
 }
 
 export async function getAllPlayers(): Promise<DbPlayer[]> {
+  await ensurePlayerDiscordColumns();
   const rs = await client.execute(
     `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
             kd_ratio, total_mvps, total_score, total_headshot_percentage,
             avg_hs_percent, matches_played, matches_won, peak_elo,
             total_play_time, roblox_avatar_image, placement_done,
-            placement_games_played
+            placement_games_played, discord_username
      FROM players
      ORDER BY elo DESC`
   );
@@ -73,17 +90,32 @@ export async function getAllPlayers(): Promise<DbPlayer[]> {
 }
 
 export async function getPlayer(name: string): Promise<DbPlayer | undefined> {
+  await ensurePlayerDiscordColumns();
   const rs = await client.execute({
     sql: `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
                  kd_ratio, total_mvps, total_score, total_headshot_percentage,
                  avg_hs_percent, matches_played, matches_won, peak_elo,
                  total_play_time, roblox_avatar_image, placement_done,
-                 placement_games_played
+                 placement_games_played, discord_username
           FROM players
           WHERE name = ?`,
     args: [name]
   });
   return (rs.rows[0] as unknown as DbPlayer) || undefined;
+}
+
+/** Record a player's Discord identity (called on login for the user's own row;
+ *  the bot's hourly sync keeps everyone else fresh). */
+export async function setPlayerDiscordIdentity(
+  name: string,
+  discordId: string,
+  username: string
+): Promise<void> {
+  await ensurePlayerDiscordColumns();
+  await client.execute({
+    sql: "UPDATE players SET discord_id = ?, discord_username = ? WHERE name = ?",
+    args: [discordId, username, name],
+  });
 }
 
 export async function getPlayerCountry(name: string): Promise<string | null> {
@@ -232,14 +264,15 @@ export async function getAllMatchIds(): Promise<{ match_id: number; timestamp: s
 export async function getMostPlayedWith(
   playerName: string,
   limit = 10
-): Promise<{ name: string; count: number }[]> {
+): Promise<{ name: string; count: number; discordUsername: string | null }[]> {
   try {
     const rs = await client.execute({
-      sql: `SELECT other.player_name AS name, COUNT(*) AS count
+      sql: `SELECT other.player_name AS name, p.discord_username AS discordUsername, COUNT(*) AS count
             FROM match_history me
             JOIN match_history other
               ON me.match_id = other.match_id
              AND other.player_name <> me.player_name
+            LEFT JOIN players p ON other.player_name = p.name
             WHERE me.player_name = ?
               AND me.match_id IS NOT NULL
             GROUP BY other.player_name
@@ -247,7 +280,7 @@ export async function getMostPlayedWith(
             LIMIT ?`,
       args: [playerName, limit]
     });
-    return rs.rows as unknown as { name: string; count: number }[];
+    return rs.rows as unknown as { name: string; count: number; discordUsername: string | null }[];
   } catch {
     return [];
   }

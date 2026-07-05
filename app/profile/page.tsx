@@ -18,6 +18,7 @@ import { ProfileInventory } from "@/components/profile-inventory";
 import { EmptyState } from "@/components/empty-state";
 import { Flag } from "@/components/flag";
 import { flagPath, countryName as countryLabel } from "@/lib/countries";
+import { formatUsername } from "@/lib/format";
 import {
   StatsFilters,
   DEFAULT_FILTERS,
@@ -48,10 +49,11 @@ interface ProfileFriend {
   avatar: string | null;
   rank: string;
   country: string | null;
+  discordUsername?: string | null;
 }
 
 interface ProfilePlayer extends Player {
-  playedWith?: { name: string; count: number }[];
+  playedWith?: { name: string; count: number; discordUsername?: string | null }[];
   matchHistory?: Match[];
   regionFlag?: string;
   country?: string | null;
@@ -61,6 +63,7 @@ interface ProfilePlayer extends Player {
   friends?: ProfileFriend[];
   inventory?: InventoryItem[];
   rankings?: { overall: number | null; country: number | null };
+  discordUsername?: string | null;
 }
 
 /** Equipped badge icon with a lucide fallback when the asset is missing. */
@@ -368,7 +371,7 @@ function ProfileContent() {
                 </Avatar>
               </AvatarFrame>
               <div className="flex items-center gap-2 mt-4">
-                <h1 className="text-xl font-black text-white drop-shadow">{player.username}</h1>
+                <h1 className="text-xl font-black text-white drop-shadow">{formatUsername(player.username, player.discordUsername)}</h1>
                 {isOwn && (
                   <Link href="/settings" className="text-hl-muted hover:text-white">
                     <Settings className="w-4 h-4" />
@@ -486,7 +489,9 @@ function ProfileContent() {
                         {p.name.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-sm text-white truncate group-hover:text-hl-gold transition-colors">{p.name}</span>
+                    <span className="text-sm text-white truncate group-hover:text-hl-gold transition-colors">
+                      {formatUsername(p.name, p.discordUsername)}
+                    </span>
                   </div>
                   <span className="text-xs text-hl-muted shrink-0">{p.count}×</span>
                 </Link>
@@ -861,7 +866,7 @@ function ProfileContent() {
                           {f.name.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-sm font-bold text-white truncate">{f.name}</span>
+                      <span className="text-sm font-bold text-white truncate">{formatUsername(f.name, f.discordUsername)}</span>
                       {f.country && (
                         <Flag src={flagPath(f.country)} name={countryLabel(f.country)} className="w-4 h-3 shrink-0" />
                       )}

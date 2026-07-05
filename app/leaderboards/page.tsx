@@ -18,10 +18,12 @@ import { EmptyState } from "@/components/empty-state";
 import { Flag } from "@/components/flag";
 import { RankTierLetter } from "@/types";
 import { Search, Users, Globe, Swords } from "lucide-react";
+import { formatUsername } from "@/lib/format";
 
 interface ApiPlayer {
   id: string;
   username: string;
+  discordUsername?: string | null;
   avatarUrl: string;
   cardAsset: string | null;
   rank: string;
@@ -263,7 +265,7 @@ export default function LeaderboardsPage() {
                             </Avatar>
                           )}
                           <div className="font-semibold text-white text-base group-hover:text-hl-gold transition-colors flex items-center gap-2">
-                            {player.username}
+                            {formatUsername(player.username, player.discordUsername)}
                             {isMe && (
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-hl-gold/20 text-hl-gold">YOU</span>
                             )}

@@ -7,7 +7,7 @@ import {
   SESSION_COOKIE,
   OAUTH_STATE_COOKIE,
 } from "@/lib/auth";
-import { getPlayer, ensurePlayer } from "@/lib/db";
+import { getPlayer, ensurePlayer, setPlayerDiscordIdentity } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
 import { resolvePlayerAvatar } from "@/lib/avatar";
 
@@ -111,6 +111,7 @@ export async function GET(request: Request) {
     const session = {
       discordId: userData.id,
       username: userData.global_name || userData.username,
+      discordUsername: userData.username ?? null,
       avatar: avatar,
       discriminator: userData.discriminator || "0",
       playerName,
@@ -122,6 +123,16 @@ export async function GET(request: Request) {
       await upsertWebUser(session.discordId, session.playerName, session.username);
     } catch (e) {
       console.error("Failed to record web_user mapping:", e);
+    }
+
+    // Record this user's @handle on their own player row immediately, so the
+    // "name (@handle)" display works before the bot's hourly guild sync runs.
+    if (playerName && userData.username) {
+      try {
+        await setPlayerDiscordIdentity(playerName, userData.id, userData.username);
+      } catch (e) {
+        console.error("Failed to record Discord identity:", e);
+      }
     }
 
     const jwt = await encodeSession(session);
