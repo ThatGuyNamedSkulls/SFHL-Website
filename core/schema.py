@@ -146,7 +146,8 @@ async def ensure_schema() -> None:
             is_highlight INTEGER DEFAULT 0,
             match_id INTEGER,
             round_score TEXT,
-            undo_state TEXT
+            undo_state TEXT,
+            is_placement INTEGER DEFAULT 0
         )
         """
     )
@@ -159,6 +160,10 @@ async def ensure_schema() -> None:
     await _safe_alter("ALTER TABLE match_history ADD COLUMN round_score TEXT")
     # undo_state holds a JSON snapshot of each player's pre-match state for exact undo.
     await _safe_alter("ALTER TABLE match_history ADD COLUMN undo_state TEXT")
+    # is_placement flags rows from placement (pre-graduation) games. The row is kept
+    # for /undolastmatch integrity but filtered out of every stat view, so placement
+    # games don't count toward stats.
+    await _safe_alter("ALTER TABLE match_history ADD COLUMN is_placement INTEGER DEFAULT 0")
     await _backfill_match_ids()
 
     # --- web_queue ---------------------------------------------------------
@@ -200,6 +205,46 @@ async def ensure_schema() -> None:
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
         """
+    )
+
+    # --- season_stats ------------------------------------------------------
+    # Per-season archive of each player's aggregate stats. /resetdb writes a row
+    # per player here (keyed by season name) right before it zeroes the live
+    # columns, so a new season starts clean while past seasons stay queryable.
+    # Permanent rewards (badges, cosmetics, coins, Discord identity, friends) are
+    # NOT archived here — they persist on their own tables across seasons.
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS season_stats (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            season_name   TEXT NOT NULL,
+            player_name   TEXT NOT NULL,
+            elo           INTEGER,
+            rank          TEXT,
+            matches_played INTEGER,
+            matches_won    INTEGER,
+            total_kills    INTEGER,
+            total_deaths   INTEGER,
+            total_assists  INTEGER,
+            kd_ratio       REAL,
+            total_mvps     INTEGER,
+            total_score    INTEGER,
+            total_headshot_percentage REAL,
+            avg_hs_percent REAL,
+            total_play_time INTEGER,
+            peak_elo       INTEGER,
+            archived_at    INTEGER
+        )
+        """
+    )
+    # One archive row per player per season; makes a re-run of /resetdb with the
+    # same season name overwrite rather than duplicate (INSERT OR REPLACE).
+    await db.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_season_stats_unique "
+        "ON season_stats(season_name, player_name)"
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_season_stats_player ON season_stats(player_name)"
     )
 
     # --- timeouts ----------------------------------------------------------

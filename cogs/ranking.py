@@ -305,6 +305,7 @@ class RankingCog(commands.Cog):
             # players' Elo changed with no matching history/undo row (which
             # /undolastmatch could never repair) or half the lineup updated.
             match_stmts = []
+            placement_names = set()  # players still in placement this match (excluded from stats)
             for idx, (name, result, point) in enumerate(zip(names, results, score_vals)):
                 snapshot = await _capture_state(name)
                 if snapshot is None:
@@ -329,13 +330,18 @@ class RankingCog(commands.Cog):
                 mp, rg, pt = map_name_val, region_val, play_time_seconds
 
                 won_match = result.strip().upper() == win_label
-                # Record the exact achievement increments applied (so undo can revert them).
-                ach_inc = {
-                    "Matches Played Mastery": 1,
-                    "Wins Mastery": 1 if won_match else 0,
-                    "Points Mastery": point,
-                    "Top Scorer Mastery": point,
-                }
+                # Record the exact achievement increments applied (so undo can revert
+                # them). Placement games don't count toward stats, so they apply — and
+                # store — nothing; their empty dict makes undo revert no achievements.
+                if placement_done:
+                    ach_inc = {
+                        "Matches Played Mastery": 1,
+                        "Wins Mastery": 1 if won_match else 0,
+                        "Points Mastery": point,
+                        "Top Scorer Mastery": point,
+                    }
+                else:
+                    ach_inc = {}
                 undo_state = json.dumps({"p": snapshot, "ach": ach_inc})
 
                 if placement_done:
@@ -399,8 +405,8 @@ class RankingCog(commands.Cog):
                     match_stmts.append((
                         """INSERT INTO match_history (player_name, elo_change, map_name, region,
                            kills, deaths, assists, hs_percentage, result, points, executed_by,
-                           timestamp, mvps, match_id, round_score, undo_state)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           timestamp, mvps, match_id, round_score, undo_state, is_placement)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
                         (name, elo_change, mp, rg, k, d, a, hs_v, result, point,
                          interaction.user.name, _now_str(), m, match_id, round_score_str, undo_state),
                     ))
@@ -432,6 +438,7 @@ class RankingCog(commands.Cog):
                             "UPDATE players SET kd_ratio = ? WHERE name = ?", (kd, name)
                         ))
                 else:
+                    placement_names.add(name)  # placement game: excluded from stats/achievements
                     new_games_played = games_played + 1
                     new_total_points = placement_points + point
                     if new_games_played == 3:
@@ -462,11 +469,13 @@ class RankingCog(commands.Cog):
                         )
                     # Record a history row for placement players too, so /undolastmatch
                     # reverses the whole match (incl. placement progress + graduations).
+                    # Flagged is_placement=1 so it's kept for undo but filtered out of
+                    # every stat view — placement games don't count toward stats.
                     match_stmts.append((
                         """INSERT INTO match_history (player_name, elo_change, map_name, region,
                            kills, deaths, assists, hs_percentage, result, points, executed_by,
-                           timestamp, mvps, match_id, round_score, undo_state)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           timestamp, mvps, match_id, round_score, undo_state, is_placement)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)""",
                         (name, elo_change, mp, rg, k, d, a, hs_v, result, point,
                          interaction.user.name, _now_str(), m, match_id, round_score_str, undo_state),
                     ))
@@ -478,9 +487,10 @@ class RankingCog(commands.Cog):
                 await db.batch(match_stmts)
 
             # Achievements are applied inside the lock so they can't interleave
-            # with a concurrent /undolastmatch reverting the same players.
+            # with a concurrent /undolastmatch reverting the same players. Placement
+            # players are skipped — placement games don't count toward stats.
             for name, result, point in zip(names, results, score_vals):
-                if name in players_not_found:
+                if name in players_not_found or name in placement_names:
                     continue
                 await update_achievement_progress(name, "Matches Played Mastery", 1)
                 if result.upper() == "W":
@@ -594,9 +604,14 @@ class RankingCog(commands.Cog):
                 placement_done = snapshot["placement_done"]
 
                 # Achievement increments applied for ties (matches the updates below).
+                # Placement games don't count toward stats, so they apply — and store
+                # for undo — nothing.
                 ach_points = unranked_points.get(name, 25)
-                ach_inc = {"Matches Played Mastery": 1, "Points Mastery": ach_points,
-                           "Top Scorer Mastery": ach_points}
+                if placement_done:
+                    ach_inc = {"Matches Played Mastery": 1, "Points Mastery": ach_points,
+                               "Top Scorer Mastery": ach_points}
+                else:
+                    ach_inc = {}
                 undo_state = json.dumps({"p": snapshot, "ach": ach_inc})
 
                 if placement_done:
@@ -649,14 +664,18 @@ class RankingCog(commands.Cog):
                              "placement_progress": new_games_played, "result": "TIE"}
                         )
 
+                # is_placement=1 keeps the row for undo but filters it from stat views.
                 match_stmts.append((
                     """INSERT INTO match_history (player_name, elo_change, result, points,
-                       executed_by, timestamp, match_id, undo_state)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       executed_by, timestamp, match_id, undo_state, is_placement)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (name, elo_change, "TIE", row_points, interaction.user.name,
-                     _now_str(), match_id, undo_state),
+                     _now_str(), match_id, undo_state, 0 if placement_done else 1),
                 ))
-                applied_achievements.append((name, ach_points))
+                # Placement games don't count toward stats — only graduated players
+                # accrue tie achievements.
+                if placement_done:
+                    applied_achievements.append((name, ach_points))
 
             if match_stmts:
                 await db.batch(match_stmts)

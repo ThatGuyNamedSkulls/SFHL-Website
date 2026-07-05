@@ -6,6 +6,7 @@ works for any game.
 """
 
 import logging
+import time
 
 import discord
 from discord import app_commands
@@ -390,9 +391,46 @@ class MatchflowCog(commands.Cog):
                 logger.exception("Failed awarding season placement items")
                 placed = []
 
+            # Archive every player's aggregate stats under this season name before
+            # the columns are zeroed, so past seasons stay queryable (/seasonstats)
+            # and the new season starts clean. Idempotent per (season, player) via
+            # season_stats' unique index. Permanent rewards (badges/cosmetics/coins/
+            # identity/friends) live on their own tables and are untouched.
+            archived_count = 0
+            try:
+                stat_rows = await db.fetchall(
+                    """SELECT name, elo, rank, matches_played, matches_won, total_kills,
+                              total_deaths, total_assists, kd_ratio, total_mvps, total_score,
+                              total_headshot_percentage, avg_hs_percent, total_play_time, peak_elo
+                       FROM players"""
+                )
+                if stat_rows:
+                    now_ms = int(time.time() * 1000)
+                    await db.batch([
+                        (
+                            """INSERT OR REPLACE INTO season_stats
+                               (season_name, player_name, elo, rank, matches_played, matches_won,
+                                total_kills, total_deaths, total_assists, kd_ratio, total_mvps,
+                                total_score, total_headshot_percentage, avg_hs_percent,
+                                total_play_time, peak_elo, archived_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (season_name, *tuple(r), now_ms),
+                        )
+                        for r in stat_rows
+                    ])
+                    archived_count = len(stat_rows)
+            except Exception:
+                logger.exception("Failed to archive season stats on /resetdb")
+
+            # Zero the live season columns: standings (elo/rank/placement) AND the
+            # aggregate stat totals now safely archived above.
             await db.execute(
                 """UPDATE players SET elo = 0, rank = '[?] Unranked', placement_points = 0,
-                   placement_games_played = 0, placement_done = 0"""
+                   placement_games_played = 0, placement_done = 0,
+                   matches_played = 0, matches_won = 0, total_kills = 0, total_deaths = 0,
+                   total_assists = 0, kd_ratio = 0.0, total_mvps = 0, total_score = 0,
+                   total_headshot_percentage = 0.0, avg_hs_percent = 0.0, total_play_time = 0,
+                   peak_elo = 0"""
             )
 
             # Drop any stale post-queue lobbies from last season.
@@ -424,6 +462,14 @@ class MatchflowCog(commands.Cog):
             embed.add_field(
                 name="Placement Items Awarded",
                 value="\n".join(placed) if placed else "None",
+                inline=False,
+            )
+            embed.add_field(
+                name="Stats Archived",
+                value=(
+                    f"{archived_count} players' stats saved to season \"{season_name}\" "
+                    "(view with /seasonstats)."
+                ),
                 inline=False,
             )
             await interaction.response.send_message(embed=embed)

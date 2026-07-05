@@ -120,7 +120,30 @@ class PlayersCog(commands.Cog):
                     f"Player '{player_name}' not found in the database.", ephemeral=True
                 )
                 return
-            await db.execute("DELETE FROM players WHERE name = ?", (player_name,))
+            # Remove the player everywhere their name is stored so no orphaned rows
+            # survive — the delete-side mirror of /renameplayer's updates: the bot's
+            # own tables AND the name-keyed website social tables, plus the queue and
+            # the per-season stat archive. One batch so it all goes together.
+            # (Moderation records in timeouts/warnings/leaving_incidents are keyed by
+            # Discord id, not name, and are intentionally left intact — same as
+            # /renameplayer, which never touches them.)
+            await db.batch([
+                ("DELETE FROM players WHERE name = ?", (player_name,)),
+                ("DELETE FROM match_history WHERE player_name = ?", (player_name,)),
+                ("DELETE FROM achievements WHERE player_name = ?", (player_name,)),
+                ("DELETE FROM badges WHERE player_name = ?", (player_name,)),
+                ("DELETE FROM cosmetic_inventory WHERE player_name = ?", (player_name,)),
+                ("DELETE FROM season_stats WHERE player_name = ?", (player_name,)),
+                ("DELETE FROM reports WHERE reporter_name = ?", (player_name,)),
+                ("DELETE FROM reports WHERE reported_user = ?", (player_name,)),
+                ("DELETE FROM web_queue WHERE player_name = ?", (player_name,)),
+                ("DELETE FROM web_users WHERE player_name = ?", (player_name,)),
+                ("DELETE FROM friendships WHERE user_a = ? OR user_b = ?", (player_name, player_name)),
+                ("DELETE FROM friend_requests WHERE from_id = ? OR to_id = ?", (player_name, player_name)),
+                ("DELETE FROM party_invites WHERE from_id = ? OR to_id = ?", (player_name, player_name)),
+                ("DELETE FROM notifications WHERE user_id = ? OR actor_id = ?", (player_name, player_name)),
+                ("DELETE FROM discord_dm_outbox WHERE to_id = ?", (player_name,)),
+            ])
             embed = discord.Embed(
                 title="Player Removed",
                 description=f"Player '{player_name}' has been removed from the database.",
@@ -355,7 +378,8 @@ class PlayersCog(commands.Cog):
 
             recent_matches = await db.fetchall(
                 """SELECT points, result, timestamp FROM match_history
-                   WHERE player_name = ? ORDER BY timestamp DESC LIMIT 10""",
+                   WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
+                   ORDER BY timestamp DESC LIMIT 10""",
                 (player_name,),
             )
             if len(recent_matches) < 3:
@@ -423,7 +447,8 @@ class PlayersCog(commands.Cog):
         rows = await db.fetchall(
             """SELECT result, elo_change, map_name, region, kills, deaths, assists,
                       hs_percentage, points, timestamp, match_id
-               FROM match_history WHERE player_name = ? ORDER BY timestamp DESC LIMIT 10""",
+               FROM match_history WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
+               ORDER BY timestamp DESC LIMIT 10""",
             (player_name,),
         )
         if not rows:
@@ -445,6 +470,62 @@ class PlayersCog(commands.Cog):
 
     @matchhistory.autocomplete("player_name")
     async def _matchhistory_ac(self, interaction: discord.Interaction, current: str):
+        return await _player_choices(current)
+
+    @app_commands.command(
+        name="seasonstats",
+        description="Show a player's archived stats from a past season (see /resetdb).",
+    )
+    async def season_stats(
+        self, interaction: discord.Interaction, season_name: str, player_name: str = None
+    ):
+        if player_name is None:
+            player_name = interaction.user.display_name
+        row = await db.fetchone(
+            """SELECT elo, rank, matches_played, matches_won, total_kills, total_deaths,
+                      total_assists, kd_ratio, total_mvps, total_score, avg_hs_percent,
+                      total_play_time, peak_elo
+               FROM season_stats WHERE season_name = ? AND player_name = ?""",
+            (season_name, player_name),
+        )
+        if not row:
+            await interaction.response.send_message(
+                f"No archived stats for '{player_name}' in season '{season_name}'.",
+                ephemeral=True,
+            )
+            return
+        (elo, rank, matches_played, matches_won, tk, td, ta, kd, mvps, score,
+         avg_hs, play_time, peak_elo) = row
+        win_rate = (matches_won / matches_played * 100) if matches_played else 0
+        embed = discord.Embed(
+            title=f"{season_name} — {player_name}", color=discord.Color.gold()
+        )
+        embed.add_field(name="Final Elo", value=str(elo), inline=True)
+        embed.add_field(name="Final Rank", value=str(rank), inline=True)
+        embed.add_field(name="Peak Elo", value=str(peak_elo), inline=True)
+        embed.add_field(name="Matches Played", value=str(matches_played), inline=True)
+        embed.add_field(name="Matches Won", value=str(matches_won), inline=True)
+        embed.add_field(name="Win Rate", value=f"{win_rate:.2f}%", inline=True)
+        embed.add_field(name="K / D / A", value=f"{tk} / {td} / {ta}", inline=True)
+        embed.add_field(name="K/D Ratio", value=str(kd), inline=True)
+        embed.add_field(name="MVPs", value=str(mvps), inline=True)
+        embed.add_field(name="Total Score", value=str(score), inline=True)
+        embed.add_field(name="Avg HS%", value=f"{avg_hs:.1f}%", inline=True)
+        await interaction.response.send_message(embed=embed)
+
+    @season_stats.autocomplete("season_name")
+    async def _season_stats_season_ac(self, interaction: discord.Interaction, current: str):
+        rows = await db.fetchall(
+            "SELECT DISTINCT season_name FROM season_stats ORDER BY season_name"
+        )
+        cur = (current or "").lower()
+        return [
+            app_commands.Choice(name=r[0], value=r[0])
+            for r in rows if r[0] and cur in r[0].lower()
+        ][:25]
+
+    @season_stats.autocomplete("player_name")
+    async def _season_stats_player_ac(self, interaction: discord.Interaction, current: str):
         return await _player_choices(current)
 
 

@@ -5,7 +5,7 @@ import logging
 from discord.ext import commands, tasks
 
 from config.settings import GUILD_ID
-from core.database import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

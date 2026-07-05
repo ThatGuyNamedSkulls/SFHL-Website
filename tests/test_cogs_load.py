@@ -25,7 +25,7 @@ EXPECTED = {
     "help",
     # players (settitle removed — titles are equipped on the website now)
     "addplayer", "removeplayer", "renameplayer", "checkplayer", "leaderboard",
-    "setcolor", "checkperformance", "matchhistory",
+    "setcolor", "checkperformance", "matchhistory", "seasonstats",
     # cosmetics
     "createitem", "deleteitem", "giveitem", "revokeitem", "listitems",
     "checkinventory", "givecoins", "setprice",
