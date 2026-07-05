@@ -17,4 +17,5 @@ EXTENSIONS = [
     "cogs.profile",
     "cogs.social",
     "cogs.cosmetics",
+    "cogs.sync",
 ]

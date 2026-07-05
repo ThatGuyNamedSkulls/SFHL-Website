@@ -101,7 +101,9 @@ async def ensure_schema() -> None:
             glicko_rd REAL DEFAULT 350.0,
             glicko_vol REAL DEFAULT 0.06,
             last_played TEXT DEFAULT NULL,
-            coins INTEGER DEFAULT 0
+            coins INTEGER DEFAULT 0,
+            discord_id INTEGER DEFAULT NULL,
+            discord_username TEXT DEFAULT NULL
         )
         """
     )
@@ -118,6 +120,10 @@ async def ensure_schema() -> None:
     await _safe_alter("ALTER TABLE players ADD COLUMN last_played TEXT DEFAULT NULL")
     # HL Coins: shop currency, granted by /givecoins (only source for now).
     await _safe_alter("ALTER TABLE players ADD COLUMN coins INTEGER DEFAULT 0")
+    # Discord identity, synced from the guild: display_name -> players.name (the
+    # "roblox username"); discord_username is the @handle shown next to it.
+    await _safe_alter("ALTER TABLE players ADD COLUMN discord_id INTEGER DEFAULT NULL")
+    await _safe_alter("ALTER TABLE players ADD COLUMN discord_username TEXT DEFAULT NULL")
 
     # --- match_history -----------------------------------------------------
     await db.execute(
