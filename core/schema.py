@@ -10,23 +10,44 @@ inserted into but never created (so smurf detection silently failed).
 """
 
 import logging
+import re
 from datetime import datetime
 
 from core import db
 
 logger = logging.getLogger(__name__)
 
+_ADD_COLUMN_RE = re.compile(
+    r"ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)", re.IGNORECASE
+)
+
+
+async def _column_exists(table: str, column: str) -> bool:
+    """True if ``column`` is present on ``table`` (via PRAGMA table_info)."""
+    try:
+        rows = await db.fetchall(f"PRAGMA table_info({table})")
+    except Exception:
+        return False
+    return any(r[1] == column for r in rows)
+
 
 async def _safe_alter(sql: str) -> None:
-    """Run an ALTER TABLE, ignoring only the expected 'duplicate column' error
-    on already-migrated DBs. Any other failure (bad SQL, missing table, a real
-    migration problem) is logged instead of silently swallowed, so a broken
-    migration surfaces rather than leaving a column quietly absent."""
+    """Run an ``ALTER TABLE ... ADD COLUMN``, treating an already-present column
+    as success. Any other failure (bad SQL, missing table, a real migration
+    problem) is logged so it surfaces rather than leaving a column quietly absent.
+
+    We can't rely on the error text: the libsql HTTP client raises a bare
+    ``KeyError('result')`` (not a "duplicate column" message) when the column
+    already exists, so instead we confirm the actual outcome — if the target
+    column is present after a failed ALTER, the ALTER was simply redundant."""
     try:
         await db.execute(sql)
     except Exception as e:
         if "duplicate column" in str(e).lower():
             return  # Column already exists — expected on existing databases.
+        m = _ADD_COLUMN_RE.search(sql)
+        if m and await _column_exists(m.group(1), m.group(2)):
+            return  # Redundant ALTER (column already present) — not a failure.
         logger.warning("Migration ALTER failed (%s): %s", sql, e)
 
 
@@ -124,6 +145,13 @@ async def ensure_schema() -> None:
     # "roblox username"); discord_username is the @handle shown next to it.
     await _safe_alter("ALTER TABLE players ADD COLUMN discord_id INTEGER DEFAULT NULL")
     await _safe_alter("ALTER TABLE players ADD COLUMN discord_username TEXT DEFAULT NULL")
+    # Hidden MMR track: soft placement MMR (seeded at unranked_effective_elo)
+    # and the hidden rating of the mmr_rr (Valorant-style) model. NULL until
+    # first used; never shown as the rank.
+    await _safe_alter("ALTER TABLE players ADD COLUMN mmr REAL DEFAULT NULL")
+    # Sum of per-placement-game average opponent skill — divided by games at
+    # graduation to shift the starting Elo (placement.opp_weight/opp_cap).
+    await _safe_alter("ALTER TABLE players ADD COLUMN placement_opp_sum REAL DEFAULT 0")
 
     # --- match_history -----------------------------------------------------
     await db.execute(
@@ -164,7 +192,56 @@ async def ensure_schema() -> None:
     # for /undolastmatch integrity but filtered out of every stat view, so placement
     # games don't count toward stats.
     await _safe_alter("ALTER TABLE match_history ADD COLUMN is_placement INTEGER DEFAULT 0")
+    # team: which side the player was on (1 = winners/team 1, 2 = losers/team 2).
+    # Lets the website render tie scoreboards, where result gives no split.
+    await _safe_alter("ALTER TABLE match_history ADD COLUMN team INTEGER")
+    # mode: the gamemode of the match ("5v5" / "2v2" / "1v1"), inferred from the
+    # lineup size at /rank time. NULL legacy rows = main ladder. Lets stats and
+    # the website filter per mode, and tells /undolastmatch which ladder to restore.
+    await _safe_alter("ALTER TABLE match_history ADD COLUMN mode TEXT")
     await _backfill_match_ids()
+
+    # --- mode_ratings --------------------------------------------------------
+    # Per-gamemode rating ladders (MMR v2): gamemodes whose profile [modes]
+    # entry sets ladder = "own" (e.g. 1v1) keep their Elo/MMR/rank/placement
+    # state here instead of the players columns — a completely separate ladder
+    # with its own placements. The main ladder (5v5) stays on `players`, which
+    # everything else (roles, top-10, website leaderboard, /resetdb) reads.
+    # Rows are created lazily on a player's first game in that mode.
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS mode_ratings (
+            player_name  TEXT NOT NULL,
+            mode         TEXT NOT NULL,
+            elo          INTEGER NOT NULL DEFAULT 0,
+            mmr          REAL DEFAULT NULL,
+            rank         TEXT NOT NULL DEFAULT '[?] Unranked',
+            peak_elo     INTEGER DEFAULT 0,
+            matches_played INTEGER DEFAULT 0,
+            matches_won  INTEGER DEFAULT 0,
+            placement_points REAL DEFAULT 0,
+            placement_games_played INTEGER DEFAULT 0,
+            placement_done INTEGER DEFAULT 0,
+            placement_opp_sum REAL DEFAULT 0,
+            glicko_rd    REAL DEFAULT 350.0,
+            glicko_vol   REAL DEFAULT 0.06,
+            last_played  TEXT DEFAULT NULL,
+            PRIMARY KEY (player_name, mode)
+        )
+        """
+    )
+
+    # --- bot_state ----------------------------------------------------------
+    # Small key/value store shared with the website (queue_mode, queue_message).
+    # Mirror the placement game count here so the website can show "x/N".
+    await db.execute(
+        "CREATE TABLE IF NOT EXISTS bot_state (key TEXT PRIMARY KEY, value TEXT)"
+    )
+    from core.game_profile import ACTIVE as _GAME
+    await db.execute(
+        "INSERT OR REPLACE INTO bot_state (key, value) VALUES ('placement_games', ?)",
+        (str(_GAME.placement.games),),
+    )
 
     # --- web_queue ---------------------------------------------------------
     await db.execute(

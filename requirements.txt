@@ -13,3 +13,7 @@ libsql-client>=0.3.1
 
 # Note: TOML config is read with the stdlib `tomllib` module (Python 3.11+),
 # so no extra TOML dependency is required.
+
+# --- dev/test only ---
+pytest>=8.0
+pytest-asyncio>=0.24  # runs tests/test_undo.py's async tests under pytest

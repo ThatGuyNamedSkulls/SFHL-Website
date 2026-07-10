@@ -6,6 +6,7 @@ Shared queue state lives in cogs.queue_state. The map-veto View comes from
 cogs.matchflow.
 """
 
+import asyncio
 import itertools
 import json
 import logging
@@ -168,6 +169,11 @@ class QueueView(View):
     def __init__(self):
         super().__init__(timeout=None)
         self.message = None
+        # Serializes match creation between the Join button and the web-queue
+        # poll loop — both check "queue full" then create a game channel, and
+        # without the lock a simultaneous web fill + click can start two
+        # matches for the same players.
+        self.start_lock = asyncio.Lock()
 
     async def recreate_queue_message(self, channel):
         try:
@@ -284,13 +290,35 @@ class QueueView(View):
 
         await channel.send(f"**Game starting!** {' '.join(p.mention for p in players)}")
 
-        # Player Elos + party blocks.
+        # Player skills + party blocks. The hidden MMR is preferred when it's
+        # the better estimate: always under the mmr_rr model, and for
+        # mid-placement players whose soft placement MMR is tracking (so a
+        # player trending 1700 stops being balanced as a flat 1000).
+        # Own-ladder gamemodes (e.g. 1v1) balance on THAT ladder's rating,
+        # seeding a player's first games there from their main-ladder skill.
+        mode_label = f"{GAME.team_size}v{GAME.team_size}"
+        own_ladder = GAME.mode_config(mode_label).ladder == "own"
         player_elos, player_parties = {}, {}
         for player in players:
             row = await db.fetchone(
-                "SELECT elo FROM players WHERE name = ?", (player.display_name,)
+                "SELECT elo, mmr, placement_done FROM players WHERE name = ?",
+                (player.display_name,),
             )
-            player_elos[player] = row[0] if row else 0
+            if row and row[1] and (GAME.elo.model == "mmr_rr" or not row[2]):
+                player_elos[player] = row[1]
+            else:
+                player_elos[player] = row[0] if row else 0
+            if own_ladder:
+                mrow = await db.fetchone(
+                    "SELECT elo, mmr, placement_done FROM mode_ratings "
+                    "WHERE player_name = ? AND mode = ?",
+                    (player.display_name, mode_label),
+                )
+                if mrow and mrow[1] and (GAME.elo.model == "mmr_rr" or not mrow[2]):
+                    player_elos[player] = mrow[1]
+                elif mrow and mrow[0]:
+                    player_elos[player] = mrow[0]
+                # else: no mode rating yet — keep the main-ladder estimate above.
             for leader_id, party in parties.items():
                 if player.id in party["members"]:
                     party_members = [p for p in players if p.id in party["members"]]
@@ -315,7 +343,7 @@ class QueueView(View):
         players_per_team = len(players) // 2
 
         def choose_balanced_teams(blocks, players_per_team):
-            best, best_diff = None, float("inf")
+            best, best_key = None, None
             n = len(blocks)
             for r in range(1, n + 1):
                 for combo in itertools.combinations(range(n), r):
@@ -327,8 +355,19 @@ class QueueView(View):
                     if t2_count == 0:
                         continue
                     diff = abs(t1_elo / players_per_team - t2_elo / t2_count)
-                    if diff < best_diff:
-                        best_diff, best = diff, combo
+                    # Tiebreak between equal-average splits: prefer the one whose
+                    # BEST players are closest (don't stack both aces on one side).
+                    t1_members = [m for i in combo for m in blocks[i][0]]
+                    t2_members = [
+                        m for idx, b in enumerate(blocks) if idx not in combo for m in b[0]
+                    ]
+                    top_gap = abs(
+                        max(effective_elo(m) for m in t1_members)
+                        - max(effective_elo(m) for m in t2_members)
+                    ) if t1_members and t2_members else 0
+                    key = (diff, top_gap)
+                    if best_key is None or key < best_key:
+                        best_key, best = key, combo
             if best is not None:
                 team1, team2 = [], []
                 for idx, (members, _, _) in enumerate(blocks):
@@ -464,10 +503,18 @@ class QueueView(View):
             await self.update_queue_message()
 
             if len(current_queue) >= GAME.queue_size:
-                for item in self.children:
-                    item.disabled = True
-                await self.message.edit(embed=self.get_queue_embed(), view=self)
-                await self.create_game_channel(interaction.guild, current_queue[: GAME.queue_size])
+                async with self.start_lock:
+                    # Re-check on the SAME list reference (not get_current_queue(),
+                    # which would roll a full queue over to a fresh empty one):
+                    # if the poll loop started this match while we waited for the
+                    # lock, create_game_channel emptied the list and we skip.
+                    if len(current_queue) >= GAME.queue_size:
+                        for item in self.children:
+                            item.disabled = True
+                        await self.message.edit(embed=self.get_queue_embed(), view=self)
+                        await self.create_game_channel(
+                            interaction.guild, current_queue[: GAME.queue_size]
+                        )
         except discord.InteractionResponded:
             await self.recreate_queue_message(interaction.channel)
             try:
@@ -723,11 +770,16 @@ class QueueCog(commands.Cog):
                 # match never spawns out of nowhere). create_game_channel empties
                 # the filled queue and persists the post-queue lobby.
                 if len(current_queue) >= GAME.queue_size and self.queue_view.message is not None:
-                    players = current_queue[: GAME.queue_size]
-                    for item in self.queue_view.children:
-                        item.disabled = True
-                    await self._refresh_queue_message()
-                    await self.queue_view.create_game_channel(guild, players)
+                    async with self.queue_view.start_lock:
+                        # Re-check on the same list reference: if a Join click
+                        # started the match while we waited for the lock,
+                        # create_game_channel emptied this list and we skip.
+                        if len(current_queue) >= GAME.queue_size:
+                            players = current_queue[: GAME.queue_size]
+                            for item in self.queue_view.children:
+                                item.disabled = True
+                            await self._refresh_queue_message()
+                            await self.queue_view.create_game_channel(guild, players)
                 elif len(current_queue) >= GAME.queue_size:
                     logger.info(
                         "Queue filled from the website but no open queue message; "
@@ -868,12 +920,13 @@ class QueueCog(commands.Cog):
 
     @app_commands.command(
         name="gamemode",
-        description="Switch the global queue format between 5v5 and 1v1 (Match Staff only).",
+        description="Switch the global queue format between 5v5, 2v2 and 1v1 (Match Staff only).",
     )
     @app_commands.describe(mode="The queue format to switch to")
     @app_commands.choices(
         mode=[
             app_commands.Choice(name="5v5", value=5),
+            app_commands.Choice(name="2v2", value=2),
             app_commands.Choice(name="1v1", value=1),
         ]
     )
@@ -1032,7 +1085,7 @@ class QueueCog(commands.Cog):
                 if result:
                     elo, rank, matches_played, matches_won, placement_games = result
                     if rank == "[?] Unranked":
-                        stats = f"Unranked\n Placement Progress: {placement_games}/3"
+                        stats = f"Unranked\n Placement Progress: {placement_games}/{GAME.placement.games}"
                     else:
                         win_rate = (matches_won / matches_played * 100) if matches_played > 0 else 0
                         stats = (

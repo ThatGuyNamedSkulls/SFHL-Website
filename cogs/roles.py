@@ -21,7 +21,10 @@ async def refresh_top10_roles(bot) -> None:
             "SELECT name, elo FROM players ORDER BY elo DESC, matches_won DESC LIMIT ?",
             (TOP10_COUNT,),
         )
-        top_set = {row[0] for row in top_rows if row[1] >= TOP10_MIN_ELO}
+        # elo > 0 guard: right after a season reset everyone sits at 0 Elo, and
+        # without it the role would go to 10 arbitrary players (mirrors the
+        # same guard in core.cosmetics.sync_top10_badge).
+        top_set = {row[0] for row in top_rows if row[1] >= TOP10_MIN_ELO and row[1] > 0}
 
         guild = bot.get_guild(GUILD_ID)
         if guild is None:

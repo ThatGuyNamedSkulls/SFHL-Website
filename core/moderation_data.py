@@ -72,3 +72,22 @@ async def get_leaving_incident_count(user_id: int) -> int:
 def calculate_leaving_elo_penalty(incident_count: int) -> int:
     """ELO penalty for the Nth leaving incident."""
     return LEAVING_PENALTY_MAP.get(incident_count, LEAVING_PENALTY_MAX)
+
+
+def _ordinal(n: int) -> str:
+    suffix = {1: "st", 2: "nd", 3: "rd"}.get(n if n < 20 else n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def penalty_scale_text() -> str:
+    """The escalation scale as display text, generated from LEAVING_PENALTY_MAP
+    so what /leavinghistory shows can never drift from what is applied."""
+    entries = [
+        f"{_ordinal(n)}: -{p} ELO" for n, p in sorted(LEAVING_PENALTY_MAP.items())
+    ]
+    entries.append(f"{_ordinal(max(LEAVING_PENALTY_MAP) + 1)}+: -{LEAVING_PENALTY_MAX} ELO")
+    lines = [" • ".join(entries[i:i + 3]) for i in range(0, len(entries), 3)]
+    return (
+        f"**ELO Penalty Scale (resets after {LEAVING_WINDOW_DAYS} days):**\n"
+        + "\n".join(lines)
+    )

@@ -28,7 +28,8 @@ async def render_elo_graph(player_name: str, output_path: str = "elo_graph.png")
     """
     elo_changes = [
         row[0] for row in await db.fetchall(
-            "SELECT elo_change FROM match_history WHERE player_name = ? "
+            "SELECT elo_change FROM match_history "
+            "WHERE player_name = ? AND COALESCE(is_placement, 0) = 0 "
             "ORDER BY timestamp DESC LIMIT 15",
             (player_name,),
         )

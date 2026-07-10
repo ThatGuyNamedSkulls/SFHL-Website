@@ -9,6 +9,7 @@ equipped title into players.title (see core/cosmetics.py).
 """
 
 import logging
+import re
 
 import discord
 from discord import app_commands
@@ -16,6 +17,7 @@ from discord.ext import commands
 from discord.ui import View, Button
 
 from core import db
+from core.game_profile import ACTIVE as GAME
 from core.ranks import RANK_THRESHOLDS, get_rank, get_expected_range
 from core.players import get_player_elo
 from core.roblox import get_roblox_user_id, get_roblox_avatar_url
@@ -79,8 +81,12 @@ class PlayersCog(commands.Cog):
             )
             return
 
-        added, already_exists, too_long = [], [], []
+        added, already_exists, too_long, failed = [], [], [], []
+        seen: set[str] = set()  # dedupe within one call ("a, a" would 2x-insert)
         for player_name in (n.strip() for n in player_names.split(",")):
+            if not player_name or player_name.lower() in seen:
+                continue  # skip empty tokens ("a,,b") and in-call duplicates
+            seen.add(player_name.lower())
             if len(player_name) > 20:
                 too_long.append(player_name)
                 continue
@@ -89,11 +95,15 @@ class PlayersCog(commands.Cog):
             ) is not None:
                 already_exists.append(player_name)
                 continue
-            await db.execute(
-                "INSERT INTO players (name, elo, rank) VALUES (?, ?, ?)",
-                (player_name, 0, get_rank(0)),
-            )
-            added.append(player_name)
+            try:
+                await db.execute(
+                    "INSERT INTO players (name, elo, rank) VALUES (?, ?, ?)",
+                    (player_name, 0, get_rank(0)),
+                )
+                added.append(player_name)
+            except Exception:
+                logger.exception(f"Failed to add player '{player_name}'")
+                failed.append(player_name)
 
         embed = discord.Embed(title="Add Players Result", color=discord.Color.gold())
         if added:
@@ -102,6 +112,10 @@ class PlayersCog(commands.Cog):
             embed.add_field(name="Already Exists", value=", ".join(already_exists), inline=False)
         if too_long:
             embed.add_field(name="Name Too Long", value=", ".join(too_long), inline=False)
+        if failed:
+            embed.add_field(name="Failed (see logs)", value=", ".join(failed), inline=False)
+        if not (added or already_exists or too_long or failed):
+            embed.description = "No valid player names were provided."
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="removeplayer", description="Remove a player from the database.")
@@ -290,7 +304,7 @@ class PlayersCog(commands.Cog):
             if rank == "[?] Unranked":
                 embed.add_field(
                     name="Placement Progress",
-                    value=f"{placement_games_played}/3 placement games played",
+                    value=f"{placement_games_played}/{GAME.placement.games} placement games played",
                     inline=False,
                 )
             else:
@@ -309,6 +323,26 @@ class PlayersCog(commands.Cog):
             embed.add_field(name="Matches Played", value=str(matches_played), inline=True)
             embed.add_field(name="Matches Won", value=str(matches_won), inline=True)
             embed.add_field(name="Win Rate", value=f"{win_rate:.2f}%", inline=True)
+
+            # Own-ladder gamemode ratings (e.g. the separate 1v1 ladder).
+            try:
+                mode_rows = await db.fetchall(
+                    """SELECT mode, elo, rank, matches_played, matches_won,
+                              placement_done, placement_games_played
+                       FROM mode_ratings WHERE player_name = ? ORDER BY mode""",
+                    (player_name,),
+                )
+            except Exception:
+                mode_rows = []  # table may not exist on an old DB
+            for m_mode, m_elo, m_rank, m_mp, m_mw, m_done, m_games in mode_rows:
+                if m_done:
+                    m_wr = (m_mw / m_mp * 100) if m_mp else 0
+                    value = f"{m_rank} · Elo {m_elo} · {m_mp} games · {m_wr:.0f}% WR"
+                else:
+                    value = (
+                        f"Placement {m_games}/{GAME.placement_games_for(m_mode)}"
+                    )
+                embed.add_field(name=f"{m_mode} Ladder", value=value, inline=False)
             if season_rewards:
                 embed.add_field(name="Season Rewards", value=season_rewards, inline=False)
             if badges:
@@ -353,6 +387,16 @@ class PlayersCog(commands.Cog):
                 "You can only set a color theme to yourself.", ephemeral=True
             )
             return
+        # Validate: the value is parsed by the bot's embeds and read by the
+        # website, so only accept a real 6-digit hex code.
+        hex_color = hex_color.strip()
+        if not re.fullmatch(r"#?[0-9A-Fa-f]{6}", hex_color):
+            await interaction.response.send_message(
+                "Invalid color — use a 6-digit hex code like `#FF0044`.", ephemeral=True
+            )
+            return
+        if not hex_color.startswith("#"):
+            hex_color = "#" + hex_color
         await db.execute(
             "UPDATE players SET profile_color = ? WHERE name = ?", (hex_color, player_name)
         )

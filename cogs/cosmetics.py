@@ -26,7 +26,7 @@ from core.cosmetics import (
     set_price,
     valid_slug,
 )
-from cogs.shared import item_slug_choices, player_name_choices
+from cogs.shared import item_slug_choices, item_slug_choices_off_shop, player_name_choices
 
 logger = logging.getLogger(__name__)
 
@@ -334,6 +334,13 @@ class CosmeticsCog(commands.Cog):
     @delete_item_cmd.autocomplete("item_slug")
     async def _item_ac(self, interaction: discord.Interaction, current: str):
         return await item_slug_choices(current)
+
+    @set_price_cmd.autocomplete("item_slug")
+    async def _set_price_item_ac(self, interaction: discord.Interaction, current: str):
+        # Only suggest items that aren't on the shop yet (price 0/NULL), since
+        # /setprice is used to add them. Existing shop items can still be
+        # re-priced by typing the slug manually.
+        return await item_slug_choices_off_shop(current)
 
 
 async def setup(bot: commands.Bot):

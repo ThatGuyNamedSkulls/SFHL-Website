@@ -93,7 +93,9 @@ async def display_player_achievements(player_name):
     lines = []
     for name, level, progress, max_progress in achievements:
         emoji = ACHIEVEMENT_EMOJIS.get(level, "")
-        thresholds = ACHIEVEMENT_THRESHOLDS[name]
+        thresholds = ACHIEVEMENT_THRESHOLDS.get(name)
+        if not thresholds:
+            continue  # legacy achievement no longer defined — skip, don't crash
         levels = list(thresholds.keys())
         current_index = levels.index(level)
         if current_index + 1 < len(levels):

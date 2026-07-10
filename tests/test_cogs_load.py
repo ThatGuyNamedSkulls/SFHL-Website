@@ -33,7 +33,7 @@ EXPECTED = {
     "rank", "ranktie", "ocr2rank", "addelo", "removeelo", "refresh_top10",
     "update_roles", "undolastmatch", "recentmatches",
     # matchflow
-    "mapvote", "teamselection", "vote_tie", "resetdb",
+    "mapvote", "teamselection", "vote_tie", "resetdb", "fullreset",
     # queue
     "queue", "resetqueue", "cancelqueue", "gamemode", "createparty", "invite", "leaveparty", "viewparty",
     # profile

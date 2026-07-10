@@ -284,6 +284,101 @@ class VoteTieView(View):
             logger.exception("Failed to announce tie vote result")
 
 
+async def _full_wipe() -> tuple[int, int]:
+    """Delete every row from every user table (a complete 100% data wipe), reset
+    autoincrement counters, and re-seed the system-owned cosmetic items the bot
+    depends on. Returns ``(tables_cleared, rows_deleted)``.
+
+    Tables are discovered dynamically from ``sqlite_master`` so this stays correct
+    as the schema grows. The schema has no foreign keys, so delete order is
+    irrelevant and the whole wipe runs in one atomic batch.
+    """
+    tables = [
+        r[0] for r in await db.fetchall(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )
+    ]
+    rows_deleted = 0
+    for t in tables:
+        cnt = await db.fetchone(f"SELECT COUNT(*) FROM {t}")
+        rows_deleted += cnt[0] if cnt else 0
+
+    await db.batch([(f"DELETE FROM {t}", ()) for t in tables])
+    # Restart AUTOINCREMENT ids from 1 (sqlite_sequence only exists once an
+    # AUTOINCREMENT table has been written to).
+    try:
+        await db.execute("DELETE FROM sqlite_sequence")
+    except Exception:
+        pass
+
+    # Re-seed code-defined scaffolding (e.g. the dynamic Top 10 badge) so the bot
+    # keeps functioning — these are not user data. ensure_schema also does this on
+    # every startup, so this just avoids waiting for a restart.
+    try:
+        from core.cosmetics import ensure_builtin_items
+        await ensure_builtin_items()
+    except Exception:
+        logger.exception("Failed to re-seed builtin cosmetic items after full reset")
+
+    return len(tables), rows_deleted
+
+
+class FullResetConfirmView(View):
+    """Final are-you-sure gate for /fullreset. Only the invoking staff member can
+    press it, and it self-disables after 30s so a stale message can't wipe later."""
+
+    def __init__(self, invoker_id: int):
+        super().__init__(timeout=30)
+        self.invoker_id = invoker_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.invoker_id:
+            await interaction.response.send_message(
+                "Only the staff member who ran /fullreset can confirm this.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Yes, wipe EVERYTHING", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: Button):
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(
+            content="⏳ Wiping the entire database…", embed=None, view=self
+        )
+        try:
+            tables, rows = await _full_wipe()
+        except Exception:
+            logger.exception("Full reset failed")
+            await interaction.edit_original_response(
+                content="❌ Full reset failed — see logs. The database may be partially wiped.",
+                view=None,
+            )
+            self.stop()
+            return
+        logger.warning(
+            "FULL DATABASE RESET by %s (%s): %d rows across %d tables wiped.",
+            interaction.user, interaction.user.id, rows, tables,
+        )
+        await interaction.edit_original_response(
+            content=(
+                f"✅ **Full reset complete.** Wiped **{rows}** rows across **{tables}** tables. "
+                "Everything is back to zero."
+            ),
+            view=None,
+        )
+        self.stop()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: Button):
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(
+            content="Full reset cancelled. Nothing was changed.", embed=None, view=self
+        )
+        self.stop()
+
+
 class MatchflowCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -359,6 +454,10 @@ class MatchflowCog(commands.Cog):
                 "Season name and badge emoji cannot be empty.", ephemeral=True
             )
             return
+        # Defer immediately: the reset does many sequential Turso round-trips
+        # (badges, placements, archive, wipe) and easily exceeds Discord's 3s
+        # interaction window — without this the final send 404s.
+        await interaction.response.defer()
         try:
             top10_names = [
                 r[0] for r in await db.fetchall(
@@ -472,13 +571,53 @@ class MatchflowCog(commands.Cog):
                 ),
                 inline=False,
             )
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
             logger.info(f"Season reset complete for '{season_name}'. Awarded: {awarded}")
         except Exception as e:
             logger.error(f"Failed during season reset: {e}")
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "An error occurred while performing the season reset.", ephemeral=True
             )
+
+    @app_commands.command(
+        name="fullreset",
+        description="DANGER: wipe the ENTIRE database to zero (all players, matches, stats — everything).",
+    )
+    @app_commands.describe(
+        confirmation="Type exactly: DELETE EVERYTHING — to unlock the confirmation button."
+    )
+    async def full_reset(self, interaction: discord.Interaction, confirmation: str):
+        if discord.utils.get(interaction.user.roles, name=MM_MANAGER_ROLE) is None:
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="Permission Denied",
+                    description=f"You do not have the required role ('{MM_MANAGER_ROLE}').",
+                    color=discord.Color.red(),
+                ),
+                ephemeral=True,
+            )
+            return
+        phrase = "DELETE EVERYTHING"
+        if confirmation.strip() != phrase:
+            await interaction.response.send_message(
+                f"To confirm a **full database wipe**, re-run `/fullreset` with `confirmation` "
+                f"set to exactly `{phrase}`.",
+                ephemeral=True,
+            )
+            return
+        embed = discord.Embed(
+            title="⚠️ Full Database Reset",
+            description=(
+                "This permanently deletes **ALL data** — every player, match, stat, badge, "
+                "cosmetic, friend, report, queue entry and season archive — resetting the "
+                "database to zero.\n\n**This cannot be undone** (it is not a season reset and "
+                "does not archive anything).\n\nPress the red button within 30s to proceed."
+            ),
+            color=discord.Color.red(),
+        )
+        await interaction.response.send_message(
+            embed=embed, view=FullResetConfirmView(interaction.user.id), ephemeral=True
+        )
 
     @app_commands.command(
         name="vote_tie", description="Start a tie vote for an overtime. Match Staff only."

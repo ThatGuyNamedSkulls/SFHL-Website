@@ -18,6 +18,7 @@ from core.moderation_data import (
     get_leaving_incident_count,
     calculate_leaving_elo_penalty,
     leaving_window_cutoff,
+    penalty_scale_text,
 )
 from core.players import get_player_elo, update_player_elo
 from cogs.shared import has_required_role
@@ -428,13 +429,9 @@ class ModerationCog(commands.Cog):
                     inline=False,
                 )
 
-            penalty_info = (
-                "**ELO Penalty Scale (resets after 3 days):**\n"
-                "1st: -15 ELO • 2nd: -18 ELO • 3rd: -22 ELO\n"
-                "4th: -25 ELO • 5th: -30 ELO • 6th: -30 ELO\n"
-                "7th: -35 ELO • 8th+: -40 ELO"
-            )
-            embed.add_field(name="Penalty System", value=penalty_info, inline=False)
+            # Generated from LEAVING_PENALTY_MAP — the previously hardcoded
+            # text here disagreed with the penalties actually applied.
+            embed.add_field(name="Penalty System", value=penalty_scale_text(), inline=False)
             embed.set_footer(
                 text="Leaving history requested by Match Staff • Incidents auto-expire after 3 days"
             )

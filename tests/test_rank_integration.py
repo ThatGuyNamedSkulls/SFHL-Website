@@ -105,6 +105,10 @@ async def _run():
         player_names="alice,bob", match_results="W,L", scores="40,25", points="13,11",
         kills="20,12", deaths="10,15", assists="5,3", mvps="3,1", hs="40.0,30.0",
         map_name="Inferno", region="EU", play_time="24:21",
+        # Explicit mode: this test exercises the MAIN ladder; without it a
+        # 2-player lineup would be inferred as 1v1 (an own ladder under the
+        # valorant-style profile) and the players table wouldn't move.
+        mode="5v5",
     )
     after_rank = {n: await full(n) for n in ("alice", "bob")}
     check("/rank changed both players",
@@ -115,6 +119,12 @@ async def _run():
     )
     check("/rank wrote 2 history rows with undo_state + match_id", tuple(row) == (2, 2, 2))
 
+    async def coins(n):
+        return (await db.fetchone("SELECT coins FROM players WHERE name = ?", (n,)))[0]
+
+    check("/rank awarded +100 HL coins to each player",
+          await coins("alice") == 100 and await coins("bob") == 100)
+
     # Undo and confirm exact restoration.
     inter2 = FakeInteraction()
     await cog.undo_last_match.callback(cog, inter2)
@@ -123,6 +133,8 @@ async def _run():
     check("/undolastmatch restored bob exactly", after_undo["bob"] == before["bob"])
     n_hist_row = await db.fetchone("SELECT COUNT(*) FROM match_history")
     check("/undolastmatch deleted the match's history rows", n_hist_row[0] == 0)
+    check("/undolastmatch reverted the coin award",
+          await coins("alice") == 0 and await coins("bob") == 0)
 
     await db.close()
     os.remove(DB)

@@ -61,3 +61,10 @@ Plan file: `C:\Users\diogo\.claude\plans\research-faceit-com-and-take-misty-lamp
 
 ## Leaked secrets (from memory — unrelated to this work)
 - Discord token + Gemini key were historically hardcoded and should be rotated. `.env.local` holds the Discord client secret (expected for local dev).
+
+## Known limitation: in-flight match Views don't survive a restart (2026-07-08)
+The map-veto / side-pick / team-select Views (`cogs/matchflow.py`) use
+`timeout=None` but have no persistent `custom_id`s, so a bot restart mid-veto
+leaves their buttons dead. Deliberate trade-off (vetoes are short): staff should
+re-run `/mapvote` / `/teamselection` if the bot restarts during one. Only the
+queue Join/Leave view is persistent.

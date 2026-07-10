@@ -126,6 +126,172 @@ def _dynamic_k(current_elo, matches_played, e: EloConfig):
     return e.k_mid
 
 
+def expected_score(team_avg, opp_avg, e: EloConfig) -> float:
+    """Standard Elo expected score of `team_avg` against `opp_avg`."""
+    return 1.0 / (1.0 + 10 ** ((opp_avg - team_avg) / e.divisor))
+
+
+def mov_multiplier(winner_rounds, loser_rounds, e: EloConfig) -> float:
+    """Margin-of-victory multiplier on the K·(S−E) term, symmetric for both
+    sides (so the term stays zero-sum). 15-14 ⇒ 1.0; a shutout ⇒ 1+mov_weight.
+    Returns 1.0 when disabled (mov_weight 0) or the rounds are unusable."""
+    if e.mov_weight <= 0 or winner_rounds is None or loser_rounds is None:
+        return 1.0
+    margin = winner_rounds - loser_rounds
+    if margin <= 1:
+        return 1.0
+    mult = 1.0 + e.mov_weight * (margin - 1) / (e.max_rounds - 1)
+    return min(1.0 + e.mov_weight, mult)
+
+
+def expectation_basis(eff_self, team_avg_incl, team_avg_excl, e: EloConfig) -> float:
+    """The rating whose expected score vs the opponents drives a player's
+    win/loss term (MMR v2 mixed-lobby handling):
+
+      "individual" — the player's OWN skill: a low-MMR player winning in a
+                     high lobby is heavily compensated (E small), a high-MMR
+                     player beating a weak lobby gains little (E large).
+      "blend"      — e_blend·own + (1−e_blend)·team average (incl. self).
+      "team"       — teammates' average excluding self (legacy behavior).
+    """
+    if e.e_basis == "individual":
+        return eff_self
+    if e.e_basis == "blend":
+        return e.e_blend * eff_self + (1.0 - e.e_blend) * team_avg_incl
+    return team_avg_excl
+
+
+def _share_weights(effs, e: EloConfig) -> list:
+    """Skill weights for expected-score shares: 10^(skill/perf_share_divisor).
+    With the divisor at 2270 a 400-MMR gap ⇒ 1.5× expectation (1330 ⇒ 2×,
+    4130 ⇒ 1.25×)."""
+    return [10 ** (eff / e.perf_share_divisor) for eff in effs]
+
+
+def skill_share_bonuses(members, e: EloConfig) -> list:
+    """Per-player performance bonuses for ONE team (perf_mode "skill_share").
+
+    ``members`` is [(eff_skill, score)]. Each player's EXPECTED score is their
+    skill-weighted share of the team total — so a low-MMR player in a strong
+    lobby is expected less and earns a positive bonus for merely keeping up,
+    while a high-MMR player must outscore their higher expectation to break
+    even. Re-centered per team so the bonuses sum to zero (no rating enters or
+    leaves the pool). A single-player team gets 0 — in 1v1, performance IS the
+    result."""
+    n = len(members)
+    if n < 2:
+        return [0.0] * n
+    total = sum(score for _eff, score in members)
+    weights = _share_weights([eff for eff, _s in members], e)
+    wsum = sum(weights)
+    if total <= 0 or wsum <= 0:
+        return [0.0] * n
+    raw = []
+    for (eff, score), w in zip(members, weights):
+        expected = total * w / wsum
+        spread = max(expected * e.perf_spread_ratio, 1.0)
+        t = max(-1.0, min(1.0, (score - expected) / spread))
+        raw.append(t * e.perf_bonus_max)
+    center = sum(raw) / n
+    return [r - center for r in raw]
+
+
+def placement_norm_factor(eff_self, own_team_effs, lobby_effs, e: EloConfig, placement) -> float:
+    """Lobby-strength normalization for a placement player's graded score
+    (placement.grade_mode "normalized"): (equal share) / (their skill-weighted
+    share), clamped to [norm_min, norm_max]. > 1 when the lobby outclasses them
+    (their score is boosted before hitting the placement bands), < 1 when the
+    lobby is beneath them.
+
+    The share is computed within the player's own team (score shares across
+    teams aren't comparable — losers score less); a solo team (1v1) falls back
+    to the whole lobby, where the raw score really is opponent-conditioned.
+    ``own_team_effs``/``lobby_effs`` must include the player themselves.
+    """
+    if placement.grade_mode != "normalized":
+        return 1.0
+    group = own_team_effs if len(own_team_effs) >= 2 else lobby_effs
+    n = len(group)
+    if n < 2:
+        return 1.0
+    weights = _share_weights(group, e)
+    wsum = sum(weights)
+    own_w = 10 ** (eff_self / e.perf_share_divisor)
+    if wsum <= 0 or own_w <= 0:
+        return 1.0
+    factor = (1.0 / n) / (own_w / wsum)
+    return max(placement.norm_min, min(placement.norm_max, factor))
+
+
+def relative_perf_bonuses(scores, e: EloConfig) -> list:
+    """Per-player performance bonuses for ONE team, from each player's score
+    relative to the team's mean this match. Re-centered so they sum to zero
+    (no rating enters or leaves the pool through the bonus). A single-player
+    team gets 0 — in 1v1, performance IS the result."""
+    n = len(scores)
+    if n < 2:
+        return [0.0] * n
+    mean = sum(scores) / n
+    spread = max(mean * e.perf_spread_ratio, 1.0)
+    raw = [
+        max(-1.0, min(1.0, (s - mean) / spread)) * e.perf_bonus_max for s in scores
+    ]
+    center = sum(raw) / n
+    return [r - center for r in raw]
+
+
+def team_expected_update(
+    current_rating, score_s, team_avg, opp_avg, matches_played,
+    profile=ACTIVE, mov_mult=1.0, perf_bonus=None, point=None,
+):
+    """Generalized team_expected update, shared by wins/losses AND ties (and the
+    mmr_rr hidden track):
+
+        delta = mov_mult · K · (S − E) + bonus,  clamped to ±delta_cap (if set)
+
+    ``score_s`` is 1 (win), 0 (loss) or 0.5 (tie). ``perf_bonus`` is an explicit
+    pre-computed bonus (the zero-sum relative mode); when None, the legacy
+    expected-band bonus is derived from ``point`` (0 if that's None too).
+
+    Returns (new_rating, breakdown dict {E, K, base, bonus, mov}).
+    """
+    e = profile.elo
+    E = expected_score(team_avg, opp_avg, e)
+    K = _dynamic_k(current_rating, matches_played, e)
+    base_delta = mov_mult * K * (score_s - E)
+
+    if perf_bonus is not None:
+        bonus = perf_bonus
+    elif point is not None:
+        emin, emax = get_expected_range(get_rank(current_rating, profile), profile)
+        expected_avg = (emin + emax) / 2
+        bonus = _perf_t(point / expected_avg, e) * e.perf_bonus_max if expected_avg > 0 else 0.0
+    else:
+        bonus = 0.0
+
+    delta = base_delta + bonus
+    if e.delta_cap > 0:
+        delta = max(-e.delta_cap, min(e.delta_cap, delta))
+    new_rating = max(1, int(round(current_rating + delta)))
+    breakdown = {
+        "E": round(E, 3), "K": K, "base": round(base_delta, 1),
+        "bonus": round(bonus, 1), "mov": round(mov_mult, 2),
+    }
+    return new_rating, breakdown
+
+
+def rr_update(visible_elo, mmr_after, score_s, e: EloConfig) -> float:
+    """Visible-rating (RR) delta for the mmr_rr model: a fixed base gain/loss
+    skewed toward the hidden MMR (Valorant-style convergence). A tie moves the
+    visible rating a little toward the MMR (±rr_tie_cap)."""
+    gap = mmr_after - visible_elo
+    if score_s == 0.5:
+        return max(-e.rr_tie_cap, min(e.rr_tie_cap, e.conv_weight * gap))
+    if score_s >= 1.0:
+        return max(e.rr_min, min(e.rr_max, e.rr_base + e.conv_weight * gap))
+    return -max(e.rr_min, min(e.rr_max, e.rr_base - e.conv_weight * gap))
+
+
 def calculate_new_elo_team(
     current_elo, won_match, point, team_avg, opp_avg, matches_played,
     profile=ACTIVE, return_breakdown=False,
@@ -144,23 +310,16 @@ def calculate_new_elo_team(
     e = profile.elo
     try:
         S = 1.0 if won_match else 0.0
-        E = 1.0 / (1.0 + 10 ** ((opp_avg - team_avg) / e.divisor))
-        K = _dynamic_k(current_elo, matches_played, e)
-        base_delta = K * (S - E)
-
-        # Small performance bonus from this match's points vs the rank's expectation.
-        emin, emax = get_expected_range(get_rank(current_elo, profile), profile)
-        expected_avg = (emin + emax) / 2
-        bonus = _perf_t(point / expected_avg, e) * e.perf_bonus_max if expected_avg > 0 else 0.0
-
-        new_elo = max(1, int(round(current_elo + base_delta + bonus)))
+        new_elo, breakdown = team_expected_update(
+            current_elo, S, team_avg, opp_avg, matches_played, profile, point=point
+        )
         logger.info(
             f"team_expected Elo: elo={current_elo} won={won_match} team_avg={team_avg:.0f} "
-            f"opp_avg={opp_avg:.0f} E={E:.3f} K={K} base={base_delta:.1f} bonus={bonus:.1f} -> {new_elo}"
+            f"opp_avg={opp_avg:.0f} E={breakdown['E']} K={breakdown['K']} "
+            f"base={breakdown['base']} bonus={breakdown['bonus']} -> {new_elo}"
         )
         new_rank = get_rank(new_elo, profile)
         if return_breakdown:
-            breakdown = {"E": round(E, 3), "K": K, "base": round(base_delta, 1), "bonus": round(bonus, 1)}
             return new_elo, new_rank, breakdown
         return new_elo, new_rank
     except Exception as exc:

@@ -1,5 +1,6 @@
 # At the start, only God and the machine knew how this works. Now, only God does.
 
+import asyncio
 import logging
 import os
 import sys
@@ -76,17 +77,28 @@ class SFHLBot(commands.Bot):
 bot = SFHLBot(command_prefix="!", intents=intents)
 
 
+# The one pending debounced refresh task (None when nothing is scheduled).
+_pending_top10_refresh: asyncio.Task | None = None
+
+
 def _schedule_top10_refresh(player_name=None, new_elo=None, new_rank=None):
     """Elo observer: refresh Top 10 roles after any Elo update (registered with
-    core.players so DB updates from any cog trigger the role refresh)."""
+    core.players so DB updates from any cog trigger the role refresh).
+
+    Debounced: refresh_top10_roles does a full guild member scan, so a burst of
+    Elo changes (multi-player penalties, repeated /addelo) coalesces into ONE
+    refresh ~5s after the first, which reads the then-current standings."""
+    global _pending_top10_refresh
     try:
-        if hasattr(bot, "loop") and bot.is_ready():
-            bot.loop.create_task(_refresh_top10_roles(bot))
-        else:
-            async def _wait_and_refresh():
-                await bot.wait_until_ready()
-                await _refresh_top10_roles(bot)
-            bot.loop.create_task(_wait_and_refresh())
+        if _pending_top10_refresh is not None and not _pending_top10_refresh.done():
+            return  # already scheduled — it runs after this change lands too
+
+        async def _debounced_refresh():
+            await bot.wait_until_ready()
+            await asyncio.sleep(5)
+            await _refresh_top10_roles(bot)
+
+        _pending_top10_refresh = bot.loop.create_task(_debounced_refresh())
     except Exception:
         logger.exception("Failed to schedule Top10 role refresh")
 

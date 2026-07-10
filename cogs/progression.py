@@ -10,35 +10,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from config.settings import GUILD_ID
 from core import db
 from core.achievements import display_player_achievements
 from core.cosmetics import sync_top10_badge
 
 logger = logging.getLogger(__name__)
-
-
-async def sync_discord_identities(bot: commands.Bot) -> None:
-    """Back-fill each player's Discord @handle + id from the guild so the website
-    can show 'Roblox name (@discord)'. Matches guild members to player rows by
-    display name (players.name IS the member's display name = "roblox username");
-    member.name is the @handle. Only touches rows whose handle/id changed."""
-    guild = bot.get_guild(GUILD_ID)
-    if guild is None:
-        return
-    try:
-        stmts = []
-        async for member in guild.fetch_members(limit=None):
-            stmts.append((
-                """UPDATE players SET discord_id = ?, discord_username = ?
-                   WHERE name = ? AND (discord_id IS NOT ? OR discord_username IS NOT ?)""",
-                (member.id, member.name, member.display_name, member.id, member.name),
-            ))
-        # Batch in chunks to avoid oversized transactions.
-        for i in range(0, len(stmts), 100):
-            await db.batch(stmts[i:i + 100])
-    except Exception:
-        logger.exception("Failed to sync Discord identities")
 
 
 async def grant_badges():
@@ -75,12 +51,11 @@ class ProgressionCog(commands.Cog):
         await grant_badges()
         # Keep the dynamic "Top 10 — Current Season" cosmetic badge in sync
         # with the live standings (grants entrants, revokes drop-outs).
+        # (Discord-identity syncing is owned by cogs/sync.py's SyncCog.)
         try:
             await sync_top10_badge()
         except Exception:
             logger.exception("Failed to sync the Top 10 cosmetic badge")
-        # Refresh each player's Discord @handle for the website's name display.
-        await sync_discord_identities(self.bot)
 
     @update_badges.before_loop
     async def _before_update_badges(self):

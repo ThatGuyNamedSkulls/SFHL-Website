@@ -39,3 +39,19 @@ async def item_slug_choices(current: str):
         ]
     except Exception:
         return []
+
+
+async def item_slug_choices_off_shop(current: str):
+    """Like :func:`item_slug_choices` but limited to items NOT currently on the
+    shop (price 0 or NULL) — used by /setprice to add an item to the shop."""
+    try:
+        rows = await db.fetchall(
+            "SELECT slug, name FROM cosmetic_items "
+            "WHERE (slug LIKE ? OR name LIKE ?) AND COALESCE(price, 0) = 0 LIMIT 10",
+            (f"%{current}%", f"%{current}%"),
+        )
+        return [
+            app_commands.Choice(name=f"{r[1]} ({r[0]})"[:100], value=r[0]) for r in rows
+        ]
+    except Exception:
+        return []

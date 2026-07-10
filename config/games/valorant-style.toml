@@ -1,11 +1,11 @@
-# Game profile: Counter-Strike (the bot's original game).
-#
-# This single file is the source of truth for everything game-specific. To
-# support a different game, copy this file, edit the values, and point the bot
-# at it (config/settings.py -> ACTIVE_GAME_PROFILE). No code changes required.
+# Game profile: Valorant-style preset — same game/maps/ranks as the CS profile
+# but running the "mmr_rr" dual-track model: a hidden MMR takes the full
+# opponent-aware update, and the visible Elo chases it with Valorant-style
+# convergence (fixed ~20 base gain skewed by MMR-vs-rank, 5 placements, perf
+# bonus only below A3). Point ACTIVE_GAME_PROFILE at this file to enable.
 
 [meta]
-name = "Counter-Strike"
+name = "Counter-Strike (Valorant-style ranked)"
 team_size = 5      # players per team
 queue_size = 10    # players needed to start a match (team_size * 2)
 
@@ -39,16 +39,35 @@ sides = ["CT", "T"]
 #                     team_expected update; the visible Elo moves by a fixed
 #                     base gain skewed toward the MMR (convergence). See
 #                     valorant-style.toml for a ready preset.
-model = "team_expected"
-tau = 0.5                    # glicko2: system constant constraining volatility change
+model = "mmr_rr"
+tau = 0.5                    # glicko2/placement-MMR: volatility-change constraint
 
 # --- balance knobs (2026-07 Elo balance overhaul) ---
 tie_mode = "expected"        # ties = S 0.5 through the model ("flat" = legacy +10)
 mov_weight = 0.35            # margin-of-victory: 15-14 ×1.0 … shutout ×1.35 (0 disables)
 max_rounds = 15              # rounds needed to win (scales the MOV multiplier)
-perf_mode = "relative"       # perf bonus vs own team's mean, zero-sum ("expected" = rank bands)
-perf_spread_ratio = 0.5      # score spread (× team mean) treated as fully over/under
+perf_spread_ratio = 0.5      # score spread (× expectation) treated as fully over/under
 delta_cap = 45               # safety clamp on any single match delta (0 disables)
+
+# --- MMR v2: mixed-skill lobby handling ---
+# Win/loss expectation E comes from the player's OWN skill vs the enemy average
+# (Valorant-like): a low-MMR player winning in a high lobby is compensated
+# heavily; a high-MMR player beating a weak lobby gains little.
+e_basis = "individual"       # "team" = legacy teammates-average, "blend" = e_blend mix
+e_blend = 0.5                # only used when e_basis = "blend"
+# Performance bonus vs the player's SKILL-WEIGHTED share of the team score —
+# a 900 in a 1300 lobby is expected less, so keeping up earns a + bonus.
+perf_mode = "skill_share"    # "relative" = raw team mean, "expected" = rank bands
+perf_share_divisor = 2270    # 400-MMR gap => 1.5x expectation (1330 => 2x, 4130 => 1.25x)
+
+# --- mmr_rr visible-rating (RR) parameters ---
+rr_base = 20                 # neutral visible gain/loss per game
+conv_weight = 0.1            # how strongly (mmr − elo) skews the visible delta
+rr_min = 10                  # visible delta floor
+rr_max = 30                  # visible delta ceiling
+rr_tie_cap = 6               # max visible movement on a tie (toward the MMR)
+# Performance bonus only applies BELOW this rank (Valorant: below ~Diamond).
+perf_rank_cap = "[A3 | 1450-1649]"
 
 base = 20                    # neutral win gain / loss magnitude (performance model)
 win_min = 5                  # clamp: smallest Elo a win can grant
@@ -71,11 +90,26 @@ k_top_elo = 2200
 [placement]
 # Placement grading is PURE performance (league decision): rank = avg score
 # through the placement_min/max bands below — wins/losses never enter the grade.
-games = 3            # placement games before graduation
-opp_weight = 0.25    # graduation-seed shift per point of avg-opponent skill above/below 1000
-opp_cap = 75         # clamp on that shift (±)
+games = 5            # placement games before graduation (Valorant-style)
 use_mmr = true       # track a hidden soft MMR (Glicko-2 + perf bonus, seeded at 1000)
                      # during placements — used for balancing, never shown as rank
+# MMR v2: the score is normalized by the player's lobby-relative expectation
+# before hitting the bands (scoring 30 in a 1400-avg lobby grades like ~41 in
+# an even one). The seed-shift drops to a fine-tuner — normalization now does
+# the band-level lobby compensation, so full weight would double-count it.
+grade_mode = "normalized"
+norm_min = 0.6       # clamps on the normalization factor
+norm_max = 1.8
+opp_weight = 0.10    # graduation-seed shift per point of avg-opponent skill above/below 1000
+opp_cap = 75         # clamp on that shift (±)
+
+[modes]
+# Per-gamemode ladders: 1v1 runs on its OWN rating (separate Elo/MMR/rank +
+# 3-game placement in the mode_ratings table); 2v2 and 5v5 share the main
+# ladder. Discord roles / top-10 / the main leaderboard follow the main ladder.
+"1v1" = { ladder = "own", placement_games = 3 }
+"2v2" = { ladder = "main" }
+"5v5" = { ladder = "main" }
 
 [unranked]
 name = "[?] Unranked"
