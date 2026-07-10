@@ -1,14 +1,61 @@
 import { NextResponse } from "next/server";
-import { getAllPlayers, getPlayerRegions, mapRank } from "@/lib/db";
+import { getAllPlayers, getModeLeaderboard, getPlayerRegions, getPlacementGamesTotal, mapRank } from "@/lib/db";
 import { getEquippedVisualsMap, EquippedVisuals } from "@/lib/cosmetics";
 import { avatarUrl, regionMeta } from "@/lib/format";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const players = await getAllPlayers();
-    const regions = await getPlayerRegions();
-    const cards = await getEquippedVisualsMap().catch(() => new Map<string, EquippedVisuals>());
+    // ?mode=1v1 → the own-ladder leaderboard for that gamemode (graduated
+    // players only), in the same shape the main leaderboard consumers use.
+    const modeParam = new URL(request.url).searchParams.get("mode");
+    if (modeParam && modeParam !== "5v5") {
+      const [rows, cards] = await Promise.all([
+        getModeLeaderboard(modeParam),
+        getEquippedVisualsMap().catch(() => new Map<string, EquippedVisuals>()),
+      ]);
+      const mappedModes = rows.map((r, idx) => {
+        const hasCountry = isValidCountry(r.country);
+        return {
+          id: `m${modeParam}-${idx}`,
+          username: r.player_name,
+          discordUsername: r.discord_username ?? null,
+          avatarUrl: avatarUrl(r.roblox_avatar_image),
+          cardAsset: cards.get(r.player_name)?.card ?? null,
+          frameAsset: cards.get(r.player_name)?.frame ?? null,
+          rank: mapRank(r.rank),
+          elo: r.elo,
+          peakElo: r.peak_elo,
+          region: "—",
+          regionFlag: "🌐",
+          country: hasCountry ? r.country!.toLowerCase() : null,
+          countryName: hasCountry ? countryName(r.country) : null,
+          countryFlag: hasCountry ? flagPath(r.country) : null,
+          position: idx + 1,
+          stats: {
+            wins: r.matches_won,
+            losses: r.matches_played - r.matches_won,
+            matchesPlayed: r.matches_played,
+            kills: 0, deaths: 0, assists: 0, headshotPercent: 0, kd: 0,
+            winPercent:
+              r.matches_played > 0 ? (r.matches_won / r.matches_played) * 100 : 0,
+            scorePerGame: 0,
+            avgMvp: 0,
+            playtimeHours: 0,
+          },
+          placementDone: Number(r.placement_done) === 1,
+          placementGamesPlayed: r.placement_games_played,
+        };
+      });
+      return NextResponse.json(mappedModes);
+    }
+
+    const [players, regions, cards, placementGamesTotal] = await Promise.all([
+      getAllPlayers(),
+      getPlayerRegions(),
+      getEquippedVisualsMap().catch(() => new Map<string, EquippedVisuals>()),
+      getPlacementGamesTotal(),
+    ]);
 
     const mapped = players.map((p, idx) => {
       const region = regionMeta(regions[p.name]);
@@ -54,6 +101,7 @@ export async function GET() {
       },
       placementDone: p.placement_done === 1,
       placementGamesPlayed: p.placement_games_played,
+      placementGamesTotal,
       };
     });
 

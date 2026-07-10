@@ -64,6 +64,17 @@ interface ProfilePlayer extends Player {
   inventory?: InventoryItem[];
   rankings?: { overall: number | null; country: number | null };
   discordUsername?: string | null;
+  /** Own-ladder gamemode ratings (e.g. the separate 1v1 ladder). */
+  modes?: {
+    mode: string;
+    elo: number;
+    rank: string;
+    peakElo: number;
+    matchesPlayed: number;
+    matchesWon: number;
+    placementDone: boolean;
+    placementGamesPlayed: number;
+  }[];
 }
 
 /** Equipped badge icon with a lucide fallback when the asset is missing. */
@@ -592,6 +603,37 @@ function ProfileContent() {
                     </div>
                   </div>
                 </Card>
+
+                {/* Own-ladder gamemode ratings (e.g. the separate 1v1 ladder) */}
+                {(player.modes ?? []).length > 0 && (
+                  <Card className="bg-hl-panel border-hl-border p-4">
+                    <div className="text-xs header-caps text-hl-muted mb-3">Other ladders</div>
+                    <div className="flex flex-wrap gap-6">
+                      {player.modes!.map((m) => (
+                        <div key={m.mode} className="flex items-center gap-3">
+                          <span className="text-sm font-bold text-white">{m.mode}</span>
+                          {m.placementDone ? (
+                            <>
+                              <RankBadge rank={m.rank as RankTierLetter} size="sm" showGlow={false} />
+                              <span className="stat-number text-hl-gold">{m.elo}</span>
+                              <span className="text-xs text-hl-muted">
+                                {m.matchesPlayed} games ·{" "}
+                                {m.matchesPlayed > 0
+                                  ? ((m.matchesWon / m.matchesPlayed) * 100).toFixed(0)
+                                  : 0}
+                                % WR
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-xs text-hl-muted">
+                              Placement {m.placementGamesPlayed} games in
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
                 {/* Recent performance */}
                 <div>

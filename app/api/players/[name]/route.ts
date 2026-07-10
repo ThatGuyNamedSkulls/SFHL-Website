@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPlayer, getMatchesForPlayer, getMostPlayedWith, getPlayerRankings, mapRank } from "@/lib/db";
+import { getPlayer, getMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, mapRank } from "@/lib/db";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
 import { resolvePlayerAvatar } from "@/lib/avatar";
@@ -41,8 +41,26 @@ export async function GET(
       );
     }
 
-    // Get their matches
-    const matches = await getMatchesForPlayer(decodedName);
+    // These are all independent of one another — fetch them concurrently
+    // instead of one sequential await per data source.
+    const [matches, eloChanges, avatar, playedWith, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings] =
+      await Promise.all([
+        getMatchesForPlayer(decodedName),
+        getEloChanges(decodedName),
+        resolvePlayerAvatar(decodedName, player.roblox_avatar_image),
+        getMostPlayedWith(decodedName, 10),
+        getPlayerRankings(decodedName).catch(() => ({ overall: null, country: null })),
+        getEquippedCosmetics(decodedName).catch(() => ({
+          card: null,
+          frame: null,
+          title: null,
+          badges: [],
+        })),
+        getFriends(decodedName).catch(() => []),
+        getInventory(decodedName).catch(() => []),
+        getPlacementGamesTotal(),
+        getModeRatings(decodedName),
+      ]);
 
     // Dominant server region for this player (most-played region across matches).
     const regionCounts: Record<string, number> = {};
@@ -52,12 +70,13 @@ export async function GET(
     const dominantRegion = Object.entries(regionCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
     const region = regionMeta(dominantRegion);
 
-    // Build ELO history from match elo_changes (reconstruct backwards)
+    // Build ELO history from the (newest-first) elo_changes, reconstructing
+    // backwards from the current Elo.
     const eloHistory: number[] = [];
     let currentElo = player.elo;
     eloHistory.unshift(currentElo);
-    for (const match of matches) {
-      currentElo -= match.elo_change;
+    for (const change of eloChanges) {
+      currentElo -= change;
       eloHistory.unshift(currentElo);
     }
 
@@ -65,7 +84,7 @@ export async function GET(
       id: `p${player.id}`,
       username: player.name,
       discordUsername: player.discord_username ?? null,
-      avatarUrl: await resolvePlayerAvatar(decodedName, player.roblox_avatar_image),
+      avatarUrl: avatar,
       rank: mapRank(player.rank),
       elo: player.elo,
       peakElo: player.peak_elo,
@@ -100,12 +119,24 @@ export async function GET(
       eloHistory,
       placementDone: player.placement_done === 1,
       placementGamesPlayed: player.placement_games_played,
-      playedWith: await getMostPlayedWith(decodedName, 10),
-      rankings: await getPlayerRankings(decodedName).catch(() => ({ overall: null, country: null })),
-      cosmetics: await getEquippedCosmetics(decodedName),
+      placementGamesTotal,
+      // Own-ladder gamemode ratings (e.g. the separate 1v1 ladder).
+      modes: modeRatings.map((mr) => ({
+        mode: mr.mode,
+        elo: mr.elo,
+        rank: mapRank(mr.rank),
+        peakElo: mr.peak_elo,
+        matchesPlayed: mr.matches_played,
+        matchesWon: mr.matches_won,
+        placementDone: Number(mr.placement_done) === 1,
+        placementGamesPlayed: mr.placement_games_played,
+      })),
+      playedWith,
+      rankings,
+      cosmetics,
       // Public social/inventory data for the FACEIT-style profile tabs.
-      friends: await getFriends(decodedName).catch(() => []),
-      inventory: await getInventory(decodedName).catch(() => []),
+      friends,
+      inventory,
       matchHistory: matches.map((m) => ({
         id: `M-${m.id}`,
         date: m.timestamp?.split(" ")[0] || "",

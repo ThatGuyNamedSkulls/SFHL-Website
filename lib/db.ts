@@ -219,38 +219,147 @@ export interface DbMatch {
   timestamp: string;
   executed_by: string | null;
   round_score: string | null;
+  /** Side the player was on (1 = winners/team 1, 2 = losers/team 2). Written by
+   *  the bot since the tie overhaul; null on older rows. */
+  team: number | null;
+  /** Gamemode ("5v5" / "2v2" / "1v1"); null on legacy rows (= main ladder). */
+  mode?: string | null;
 }
 
-export async function getMatchesForPlayer(playerName: string): Promise<DbMatch[]> {
+export async function getMatchesForPlayer(playerName: string, limit = 100): Promise<DbMatch[]> {
   // Exclude placement games (is_placement=1): they don't count toward stats, so
   // they're kept out of the profile match list, the region tally, and the ELO
   // graph — the graph then starts at the player's post-placement ELO instead of
   // reconstructing the 0 → 0 → 0 → <graduation ELO> placement climb. COALESCE
   // covers legacy rows written before the column existed. Mirrors the bot's
-  // /matchhistory + /checkperformance filters.
+  // /matchhistory + /checkperformance filters. Capped: hydrating a whole
+  // career of full rows grows unbounded as history accumulates.
   const rs = await client.execute({
     sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
                  hs_percentage, elo_change, result, points, mvps, match_id,
                  timestamp, executed_by, round_score
           FROM match_history
           WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
-          ORDER BY id DESC`,
-    args: [playerName]
+          ORDER BY id DESC
+          LIMIT ?`,
+    args: [playerName, limit]
   });
   return rs.rows as unknown as DbMatch[];
 }
 
-export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
+/** Just the Elo deltas of a player's non-placement matches (newest first,
+ *  capped) — enough to draw the profile Elo curve without hydrating every
+ *  column of every match. */
+export async function getEloChanges(playerName: string, limit = 250): Promise<number[]> {
   const rs = await client.execute({
-    sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
-                 hs_percentage, elo_change, result, points, mvps, match_id,
-                 timestamp, executed_by, round_score
-          FROM match_history
-          WHERE match_id = ?
-          ORDER BY points DESC`,
-    args: [matchId]
+    sql: `SELECT elo_change FROM match_history
+          WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
+          ORDER BY id DESC
+          LIMIT ?`,
+    args: [playerName, limit],
   });
-  return rs.rows as unknown as DbMatch[];
+  return rs.rows.map((r) => Number(r.elo_change ?? 0));
+}
+
+export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
+  // COALESCE(team, ...) keeps this working on DBs from before the bot added
+  // the team column (it backfills via ALTER, but a not-yet-restarted bot
+  // means the column may not exist — fall back to a team-less select).
+  try {
+    const rs = await client.execute({
+      sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
+                   hs_percentage, elo_change, result, points, mvps, match_id,
+                   timestamp, executed_by, round_score, team, mode
+            FROM match_history
+            WHERE match_id = ?
+            ORDER BY points DESC`,
+      args: [matchId]
+    });
+    return rs.rows as unknown as DbMatch[];
+  } catch {
+    const rs = await client.execute({
+      sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
+                   hs_percentage, elo_change, result, points, mvps, match_id,
+                   timestamp, executed_by, round_score, NULL AS team, NULL AS mode
+            FROM match_history
+            WHERE match_id = ?
+            ORDER BY points DESC`,
+      args: [matchId]
+    });
+    return rs.rows as unknown as DbMatch[];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Per-mode rating ladders (mode_ratings — own-ladder gamemodes, e.g. 1v1)
+// ---------------------------------------------------------------------------
+
+export interface DbModeRating {
+  mode: string;
+  elo: number;
+  rank: string;
+  peak_elo: number;
+  matches_played: number;
+  matches_won: number;
+  placement_done: number;
+  placement_games_played: number;
+}
+
+/** A player's own-ladder ratings (e.g. their separate 1v1 rank), if any. */
+export async function getModeRatings(playerName: string): Promise<DbModeRating[]> {
+  try {
+    const rs = await client.execute({
+      sql: `SELECT mode, elo, rank, peak_elo, matches_played, matches_won,
+                   placement_done, placement_games_played
+            FROM mode_ratings WHERE player_name = ? ORDER BY mode`,
+      args: [playerName],
+    });
+    return rs.rows as unknown as DbModeRating[];
+  } catch {
+    return []; // table not created yet (bot hasn't run the MMR v2 schema)
+  }
+}
+
+/** Leaderboard for an own-ladder mode (players with a graduated rating first,
+ *  by Elo; still-placing players excluded). Joined with players for avatars. */
+export async function getModeLeaderboard(
+  mode: string
+): Promise<(DbModeRating & { player_name: string; roblox_avatar_image: string | null; country: string | null; discord_username: string | null })[]> {
+  try {
+    const rs = await client.execute({
+      sql: `SELECT mr.player_name, mr.mode, mr.elo, mr.rank, mr.peak_elo,
+                   mr.matches_played, mr.matches_won, mr.placement_done,
+                   mr.placement_games_played,
+                   p.roblox_avatar_image, p.country, p.discord_username
+            FROM mode_ratings mr
+            JOIN players p ON p.name = mr.player_name
+            WHERE mr.mode = ? AND mr.placement_done = 1
+            ORDER BY mr.elo DESC`,
+      args: [mode],
+    });
+    return rs.rows as unknown as (DbModeRating & {
+      player_name: string;
+      roblox_avatar_image: string | null;
+      country: string | null;
+      discord_username: string | null;
+    })[];
+  } catch {
+    return [];
+  }
+}
+
+/** The bot's configured number of placement games (bot_state key
+ *  'placement_games', written on startup). Defaults to 3. */
+export async function getPlacementGamesTotal(): Promise<number> {
+  try {
+    const rs = await client.execute(
+      "SELECT value FROM bot_state WHERE key = 'placement_games'"
+    );
+    const v = Number(rs.rows[0]?.value);
+    return Number.isInteger(v) && v >= 1 ? v : 3;
+  } catch {
+    return 3; // bot_state table may not exist yet
+  }
 }
 
 export async function getAllMatchIds(): Promise<{ match_id: number; timestamp: string; map_name: string; region: string }[]> {

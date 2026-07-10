@@ -62,10 +62,12 @@ export default function LeaderboardsPage() {
   const [loading, setLoading] = useState(true);
   const [myPlayer, setMyPlayer] = useState<string | null>(null);
   const [countryFilter, setCountryFilter] = useState("All");
+  // Ladder tab: the main (5v5) ladder or an own-ladder gamemode (1v1).
+  const [ladder, setLadder] = useState<"5v5" | "1v1">("5v5");
 
   useEffect(() => {
     setLoading(true);
-    fetch("/api/players")
+    fetch(ladder === "5v5" ? "/api/players" : `/api/players?mode=${ladder}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         // The API returns a bare array; on error (e.g. 500) it returns an
@@ -85,7 +87,7 @@ export default function LeaderboardsPage() {
         if (data.user) setMyPlayer(data.user.playerName || data.user.username);
       })
       .catch(() => {});
-  }, []);
+  }, [ladder]);
 
   const countryFilterOptions = useMemo(
     () =>
@@ -123,10 +125,20 @@ export default function LeaderboardsPage() {
           </span>
           <span className="text-xs text-hl-muted font-bold">EU</span>
         </div>
-        <div className="flex justify-center">
-          <span className="inline-block pb-3 border-b-2 border-hl-gold text-sm font-bold text-hl-gold header-caps">
-            Matchmaking
-          </span>
+        <div className="flex justify-center gap-6">
+          {(["5v5", "1v1"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setLadder(tab)}
+              className={
+                ladder === tab
+                  ? "inline-block pb-3 border-b-2 border-hl-gold text-sm font-bold text-hl-gold header-caps"
+                  : "inline-block pb-3 border-b-2 border-transparent text-sm font-bold text-hl-muted hover:text-white header-caps"
+              }
+            >
+              {tab === "5v5" ? "Matchmaking" : "1v1 Ladder"}
+            </button>
+          ))}
         </div>
         <div />
       </div>

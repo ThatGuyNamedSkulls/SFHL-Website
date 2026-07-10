@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMatchesByMatchId, getPlayer, mapRank } from "@/lib/db";
+import { client, getMatchesByMatchId, mapRank } from "@/lib/db";
 import { avatarUrl, prettyMap, prettyRegion } from "@/lib/format";
 
 export async function GET(
@@ -26,12 +26,22 @@ export async function GET(
       );
     }
 
-    // Split into winners (Team A) and losers (Team B)
+    // Split into winners (Team A) and losers (Team B). Tie matches have no
+    // W/L results — split those by the stored team number instead (rows from
+    // before the tie overhaul have no team either; they all land in Team A).
     const winners = rows.filter((r) => r.result === "W");
     const losers = rows.filter((r) => r.result === "L");
+    const isTie = winners.length === 0 && losers.length === 0;
 
-    const teamAPlayers = winners.length > 0 ? winners : losers;
-    const teamBPlayers = winners.length > 0 ? losers : winners;
+    let teamAPlayers: typeof rows;
+    let teamBPlayers: typeof rows;
+    if (isTie) {
+      teamAPlayers = rows.filter((r) => (r.team ?? 1) === 1);
+      teamBPlayers = rows.filter((r) => r.team === 2);
+    } else {
+      teamAPlayers = winners.length > 0 ? winners : losers;
+      teamBPlayers = winners.length > 0 ? losers : winners;
+    }
 
     // Determine the single overall match MVP: most round-MVPs, tie-broken by
     // points. Only this player gets the MVP star on the scoreboard.
@@ -46,21 +56,35 @@ export async function GET(
     const mvpName =
       mvpRow && (mvpRow.mvps || 0) > 0 ? mvpRow.player_name : null;
 
-    // Build player stats for each team
-    const buildPlayerStats = async (
-      players: typeof rows,
-      team: "A" | "B"
-    ) =>
-      Promise.all(players.map(async (p) => {
-        // Look up the player's current rank from the players table
-        const playerData = await getPlayer(p.player_name);
-        const rank = playerData ? mapRank(playerData.rank) : "UNRANKED";
+    // One query for every player's current rank/avatar (was one per player).
+    const playerInfo = new Map<string, { rank: string; avatar: string }>();
+    if (rows.length > 0) {
+      const placeholders = rows.map(() => "?").join(",");
+      try {
+        const rs = await client.execute({
+          sql: `SELECT name, rank, roblox_avatar_image FROM players WHERE name IN (${placeholders})`,
+          args: rows.map((r) => r.player_name),
+        });
+        for (const r of rs.rows as unknown as Record<string, unknown>[]) {
+          playerInfo.set(r.name as string, {
+            rank: mapRank((r.rank as string) || ""),
+            avatar: avatarUrl(r.roblox_avatar_image as string | null),
+          });
+        }
+      } catch {
+        /* players table unreadable — fall back to bare names below */
+      }
+    }
 
+    // Build player stats for each team
+    const buildPlayerStats = (players: typeof rows, team: "A" | "B") =>
+      players.map((p) => {
+        const info = playerInfo.get(p.player_name);
         return {
           playerId: p.player_name,
           username: p.player_name,
-          avatarUrl: playerData ? avatarUrl(playerData.roblox_avatar_image) : "",
-          rank,
+          avatarUrl: info?.avatar ?? "",
+          rank: info?.rank ?? "UNRANKED",
           team,
           kills: p.kills,
           deaths: p.deaths,
@@ -76,7 +100,7 @@ export async function GET(
           plants: 0,
           defuses: 0,
         };
-      }));
+      });
 
     const firstRow = rows[0];
     const dateStr = firstRow.timestamp?.split(" ")[0] || "";
@@ -108,9 +132,11 @@ export async function GET(
       date: dateStr,
       region: prettyRegion(firstRow.region),
       map: prettyMap(firstRow.map_name),
-      mode: "Competitive",
-      teamAName: winners.length > 0 ? "Winners" : "Team 1",
-      teamBName: winners.length > 0 ? "Defeated" : "Team 2",
+      // The real gamemode when the bot recorded one ("1v1"/"2v2"/"5v5");
+      // legacy rows fall back to the generic label.
+      mode: firstRow.mode ? `Competitive ${firstRow.mode}` : "Competitive",
+      teamAName: isTie ? "Team 1 (Tie)" : winners.length > 0 ? "Winners" : "Team 1",
+      teamBName: isTie ? "Team 2 (Tie)" : winners.length > 0 ? "Defeated" : "Team 2",
       teamAScore,
       teamBScore,
       scoreType,
@@ -121,8 +147,8 @@ export async function GET(
       teamBRoundsSecondHalf: 0,
       duration: "",
       players: [
-        ...(await buildPlayerStats(teamAPlayers, "A")),
-        ...(await buildPlayerStats(teamBPlayers, "B")),
+        ...buildPlayerStats(teamAPlayers, "A"),
+        ...buildPlayerStats(teamBPlayers, "B"),
       ],
       rounds: [],
     };

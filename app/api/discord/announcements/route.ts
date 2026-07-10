@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 
 const ANNOUNCEMENTS_CHANNEL_ID = "1275469567006740575";
 const DISCORD_API = "https://discord.com/api/v10";
@@ -18,19 +16,9 @@ interface Announcement {
   attachments: string[];
 }
 
-/** Resolve the bot token from env, or fall back to the shared bot .env file. */
+/** Resolve the bot token from env (set DISCORD_BOT_TOKEN in Vercel / .env.local). */
 function getBotToken(): string | null {
-  if (process.env.DISCORD_BOT_TOKEN) return process.env.DISCORD_BOT_TOKEN;
-  if (process.env.DISCORD_TOKEN) return process.env.DISCORD_TOKEN;
-  try {
-    const envPath = path.resolve(process.cwd(), "..", "..", ".env");
-    const raw = fs.readFileSync(envPath, "utf-8");
-    const match = raw.match(/^DISCORD_TOKEN\s*=\s*(.+)$/m);
-    if (match) return match[1].trim().replace(/^["']|["']$/g, "");
-  } catch {
-    // ignore
-  }
-  return null;
+  return process.env.DISCORD_BOT_TOKEN || process.env.DISCORD_TOKEN || null;
 }
 
 interface DiscordMessage {
