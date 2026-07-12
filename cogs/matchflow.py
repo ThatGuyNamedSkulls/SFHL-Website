@@ -7,6 +7,7 @@ works for any game.
 
 import logging
 import time
+from datetime import datetime, timezone
 
 import discord
 from discord import app_commands
@@ -521,6 +522,19 @@ class MatchflowCog(commands.Cog):
             except Exception:
                 logger.exception("Failed to archive season stats on /resetdb")
 
+            # Mark the season boundary BEFORE zeroing, so the website can split
+            # the Elo graph per season (it reconstructs history backwards from the
+            # current Elo — without this marker a reset drags every past match
+            # into negative values). Stored in the same UTC TEXT format as
+            # match_history.timestamp so the two compare directly.
+            try:
+                await db.execute(
+                    "INSERT INTO season_resets (season_name, reset_at) VALUES (?, ?)",
+                    (season_name, datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
+                )
+            except Exception:
+                logger.exception("Failed to record the season reset boundary")
+
             # Zero the live season columns: standings (elo/rank/placement) AND the
             # aggregate stat totals now safely archived above.
             await db.execute(
@@ -529,7 +543,7 @@ class MatchflowCog(commands.Cog):
                    matches_played = 0, matches_won = 0, total_kills = 0, total_deaths = 0,
                    total_assists = 0, kd_ratio = 0.0, total_mvps = 0, total_score = 0,
                    total_headshot_percentage = 0.0, avg_hs_percent = 0.0, total_play_time = 0,
-                   peak_elo = 0"""
+                   peak_elo = 0, mmr = NULL, placement_opp_sum = 0"""
             )
 
             # Drop any stale post-queue lobbies from last season.

@@ -90,7 +90,7 @@ k_top_elo = 2200
 [placement]
 # Placement grading is PURE performance (league decision): rank = avg score
 # through the placement_min/max bands below — wins/losses never enter the grade.
-games = 5            # placement games before graduation (Valorant-style)
+games = 3            # placement games before graduation (Valorant-style)
 use_mmr = true       # track a hidden soft MMR (Glicko-2 + perf bonus, seeded at 1000)
                      # during placements — used for balancing, never shown as rank
 # MMR v2: the score is normalized by the player's lobby-relative expectation

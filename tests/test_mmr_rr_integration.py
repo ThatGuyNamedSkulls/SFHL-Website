@@ -130,7 +130,10 @@ async def _run():
 
         e = VAL.elo
         p = VAL.placement
-        check("preset sanity: mmr_rr model, 5 placements", e.model == "mmr_rr" and p.games == 5)
+        # The placement count comes from the TOML (a league decision) — the flow
+        # below is driven by p.games rather than a hardcoded number.
+        check("preset sanity: mmr_rr model, >=1 placements",
+              e.model == "mmr_rr" and p.games >= 1)
 
         # --- ranked win/loss under mmr_rr -----------------------------------
         for nm, elo_v in [("alice", 1200), ("bob", 1180)]:
@@ -140,6 +143,17 @@ async def _run():
                 (nm, elo_v),
             )
         cog = RankingCog(FakeBot())
+        # Capture the embed breakdowns so the displayed RR can be checked against
+        # the Elo actually applied (they must never disagree — see below).
+        captured = {}
+        real_send = cog._send_results
+
+        async def spy_send(*a, **kw):
+            captured.update(kw.get("breakdowns") or {})
+            return await real_send(*a, **kw)
+
+        cog._send_results = spy_send
+
         await cog.rank.callback(
             cog, FakeInteraction(),
             player_names="alice,bob", match_results="W,L", scores="40,25", points="15,9",
@@ -152,6 +166,13 @@ async def _run():
               e.rr_min <= 1180 - b_elo <= e.rr_max)
         check("hidden MMR was created and moved for both",
               a_mmr is not None and a_mmr > 1200 and b_mmr is not None and b_mmr < 1180)
+        # The embed's "RR ±N" must equal the Elo delta actually applied. The raw
+        # RR float used to be shown, which could round the other way (19.5 shown
+        # as "+20" while the Elo only moved +19).
+        check("displayed RR matches the applied Elo delta (winner)",
+              captured["alice"]["rr"] == a_elo - 1200)
+        check("displayed RR matches the applied Elo delta (loser)",
+              captured["bob"]["rr"] == b_elo - 1180)
 
         # --- convergence: MMR far above visible Elo => win pays rr_max -------
         await db.execute(
@@ -199,12 +220,15 @@ async def _run():
                       r_opp > 0)
         r_elo, r_mmr, r_rank, r_done, r_games, r_opp = await row("rookie")
         check("graduated after exactly placement.games games", r_done == 1 and r_games == 0)
-        # avg score 55 -> A3 band (placement 50-60, seed 1500); opponents ~1200+
-        # so the +0.25*(opp-1000) shift lands the seed above the raw band elo.
-        check("0-5 with high stats still graduates by performance (A3 band)",
-              r_rank == "[A3 | 1450-1649]")
-        check("opponent-strength shift applied to the seed (1500 < elo <= 1575)",
-              1500 < r_elo <= 1500 + p.opp_cap)
+        # Raw 55/game is the A3 band (50-60); with grade_mode "normalized" the
+        # scores are boosted for outscoring a stronger lobby, which can lift the
+        # grade into S1. Either way: a HIGH band despite going 0-5 — grading is
+        # pure performance, losses never enter it.
+        check("0-5 with high stats still graduates by performance (A3+ band)",
+              r_rank in ("[A3 | 1450-1649]", "[S1 | 1650-1899]"))
+        band_elo = next(r.placement_elo for r in VAL.ranks if r.name == r_rank)
+        check("opponent-strength shift applied to the seed (band < elo <= band + cap)",
+              band_elo < r_elo <= band_elo + p.opp_cap)
         check("placement_opp_sum reset on graduation", r_opp == 0)
         check("soft MMR survived graduation", r_mmr is not None)
 

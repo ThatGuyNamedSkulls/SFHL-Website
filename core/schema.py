@@ -145,6 +145,12 @@ async def ensure_schema() -> None:
     # "roblox username"); discord_username is the @handle shown next to it.
     await _safe_alter("ALTER TABLE players ADD COLUMN discord_id INTEGER DEFAULT NULL")
     await _safe_alter("ALTER TABLE players ADD COLUMN discord_username TEXT DEFAULT NULL")
+    # discord_avatar is the member's Discord profile-picture URL, captured by the
+    # hourly guild sync. The website can't serve the bot's LOCAL Roblox avatar
+    # files (they don't deploy to Vercel), and resolving each player's avatar via
+    # the Discord API at request time would mean one API call per leaderboard row.
+    # Storing the URL here makes the website's avatar lookup a plain column read.
+    await _safe_alter("ALTER TABLE players ADD COLUMN discord_avatar TEXT DEFAULT NULL")
     # Hidden MMR track: soft placement MMR (seeded at unranked_effective_elo)
     # and the hidden rating of the mmr_rr (Valorant-style) model. NULL until
     # first used; never shown as the rank.
@@ -322,6 +328,22 @@ async def ensure_schema() -> None:
     )
     await db.execute(
         "CREATE INDEX IF NOT EXISTS idx_season_stats_player ON season_stats(player_name)"
+    )
+
+    # --- season_resets ------------------------------------------------------
+    # One row per /resetdb, marking WHEN a season ended. The website uses these
+    # boundaries to draw the Elo graph per season: without them it reconstructs
+    # history backwards from the player's CURRENT Elo, so a reset (Elo -> 0)
+    # dragged every past match into negative values. reset_at is the same UTC
+    # TEXT format as match_history.timestamp so the two compare directly.
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS season_resets (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            season_name TEXT NOT NULL,
+            reset_at    TEXT NOT NULL
+        )
+        """
     )
 
     # --- timeouts ----------------------------------------------------------

@@ -563,7 +563,12 @@ class RankingCog(commands.Cog):
                         rr = rr_update(base_elo, new_mmr, S, GAME.elo)
                         new_elo = max(1, int(round(base_elo + rr)))
                         new_rank = get_rank(new_elo)
-                        breakdowns[name] = {"mmr": f"{int(mmr0)}→{int(new_mmr)}", "rr": rr}
+                        # Show the APPLIED (rounded) RR so it always matches the
+                        # Elo delta — the raw float can display one off (19.5 ⇒
+                        # "+20" while round(elo+19.5) lands +19).
+                        breakdowns[name] = {
+                            "mmr": f"{int(mmr0)}→{int(new_mmr)}", "rr": new_elo - base_elo,
+                        }
                     elif model == "glicko2":
                         opponents = glicko_opponents(side, S)
                         rd0 = glicko2.apply_decay(
@@ -1095,7 +1100,10 @@ class RankingCog(commands.Cog):
                             rr = rr_update(base_elo, new_mmr, 0.5, GAME.elo)
                             new_elo = max(1, int(round(base_elo + rr)))
                             new_rank = get_rank(new_elo)
-                            breakdowns[name] = {"mmr": f"{int(mmr0)}→{int(new_mmr)}", "rr": rr}
+                            # Applied (rounded) RR so the display matches the Elo delta.
+                            breakdowns[name] = {
+                                "mmr": f"{int(mmr0)}→{int(new_mmr)}", "rr": new_elo - base_elo,
+                            }
                         else:  # glicko2 — draws are native (score 0.5)
                             rd0 = glicko2.apply_decay(
                                 snapshot["glicko_rd"], snapshot["glicko_vol"],

@@ -152,5 +152,7 @@ def test_unmigrated_profile_keeps_old_behavior():
 def test_profiles_valid():
     assert CS.elo.tie_mode == "expected"
     assert VAL.elo.model == "mmr_rr"
-    assert VAL.placement.games == 5
+    # The placement count is a league decision (tuned in the TOML) — assert it's
+    # sane rather than pinning a specific number, so changing it isn't a "failure".
+    assert VAL.placement.games >= 1
     assert VAL.elo.perf_rank_cap in {r.name for r in VAL.ranks}

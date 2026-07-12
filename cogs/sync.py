@@ -20,8 +20,13 @@ class SyncCog(commands.Cog):
 
     @tasks.loop(hours=1)
     async def sync_discord_identities(self):
-        """Syncs all guild members' Discord ID and username (@handle) into their
-        players row (keyed by display_name, which is the Roblox username).
+        """Syncs all guild members' Discord ID, username (@handle) and avatar URL
+        into their players row (keyed by display_name, the Roblox username).
+
+        The avatar URL is stored so the website can show a real profile picture
+        without hitting the Discord API per leaderboard row (the bot's local
+        Roblox avatar files aren't deployed to Vercel, so those URLs 404 there
+        and the UI fell back to initials).
 
         Uses fetch_members (authoritative — the local member cache can be empty
         or partial right after startup), only writes rows whose values actually
@@ -36,11 +41,16 @@ class SyncCog(commands.Cog):
             stmts = []
             async for member in guild.fetch_members(limit=None):
                 # member.name is the @handle, member.display_name is the server
-                # profile name (= players.name).
+                # profile name (= players.name). display_avatar falls back to the
+                # default embed avatar when they have no custom one.
+                avatar = str(member.display_avatar.replace(format="png", size=256))
                 stmts.append((
-                    """UPDATE players SET discord_id = ?, discord_username = ?
-                       WHERE name = ? AND (discord_id IS NOT ? OR discord_username IS NOT ?)""",
-                    (member.id, member.name, member.display_name, member.id, member.name),
+                    """UPDATE players SET discord_id = ?, discord_username = ?,
+                              discord_avatar = ?
+                       WHERE name = ? AND (discord_id IS NOT ? OR discord_username IS NOT ?
+                                           OR discord_avatar IS NOT ?)""",
+                    (member.id, member.name, avatar, member.display_name,
+                     member.id, member.name, avatar),
                 ))
             for i in range(0, len(stmts), 100):
                 await db.batch(stmts[i:i + 100])
