@@ -68,7 +68,11 @@ export interface Player {
   peakElo: number;
   region: Region;
   stats: PlayerStats;
-  eloHistory: number[];
+  /** ELO oldest → newest. A `null` marks a season boundary (the line breaks
+   *  there — past seasons are kept, the new season restarts to its right). */
+  eloHistory: (number | null)[];
+  /** Season resets: index of each break in eloHistory + the season's name. */
+  eloResets?: { index: number; label: string }[];
   joinedDate: string;
   placementDone?: boolean;
   placementGamesPlayed?: number;

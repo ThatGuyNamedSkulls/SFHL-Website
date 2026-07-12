@@ -66,7 +66,8 @@ export default function LeaderboardsPage() {
   const [ladder, setLadder] = useState<"5v5" | "1v1">("5v5");
 
   useEffect(() => {
-    setLoading(true);
+    // (loading is set by the initial state and by the tab click handler —
+    // setting it synchronously here trips react-hooks/set-state-in-effect.)
     fetch(ladder === "5v5" ? "/api/players" : `/api/players?mode=${ladder}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -129,7 +130,10 @@ export default function LeaderboardsPage() {
           {(["5v5", "1v1"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setLadder(tab)}
+              onClick={() => {
+                if (tab !== ladder) setLoading(true);
+                setLadder(tab);
+              }}
               className={
                 ladder === tab
                   ? "inline-block pb-3 border-b-2 border-hl-gold text-sm font-bold text-hl-gold header-caps"

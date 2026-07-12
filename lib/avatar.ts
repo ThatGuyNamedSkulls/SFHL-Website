@@ -27,15 +27,35 @@ function localAvatarExists(url: string): boolean {
   }
 }
 
-/** The best avatar URL we can serve for this player, or "" for none. */
-export async function resolvePlayerAvatar(
-  playerName: string,
-  robloxAvatarImage: string | null | undefined
-): Promise<string> {
+/**
+ * The best avatar URL we can serve for this player, or "" for none.
+ *
+ * `discordAvatar` is the URL the bot's hourly guild sync stores on the players
+ * row. Prefer it over a live Discord API lookup: it costs nothing, and it's the
+ * only option that works for a whole leaderboard at once (resolving each row via
+ * the API would mean one request per player).
+ */
+export function pickAvatar(
+  robloxAvatarImage: string | null | undefined,
+  discordAvatar: string | null | undefined
+): string {
   const stored = avatarUrl(robloxAvatarImage);
   if (stored && (!stored.startsWith("/api/avatar/") || localAvatarExists(stored))) {
     return stored;
   }
+  return discordAvatar || "";
+}
+
+/** Like {@link pickAvatar}, but falls back to a live Discord API lookup when the
+ *  bot hasn't synced an avatar URL yet. Single-player use only (it can make a
+ *  network call) — list views must use pickAvatar. */
+export async function resolvePlayerAvatar(
+  playerName: string,
+  robloxAvatarImage: string | null | undefined,
+  discordAvatar?: string | null
+): Promise<string> {
+  const picked = pickAvatar(robloxAvatarImage, discordAvatar);
+  if (picked) return picked;
   try {
     const discordId = await getDiscordIdForPlayer(playerName);
     if (discordId) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getPlayer, getMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, mapRank } from "@/lib/db";
+import { getPlayer, getMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, mapRank } from "@/lib/db";
+import { buildEloTimeline } from "@/lib/elo-timeline";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
 import { resolvePlayerAvatar } from "@/lib/avatar";
@@ -43,11 +44,11 @@ export async function GET(
 
     // These are all independent of one another — fetch them concurrently
     // instead of one sequential await per data source.
-    const [matches, eloChanges, avatar, playedWith, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings] =
+    const [matches, eloChanges, avatar, playedWith, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings, seasonResets, seasonFinalElos] =
       await Promise.all([
         getMatchesForPlayer(decodedName),
         getEloChanges(decodedName),
-        resolvePlayerAvatar(decodedName, player.roblox_avatar_image),
+        resolvePlayerAvatar(decodedName, player.roblox_avatar_image, player.discord_avatar),
         getMostPlayedWith(decodedName, 10),
         getPlayerRankings(decodedName).catch(() => ({ overall: null, country: null })),
         getEquippedCosmetics(decodedName).catch(() => ({
@@ -60,6 +61,8 @@ export async function GET(
         getInventory(decodedName).catch(() => []),
         getPlacementGamesTotal(),
         getModeRatings(decodedName),
+        getSeasonResets(),
+        getSeasonFinalElos(decodedName),
       ]);
 
     // Dominant server region for this player (most-played region across matches).
@@ -70,15 +73,17 @@ export async function GET(
     const dominantRegion = Object.entries(regionCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
     const region = regionMeta(dominantRegion);
 
-    // Build ELO history from the (newest-first) elo_changes, reconstructing
-    // backwards from the current Elo.
-    const eloHistory: number[] = [];
-    let currentElo = player.elo;
-    eloHistory.unshift(currentElo);
-    for (const change of eloChanges) {
-      currentElo -= change;
-      eloHistory.unshift(currentElo);
-    }
+    // Build the ELO history season by season. Reconstructing the whole curve
+    // backwards from the CURRENT Elo breaks after a season reset (everyone drops
+    // to 0, so past matches march negative); instead each past season is anchored
+    // to the final Elo /resetdb archived for it, and the line is broken at every
+    // reset boundary so the new season starts fresh.
+    const { history: eloHistory, resets: eloResets } = buildEloTimeline(
+      player.elo,
+      eloChanges,
+      seasonResets,
+      seasonFinalElos
+    );
 
     const mapped = {
       id: `p${player.id}`,
@@ -117,6 +122,8 @@ export async function GET(
         playtimeHours: Math.round(player.total_play_time / 3600),
       },
       eloHistory,
+      /** Season boundaries in eloHistory (index of the break + season name). */
+      eloResets,
       placementDone: player.placement_done === 1,
       placementGamesPlayed: player.placement_games_played,
       placementGamesTotal,

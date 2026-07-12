@@ -59,6 +59,11 @@ export interface DbPlayer {
   placement_games_played: number;
   /** Discord @handle, synced from the guild by the bot (null until synced). */
   discord_username: string | null;
+  /** Discord profile-picture URL, synced hourly by the bot. This is what the
+   *  leaderboard/profile actually render: the bot's Roblox avatar files are
+   *  local to its host and 404 on Vercel, which is why avatars degraded to
+   *  initials there. Null until the bot's sync has run. */
+  discord_avatar: string | null;
 }
 
 /** Lazily add the Discord-identity columns if the bot hasn't migrated them yet
@@ -70,6 +75,7 @@ export function ensurePlayerDiscordColumns(): Promise<void> {
     discordColsReady = (async () => {
       await client.execute("ALTER TABLE players ADD COLUMN discord_id INTEGER DEFAULT NULL").catch(() => {});
       await client.execute("ALTER TABLE players ADD COLUMN discord_username TEXT DEFAULT NULL").catch(() => {});
+      await client.execute("ALTER TABLE players ADD COLUMN discord_avatar TEXT DEFAULT NULL").catch(() => {});
     })();
   }
   return discordColsReady;
@@ -82,7 +88,7 @@ export async function getAllPlayers(): Promise<DbPlayer[]> {
             kd_ratio, total_mvps, total_score, total_headshot_percentage,
             avg_hs_percent, matches_played, matches_won, peak_elo,
             total_play_time, roblox_avatar_image, placement_done,
-            placement_games_played, discord_username
+            placement_games_played, discord_username, discord_avatar
      FROM players
      ORDER BY elo DESC`
   );
@@ -96,7 +102,7 @@ export async function getPlayer(name: string): Promise<DbPlayer | undefined> {
                  kd_ratio, total_mvps, total_score, total_headshot_percentage,
                  avg_hs_percent, matches_played, matches_won, peak_elo,
                  total_play_time, roblox_avatar_image, placement_done,
-                 placement_games_played, discord_username
+                 placement_games_played, discord_username, discord_avatar
           FROM players
           WHERE name = ?`,
     args: [name]
@@ -249,16 +255,67 @@ export async function getMatchesForPlayer(playerName: string, limit = 100): Prom
 
 /** Just the Elo deltas of a player's non-placement matches (newest first,
  *  capped) — enough to draw the profile Elo curve without hydrating every
- *  column of every match. */
-export async function getEloChanges(playerName: string, limit = 250): Promise<number[]> {
+ *  column of every match. Timestamps come along so the curve can be split at
+ *  season-reset boundaries (see buildEloTimeline). */
+export async function getEloChanges(
+  playerName: string,
+  limit = 250
+): Promise<{ eloChange: number; timestamp: string }[]> {
   const rs = await client.execute({
-    sql: `SELECT elo_change FROM match_history
+    sql: `SELECT elo_change, timestamp FROM match_history
           WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
           ORDER BY id DESC
           LIMIT ?`,
     args: [playerName, limit],
   });
-  return rs.rows.map((r) => Number(r.elo_change ?? 0));
+  return rs.rows.map((r) => ({
+    eloChange: Number(r.elo_change ?? 0),
+    timestamp: (r.timestamp as string) ?? "",
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Season boundaries (season_resets + season_stats)
+// ---------------------------------------------------------------------------
+
+export interface SeasonReset {
+  season_name: string;
+  /** UTC "YYYY-MM-DD HH:MM:SS" — same format as match_history.timestamp. */
+  reset_at: string;
+}
+
+/** Every season reset the bot has performed, oldest first. */
+export async function getSeasonResets(): Promise<SeasonReset[]> {
+  try {
+    const rs = await client.execute(
+      "SELECT season_name, reset_at FROM season_resets ORDER BY reset_at ASC"
+    );
+    return rs.rows as unknown as SeasonReset[];
+  } catch {
+    return []; // table not created yet (bot hasn't run the migration)
+  }
+}
+
+/** A player's archived FINAL Elo for each past season (from /resetdb's
+ *  season_stats archive) — the anchor each past season's curve is drawn back
+ *  from, so history keeps its real values instead of being reconstructed from
+ *  the post-reset Elo (which sent it negative). */
+export async function getSeasonFinalElos(
+  playerName: string
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  try {
+    const rs = await client.execute({
+      sql: "SELECT season_name, elo FROM season_stats WHERE player_name = ?",
+      args: [playerName],
+    });
+    for (const r of rs.rows) {
+      out.set(r.season_name as string, Number(r.elo ?? 0));
+    }
+  } catch {
+    /* table not created yet */
+  }
+  return out;
 }
 
 export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
@@ -324,13 +381,13 @@ export async function getModeRatings(playerName: string): Promise<DbModeRating[]
  *  by Elo; still-placing players excluded). Joined with players for avatars. */
 export async function getModeLeaderboard(
   mode: string
-): Promise<(DbModeRating & { player_name: string; roblox_avatar_image: string | null; country: string | null; discord_username: string | null })[]> {
+): Promise<(DbModeRating & { player_name: string; roblox_avatar_image: string | null; country: string | null; discord_username: string | null; discord_avatar: string | null })[]> {
   try {
     const rs = await client.execute({
       sql: `SELECT mr.player_name, mr.mode, mr.elo, mr.rank, mr.peak_elo,
                    mr.matches_played, mr.matches_won, mr.placement_done,
                    mr.placement_games_played,
-                   p.roblox_avatar_image, p.country, p.discord_username
+                   p.roblox_avatar_image, p.country, p.discord_username, p.discord_avatar
             FROM mode_ratings mr
             JOIN players p ON p.name = mr.player_name
             WHERE mr.mode = ? AND mr.placement_done = 1
@@ -342,6 +399,7 @@ export async function getModeLeaderboard(
       roblox_avatar_image: string | null;
       country: string | null;
       discord_username: string | null;
+      discord_avatar: string | null;
     })[];
   } catch {
     return [];

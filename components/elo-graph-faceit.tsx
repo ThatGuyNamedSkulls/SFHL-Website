@@ -8,32 +8,52 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  ReferenceLine,
   Tooltip,
 } from "recharts";
 import { Match } from "@/types";
 
 interface EloGraphFaceitProps {
-  /** ELO values oldest → newest (length = matches + 1). */
-  eloHistory: number[];
+  /** ELO values oldest → newest. A `null` is a season boundary (the line breaks
+   *  there: the old season's final Elo and the new season's start are unrelated). */
+  eloHistory: (number | null)[];
   /** Matches newest → oldest (as returned by the API). */
   matches: Match[];
+  /** Season resets: the index of each break in eloHistory + the season's name. */
+  eloResets?: { index: number; label: string }[];
 }
 
 /**
  * FACEIT-style ELO progression: orange line chart, a strip of W/L dashes
  * below it, and a side panel of aggregate stats.
+ *
+ * Past seasons are kept on the graph. Each season reset is drawn as a white
+ * divider, with the new season's Elo starting to the right of it.
  */
-export function EloGraphFaceit({ eloHistory, matches }: EloGraphFaceitProps) {
+export function EloGraphFaceit({ eloHistory, matches, eloResets = [] }: EloGraphFaceitProps) {
   // matches come newest-first; reverse so results line up with eloHistory.
   const results = useMemo(() => [...matches].reverse(), [matches]);
 
   const data = eloHistory.map((elo, i) => ({ match: i, elo }));
-  const minElo = Math.min(...eloHistory);
-  const maxElo = Math.max(...eloHistory);
+  // The boundary gaps carry no Elo — exclude them from the stats/axis maths.
+  const values = useMemo(
+    () => eloHistory.filter((e): e is number => e !== null),
+    [eloHistory]
+  );
+  const minElo = values.length ? Math.min(...values) : 0;
+  const maxElo = values.length ? Math.max(...values) : 0;
 
   const wins = matches.filter((m) => m.result === "W").length;
   const losses = matches.length - wins;
-  const eloChange = eloHistory.length > 1 ? eloHistory[eloHistory.length - 1] - eloHistory[0] : 0;
+  // Change across the CURRENT season only (i.e. after the last reset) — spanning
+  // a reset would compare two unrelated ladders.
+  const eloChange = useMemo(() => {
+    const lastBreak = eloHistory.lastIndexOf(null);
+    const current = (lastBreak === -1 ? eloHistory : eloHistory.slice(lastBreak + 1)).filter(
+      (e): e is number => e !== null
+    );
+    return current.length > 1 ? current[current.length - 1] - current[0] : 0;
+  }, [eloHistory]);
 
   // Longest win streak across the whole history.
   const longestWin = useMemo(() => {
@@ -73,7 +93,25 @@ export function EloGraphFaceit({ eloHistory, matches }: EloGraphFaceitProps) {
                 labelFormatter={(v) => (v === 0 ? "Start" : `Match ${v}`)}
                 formatter={(value) => [`${value}`, "ELO"]}
               />
-              <Area type="monotone" dataKey="elo" stroke="#ff5500" strokeWidth={2.5} fill="url(#eloFill)" dot={false} activeDot={{ r: 4, fill: "#ff5500" }} />
+              {/* Season boundary: a white divider, with the new season's ELO to
+                  its right. The history to the left is last season's, kept as-is. */}
+              {eloResets.map((r) => (
+                <ReferenceLine
+                  key={r.index}
+                  x={r.index}
+                  stroke="#ffffff"
+                  strokeWidth={1.5}
+                  label={{
+                    value: "Season reset",
+                    position: "insideTopLeft",
+                    fill: "#ffffff",
+                    fontSize: 10,
+                  }}
+                />
+              ))}
+              {/* connectNulls stays false so the line BREAKS at a reset instead of
+                  drawing a cliff from last season's ELO down to the new start. */}
+              <Area type="monotone" dataKey="elo" stroke="#ff5500" strokeWidth={2.5} fill="url(#eloFill)" dot={false} activeDot={{ r: 4, fill: "#ff5500" }} connectNulls={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

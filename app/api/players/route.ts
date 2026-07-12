@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAllPlayers, getModeLeaderboard, getPlayerRegions, getPlacementGamesTotal, mapRank } from "@/lib/db";
 import { getEquippedVisualsMap, EquippedVisuals } from "@/lib/cosmetics";
-import { avatarUrl, regionMeta } from "@/lib/format";
+import { regionMeta } from "@/lib/format";
+import { pickAvatar } from "@/lib/avatar";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
 
 export async function GET(request: Request) {
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
           id: `m${modeParam}-${idx}`,
           username: r.player_name,
           discordUsername: r.discord_username ?? null,
-          avatarUrl: avatarUrl(r.roblox_avatar_image),
+          avatarUrl: pickAvatar(r.roblox_avatar_image, r.discord_avatar),
           cardAsset: cards.get(r.player_name)?.card ?? null,
           frameAsset: cards.get(r.player_name)?.frame ?? null,
           rank: mapRank(r.rank),
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
       id: `p${p.id}`,
       username: p.name,
       discordUsername: p.discord_username ?? null,
-      avatarUrl: avatarUrl(p.roblox_avatar_image),
+      avatarUrl: pickAvatar(p.roblox_avatar_image, p.discord_avatar),
       cardAsset: cards.get(p.name)?.card ?? null,
       frameAsset: cards.get(p.name)?.frame ?? null,
       rank: mapRank(p.rank),

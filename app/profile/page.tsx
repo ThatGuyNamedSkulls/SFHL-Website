@@ -655,7 +655,7 @@ function ProfileContent() {
                 {/* ELO graph */}
                 <Card className="bg-hl-panel border-hl-border p-5">
                   {player.eloHistory && player.eloHistory.length > 1 ? (
-                    <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} />
+                    <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} eloResets={player.eloResets} />
                   ) : (
                     <p className="text-sm text-hl-muted py-8 text-center">Not enough matches to chart yet.</p>
                   )}
@@ -857,7 +857,7 @@ function ProfileContent() {
                 {/* ELO graph */}
                 <Card className="bg-hl-panel border-hl-border p-5">
                   {player.eloHistory && player.eloHistory.length > 1 ? (
-                    <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} />
+                    <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} eloResets={player.eloResets} />
                   ) : (
                     <p className="text-sm text-hl-muted py-8 text-center">Not enough matches to chart yet.</p>
                   )}
