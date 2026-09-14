@@ -21,6 +21,8 @@ export type PlayRegionId = (typeof PLAY_REGIONS)[number]["id"];
 export const DEFAULT_PLAY_REGION: PlayRegionId = "GLOBAL";
 export const REGION_STORAGE_KEY = "hl_view_region";
 export const REGION_CHANGE_EVENT = "hl-region-change";
+export const QUEUE_LOCK_KEY = "hl_queue_lock";
+export const QUEUE_LOCK_EVENT = "hl-queue-lock";
 
 const PLAY_REGION_IDS = new Set<string>(PLAY_REGIONS.map((r) => r.id));
 const QUEUE_REGION_IDS = new Set<string>(QUEUE_REGIONS.map((r) => r.id));

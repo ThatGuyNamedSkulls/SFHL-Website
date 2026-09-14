@@ -28,10 +28,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const regionParam = (searchParams.get("region") || "").toUpperCase();
     const region = isQueueRegion(regionParam) ? regionParam : undefined;
-    const [queue, teamSize, gate] = await Promise.all([
+    const session = await getSession();
+    const [queue, teamSize, gate, me] = await Promise.all([
       getWebQueue(region),
       getQueueTeamSize(),
       getQueueGate(),
+      session ? getWebQueueSpot(session.discordId) : Promise.resolve(null),
     ]);
     return NextResponse.json({
       queue,
@@ -41,6 +43,7 @@ export async function GET(request: Request) {
       region: gate.region,
       openRegions: gate.openRegions,
       openModes: gate.openModes,
+      me,
     });
   } catch (error) {
     console.error("Error fetching queue:", error);
@@ -52,6 +55,7 @@ export async function GET(request: Request) {
       region: null,
       openRegions: [],
       openModes: {},
+      me: null,
     });
   }
 }

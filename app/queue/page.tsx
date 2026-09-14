@@ -21,8 +21,8 @@ import {
   Server,
   Zap,
 } from "lucide-react";
-import { usePlayRegion } from "@/components/use-play-region";
-import { QUEUE_REGIONS, regionQueueLabel } from "@/lib/regions";
+import { usePlayRegion, setQueueLocked } from "@/components/use-play-region";
+import { QUEUE_REGIONS, regionQueueLabel, isQueueRegion } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 import { QUEUE_MODE_SUPER, SUPER_PARTY_MAX, SUPER_ELO_RANGE, parseQueueMode } from "@/lib/queue-modes";
 
@@ -129,6 +129,7 @@ export default function QueuePage() {
   const [queueOpen, setQueueOpen] = useState(false);
   const [openRegions, setOpenRegions] = useState<string[]>([]);
   const [openModes, setOpenModes] = useState<Record<string, string[]>>({});
+  const [queuedSpot, setQueuedSpot] = useState<{ region: string; mode: string } | null>(null);
   const { region, setRegion } = usePlayRegion();
   // While a join/leave POST is in flight (and briefly after), ignore the 5s
   // poll's queue snapshot so a poll that started before the action can't land
@@ -156,6 +157,11 @@ export default function QueuePage() {
         if (qData.openModes && typeof qData.openModes === "object") {
           setOpenModes(qData.openModes as Record<string, string[]>);
         }
+        setQueuedSpot(
+          qData.me && typeof qData.me.region === "string"
+            ? { region: qData.me.region, mode: parseQueueMode(qData.me.mode) }
+            : null
+        );
         const sData = await sRes.json();
         const me = sData.user as UserSession | undefined;
         if (me) setSession(me);
@@ -199,9 +205,24 @@ export default function QueuePage() {
     }
   }, [session?.playerName]);
 
-  const inQueue = session ? queue.some((q) => q.discord_user_id === session.discordId) : false;
+  const inQueue =
+    !!queuedSpot ||
+    !!(session && queue.some((q) => q.discord_user_id === session.discordId));
+  const selectionLocked = inQueue || actionLoading;
   const visibleQueue = queue.filter((e) => parseQueueMode(e.queue_mode) === matchType);
   const canQueue = !!session?.inGuild && !!session?.playerName;
+
+  useEffect(() => {
+    setQueueLocked(inQueue);
+  }, [inQueue]);
+
+  useEffect(() => {
+    if (!queuedSpot) return;
+    if (isQueueRegion(queuedSpot.region) && queuedSpot.region !== region) {
+      setRegion(queuedSpot.region, { force: true });
+    }
+    if (queuedSpot.mode !== matchType) setMatchType(queuedSpot.mode);
+  }, [queuedSpot, region, matchType, setRegion]);
 
   const handleJoin = async () => {
     setActionLoading(true);
@@ -215,7 +236,10 @@ export default function QueuePage() {
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || "Failed to join queue");
-      else setQueue(data.queue);
+      else {
+        setQueue(data.queue);
+        setQueuedSpot({ region, mode: matchType });
+      }
     } catch {
       setError("An error occurred");
     } finally {
@@ -232,7 +256,10 @@ export default function QueuePage() {
       const res = await fetch(`/api/queue?region=${encodeURIComponent(region)}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) setError(data.error || "Failed to leave queue");
-      else setQueue(data.queue);
+      else {
+        setQueue(data.queue);
+        setQueuedSpot(null);
+      }
     } catch {
       setError("An error occurred");
     } finally {
@@ -491,10 +518,15 @@ export default function QueuePage() {
             return (
               <button
                 key={mt.id}
-                onClick={() => setMatchType(mt.id)}
-                className={`relative w-full text-left p-4 rounded-xl border transition-colors overflow-hidden bg-hl-panel ${
+                type="button"
+                disabled={selectionLocked && mt.id !== matchType}
+                onClick={() => {
+                  if (selectionLocked) return;
+                  setMatchType(mt.id);
+                }}
+                className={`relative w-full text-left p-4 rounded-xl border overflow-hidden bg-hl-panel ${
                   active ? "border-white/60" : "border-hl-border hover:border-hl-gold/40"
-                }`}
+                } ${selectionLocked && mt.id !== matchType ? "opacity-40 cursor-not-allowed hover:border-hl-border" : "transition-colors"}`}
               >
                 {mt.green && (
                   <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-hl-green/15 to-transparent pointer-events-none" />
@@ -534,10 +566,14 @@ export default function QueuePage() {
                 <button
                   key={r.id}
                   type="button"
-                  onClick={() => setRegion(r.id)}
-                  className={`text-left p-4 rounded-xl border bg-hl-panel transition-colors ${
+                  disabled={selectionLocked && r.id !== region}
+                  onClick={() => {
+                    if (selectionLocked) return;
+                    setRegion(r.id);
+                  }}
+                  className={`text-left p-4 rounded-xl border bg-hl-panel ${
                     selected ? "border-white/70" : "border-hl-border hover:border-hl-gold/40"
-                  }`}
+                  } ${selectionLocked && r.id !== region ? "opacity-40 cursor-not-allowed hover:border-hl-border" : "transition-colors"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-black text-white">{r.label}</span>

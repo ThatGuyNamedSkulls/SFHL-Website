@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   DEFAULT_PLAY_REGION,
   PLAY_REGIONS,
+  QUEUE_LOCK_EVENT,
+  QUEUE_LOCK_KEY,
   REGION_CHANGE_EVENT,
   REGION_STORAGE_KEY,
   isPlayRegion,
@@ -21,8 +23,39 @@ function readStoredRegion(): PlayRegionId {
   return DEFAULT_PLAY_REGION;
 }
 
+function readQueueLocked(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(QUEUE_LOCK_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setQueueLocked(locked: boolean) {
+  try {
+    if (locked) window.sessionStorage.setItem(QUEUE_LOCK_KEY, "1");
+    else window.sessionStorage.removeItem(QUEUE_LOCK_KEY);
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new Event(QUEUE_LOCK_EVENT));
+}
+
+export function useQueueLocked() {
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    const sync = () => setLocked(readQueueLocked());
+    sync();
+    window.addEventListener(QUEUE_LOCK_EVENT, sync);
+    return () => window.removeEventListener(QUEUE_LOCK_EVENT, sync);
+  }, []);
+  return locked;
+}
+
 export function usePlayRegion() {
   const [region, setRegionState] = useState<PlayRegionId>(DEFAULT_PLAY_REGION);
+  const queueLocked = useQueueLocked();
 
   useEffect(() => {
     setRegionState(readStoredRegion());
@@ -35,7 +68,8 @@ export function usePlayRegion() {
     };
   }, []);
 
-  const setRegion = useCallback((next: PlayRegionId) => {
+  const setRegion = useCallback((next: PlayRegionId, opts?: { force?: boolean }) => {
+    if (!opts?.force && readQueueLocked()) return;
     setRegionState(next);
     try {
       window.localStorage.setItem(REGION_STORAGE_KEY, next);
@@ -46,5 +80,5 @@ export function usePlayRegion() {
   }, []);
 
   const meta = PLAY_REGIONS.find((r) => r.id === region) ?? PLAY_REGIONS[0];
-  return { region, setRegion, meta };
+  return { region, setRegion, meta, queueLocked };
 }

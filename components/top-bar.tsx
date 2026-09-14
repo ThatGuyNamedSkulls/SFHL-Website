@@ -17,7 +17,7 @@ const CENTER_TABS = [
 /** Game + region on the left, MATCHMAKING / LEAGUE / TOURNAMENTS center, avatar right. */
 export function TopBar() {
   const pathname = usePathname();
-  const { region, setRegion, meta } = usePlayRegion();
+  const { region, setRegion, meta, queueLocked } = usePlayRegion();
   const [regionOpen, setRegionOpen] = useState(false);
   const matchmakingOn =
     pathname === "/" ||
@@ -35,13 +35,22 @@ export function TopBar() {
         <div className="relative">
           <button
             type="button"
-            onClick={() => setRegionOpen((v) => !v)}
-            className="flex items-center gap-1 text-[13px] font-bold text-hl-muted hover:text-white px-1.5 py-1 rounded-md"
+            disabled={queueLocked}
+            title={queueLocked ? "Cancel queue to switch region" : undefined}
+            onClick={() => {
+              if (queueLocked) return;
+              setRegionOpen((v) => !v);
+            }}
+            className={`flex items-center gap-1 text-[13px] font-bold px-1.5 py-1 rounded-md ${
+              queueLocked
+                ? "text-hl-muted cursor-not-allowed"
+                : "text-hl-muted hover:text-white"
+            }`}
           >
             {meta.short}
             <ChevronDown className="w-3 h-3" />
           </button>
-          {regionOpen && (
+          {regionOpen && !queueLocked && (
             <>
               <button
                 type="button"
