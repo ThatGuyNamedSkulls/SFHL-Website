@@ -1,5 +1,5 @@
 import { createClient, type Client, type ResultSet } from "@libsql/client";
-import { isPlayRegion } from "@/lib/regions";
+import { isQueueRegion } from "@/lib/regions";
 import { countryToPlayRegion } from "@/lib/country-regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 
@@ -707,7 +707,7 @@ export async function getWebQueueRegion(discordUserId: string): Promise<string |
     });
     if (!rs.rows.length) return null;
     const raw = String(rs.rows[0].region ?? "").toUpperCase();
-    return isPlayRegion(raw) ? raw : null;
+    return isQueueRegion(raw) ? raw : null;
   } catch {
     return null;
   }
@@ -733,12 +733,12 @@ export async function getQueueGate(): Promise<{
         openRegions = value
           .split(",")
           .map((part) => part.trim().toUpperCase())
-          .filter((part) => isPlayRegion(part));
+          .filter((part) => isQueueRegion(part));
       }
       if (key === "queue_open") legacyOpen = value === "1";
       if (key === "queue_region" && value) legacyRegion = value.toUpperCase();
     }
-    if (!openRegions.length && legacyOpen && legacyRegion && isPlayRegion(legacyRegion)) {
+    if (!openRegions.length && legacyOpen && legacyRegion && isQueueRegion(legacyRegion)) {
       openRegions = [legacyRegion];
     }
     return {

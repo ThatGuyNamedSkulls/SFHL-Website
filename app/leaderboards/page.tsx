@@ -8,7 +8,7 @@ import { Flag } from "@/components/flag";
 import { RankTierLetter } from "@/types";
 import { Users, Globe, ChevronDown } from "lucide-react";
 import { usePlayRegion } from "@/components/use-play-region";
-import { PLAY_REGIONS, type PlayRegionId } from "@/lib/regions";
+import { PLAY_REGIONS, isGlobalRegion, type PlayRegionId } from "@/lib/regions";
 
 interface ApiPlayer {
   id: string;
@@ -106,7 +106,7 @@ export default function LeaderboardsPage() {
       Array.from(
         new Set(
           players
-            .filter((p) => p.region === region)
+            .filter((p) => isGlobalRegion(region) || p.region === region)
             .map((p) => p.countryName)
             .filter((n): n is string => !!n)
         )
@@ -116,7 +116,7 @@ export default function LeaderboardsPage() {
 
   const filteredPlayers = useMemo(() => {
     return players.filter((p) => {
-      if (p.region !== region) return false;
+      if (!isGlobalRegion(region) && p.region !== region) return false;
       if (countryFilter !== "All" && p.countryName !== countryFilter) return false;
       return true;
     });
@@ -151,10 +151,14 @@ export default function LeaderboardsPage() {
               <b className="text-white tabular-nums">{myCountryRank}</b>
             </span>
           ) : null}
+          <span className="flex items-center gap-1.5 text-[#8a8a8a]">
+            <span className="font-bold text-white">Global</span>
+            <Globe className="w-3.5 h-3.5 text-[#ff5500]" />
+            <b className="text-white tabular-nums">{me?.position ?? 0}</b>
+          </span>
           {me?.region ? (
             <span className="flex items-center gap-1.5 text-[#8a8a8a]">
               <span className="font-bold text-white">{me.region}</span>
-              <Globe className="w-3.5 h-3.5 text-[#ff5500]" />
               <b className="text-white tabular-nums">{myRegionRank}</b>
             </span>
           ) : null}
@@ -216,7 +220,11 @@ export default function LeaderboardsPage() {
           <EmptyState
             icon={Users}
             title="No players found"
-            hint="No players from this region yet. Set your country in Settings to appear on the matching board."
+            hint={
+              isGlobalRegion(region)
+                ? "No players match your filters."
+                : "No players from this region yet. Set your country in Settings to appear on the matching board."
+            }
           />
         ) : (
           filteredPlayers.map((player, idx) => {

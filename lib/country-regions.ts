@@ -1,5 +1,5 @@
 import { COUNTRY_CODES } from "@/data/country-codes";
-import type { PlayRegionId } from "@/lib/regions";
+import type { QueueRegionId } from "@/lib/regions";
 
 /**
  * ISO country → matchmaking region. The leaderboard region filter uses this
@@ -8,7 +8,7 @@ import type { PlayRegionId } from "@/lib/regions";
  * There is no Africa / Middle East queue, so those countries sit on EU
  * (typical CS ping + how FACEIT-style boards group them).
  */
-const REGION_COUNTRIES: Record<PlayRegionId, readonly string[]> = {
+const REGION_COUNTRIES: Record<QueueRegionId, readonly string[]> = {
   EU: [
     // Europe
     "ad", "al", "at", "ax", "ba", "be", "bg", "by", "ch", "cy", "cz", "de", "dk",
@@ -52,20 +52,20 @@ const REGION_COUNTRIES: Record<PlayRegionId, readonly string[]> = {
   ],
 };
 
-const COUNTRY_TO_REGION: Record<string, PlayRegionId> = {};
-for (const [region, codes] of Object.entries(REGION_COUNTRIES) as [PlayRegionId, readonly string[]][]) {
+const COUNTRY_TO_REGION: Record<string, QueueRegionId> = {};
+for (const [region, codes] of Object.entries(REGION_COUNTRIES) as [QueueRegionId, readonly string[]][]) {
   for (const code of codes) COUNTRY_TO_REGION[code] = region;
 }
 
-/** Play region for an ISO country code, or null when unset / unknown. */
+/** Queue region for an ISO country code, or null when unset / unknown. */
 export function countryToPlayRegion(
   code: string | null | undefined
-): PlayRegionId | null {
+): QueueRegionId | null {
   if (!code) return null;
   return COUNTRY_TO_REGION[code.toLowerCase()] ?? null;
 }
 
-export function countriesInPlayRegion(region: PlayRegionId): readonly string[] {
+export function countriesInPlayRegion(region: QueueRegionId): readonly string[] {
   return REGION_COUNTRIES[region];
 }
 

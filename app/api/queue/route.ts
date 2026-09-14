@@ -4,7 +4,7 @@ import { getWebQueue, joinWebQueue, leaveWebQueue, getWebQueueRegion, getQueueTe
 import { getPartyForMember } from "@/lib/parties";
 import { getActiveLobbyMemberIds } from "@/lib/lobby";
 import { upsertWebUser } from "@/lib/social";
-import { isPlayRegion, regionMeta } from "@/lib/regions";
+import { isQueueRegion, regionMeta } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 
 /** GET — returns current web queue state. */
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const regionParam = (searchParams.get("region") || "").toUpperCase();
-    const region = isPlayRegion(regionParam) ? regionParam : undefined;
+    const region = isQueueRegion(regionParam) ? regionParam : undefined;
     const [queue, teamSize, gate] = await Promise.all([
       getWebQueue(region),
       getQueueTeamSize(),
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({} as { region?: unknown }));
   const requested = typeof body.region === "string" ? body.region.toUpperCase() : "";
-  if (!isPlayRegion(requested)) {
+  if (!isQueueRegion(requested)) {
     return NextResponse.json(
       { error: "Pick a region in Servers before finding a match." },
       { status: 400 }
@@ -217,7 +217,7 @@ export async function DELETE(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const regionParam = (searchParams.get("region") || "").toUpperCase();
-    const region = isPlayRegion(regionParam) ? regionParam : undefined;
+    const region = isQueueRegion(regionParam) ? regionParam : undefined;
     const queue = await getWebQueue(region);
     return NextResponse.json({
       message: "Left queue",

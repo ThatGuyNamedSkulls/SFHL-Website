@@ -21,7 +21,7 @@ import {
   Server,
 } from "lucide-react";
 import { usePlayRegion } from "@/components/use-play-region";
-import { PLAY_REGIONS, regionQueueLabel } from "@/lib/regions";
+import { QUEUE_REGIONS, regionQueueLabel } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 
 interface WebQueueEntry {
@@ -497,7 +497,7 @@ export default function QueuePage() {
         </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {PLAY_REGIONS.map((r) => {
+            {QUEUE_REGIONS.map((r) => {
               const selected = region === r.id;
               const thisOpen = openRegions.includes(r.id);
               return (
