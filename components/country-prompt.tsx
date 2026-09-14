@@ -60,7 +60,7 @@ export function CountryPrompt() {
             <MapPin className="w-5 h-5 text-hl-gold" /> Where are you from?
           </DialogTitle>
           <DialogDescription className="text-hl-muted">
-            Pick your country so it shows on your profile and the rankings.
+            Pick your country so it shows on your profile and places you on the matching regional leaderboard.
           </DialogDescription>
         </DialogHeader>
 

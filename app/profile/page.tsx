@@ -63,7 +63,7 @@ interface ProfilePlayer extends Player {
   cosmetics?: ProfileCosmetics;
   friends?: ProfileFriend[];
   inventory?: InventoryItem[];
-  rankings?: { overall: number | null; country: number | null };
+  rankings?: { overall: number | null; country: number | null; region: number | null };
   discordUsername?: string | null;
   /** Own-ladder gamemode ratings (e.g. the separate 1v1 ladder). */
   modes?: {
@@ -369,6 +369,7 @@ function ProfileContent() {
       : null;
   const overallRank = player.rankings?.overall ?? null;
   const countryRank = player.rankings?.country ?? null;
+  const regionRank = player.rankings?.region ?? null;
   const friends = player.friends ?? [];
   const inventory = player.inventory ?? [];
 
@@ -614,7 +615,7 @@ function ProfileContent() {
                     </>
                   }
                   footer={
-                    (player.countryFlag && countryRank) || overallRank ? (
+                    (player.countryFlag && countryRank) || regionRank || overallRank ? (
                       <>
                         {player.countryFlag && countryRank && (
                           <span
@@ -623,6 +624,15 @@ function ProfileContent() {
                           >
                             <Flag src={player.countryFlag} name={player.countryName} className="w-5 h-3.5" />
                             <b className="text-white stat-number">{countryRank.toLocaleString()}</b>
+                          </span>
+                        )}
+                        {regionRank && player.region && (
+                          <span
+                            className="flex items-center gap-1.5 text-sm text-[#8a8a8a]"
+                            title={`#${regionRank} in ${player.region}`}
+                          >
+                            <span className="text-[11px] font-bold text-white">{player.region}</span>
+                            <b className="text-white stat-number">{regionRank.toLocaleString()}</b>
                           </span>
                         )}
                         {overallRank && (

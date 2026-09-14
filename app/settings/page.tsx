@@ -177,6 +177,9 @@ export default function SettingsPage() {
           <h2 className="text-sm font-bold text-white header-caps mb-4 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-hl-gold" /> Country
           </h2>
+          <p className="text-xs text-hl-muted mb-4">
+            Your country places you on the matching regional leaderboard (EU, NA, SA, APAC, or OC).
+          </p>
           {!editingCountry ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

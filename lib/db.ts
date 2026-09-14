@@ -1,5 +1,6 @@
 import { createClient, type Client, type ResultSet } from "@libsql/client";
 import { isPlayRegion } from "@/lib/regions";
+import { countryToPlayRegion } from "@/lib/country-regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 
 // Ensure we have a database URL
@@ -220,34 +221,34 @@ export async function getPlayerCoins(name: string): Promise<number> {
   return Number(rs.rows[0]?.coins ?? 0);
 }
 
-/** Leaderboard positions by elo: overall, and within the player's country
- *  (null when they have no country set). */
+/** Leaderboard positions by elo: overall, within the player's country, and
+ *  within the play region that country maps to (EU/NA/SA/APAC/OC). */
 export async function getPlayerRankings(
   name: string
-): Promise<{ overall: number | null; country: number | null }> {
+): Promise<{ overall: number | null; country: number | null; region: number | null }> {
   const rs = await client.execute({
     sql: "SELECT elo, country FROM players WHERE name = ?",
     args: [name],
   });
-  if (rs.rows.length === 0) return { overall: null, country: null };
+  if (rs.rows.length === 0) return { overall: null, country: null, region: null };
   const elo = Number(rs.rows[0].elo);
-  const ctry = (rs.rows[0].country as string) || null;
+  const ctry = ((rs.rows[0].country as string) || "").toLowerCase() || null;
+  const playRegion = countryToPlayRegion(ctry);
 
-  const o = await client.execute({
-    sql: "SELECT COUNT(*) AS c FROM players WHERE elo > ?",
-    args: [elo],
-  });
-  const overall = Number(o.rows[0].c) + 1;
-
-  let country: number | null = null;
-  if (ctry) {
-    const c = await client.execute({
-      sql: "SELECT COUNT(*) AS c FROM players WHERE elo > ? AND LOWER(country) = LOWER(?)",
-      args: [elo, ctry],
-    });
-    country = Number(c.rows[0].c) + 1;
+  const all = await client.execute("SELECT elo, country FROM players");
+  let overall = 1;
+  let country: number | null = ctry ? 1 : null;
+  let region: number | null = playRegion ? 1 : null;
+  for (const row of all.rows) {
+    if (Number(row.elo) <= elo) continue;
+    overall += 1;
+    const rowCountry = ((row.country as string) || "").toLowerCase() || null;
+    if (ctry && country !== null && rowCountry === ctry) country += 1;
+    if (playRegion && region !== null && countryToPlayRegion(rowCountry) === playRegion) {
+      region += 1;
+    }
   }
-  return { overall, country };
+  return { overall, country, region };
 }
 
 /** The DB rank string for a brand-new (Elo 0) player — mirrors the bot's

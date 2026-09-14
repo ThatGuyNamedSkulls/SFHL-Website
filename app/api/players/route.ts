@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { getAllPlayers, getModeLeaderboard, getPlayerRegions, getPlacementGamesTotal, mapRank } from "@/lib/db";
+import { getAllPlayers, getModeLeaderboard, getPlacementGamesTotal, mapRank } from "@/lib/db";
 import { getEquippedVisualsMap, EquippedVisuals } from "@/lib/cosmetics";
-import { regionMeta } from "@/lib/format";
 import { pickAvatar } from "@/lib/avatar";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
+import { countryToPlayRegion } from "@/lib/country-regions";
+import { regionMeta } from "@/lib/regions";
 
 export async function GET(request: Request) {
   try {
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
       ]);
       const mappedModes = rows.map((r, idx) => {
         const hasCountry = isValidCountry(r.country);
+        const playRegion = countryToPlayRegion(r.country);
         return {
           id: `m${modeParam}-${idx}`,
           username: r.player_name,
@@ -27,8 +29,8 @@ export async function GET(request: Request) {
           rank: mapRank(r.rank),
           elo: r.elo,
           peakElo: r.peak_elo,
-          region: "—",
-          regionFlag: "🌐",
+          region: playRegion ?? "",
+          regionFlag: playRegion ?? "🌐",
           country: hasCountry ? r.country!.toLowerCase() : null,
           countryName: hasCountry ? countryName(r.country) : null,
           countryFlag: hasCountry ? flagPath(r.country) : null,
@@ -51,15 +53,14 @@ export async function GET(request: Request) {
       return NextResponse.json(mappedModes);
     }
 
-    const [players, regions, cards, placementGamesTotal] = await Promise.all([
+    const [players, cards, placementGamesTotal] = await Promise.all([
       getAllPlayers(),
-      getPlayerRegions(),
       getEquippedVisualsMap().catch(() => new Map<string, EquippedVisuals>()),
       getPlacementGamesTotal(),
     ]);
 
     const mapped = players.map((p, idx) => {
-      const region = regionMeta(regions[p.name]);
+      const playRegion = countryToPlayRegion(p.country);
       const hasCountry = isValidCountry(p.country);
       return {
       id: `p${p.id}`,
@@ -71,8 +72,8 @@ export async function GET(request: Request) {
       rank: mapRank(p.rank),
       elo: p.elo,
       peakElo: p.peak_elo,
-      region: region.label,
-      regionFlag: region.flag,
+      region: playRegion ?? "",
+      regionFlag: playRegion ? regionMeta(playRegion).short : "🌐",
       country: hasCountry ? p.country!.toLowerCase() : null,
       countryName: hasCountry ? countryName(p.country) : null,
       countryFlag: hasCountry ? flagPath(p.country) : null,

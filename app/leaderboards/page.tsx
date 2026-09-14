@@ -97,18 +97,30 @@ export default function LeaderboardsPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    setCountryFilter("All");
+  }, [region]);
+
   const countryFilterOptions = useMemo(
     () =>
-      Array.from(new Set(players.map((p) => p.countryName).filter((n): n is string => !!n))).sort(),
-    [players]
+      Array.from(
+        new Set(
+          players
+            .filter((p) => p.region === region)
+            .map((p) => p.countryName)
+            .filter((n): n is string => !!n)
+        )
+      ).sort(),
+    [players, region]
   );
 
   const filteredPlayers = useMemo(() => {
     return players.filter((p) => {
+      if (p.region !== region) return false;
       if (countryFilter !== "All" && p.countryName !== countryFilter) return false;
       return true;
     });
-  }, [players, countryFilter]);
+  }, [players, countryFilter, region]);
 
   const me = useMemo(
     () => (myPlayer ? players.find((p) => p.username === myPlayer) : undefined),
@@ -118,6 +130,11 @@ export default function LeaderboardsPage() {
   const myCountryRank = useMemo(() => {
     if (!me?.country) return 0;
     return players.filter((p) => p.country === me.country && p.position < me.position).length + 1;
+  }, [players, me]);
+
+  const myRegionRank = useMemo(() => {
+    if (!me?.region) return 0;
+    return players.filter((p) => p.region === me.region && p.position < me.position).length + 1;
   }, [players, me]);
 
   const ranked = !!me && me.rank !== "UNRANKED" && me.placementDone !== false;
@@ -134,11 +151,13 @@ export default function LeaderboardsPage() {
               <b className="text-white tabular-nums">{myCountryRank}</b>
             </span>
           ) : null}
-          <span className="flex items-center gap-1.5 text-[#8a8a8a]">
-            <span className="font-bold text-white">{meta.short}</span>
-            <Globe className="w-3.5 h-3.5 text-[#ff5500]" />
-            <b className="text-white tabular-nums">{me?.position ?? 0}</b>
-          </span>
+          {me?.region ? (
+            <span className="flex items-center gap-1.5 text-[#8a8a8a]">
+              <span className="font-bold text-white">{me.region}</span>
+              <Globe className="w-3.5 h-3.5 text-[#ff5500]" />
+              <b className="text-white tabular-nums">{myRegionRank}</b>
+            </span>
+          ) : null}
           <span className="flex items-center gap-1.5 text-[#8a8a8a]">
             Skill &amp; Elo
             {ranked && me ? (
@@ -194,10 +213,15 @@ export default function LeaderboardsPage() {
         {loading ? (
           <div className="py-16 text-center text-sm text-[#6a6a6a]">Loading…</div>
         ) : filteredPlayers.length === 0 ? (
-          <EmptyState icon={Users} title="No players found" hint="No players match your filters." />
+          <EmptyState
+            icon={Users}
+            title="No players found"
+            hint="No players from this region yet. Set your country in Settings to appear on the matching board."
+          />
         ) : (
-          filteredPlayers.map((player) => {
+          filteredPlayers.map((player, idx) => {
             const isMe = myPlayer !== null && player.username === myPlayer;
+            const boardRank = idx + 1;
             return (
               <Link
                 key={player.id}
@@ -206,7 +230,7 @@ export default function LeaderboardsPage() {
                   isMe ? "bg-[#ff5500]/10" : "hover:bg-white/[0.03]"
                 }`}
               >
-                <span className="text-sm tabular-nums text-[#8a8a8a]">{player.position}</span>
+                <span className="text-sm tabular-nums text-[#8a8a8a]">{boardRank}</span>
                 <span className="flex items-center gap-3 min-w-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {player.avatarUrl ? (
@@ -231,8 +255,8 @@ export default function LeaderboardsPage() {
                   )}
                 </span>
                 <span className="flex items-center justify-center">
-                  {player.position <= 10 ? (
-                    <SkillPill position={player.position} rank={player.rank as RankTierLetter} />
+                  {boardRank <= 10 ? (
+                    <SkillPill position={boardRank} rank={player.rank as RankTierLetter} />
                   ) : (
                     <RankBadge rank={player.rank as RankTierLetter} size="sm" showGlow={false} className="!w-6 !h-6" />
                   )}

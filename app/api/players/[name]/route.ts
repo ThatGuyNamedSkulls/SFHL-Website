@@ -4,8 +4,10 @@ import { buildEloTimeline } from "@/lib/elo-timeline";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
 import { resolvePlayerAvatar, resolveAvatarMap } from "@/lib/avatar";
-import { prettyMap, prettyRegion, regionMeta, formatRoundScore } from "@/lib/format";
+import { prettyMap, prettyRegion, formatRoundScore } from "@/lib/format";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
+import { countryToPlayRegion } from "@/lib/country-regions";
+import { regionMeta } from "@/lib/regions";
 
 export async function GET(
   _request: Request,
@@ -32,7 +34,7 @@ export async function GET(
         getEloChanges(decodedName),
         resolvePlayerAvatar(decodedName, player.roblox_avatar_image, player.discord_avatar, player.discord_id),
         getMostPlayedWith(decodedName, 10),
-        getPlayerRankings(decodedName).catch(() => ({ overall: null, country: null })),
+        getPlayerRankings(decodedName).catch(() => ({ overall: null, country: null, region: null })),
         getEquippedCosmetics(decodedName).catch(() => ({
           card: null,
           frame: null,
@@ -55,13 +57,8 @@ export async function GET(
       avatar: playedAvatars.get(p.name) || null,
     }));
 
-    // Dominant server region for this player (most-played region across matches).
-    const regionCounts: Record<string, number> = {};
-    for (const m of matches) {
-      if (m.region) regionCounts[m.region] = (regionCounts[m.region] ?? 0) + 1;
-    }
-    const dominantRegion = Object.entries(regionCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const region = regionMeta(dominantRegion);
+    const playRegion = countryToPlayRegion(player.country);
+    const region = playRegion ? regionMeta(playRegion) : { label: "", short: "" };
 
     // Build the ELO history season by season. Reconstructing the whole curve
     // backwards from the CURRENT Elo breaks after a season reset (everyone drops
@@ -83,8 +80,8 @@ export async function GET(
       rank: mapRank(player.rank),
       elo: player.elo,
       peakElo: player.peak_elo,
-      region: region.label,
-      regionFlag: region.flag,
+      region: region.short || "",
+      regionFlag: region.short || "🌐",
       country: isValidCountry(player.country) ? player.country!.toLowerCase() : null,
       countryName: isValidCountry(player.country) ? countryName(player.country) : null,
       countryFlag: isValidCountry(player.country) ? flagPath(player.country) : null,
