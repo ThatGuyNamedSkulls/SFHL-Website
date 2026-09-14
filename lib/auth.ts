@@ -96,17 +96,31 @@ export async function isUserInGuildById(userId: string): Promise<boolean | null>
 
 /** Per-instance cache of guild-membership checks. The parties/queue endpoints
  *  are polled every few seconds, so raw per-member Discord API calls would
- *  burn rate limit; definitive answers are cached for a few minutes. */
+ *  burn rate limit. "Is a member" can stay cached longer; "not a member"
+ *  must expire quickly so joining Discord after a failed check starts working. */
 const guildCache = new Map<string, { val: boolean; at: number }>();
-const GUILD_CACHE_TTL_MS = 5 * 60 * 1000;
+const GUILD_CACHE_TTL_TRUE_MS = 5 * 60 * 1000;
+const GUILD_CACHE_TTL_FALSE_MS = 20 * 1000;
 
 /** isUserInGuildById with a short-lived cache. Unknown (null) is not cached. */
 export async function isUserInGuildCached(userId: string): Promise<boolean | null> {
   const hit = guildCache.get(userId);
-  if (hit && Date.now() - hit.at < GUILD_CACHE_TTL_MS) return hit.val;
+  if (hit) {
+    const ttl = hit.val ? GUILD_CACHE_TTL_TRUE_MS : GUILD_CACHE_TTL_FALSE_MS;
+    if (Date.now() - hit.at < ttl) return hit.val;
+  }
   const val = await isUserInGuildById(userId);
   if (val !== null) guildCache.set(userId, { val, at: Date.now() });
   return val;
+}
+
+/** Re-check Discord membership and return an updated session when it changed.
+ *  Login freezes `inGuild` in the cookie; without this, joining the server
+ *  after signing in still looks like "not a member" until they log in again. */
+export async function withLiveGuildFlag(session: UserSession): Promise<UserSession> {
+  const live = await isUserInGuildCached(session.discordId);
+  if (live === null || live === session.inGuild) return session;
+  return { ...session, inGuild: live };
 }
 
 /** Per-instance cache of Discord avatar URLs (the queue page polls every 5s;

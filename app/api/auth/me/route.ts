@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession, encodeSession, SESSION_COOKIE } from "@/lib/auth";
+import { getSession, encodeSession, SESSION_COOKIE, withLiveGuildFlag } from "@/lib/auth";
 
 // Never cache this: it's per-user and read on every navigation. A cached
 // `{ user: null }` (e.g. from before login, or from another visitor via a CDN)
@@ -16,14 +16,15 @@ export async function GET() {
     return NextResponse.json({ user: null }, { headers: noStore });
   }
 
-  const res = NextResponse.json({ user: session }, { headers: noStore });
+  const fresh = await withLiveGuildFlag(session);
+  const res = NextResponse.json({ user: fresh }, { headers: noStore });
 
   // Sliding session: re-issue the cookie on each check so an actively-browsing
   // user never hits the 7-day hard expiry (and gets bumped to the login page)
-  // while they're still using the site. Best-effort — if re-signing fails we
-  // still return the valid session we already decoded.
+  // while they're still using the site. Also persist a live guild-membership
+  // flip (joined/left Discord) so queue no longer trusts the login-time flag.
   try {
-    const jwt = await encodeSession(session);
+    const jwt = await encodeSession(fresh);
     res.cookies.set(SESSION_COOKIE, jwt, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
