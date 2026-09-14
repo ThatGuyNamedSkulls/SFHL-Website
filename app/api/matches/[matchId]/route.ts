@@ -10,7 +10,6 @@ import {
   kdRatio,
   roundCount,
   teamHandle,
-  avg,
 } from "@/lib/match-stats";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 
@@ -126,18 +125,17 @@ export async function GET(
     const firstRow = rows[0];
     const rounds = roundCount(firstRow?.round_score);
 
-    const ratingsFor = (players: typeof rows) =>
-      players.map((p) => performanceRating(p.kills, p.deaths, p.assists, rounds));
-
-    const teamARatings = ratingsFor(teamAPlayers);
-    const teamBRatings = ratingsFor(teamBPlayers);
-    const avgA = avg(teamARatings);
-    const avgB = avg(teamBRatings);
-
-    const buildPlayerStats = (players: typeof rows, team: "A" | "B", teamAvg: number) =>
+    const buildPlayerStats = (players: typeof rows, team: "A" | "B") =>
       players.map((p) => {
         const info = playerInfo.get(p.player_name);
-        const rating = performanceRating(p.kills, p.deaths, p.assists, rounds);
+        const rating = performanceRating({
+          kills: p.kills,
+          deaths: p.deaths,
+          assists: p.assists,
+          rounds,
+          score: p.points,
+          mvps: p.mvps || 0,
+        });
         return {
           playerId: p.player_name,
           username: p.player_name,
@@ -157,7 +155,7 @@ export async function GET(
           mvps: p.mvps || 0,
           eloChange: p.elo_change,
           rating,
-          swing: swingPercent(rating, teamAvg),
+          swing: swingPercent(rating),
           kpr: killsPerRound(p.kills, rounds),
           firstKills: 0,
           clutches: 0,
@@ -214,8 +212,8 @@ export async function GET(
       teamBRoundsSecondHalf: 0,
       duration: "",
       players: [
-        ...buildPlayerStats(teamAPlayers, "A", avgA),
-        ...buildPlayerStats(teamBPlayers, "B", avgB),
+        ...buildPlayerStats(teamAPlayers, "A"),
+        ...buildPlayerStats(teamBPlayers, "B"),
       ],
       rounds: [],
     };

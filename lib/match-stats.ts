@@ -1,9 +1,33 @@
-/** Performance numbers we can compute from stored K/D/A + round score.
+/** Scoreboard Rating / Swing.
  *
- *  HyperLeague does not store damage, multi-kills, or KAST. Rating is a
- *  kills-per-round style index centred near 1.00 so the matchroom and profile
- *  can show FACEIT-like cards without inventing ADR.
+ *  FACEIT Rating and Round Swing are unpublished win-probability metrics that
+ *  need per-round events (alive counts, economy, bomb, damage share). We do
+ *  not store any of that — only K/D/A, score, MVPs, and the match round total.
+ *
+ *  These numbers are a FACEIT-scaled estimate from that scoreboard. They are
+ *  not FACEIT's model, not HLTV 3.0, and they do not affect Elo.
+ *
+ *  Anchors (FACEIT's published display scale): 1.4 advanced, 1.1 average, 0.7
+ *  below average. TYPICAL_SPR (~60 score over 24 rounds) is the one knob to
+ *  retune if live scores sit on a different scale — do not invent ADR.
  */
+
+export const RATING_BASELINE = 1.1;
+export const SWING_SCALE = 20;
+export const TYPICAL_SPR = 2.5;
+export const RATING_MIN = 0.2;
+export const RATING_MAX = 2.5;
+
+export const STAT_ESTIMATE_HINT = "Estimate from scoreboard stats (no demo).";
+
+export type PerformanceInputs = {
+  kills: number;
+  deaths: number;
+  assists: number;
+  rounds?: number | null;
+  score?: number | null;
+  mvps?: number | null;
+};
 
 export function parseRoundScore(raw: string | null | undefined): {
   first: number;
@@ -27,21 +51,37 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** ~1.00 for a typical 20/20 game over a 24-round match. */
-export function performanceRating(
-  kills: number,
-  deaths: number,
-  assists: number,
-  rounds: number | null
-): number {
+function clampRating(n: number): number {
+  return round2(Math.min(RATING_MAX, Math.max(RATING_MIN, n)));
+}
+
+/** Scoreboard estimate centred near FACEIT's 1.10 platform average. */
+export function performanceRating(input: PerformanceInputs): number {
+  const kills = input.kills || 0;
+  const deaths = input.deaths || 0;
+  const assists = input.assists || 0;
+  const rounds = input.rounds;
+  const score = input.score ?? 0;
+  const mvps = input.mvps ?? 0;
+
   if (rounds && rounds > 0) {
     const kpr = kills / rounds;
     const dpr = deaths / rounds;
     const apr = assists / rounds;
-    return Math.max(0.01, round2(kpr * 1.05 + apr * 0.35 - dpr * 0.32 + 0.48));
+    const mpr = mvps / rounds;
+    const spr = score / rounds;
+    return clampRating(
+      0.95 * kpr +
+        0.28 * apr -
+        0.38 * dpr +
+        0.35 * mpr +
+        0.04 * (spr / TYPICAL_SPR) +
+        0.58
+    );
   }
+
   const kd = deaths > 0 ? kills / deaths : kills;
-  return Math.max(0.01, round2(0.45 * kd + 0.12 * (assists / Math.max(deaths, 1)) + 0.3));
+  return clampRating(0.45 * kd + 0.12 * (assists / Math.max(deaths, 1)) + 0.65);
 }
 
 export function killsPerRound(kills: number, rounds: number | null): number | null {
@@ -49,10 +89,9 @@ export function killsPerRound(kills: number, rounds: number | null): number | nu
   return round2(kills / rounds);
 }
 
-/** Percent the player's rating sits above/below their team's average. */
-export function swingPercent(rating: number, teamAvg: number): number {
-  if (!teamAvg) return 0;
-  return round2(((rating - teamAvg) / teamAvg) * 100);
+/** Signed percent vs the 1.10 baseline. A 1.40 game is +6.00%. */
+export function swingPercent(rating: number): number {
+  return round2((rating - RATING_BASELINE) * SWING_SCALE);
 }
 
 export function kdRatio(kills: number, deaths: number): number {
@@ -65,8 +104,8 @@ export function avg(nums: number[]): number {
 }
 
 export function ratingColor(rating: number): string {
-  if (rating >= 1.3) return "#ff5500";
-  if (rating >= 1.0) return "#2ecc71";
+  if (rating >= 1.4) return "#ff5500";
+  if (rating >= 1.25) return "#2ecc71";
   if (rating >= 0.8) return "#e8e8e8";
   return "#e74c3c";
 }

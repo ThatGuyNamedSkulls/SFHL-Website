@@ -22,6 +22,7 @@ import {
   avg,
   ratingColor,
   swingColor,
+  swingPercent,
 } from "@/lib/match-stats";
 import { formatScoreDisplay } from "@/lib/format";
 import { Shield } from "lucide-react";
@@ -43,7 +44,14 @@ function roundsOf(m: Match): number | null {
 }
 
 function matchRating(m: Match): number {
-  return performanceRating(m.kills, m.deaths, m.assists, roundsOf(m));
+  return performanceRating({
+    kills: m.kills,
+    deaths: m.deaths,
+    assists: m.assists,
+    rounds: roundsOf(m),
+    score: m.score,
+    mvps: m.mvps,
+  });
 }
 
 function formatWhen(date: string): string {
@@ -83,7 +91,7 @@ function GraphTooltip({
   const m = p.match;
   const win = m.result === "W";
   const rating = matchRating(m);
-  const swing = (rating - 1) * 100;
+  const swing = swingPercent(rating);
   const score = m.rounds ? formatScoreDisplay(m.rounds) : "";
   const skill = getRankForElo(p.elo ?? 0);
 
@@ -184,7 +192,7 @@ export function RecentPerformance({
     const score = avg(statSource.map((m) => m.score || 0));
     const wins = statSource.filter((m) => m.result === "W").length;
     const winPct = n ? (wins / n) * 100 : 0;
-    const swing = n > 1 ? avg(ratings.map((r) => ((r - rating) / Math.max(rating, 0.01)) * 100)) : 0;
+    const swing = n ? avg(ratings.map(swingPercent)) : 0;
     return {
       rating,
       kda: `${Math.round(k)} / ${Math.round(d)} / ${Math.round(a)}`,

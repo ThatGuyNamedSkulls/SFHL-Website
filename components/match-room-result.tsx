@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { MapThumb } from "@/components/map-thumb";
 import { MatchDetail, MatchPlayerStats, RankTierLetter } from "@/types";
-import { ratingColor, swingColor } from "@/lib/match-stats";
+import { ratingColor, swingColor, STAT_ESTIMATE_HINT } from "@/lib/match-stats";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 import { cn } from "@/lib/utils";
 import { Calendar, Star, Swords } from "lucide-react";
@@ -155,8 +155,12 @@ function StatsTable({
             <tr className="text-[#6a6a6a] text-[10px] uppercase tracking-wide border-b border-white/[0.06]">
               <th className="text-left font-semibold px-3 py-2">Player</th>
               <th className="font-semibold px-2 py-2">Rank</th>
-              <th className="font-semibold px-2 py-2">Rating</th>
-              <th className="font-semibold px-2 py-2">Swing</th>
+              <th className="font-semibold px-2 py-2 cursor-help" title={STAT_ESTIMATE_HINT}>
+                Rating
+              </th>
+              <th className="font-semibold px-2 py-2 cursor-help" title={STAT_ESTIMATE_HINT}>
+                Swing
+              </th>
               <th className="font-semibold px-2 py-2">K</th>
               <th className="font-semibold px-2 py-2">D</th>
               <th className="font-semibold px-2 py-2">A</th>
@@ -305,13 +309,21 @@ function Stats({ match }: { match: MatchDetail }) {
                 )}
               </div>
             </div>
-            <div className="text-4xl font-black tabular-nums" style={{ color: ratingColor(selected.rating ?? 0) }}>
+            <div
+              className="text-4xl font-black tabular-nums cursor-help"
+              style={{ color: ratingColor(selected.rating ?? 0) }}
+              title={STAT_ESTIMATE_HINT}
+            >
               {(selected.rating ?? 0).toFixed(2)}
             </div>
-            <div className="text-[12px] text-[#8a8a8a] mb-4">Rating</div>
+            <div className="text-[12px] text-[#8a8a8a] mb-4 cursor-help" title={STAT_ESTIMATE_HINT}>
+              Rating
+            </div>
             <div className="grid grid-cols-2 gap-3 text-[13px]">
               <div>
-                <div className="text-[#8a8a8a] text-[11px]">Swing</div>
+                <div className="text-[#8a8a8a] text-[11px] cursor-help" title={STAT_ESTIMATE_HINT}>
+                  Swing
+                </div>
                 <div className="font-bold tabular-nums" style={{ color: swingColor(selected.swing ?? 0) }}>
                   {(selected.swing ?? 0) >= 0 ? "+" : ""}
                   {(selected.swing ?? 0).toFixed(2)}%
