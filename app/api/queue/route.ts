@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession, isUserInGuildCached } from "@/lib/auth";
-import { getWebQueue, joinWebQueue, leaveWebQueue, isInWebQueue, getQueueTeamSize, getQueueGate } from "@/lib/db";
+import { getWebQueue, joinWebQueue, leaveWebQueue, getWebQueueRegion, getQueueTeamSize, getQueueGate } from "@/lib/db";
 import { getPartyForMember } from "@/lib/parties";
 import { getActiveLobbyMemberIds } from "@/lib/lobby";
 import { upsertWebUser } from "@/lib/social";
@@ -8,10 +8,13 @@ import { isPlayRegion, regionMeta } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 
 /** GET — returns current web queue state (1v1 while testing). */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const regionParam = (searchParams.get("region") || "").toUpperCase();
+    const region = isPlayRegion(regionParam) ? regionParam : undefined;
     const [queue, teamSize, gate] = await Promise.all([
-      getWebQueue(),
+      getWebQueue(region),
       getQueueTeamSize(),
       getQueueGate(),
     ]);
@@ -21,10 +24,18 @@ export async function GET() {
       teamSize,
       open: gate.open,
       region: gate.region,
+      openRegions: gate.openRegions,
     });
   } catch (error) {
     console.error("Error fetching queue:", error);
-    return NextResponse.json({ queue: [], count: 0, teamSize: MATCH_TEAM_SIZE, open: false, region: null });
+    return NextResponse.json({
+      queue: [],
+      count: 0,
+      teamSize: MATCH_TEAM_SIZE,
+      open: false,
+      region: null,
+      openRegions: [],
+    });
   }
 }
 
@@ -49,16 +60,17 @@ export async function POST(request: Request) {
   }
 
   const gate = await getQueueGate();
-  if (!gate.open || !gate.region) {
+  if (!gate.openRegions.length) {
     return NextResponse.json(
       { error: "No matchmaking queue is open. Wait for Match Staff to open a region queue in Discord." },
       { status: 403 }
     );
   }
-  if (requested !== gate.region) {
+  if (!gate.openRegions.includes(requested)) {
+    const openLabels = gate.openRegions.map((code) => regionMeta(code).label).join(", ");
     return NextResponse.json(
       {
-        error: `The open queue is ${regionMeta(gate.region).label}. Switch to that region in Servers to join.`,
+        error: `That region is closed. Open now: ${openLabels}. Switch in Servers to join.`,
       },
       { status: 403 }
     );
@@ -86,9 +98,15 @@ export async function POST(request: Request) {
     // Remember this player's Discord id so the bot can DM them by id.
     upsertWebUser(session.discordId, session.playerName, session.username).catch(() => {});
 
-    if (await isInWebQueue(session.discordId)) {
+    const alreadyRegion = await getWebQueueRegion(session.discordId);
+    if (alreadyRegion) {
       return NextResponse.json(
-        { error: "You are already in the queue" },
+        {
+          error:
+            alreadyRegion === requested
+              ? "You are already in the queue"
+              : `You're already in the ${alreadyRegion} queue. Leave that one first.`,
+        },
         { status: 409 }
       );
     }
@@ -147,10 +165,19 @@ export async function POST(request: Request) {
           },
         ];
     for (const m of toQueue) {
-      await joinWebQueue(m.discordId, m.username, m.playerName);
+      const other = await getWebQueueRegion(m.discordId);
+      if (other && other !== requested) {
+        return NextResponse.json(
+          {
+            error: `${m.playerName || m.username} is already in the ${other} queue. Leave that one first.`,
+          },
+          { status: 409 }
+        );
+      }
+      await joinWebQueue(m.discordId, m.username, m.playerName, requested);
     }
 
-    const queue = await getWebQueue();
+    const queue = await getWebQueue(requested);
     return NextResponse.json({
       message: party ? "Party joined queue" : "Joined queue successfully",
       queue,
@@ -166,7 +193,7 @@ export async function POST(request: Request) {
 }
 
 /** DELETE — leave the queue */
-export async function DELETE() {
+export async function DELETE(request: Request) {
   const session = await getSession();
 
   if (!session) {
@@ -188,7 +215,10 @@ export async function DELETE() {
       await leaveWebQueue(session.discordId);
     }
 
-    const queue = await getWebQueue();
+    const { searchParams } = new URL(request.url);
+    const regionParam = (searchParams.get("region") || "").toUpperCase();
+    const region = isPlayRegion(regionParam) ? regionParam : undefined;
+    const queue = await getWebQueue(region);
     return NextResponse.json({
       message: "Left queue",
       queue,

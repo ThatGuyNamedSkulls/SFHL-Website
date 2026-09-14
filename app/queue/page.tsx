@@ -110,7 +110,7 @@ export default function QueuePage() {
   const [matchType, setMatchType] = useState("standard");
   const [playTab, setPlayTab] = useState<"type" | "servers">("type");
   const [queueOpen, setQueueOpen] = useState(false);
-  const [openRegion, setOpenRegion] = useState<string | null>(null);
+  const [openRegions, setOpenRegions] = useState<string[]>([]);
   const { region, setRegion } = usePlayRegion();
   // While a join/leave POST is in flight (and briefly after), ignore the 5s
   // poll's queue snapshot so a poll that started before the action can't land
@@ -121,15 +121,20 @@ export default function QueuePage() {
     const fetchQueue = async () => {
       try {
         const [qRes, sRes, pRes] = await Promise.all([
-          fetch("/api/queue"),
+          fetch(`/api/queue?region=${encodeURIComponent(region)}`),
           fetch("/api/auth/me"),
           fetch("/api/parties"),
         ]);
         const qData = await qRes.json();
         if (!actionInFlight.current) setQueue(qData.queue || []);
         setTeamSize(qData.teamSize || MATCH_TEAM_SIZE);
-        setQueueOpen(!!qData.open);
-        setOpenRegion(typeof qData.region === "string" ? qData.region : null);
+        const regions = Array.isArray(qData.openRegions)
+          ? (qData.openRegions as string[])
+          : typeof qData.region === "string"
+            ? [qData.region]
+            : [];
+        setOpenRegions(regions);
+        setQueueOpen(regions.length > 0);
         const sData = await sRes.json();
         const me = sData.user as UserSession | undefined;
         if (me) setSession(me);
@@ -150,7 +155,7 @@ export default function QueuePage() {
     fetchQueue();
     const interval = setInterval(fetchQueue, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [region]);
 
   // Fetch the linked player's rank/elo for the lobby slot + season display.
   useEffect(() => {
@@ -202,7 +207,7 @@ export default function QueuePage() {
     actionInFlight.current = true;
     setError(null);
     try {
-      const res = await fetch("/api/queue", { method: "DELETE" });
+      const res = await fetch(`/api/queue?region=${encodeURIComponent(region)}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) setError(data.error || "Failed to leave queue");
       else setQueue(data.queue);
@@ -260,7 +265,7 @@ export default function QueuePage() {
   const partyBlocked = lobbyMembers.some((m) => m.canQueue === false);
 
   const modeLabel = `${teamSize}v${teamSize}`;
-  const regionOk = queueOpen && openRegion === region;
+  const regionOk = openRegions.includes(region);
   const findDisabled =
     actionLoading || loading || ((!canQueue || partyBlocked || !regionOk) && !inQueue);
   const findHint = !session
@@ -271,8 +276,8 @@ export default function QueuePage() {
         ? null
         : !queueOpen
           ? "No Discord queue is open. Match Staff need to run /queue with a region first."
-          : openRegion !== region
-            ? `The open queue is ${openRegion}. Switch to that region in Servers to find a match.`
+          : !regionOk
+            ? `Open now: ${openRegions.join(", ")}. Switch to one of those regions in Servers to find a match.`
             : null;
 
   // Header banner state: placement progress until ranked, tier ladder after.
@@ -494,7 +499,7 @@ export default function QueuePage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {PLAY_REGIONS.map((r) => {
               const selected = region === r.id;
-              const thisOpen = queueOpen && openRegion === r.id;
+              const thisOpen = openRegions.includes(r.id);
               return (
                 <button
                   key={r.id}

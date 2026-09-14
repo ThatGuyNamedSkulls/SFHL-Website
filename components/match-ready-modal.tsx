@@ -49,6 +49,9 @@ export function MatchReadyModal() {
       if (typeof qData?.region === "string") {
         setRegionLabel(`${regionMeta(qData.region).label} ${MATCH_MODE_LABEL} Queue`);
       }
+      if (Array.isArray(qData?.openRegions) && qData.openRegions.length === 1) {
+        setRegionLabel(`${regionMeta(qData.openRegions[0]).label} ${MATCH_MODE_LABEL} Queue`);
+      }
     } catch {
       /* ignore */
     }

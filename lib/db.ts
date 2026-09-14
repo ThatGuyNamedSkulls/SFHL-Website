@@ -612,10 +612,18 @@ export interface WebQueueEntry {
   discord_username: string;
   player_name: string | null;
   joined_at: string;
+  region?: string | null;
 }
 
-export async function getWebQueue(): Promise<WebQueueEntry[]> {
+export async function getWebQueue(region?: string): Promise<WebQueueEntry[]> {
   try {
+    if (region) {
+      const rs = await client.execute({
+        sql: "SELECT * FROM web_queue WHERE region = ? ORDER BY joined_at ASC",
+        args: [region],
+      });
+      return rs.rows as unknown as WebQueueEntry[];
+    }
     const rs = await client.execute("SELECT * FROM web_queue ORDER BY joined_at ASC");
     return rs.rows as unknown as WebQueueEntry[];
   } catch {
@@ -626,7 +634,8 @@ export async function getWebQueue(): Promise<WebQueueEntry[]> {
 export async function joinWebQueue(
   discordUserId: string,
   discordUsername: string,
-  playerName: string | null
+  playerName: string | null,
+  region: string
 ): Promise<void> {
   await client.execute(`
     CREATE TABLE IF NOT EXISTS web_queue (
@@ -634,13 +643,19 @@ export async function joinWebQueue(
       discord_user_id TEXT NOT NULL UNIQUE,
       discord_username TEXT NOT NULL,
       player_name TEXT,
-      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      region TEXT
     )
   `);
+  try {
+    await client.execute("ALTER TABLE web_queue ADD COLUMN region TEXT");
+  } catch {
+    /* already present */
+  }
   await client.execute({
-    sql: `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name)
-          VALUES (?, ?, ?)`,
-    args: [discordUserId, discordUsername, playerName]
+    sql: `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name, region)
+          VALUES (?, ?, ?, ?)`,
+    args: [discordUserId, discordUsername, playerName, region]
   });
 }
 
@@ -664,25 +679,55 @@ export async function isInWebQueue(discordUserId: string): Promise<boolean> {
   }
 }
 
-/** Whether Match Staff currently have a region queue open in Discord. */
-export async function getQueueGate(): Promise<{ open: boolean; region: string | null }> {
+/** Which region queue this Discord user is waiting in, if any. */
+export async function getWebQueueRegion(discordUserId: string): Promise<string | null> {
+  try {
+    const rs = await client.execute({
+      sql: "SELECT region FROM web_queue WHERE discord_user_id = ?",
+      args: [discordUserId],
+    });
+    if (!rs.rows.length) return null;
+    const raw = String(rs.rows[0].region ?? "").toUpperCase();
+    return isPlayRegion(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether Match Staff currently have one or more region queues open in Discord. */
+export async function getQueueGate(): Promise<{
+  open: boolean;
+  region: string | null;
+  openRegions: string[];
+}> {
   try {
     const rs = await client.execute(
-      "SELECT key, value FROM bot_state WHERE key IN ('queue_open', 'queue_region')"
+      "SELECT key, value FROM bot_state WHERE key IN ('queue_open_regions', 'queue_open', 'queue_region')"
     );
-    let open = false;
-    let region: string | null = null;
+    let openRegions: string[] = [];
+    let legacyOpen = false;
+    let legacyRegion: string | null = null;
     for (const row of rs.rows) {
       const key = String(row.key);
       const value = String(row.value ?? "");
-      if (key === "queue_open") open = value === "1";
-      if (key === "queue_region" && value) region = value.toUpperCase();
+      if (key === "queue_open_regions" && value) {
+        openRegions = value
+          .split(",")
+          .map((part) => part.trim().toUpperCase())
+          .filter((part) => isPlayRegion(part));
+      }
+      if (key === "queue_open") legacyOpen = value === "1";
+      if (key === "queue_region" && value) legacyRegion = value.toUpperCase();
     }
-    if (!open || !region || !isPlayRegion(region)) {
-      return { open: false, region: region && isPlayRegion(region) ? region : null };
+    if (!openRegions.length && legacyOpen && legacyRegion && isPlayRegion(legacyRegion)) {
+      openRegions = [legacyRegion];
     }
-    return { open: true, region };
+    return {
+      open: openRegions.length > 0,
+      region: openRegions[0] ?? null,
+      openRegions,
+    };
   } catch {
-    return { open: false, region: null };
+    return { open: false, region: null, openRegions: [] };
   }
 }
