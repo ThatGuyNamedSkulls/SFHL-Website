@@ -1,12 +1,9 @@
 /**
  * Server-side avatar resolution.
  *
- * Prefer the bot's stored Roblox avatar when it can actually be served: remote
- * URLs always can, local `/api/avatar/<file>` ones only when the file exists on
- * this instance's disk (the bot's avatars folder doesn't deploy to Vercel, so
- * there those URLs would 404 and the UI would degrade to initials). When the
- * stored avatar is missing or dead, fall back to the player's Discord profile
- * picture via their linked Discord id.
+ * The website prefers a *live* Discord profile picture (stored CDN hashes go
+ * stale and 404, which is what turned avatars into two-letter fallbacks).
+ * Roblox files live on the bot host and 404 on Vercel, so they are last resort.
  */
 
 import { existsSync } from "fs";
@@ -15,7 +12,17 @@ import { avatarUrl } from "@/lib/format";
 import { getDiscordIdForPlayer } from "@/lib/social";
 import { getDiscordAvatarById } from "@/lib/auth";
 
-/** Does the local file behind a `/api/avatar/<file>` URL exist here? */
+/** Discord's default embed avatar when we have an id but no custom hash. */
+export function defaultDiscordAvatar(discordId: string | number | bigint): string {
+  try {
+    const id = BigInt(discordId);
+    const idx = Number((id >> BigInt(22)) % BigInt(6));
+    return `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
+  } catch {
+    return "https://cdn.discordapp.com/embed/avatars/0.png";
+  }
+}
+
 function localAvatarExists(url: string): boolean {
   const file = decodeURIComponent(url.replace(/^\/api\/avatar\//, ""));
   const dir =
@@ -27,43 +34,96 @@ function localAvatarExists(url: string): boolean {
   }
 }
 
+function snowflake(id: string | number | bigint | null | undefined): string {
+  if (id == null) return "";
+  const s = String(id).trim();
+  return /^\d{15,22}$/.test(s) ? s : "";
+}
+
 /**
- * The best avatar URL we can serve for this player, or "" for none.
+ * Best avatar URL for list views (no extra network).
  *
- * `discordAvatar` is the URL the bot's hourly guild sync stores on the players
- * row. Prefer it over a live Discord API lookup: it costs nothing, and it's the
- * only option that works for a whole leaderboard at once (resolving each row via
- * the API would mean one request per player).
+ * 1. Discord CDN URL the bot/login stored
+ * 2. Discord default avatar from discord id
+ * 3. Roblox file, only if it actually exists on this host
  */
 export function pickAvatar(
   robloxAvatarImage: string | null | undefined,
-  discordAvatar: string | null | undefined
+  discordAvatar: string | null | undefined,
+  discordId?: string | number | null
 ): string {
+  if (discordAvatar && /^https?:\/\//i.test(discordAvatar)) return discordAvatar;
+  const id = snowflake(discordId);
+  if (id) return defaultDiscordAvatar(id);
   const stored = avatarUrl(robloxAvatarImage);
   if (stored && (!stored.startsWith("/api/avatar/") || localAvatarExists(stored))) {
     return stored;
   }
-  return discordAvatar || "";
+  return "";
 }
 
-/** Like {@link pickAvatar}, but falls back to a live Discord API lookup when the
- *  bot hasn't synced an avatar URL yet. Single-player use only (it can make a
- *  network call) — list views must use pickAvatar. */
+/** Live Discord PFP when we have (or can look up) a snowflake. Cached in auth. */
 export async function resolvePlayerAvatar(
   playerName: string,
   robloxAvatarImage: string | null | undefined,
-  discordAvatar?: string | null
+  discordAvatar?: string | null,
+  discordId?: string | number | null
 ): Promise<string> {
-  const picked = pickAvatar(robloxAvatarImage, discordAvatar);
-  if (picked) return picked;
-  try {
-    const discordId = await getDiscordIdForPlayer(playerName);
-    if (discordId) {
-      const discord = await getDiscordAvatarById(discordId);
-      if (discord) return discord;
+  let id = snowflake(discordId);
+  if (!id && playerName) {
+    try {
+      id = snowflake(await getDiscordIdForPlayer(playerName));
+    } catch {
+      /* web_users may be empty */
     }
-  } catch {
-    /* best-effort — callers keep their own fallback (initials) */
   }
-  return "";
+  if (id) {
+    try {
+      const live = await getDiscordAvatarById(id);
+      if (live) return live;
+    } catch {
+      /* bot token missing / Discord down */
+    }
+    return defaultDiscordAvatar(id);
+  }
+  return pickAvatar(robloxAvatarImage, discordAvatar, discordId);
+}
+
+export async function resolveAvatarMap(
+  rows: {
+    name: string;
+    roblox_avatar_image?: string | null;
+    discord_avatar?: string | null;
+    discord_id?: string | number | null;
+  }[]
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  await Promise.all(
+    rows.map(async (r) => {
+      const url = await resolvePlayerAvatar(
+        r.name,
+        r.roblox_avatar_image,
+        r.discord_avatar,
+        r.discord_id
+      );
+      if (url) map.set(r.name, url);
+    })
+  );
+  return map;
+}
+
+export async function resolveAvatarsByDiscordId(ids: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const unique = [...new Set(ids.map(snowflake).filter(Boolean))];
+  await Promise.all(
+    unique.map(async (id) => {
+      try {
+        const live = await getDiscordAvatarById(id);
+        map.set(id, live || defaultDiscordAvatar(id));
+      } catch {
+        map.set(id, defaultDiscordAvatar(id));
+      }
+    })
+  );
+  return map;
 }

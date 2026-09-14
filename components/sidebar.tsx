@@ -1,177 +1,141 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserSession } from "@/types";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { NotificationsBell } from "@/components/notifications-bell";
-import { formatUsername } from "@/lib/format";
+import { SearchOverlay } from "@/components/search-overlay";
 import {
   Search,
   Users,
-  UserPlus,
   Play,
   BarChart3,
   TrendingUp,
   Rss,
   Building2,
   Plus,
-  Settings,
   ShoppingBag,
+  Trophy,
   type LucideIcon,
 } from "lucide-react";
 
 interface NavItem {
-  href: string;
+  href?: string;
   label: string;
   icon: LucideIcon;
-  /**
-   * Whether this item "owns" the active highlight for its route. When several
-   * items share a destination (e.g. Search/Rank → /leaderboards), only the
-   * owner lights up so we never highlight two items at once.
-   */
   owns?: boolean;
+  search?: boolean;
+  create?: boolean;
 }
 
 const TOP_NAV: NavItem[] = [
-  { href: "/leaderboards", label: "Search", icon: Search, owns: false },
-  { href: "/party-finder", label: "Party Finder", icon: Users, owns: true },
-  { href: "/friends", label: "Friends", icon: UserPlus, owns: true },
+  { label: "Search", icon: Search, search: true },
+  { href: "/party-finder", label: "Social", icon: Users, owns: true },
   { href: "/queue", label: "Play", icon: Play, owns: true },
   { href: "/leaderboards", label: "Rank", icon: BarChart3, owns: true },
-  { href: "/profile", label: "Track", icon: TrendingUp, owns: true },
-  { href: "/matches", label: "Feed", icon: Rss, owns: true },
+  { href: "/track", label: "Track", icon: TrendingUp, owns: true },
+  { href: "/feed", label: "Feed", icon: Rss, owns: true },
 ];
 
 const BOTTOM_NAV: NavItem[] = [
   { href: "/shop", label: "Shop", icon: ShoppingBag, owns: true },
-  { href: "/tournaments", label: "Clubs", icon: Building2, owns: true },
-  { href: "/party-finder?create=1", label: "Create", icon: Plus, owns: false },
+  { href: "/clubs", label: "Clubs", icon: Building2, owns: true },
+  { href: "/party-finder?create=1", label: "Create", icon: Plus, create: true, owns: false },
 ];
 
-function NavLink({
+function NavButton({
   item,
   active,
+  onSearch,
 }: {
   item: NavItem;
   active: boolean;
+  onSearch: () => void;
 }) {
   const Icon = item.icon;
-  return (
-    <Link
-      href={item.href}
-      data-active={active}
-      className={`hl-nav-item flex items-center gap-4 h-11 px-4 rounded-md mx-1 ${
-        active ? "text-hl-gold" : "text-hl-muted hover:text-white hover:bg-hl-panel-light/40"
+  const className = `hl-nav-item flex items-center justify-center h-[42px] w-full ${
+    active ? "text-[#ff5500]" : "text-[#8b8b8b] hover:text-white"
+  }`;
+
+  const icon = item.create ? (
+    <span
+      className={`flex items-center justify-center w-[22px] h-[22px] rounded-[5px] border ${
+        active ? "border-[#ff5500]" : "border-current"
       }`}
-      title={item.label}
     >
-      <Icon className={`w-5 h-5 shrink-0 ${active ? "text-hl-gold" : ""}`} />
-      <span className="text-sm font-semibold whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-150">
-        {item.label}
-      </span>
+      <Plus className="w-3 h-3" strokeWidth={2.2} />
+    </span>
+  ) : (
+    <Icon
+      className={`w-[20px] h-[20px] ${item.href === "/queue" && active ? "fill-current" : ""}`}
+      strokeWidth={1.75}
+      fill={item.label === "Play" && active ? "currentColor" : "none"}
+    />
+  );
+
+  if (item.search) {
+    return (
+      <button type="button" data-active={active} className={className} title={item.label} onClick={onSearch}>
+        {icon}
+      </button>
+    );
+  }
+
+  return (
+    <Link href={item.href!} data-active={active} className={className} title={item.label}>
+      {icon}
     </Link>
   );
 }
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [session, setSession] = useState<UserSession | null>(null);
-
-  // Only update on a definitive 200; a transient error keeps the last known
-  // session so the sidebar doesn't flip to "Log in" at random.
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/auth/me", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (cancelled || d === null) return;
-        setSession(d.user ?? null);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname]);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const isActive = (item: NavItem) => {
-    if (item.owns === false) return false;
+    if (item.search) return searchOpen;
+    if (item.owns === false || !item.href) return false;
     const base = item.href.split("?")[0];
     return pathname === base;
   };
 
-  const profileHref = session
-    ? `/profile?player=${encodeURIComponent(session.playerName || session.username)}`
-    : "/login";
-
   return (
-    // Fixed 64px placeholder keeps layout stable; the panel itself is absolutely
-    // positioned so it overlays the content when it expands on hover (FACEIT-style).
-    <div className="relative w-[64px] shrink-0 h-screen">
-    <aside className="group/sidebar hl-sidebar absolute inset-y-0 left-0 w-[64px] hover:w-[210px] hover:shadow-2xl hover:shadow-black/50 transition-[width] duration-200 z-40 flex flex-col overflow-hidden">
-      {/* Logo */}
-      <Link
-        href="/"
-        className="flex items-center gap-3 h-16 px-4 shrink-0 border-b border-hl-border"
-        title="HyperLeague"
-      >
-        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-gold-gradient shadow-[0_0_15px_rgba(255,85,0,0.4)] shrink-0">
-          <Play className="w-4 h-4 text-hl-base fill-hl-base" />
-        </div>
-        <span className="text-lg font-black text-white tracking-tight whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-150">
-          HYPER<span className="text-hl-gold">LEAGUE</span>
-        </span>
-      </Link>
-
-      {/* Primary nav */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 flex flex-col gap-0.5">
-        {TOP_NAV.map((item) => (
-          <NavLink key={item.label} item={item} active={isActive(item)} />
-        ))}
-
-        <div className="h-px bg-hl-border mx-4 my-3" />
-
-        {BOTTOM_NAV.map((item) => (
-          <NavLink key={item.label} item={item} active={isActive(item)} />
-        ))}
-      </nav>
-
-      {/* Bottom section: notifications + user */}
-      <div className="shrink-0 border-t border-hl-border py-3 flex flex-col gap-0.5">
-        <NotificationsBell />
-
-        <Link
-          href="/settings"
-          data-active={pathname === "/settings"}
-          className={`hl-nav-item flex items-center gap-4 h-11 px-4 rounded-md mx-1 ${
-            pathname === "/settings" ? "text-hl-gold" : "text-hl-muted hover:text-white hover:bg-hl-panel-light/40"
-          }`}
-          title="Settings"
-        >
-          <Settings className="w-5 h-5 shrink-0" />
-          <span className="text-sm font-semibold whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-150">
-            Settings
-          </span>
+    <>
+      <aside className="hl-sidebar w-12 shrink-0 h-screen flex flex-col overflow-hidden z-40">
+        <Link href="/" className="flex items-center justify-center h-[52px] shrink-0" title="HyperLeague">
+          <Play className="w-[17px] h-[17px] text-[#ff5500] fill-[#ff5500] -rotate-[20deg]" />
         </Link>
 
-        <Link
-          href={profileHref}
-          className="flex items-center gap-3 h-12 px-4 mx-1 rounded-md hover:bg-hl-panel-light/40"
-          title={session ? formatUsername(session.username, session.discordUsername) : "Log in"}
-        >
-          <Avatar className="w-8 h-8 border border-hl-border shrink-0">
-            {session?.avatar ? <AvatarImage src={session.avatar} /> : null}
-            <AvatarFallback className="bg-hl-panel-light text-xs font-bold text-hl-gold">
-              {(session?.username ?? "?").slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-sm font-semibold text-white truncate whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-150">
-            {session ? formatUsername(session.username, session.discordUsername) : "Log in"}
+        <nav className="flex-1 pt-0.5 flex flex-col gap-0.5">
+          {TOP_NAV.map((item) => (
+            <NavButton
+              key={item.label}
+              item={item}
+              active={isActive(item)}
+              onSearch={() => setSearchOpen(true)}
+            />
+          ))}
+
+          <div className="h-px bg-white/10 mx-2.5 my-2.5" />
+
+          {BOTTOM_NAV.map((item) => (
+            <NavButton
+              key={item.label}
+              item={item}
+              active={isActive(item)}
+              onSearch={() => setSearchOpen(true)}
+            />
+          ))}
+
+          <div className="flex-1" />
+          <span
+            title="Coming soon"
+            className="hl-nav-item flex items-center justify-center h-[42px] w-full text-[#8b8b8b]"
+          >
+            <Trophy className="w-[20px] h-[20px]" strokeWidth={1.75} />
           </span>
-        </Link>
-      </div>
-    </aside>
-    </div>
+        </nav>
+      </aside>
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+    </>
   );
 }

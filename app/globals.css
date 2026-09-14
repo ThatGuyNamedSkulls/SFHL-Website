@@ -307,32 +307,15 @@
    FACEIT-style dashboard chrome
    ============================================================ */
 
-/* Left sidebar */
+/* Left sidebar — FACEIT: thin, icon-only, active = orange icon (no left bar) */
 .hl-sidebar {
-  background: #141414;
-  border-right: 1px solid var(--border-subtle);
+  background: #181818;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* Sidebar nav item active state — 3px orange left border */
 .hl-nav-item {
   position: relative;
-  transition: color 0.15s ease, background-color 0.15s ease;
-}
-
-.hl-nav-item::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
-  background: transparent;
-  transition: background 0.15s ease;
-}
-
-.hl-nav-item[data-active="true"]::before {
-  background: var(--accent-gold);
+  transition: color 0.15s ease;
 }
 
 /* Lobby slot cards (matchmaking) */

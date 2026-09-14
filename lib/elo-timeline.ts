@@ -46,7 +46,10 @@ function segmentPoints(changes: number[], endElo: number): number[] {
   for (let i = changes.length - 1; i >= 0; i--) {
     points[i] = points[i + 1] - changes[i];
   }
-  return points;
+  // Walking back from live Elo can go negative when history doesn't reconcile
+  // (undos, placements, manual adjustments). Never draw below 0 — FACEIT's
+  // graph starts at 0, not -66.
+  return points.map((p) => Math.max(0, p));
 }
 
 /**

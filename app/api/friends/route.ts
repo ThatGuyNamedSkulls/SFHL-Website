@@ -13,7 +13,7 @@ function requireLinked(session: Awaited<ReturnType<typeof getSession>>) {
   if (!session) return { error: "You must be logged in", status: 401 as const };
   if (!session.playerName)
     return {
-      error: "Your Discord account isn't linked to an SFHL player yet.",
+      error: "Your Discord account isn't linked to a HyperLeague player yet.",
       status: 403 as const,
     };
   return null;

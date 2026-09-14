@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Bell, UserPlus, Users, Check, X } from "lucide-react";
+import { Bell, UserPlus, Users, Check, X, Swords, Headphones } from "lucide-react";
 
 interface NotificationView {
   id: number;
@@ -15,9 +15,9 @@ interface NotificationView {
   createdAt: number;
 }
 
-/** Sidebar notifications bell: unread badge + dropdown with inline actions for
- *  friend requests and party invites. */
-export function NotificationsBell() {
+/** Notifications bell: unread badge + dropdown with inline actions for
+ *  friend requests and party invites. `rail` sits on the right icon strip. */
+export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar" | "rail" }) {
   const router = useRouter();
   const [items, setItems] = useState<NotificationView[]>([]);
   const [unread, setUnread] = useState(0);
@@ -27,7 +27,9 @@ export function NotificationsBell() {
   // Fixed-viewport coords for the dropdown. The sidebar is `overflow-hidden`
   // (for its width animation), which would clip an absolutely-positioned menu,
   // so we portal the dropdown to <body> and position it next to the bell.
-  const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(
+    null
+  );
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +70,11 @@ export function NotificationsBell() {
     // Anchor the dropdown just to the right of the bell, aligned to its bottom.
     if (next && buttonRef.current) {
       const r = buttonRef.current.getBoundingClientRect();
-      setPos({ left: r.right + 8, bottom: window.innerHeight - r.bottom });
+      if (variant === "rail") {
+        setPos({ left: r.left - 320 - 8, top: r.top });
+      } else {
+        setPos({ left: r.right + 8, bottom: window.innerHeight - r.bottom });
+      }
     }
     setOpen(next);
     if (next && unread > 0) {
@@ -131,26 +137,35 @@ export function NotificationsBell() {
       <button
         ref={buttonRef}
         onClick={toggle}
-        className="hl-nav-item flex items-center gap-4 h-11 px-4 rounded-md mx-1 w-[calc(100%-8px)] text-hl-muted hover:text-white hover:bg-hl-panel-light/40"
+            className={
+          variant === "rail"
+            ? "relative flex items-center justify-center w-9 h-9 rounded-md text-[#8a8a8a] hover:text-white hover:bg-white/5"
+            : "hl-nav-item flex items-center gap-4 h-11 px-4 rounded-md mx-1 w-[calc(100%-8px)] text-hl-muted hover:text-white hover:bg-hl-panel-light/40"
+        }
         title="Notifications"
       >
         <span className="relative shrink-0">
-          <Bell className="w-5 h-5" />
+          <Bell className={variant === "rail" ? "w-[18px] h-[18px]" : "w-5 h-5"} />
           {unread > 0 && (
             <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-hl-red text-white text-[10px] font-bold flex items-center justify-center">
               {unread > 9 ? "9+" : unread}
             </span>
           )}
         </span>
-        <span className="text-sm font-semibold whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-150">
-          Alerts
-        </span>
+        {variant !== "rail" && (
+          <span className="text-sm font-semibold whitespace-nowrap">Alerts</span>
+        )}
       </button>
 
       {mounted && open && pos && createPortal(
         <div
           ref={dropdownRef}
-          style={{ position: "fixed", left: pos.left, bottom: pos.bottom }}
+          style={{
+            position: "fixed",
+            left: pos.left,
+            top: pos.top,
+            bottom: pos.bottom,
+          }}
           className="w-80 max-h-[70vh] overflow-y-auto rounded-xl border border-hl-border bg-hl-panel shadow-2xl z-[60]"
         >
           <div className="px-4 py-3 border-b border-hl-border">
@@ -165,6 +180,10 @@ export function NotificationsBell() {
                   <div className="flex items-start gap-2">
                     {n.type === "party_invite" ? (
                       <Users className="w-4 h-4 text-hl-gold shrink-0 mt-0.5" />
+                    ) : n.type === "match_found" ? (
+                      <Swords className="w-4 h-4 text-hl-gold shrink-0 mt-0.5" />
+                    ) : n.type === "party_voice" ? (
+                      <Headphones className="w-4 h-4 text-[#57F287] shrink-0 mt-0.5" />
                     ) : (
                       <UserPlus className="w-4 h-4 text-hl-teal shrink-0 mt-0.5" />
                     )}
@@ -196,6 +215,31 @@ export function NotificationsBell() {
                         className="text-xs font-bold px-4 py-1.5 rounded-md bg-gold-gradient text-hl-base hover:opacity-90 disabled:opacity-50"
                       >
                         Join party
+                      </button>
+                    </div>
+                  )}
+                  {n.type === "party_voice" && n.refId && (
+                    <div className="flex gap-2 pl-6">
+                      <a
+                        href={n.refId}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold px-4 py-1.5 rounded-md bg-[#57F287] text-hl-base hover:opacity-90"
+                      >
+                        Join voice
+                      </a>
+                    </div>
+                  )}
+                  {n.type === "match_found" && (
+                    <div className="flex gap-2 pl-6">
+                      <button
+                        onClick={() => {
+                          setOpen(false);
+                          router.push("/match/live");
+                        }}
+                        className="text-xs font-bold px-4 py-1.5 rounded-md bg-gold-gradient text-hl-base hover:opacity-90"
+                      >
+                        Open match room
                       </button>
                     </div>
                   )}

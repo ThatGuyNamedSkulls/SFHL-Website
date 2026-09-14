@@ -28,7 +28,7 @@ export interface RankTier {
 }
 
 /** Region codes */
-export type Region = "NA" | "EU" | "APAC" | "EU-West-2";
+export type Region = "NA" | "EU" | "SA" | "APAC" | "OC" | "EU-West-2";
 
 /** Game modes */
 export type GameMode = "Competitive" | "Ranked" | "Casual";
@@ -309,6 +309,9 @@ export interface PartyView {
   invitedNames?: string[];
   createdAt: number;
   updatedAt: number;
+  voiceChannelId?: string | null;
+  voiceChannelUrl?: string | null;
+  guildId?: string | null;
 }
 
 /** Auth session stored in cookie */

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { LobbySlots, LobbyMember } from "@/components/lobby-slots";
 import { UserSession, RankTierLetter } from "@/types";
@@ -12,34 +12,17 @@ import {
   AlertCircle,
   Users,
   Loader2,
-  Search,
   Swords,
   Info,
   ShieldCheck,
   Activity,
   Medal,
   Star,
-  Coins,
-  Zap,
-  PartyPopper,
-  ExternalLink,
+  Server,
 } from "lucide-react";
-
-interface MatchLobbyMember {
-  discordId: string;
-  name: string;
-  team: number;
-  avatar: string | null;
-  rank: RankTierLetter;
-}
-interface MatchLobby {
-  channelId: string;
-  channelName: string;
-  channelUrl: string;
-  map: string | null;
-  createdAt: number;
-  members: MatchLobbyMember[];
-}
+import { usePlayRegion } from "@/components/use-play-region";
+import { PLAY_REGIONS, regionQueueLabel } from "@/lib/regions";
+import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 
 interface WebQueueEntry {
   id: number;
@@ -89,7 +72,7 @@ interface MatchTypeFeature {
   star?: boolean;
 }
 
-/** FACEIT-style match-type cards: header + a grid of requirement chips. */
+/** FACEIT-style match-type cards. Premium variants are deferred — Standard 1v1 while testing. */
 const MATCH_TYPES: {
   id: string;
   label: string;
@@ -100,35 +83,10 @@ const MATCH_TYPES: {
     id: "standard",
     label: "Standard Match",
     features: [
-      { icon: Users, text: "All party sizes" },
+      { icon: Users, text: "Party of 2" },
       { icon: ShieldCheck, text: "Verified Matching", star: true },
       { icon: Activity, text: "No Elo restrictions" },
-      { icon: Medal, text: "Veteran Matching", star: true },
-    ],
-  },
-  {
-    id: "super",
-    label: "Super Match",
-    green: true,
-    features: [
-      { icon: Users, text: "Solo, duo, trio" },
-      { icon: ShieldCheck, text: "Verified Matching", star: true },
-      { icon: Activity, text: "400 Elo range" },
-      { icon: Medal, text: "Veteran Matching", star: true },
-      { icon: Star, text: "Premium flex" },
-    ],
-  },
-  {
-    id: "premium",
-    label: "Premium Match",
-    green: true,
-    features: [
-      { icon: Users, text: "Solo or duo" },
-      { icon: ShieldCheck, text: "Verified required" },
-      { icon: Activity, text: "400 Elo range" },
-      { icon: Medal, text: "Veteran required" },
-      { icon: Star, text: "Premium Required" },
-      { icon: Coins, text: "High stakes" },
+      { icon: Medal, text: "1v1 Strike Force" },
     ],
   },
 ];
@@ -144,16 +102,16 @@ export default function QueuePage() {
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
   const [party, setParty] = useState<PartyLite | null>(null);
   const [queue, setQueue] = useState<WebQueueEntry[]>([]);
-  // Global queue format (5 = 5v5, 1 = 1v1), toggled by the bot's /gamemode
-  // command and mirrored here from the bot_state table via /api/queue.
-  const [teamSize, setTeamSize] = useState(5);
-  // The private post-queue match this user is in (set by the bot when the
-  // queue fills). Shown as a "Match Found" lobby above everything else.
-  const [lobby, setLobby] = useState<MatchLobby | null>(null);
+  // Global queue format — 1v1 while testing with friends.
+  const [teamSize, setTeamSize] = useState(MATCH_TEAM_SIZE);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [matchType, setMatchType] = useState("standard");
+  const [playTab, setPlayTab] = useState<"type" | "servers">("type");
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [openRegion, setOpenRegion] = useState<string | null>(null);
+  const { region, setRegion } = usePlayRegion();
   // While a join/leave POST is in flight (and briefly after), ignore the 5s
   // poll's queue snapshot so a poll that started before the action can't land
   // afterwards and revert the button's optimistic result.
@@ -162,20 +120,19 @@ export default function QueuePage() {
   useEffect(() => {
     const fetchQueue = async () => {
       try {
-        const [qRes, sRes, pRes, lRes] = await Promise.all([
+        const [qRes, sRes, pRes] = await Promise.all([
           fetch("/api/queue"),
           fetch("/api/auth/me"),
           fetch("/api/parties"),
-          fetch("/api/lobby"),
         ]);
         const qData = await qRes.json();
         if (!actionInFlight.current) setQueue(qData.queue || []);
-        if (qData.teamSize === 1 || qData.teamSize === 5) setTeamSize(qData.teamSize);
+        setTeamSize(qData.teamSize || MATCH_TEAM_SIZE);
+        setQueueOpen(!!qData.open);
+        setOpenRegion(typeof qData.region === "string" ? qData.region : null);
         const sData = await sRes.json();
         const me = sData.user as UserSession | undefined;
         if (me) setSession(me);
-        const lData = await lRes.json();
-        setLobby((lData?.lobby as MatchLobby | null) ?? null);
         // Find the party this user belongs to, so we can show teammates in the lobby.
         const pData = await pRes.json();
         const mine = me
@@ -224,7 +181,11 @@ export default function QueuePage() {
     actionInFlight.current = true;
     setError(null);
     try {
-      const res = await fetch("/api/queue", { method: "POST" });
+      const res = await fetch("/api/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ region }),
+      });
       const data = await res.json();
       if (!res.ok) setError(data.error || "Failed to join queue");
       else setQueue(data.queue);
@@ -299,6 +260,20 @@ export default function QueuePage() {
   const partyBlocked = lobbyMembers.some((m) => m.canQueue === false);
 
   const modeLabel = `${teamSize}v${teamSize}`;
+  const regionOk = queueOpen && openRegion === region;
+  const findDisabled =
+    actionLoading || loading || ((!canQueue || partyBlocked || !regionOk) && !inQueue);
+  const findHint = !session
+    ? null
+    : !canQueue
+      ? null
+      : partyBlocked
+        ? null
+        : !queueOpen
+          ? "No Discord queue is open. Match Staff need to run /queue with a region first."
+          : openRegion !== region
+            ? `The open queue is ${openRegion}. Switch to that region in Servers to find a match.`
+            : null;
 
   // Header banner state: placement progress until ranked, tier ladder after.
   const placed = !!player?.placementDone;
@@ -308,21 +283,10 @@ export default function QueuePage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Tab bar */}
-      <div className="border-b border-hl-border mb-6">
-        <div className="inline-flex items-center gap-2 pb-3 border-b-2 border-hl-gold">
-          <Search className="w-4 h-4 text-hl-gold" />
-          <span className="text-sm font-bold text-hl-gold header-caps">Matchmaking</span>
-        </div>
-      </div>
-
-      {/* Post-queue lobby (match found) — shown above the queue when active */}
-      {lobby && <MatchLobbyPanel lobby={lobby} />}
-
-      {/* Queue region pill */}
+      {/* Queue region pill — follows the server you picked in Servers */}
       <div className="flex justify-center mb-5">
         <span className="bg-gold-gradient text-hl-base rounded-full px-4 py-1.5 text-xs font-black header-caps">
-          Europe {modeLabel} Queue
+          {regionQueueLabel(region, teamSize)}
         </span>
       </div>
 
@@ -423,6 +387,11 @@ export default function QueuePage() {
             There are requirements one or more party members don&apos;t meet — check the warning icon above their card.
           </div>
         )}
+        {findHint && (
+          <div className="mt-5 p-4 rounded-xl bg-hl-gold/10 border border-hl-gold/30 text-hl-gold flex items-center gap-2 text-sm">
+            <AlertCircle className="w-5 h-5 shrink-0" /> {findHint}
+          </div>
+        )}
 
         {error && (
           <div className="mt-5 p-4 rounded-xl bg-hl-red/10 border border-hl-red/20 text-hl-red flex items-center gap-2 text-sm">
@@ -442,11 +411,11 @@ export default function QueuePage() {
           ) : (
             <button
               onClick={inQueue ? handleLeave : handleJoin}
-              disabled={actionLoading || loading || ((!canQueue || partyBlocked) && !inQueue)}
+              disabled={findDisabled}
               className={`inline-flex items-center gap-2 px-12 py-4 rounded-xl font-black text-lg header-caps transition-all ${inQueue
                   ? "bg-hl-red/10 text-hl-red border border-hl-red/30 hover:bg-hl-red/20"
                   : "find-match-btn text-hl-base"
-                } ${(actionLoading || loading || ((!canQueue || partyBlocked) && !inQueue)) && "opacity-50 cursor-not-allowed"}`}
+                } ${findDisabled && "opacity-50 cursor-not-allowed"}`}
             >
               {actionLoading ? "Processing…" : inQueue ? "Cancel" : "Find Match"}
             </button>
@@ -454,15 +423,34 @@ export default function QueuePage() {
         </div>
       </Card>
 
-      {/* Match type selector (FACEIT-style requirement cards) */}
+      {/* Match type / Servers (FACEIT-style). Maps stay post-match veto. */}
       <div className="mb-6">
-        <div className="border-b border-hl-border mb-4">
-          <div className="inline-flex items-center gap-2 pb-3 border-b-2 border-hl-gold">
-            <Swords className="w-4 h-4 text-hl-gold" />
-            <span className="text-sm font-bold text-hl-gold header-caps">Match Type</span>
+        <div className="border-b border-hl-border mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <button
+              type="button"
+              onClick={() => setPlayTab("type")}
+              className={`inline-flex items-center gap-2 pb-3 border-b-2 text-sm font-bold header-caps ${
+                playTab === "type" ? "text-hl-gold border-hl-gold" : "text-hl-muted border-transparent hover:text-white"
+              }`}
+            >
+              <Swords className="w-4 h-4" />
+              Match Type
+            </button>
+            <button
+              type="button"
+              onClick={() => setPlayTab("servers")}
+              className={`inline-flex items-center gap-2 pb-3 border-b-2 text-sm font-bold header-caps ${
+                playTab === "servers" ? "text-hl-gold border-hl-gold" : "text-hl-muted border-transparent hover:text-white"
+              }`}
+            >
+              <Server className="w-4 h-4" />
+              Servers
+            </button>
           </div>
         </div>
-        <div className="grid md:grid-cols-3 gap-4 items-start">
+        {playTab === "type" ? (
+        <div className="grid md:grid-cols-1 max-w-xl gap-4 items-start">
           {MATCH_TYPES.map((mt) => {
             const active = matchType === mt.id;
             return (
@@ -478,12 +466,8 @@ export default function QueuePage() {
                 )}
                 <div className="relative flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    {mt.green ? (
-                      <Zap className="w-4 h-4 text-hl-green shrink-0" />
-                    ) : (
-                      <Swords className="w-4 h-4 text-white shrink-0" />
-                    )}
-                    <span className={`text-sm font-bold truncate ${mt.green ? "text-hl-green" : "text-white"}`}>
+                    <Swords className="w-4 h-4 text-white shrink-0" />
+                    <span className="text-sm font-bold truncate text-white">
                       {mt.label}
                     </span>
                     <span className="text-xs text-hl-muted shrink-0">· {modeLabel}</span>
@@ -506,6 +490,36 @@ export default function QueuePage() {
             );
           })}
         </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {PLAY_REGIONS.map((r) => {
+              const selected = region === r.id;
+              const thisOpen = queueOpen && openRegion === r.id;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setRegion(r.id)}
+                  className={`text-left p-4 rounded-xl border bg-hl-panel transition-colors ${
+                    selected ? "border-white/70" : "border-hl-border hover:border-hl-gold/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-black text-white">{r.label}</span>
+                    <span className="text-xs font-bold text-hl-muted">{r.short}</span>
+                  </div>
+                  <div className="mt-2 text-[11px]">
+                    {thisOpen ? (
+                      <span className="text-hl-green font-bold">Queue open</span>
+                    ) : (
+                      <span className="text-hl-muted">Closed until staff run /queue {r.short}</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Web queue list */}
@@ -547,69 +561,5 @@ export default function QueuePage() {
         Players queueing: <b className="text-white stat-number">{queue.length}</b>
       </div>
     </div>
-  );
-}
-
-/** One team column in the match-found lobby. */
-function LobbyTeam({ label, members }: { label: string; members: MatchLobbyMember[] }) {
-  return (
-    <div className="flex-1 min-w-0">
-      <div className="text-[11px] header-caps text-hl-muted mb-3 text-center">{label}</div>
-      <div className="space-y-2">
-        {members.map((m) => (
-          <div key={m.discordId} className="flex items-center gap-2.5 rounded-lg bg-hl-base/60 border border-hl-border px-3 py-2">
-            <Avatar className="w-8 h-8 border border-hl-border shrink-0">
-              {m.avatar ? <AvatarImage src={m.avatar} /> : null}
-              <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
-                {m.name.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-sm font-bold text-white truncate flex-1">{m.name}</span>
-            <RankBadge rank={m.rank} size="sm" showGlow={false} className="!w-6 !h-6 shrink-0" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** FACEIT-style "Match Found" panel: the private post-queue lobby the bot
- *  created when the queue filled, with teams and a jump to the Discord channel. */
-function MatchLobbyPanel({ lobby }: { lobby: MatchLobby }) {
-  const team1 = lobby.members.filter((m) => m.team === 1);
-  const team2 = lobby.members.filter((m) => m.team === 2);
-  return (
-    <Card className="relative overflow-hidden bg-hl-panel border-hl-gold/50 p-6 mb-6 shadow-[0_0_30px_rgba(255,85,0,0.15)]">
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-hl-gold/15 to-transparent pointer-events-none" />
-      <div className="relative flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-2">
-          <PartyPopper className="w-5 h-5 text-hl-gold" />
-          <h2 className="text-lg font-black text-white header-caps">Match Found</h2>
-          <span className="text-xs text-hl-muted">#{lobby.channelName}</span>
-        </div>
-        <a
-          href={lobby.channelUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm hover:opacity-90 transition-opacity"
-        >
-          Open match channel <ExternalLink className="w-4 h-4" />
-        </a>
-      </div>
-      <div className="relative flex items-stretch gap-3">
-        <LobbyTeam label="Team 1" members={team1} />
-        <div className="flex items-center">
-          <span className="text-sm font-black text-hl-muted">VS</span>
-        </div>
-        <LobbyTeam label="Team 2" members={team2} />
-      </div>
-      <div className="relative mt-4 text-center text-xs text-hl-muted">
-        {lobby.map ? (
-          <>Map: <b className="text-white">{lobby.map}</b></>
-        ) : (
-          "Head to the Discord channel to veto maps and play."
-        )}
-      </div>
-    </Card>
   );
 }

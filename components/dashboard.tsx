@@ -4,18 +4,17 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { RankBadge } from "@/components/rank-badge";
+import { GameSkillBar } from "@/components/game-skill-bar";
 import { UserSession, RankTierLetter } from "@/types";
 import {
   Swords,
   Trophy,
-  Rss,
-  Users,
   ChevronRight,
   Globe,
   Megaphone,
   ArrowUpRight,
   Zap,
+  UserPlus,
 } from "lucide-react";
 
 interface DashboardProps {
@@ -44,18 +43,26 @@ interface RecentMatch {
   region: string;
 }
 
+interface LiveLobbyHint {
+  channelName: string;
+  voiceChannelUrl: string | null;
+}
+
 interface PartyAvatar {
   discordId: string;
   username: string;
   avatar: string | null;
 }
 
+/** FACEIT-home inspired dashboard for HyperLeague / Strike Force. */
 export function Dashboard({ session }: DashboardProps) {
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
   const [partyCount, setPartyCount] = useState(0);
   const [partyAvatars, setPartyAvatars] = useState<PartyAvatar[]>([]);
+  const [partyLooking, setPartyLooking] = useState(0);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [matches, setMatches] = useState<RecentMatch[]>([]);
+  const [liveLobby, setLiveLobby] = useState<LiveLobbyHint | null>(null);
 
   const displayName = session.playerName || session.username;
 
@@ -64,110 +71,171 @@ export function Dashboard({ session }: DashboardProps) {
       fetch(`/api/players/${encodeURIComponent(session.playerName)}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => d && setPlayer({ rank: d.rank, elo: d.elo, stats: d.stats }))
-        .catch(() => { });
+        .catch(() => {});
     }
     fetch("/api/parties")
       .then((r) => r.json())
       .then((d) => {
         setPartyCount(d.count ?? 0);
-        const members = (d.parties ?? []).flatMap(
+        const parties = d.parties ?? [];
+        const members = parties.flatMap(
           (p: { members: PartyAvatar[] }) => p.members
         );
         setPartyAvatars(members.slice(0, 5));
+        setPartyLooking(members.length);
       })
-      .catch(() => { });
+      .catch(() => {});
     fetch("/api/discord/announcements")
       .then((r) => r.json())
       .then((d) => setAnnouncement(d.announcements?.[0] ?? null))
-      .catch(() => { });
+      .catch(() => {});
     fetch("/api/matches")
       .then((r) => r.json())
       .then((d) => setMatches(Array.isArray(d) ? d.slice(0, 4) : []))
-      .catch(() => { });
+      .catch(() => {});
+    fetch("/api/lobby")
+      .then((r) => r.json())
+      .then((d) => {
+        const lobby = d?.lobby;
+        setLiveLobby(
+          lobby
+            ? { channelName: lobby.channelName, voiceChannelUrl: lobby.voiceChannelUrl ?? null }
+            : null
+        );
+      })
+      .catch(() => {});
   }, [session.playerName]);
 
-  const gameCards = [
-    { href: "/queue", title: "Matchmaking", desc: "Find a ranked 5v5 match", icon: Swords, accent: "from-hl-burnt/30" },
-    { href: "/tournaments", title: "Tournaments", desc: "Compete for prizes", icon: Trophy, accent: "from-hl-gold/20" },
-    { href: "/matches", title: "Recent Activity", desc: "Browse recent matches", icon: Rss, accent: "from-hl-teal/20" },
+  const modeCards = [
+    {
+      href: "/queue",
+      title: "Matchmaking",
+      desc: "Ranked 5v5 Strike Force",
+      icon: Swords,
+      glow: "from-hl-gold/35",
+      soon: false,
+    },
+    {
+      href: "#",
+      title: "League",
+      desc: "Coming soon",
+      icon: Trophy,
+      glow: "from-orange-500/25",
+      soon: true,
+    },
+    {
+      href: "#",
+      title: "Tournaments",
+      desc: "Coming soon",
+      icon: Globe,
+      glow: "from-hl-teal/25",
+      soon: true,
+    },
   ];
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Promo banner */}
-      <Card className="relative overflow-hidden border-hl-border p-0 mb-6">
-        <div className="absolute inset-0 bg-hero-gradient opacity-80" />
+      {liveLobby && (
+        <Card className="mb-5 border-hl-gold/50 bg-hl-panel p-4 flex flex-wrap items-center gap-3">
+          <Swords className="w-5 h-5 text-hl-gold shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-black text-white">Match found — #{liveLobby.channelName}</div>
+            <div className="text-xs text-hl-muted">Open the match room for veto, teams, and Discord voice.</div>
+          </div>
+          <Link
+            href="/match/live"
+            className="inline-flex px-4 py-2 rounded-lg bg-gold-gradient text-hl-base font-black text-xs header-caps hover:opacity-90"
+          >
+            Open match room
+          </Link>
+        </Card>
+      )}
+      {/* Promo banner — FACEIT-style hero */}
+      <Card className="relative overflow-hidden border-hl-border p-0 mb-5">
+        <div className="absolute inset-0 bg-hero-gradient opacity-90" />
         <div className="absolute inset-0 bg-hero-radial" />
-        <div className="relative z-10 px-8 py-10 md:py-12">
-          <span className="inline-flex items-center gap-1.5 text-xs header-caps text-hl-gold bg-hl-base/40 border border-hl-gold/30 rounded-full px-3 py-1 mb-4">
-            <Zap className="w-3 h-3" /> Season 1 is Live
-          </span>
-          <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-2">
-            Welcome back, {displayName}
-          </h1>
-          <p className="text-hl-muted max-w-md">
-            Queue up, climb the ladder, and track your rating across the season.
-          </p>
-        </div>
-      </Card>
-
-      {/* Game selector bar */}
-      <Card className="bg-hl-panel border-hl-border p-4 mb-6 flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gold-gradient flex items-center justify-center">
-            <Swords className="w-5 h-5 text-hl-base" />
-          </div>
+        <div className="relative z-10 px-6 sm:px-8 py-8 md:py-10 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="text-sm font-bold text-white">Blox Strike</div>
-            <div className="text-xs text-hl-muted flex items-center gap-1">
-              <Globe className="w-3 h-3" /> EU
+            <span className="inline-flex items-center gap-1.5 text-[11px] header-caps text-hl-gold bg-hl-base/50 border border-hl-gold/30 rounded-full px-3 py-1 mb-3">
+              <Zap className="w-3 h-3" /> Season 1 · Strike Force
+            </span>
+            <h1 className="text-2xl md:text-4xl font-black text-white tracking-tight mb-2">
+              Compete in <span className="text-hl-gold">HyperLeague</span> Matchmaking
+            </h1>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {["5v5 only", "Discord synced", "Verified matching", "Map veto"].map((t) => (
+                <span
+                  key={t}
+                  className="text-[11px] text-hl-muted bg-hl-base/50 border border-hl-border rounded-full px-2.5 py-1"
+                >
+                  {t}
+                </span>
+              ))}
             </div>
+            <p className="text-sm text-hl-muted max-w-lg">
+              Welcome back, {displayName}. Queue from the website or Discord — same lobby, same match room.
+            </p>
           </div>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-[11px] header-caps text-hl-muted">Skill Level</span>
-          {player ? (
-            <div className="flex items-center gap-2">
-              <RankBadge rank={player.rank} size="sm" />
-              <span className="stat-number text-hl-gold text-lg">{player.elo}</span>
-            </div>
-          ) : (
-            <span className="text-sm text-hl-muted">Unranked</span>
-          )}
+          <Link
+            href="/queue"
+            className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-[#ccff00] text-hl-base font-black text-sm header-caps hover:opacity-90 transition-opacity shadow-[0_0_24px_rgba(204,255,0,0.25)]"
+          >
+            Find Match
+          </Link>
         </div>
       </Card>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Center: game cards */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid sm:grid-cols-3 gap-4">
-            {gameCards.map((c) => {
+      <GameSkillBar rank={player?.rank} elo={player?.elo} className="mb-5" />
+
+      <div className="grid lg:grid-cols-[1fr_300px] gap-5">
+        {/* Left: mode cards stacked like FACEIT */}
+        <div className="space-y-5">
+          <div className="grid sm:grid-cols-3 gap-3">
+            {modeCards.map((c) => {
               const Icon = c.icon;
-              return (
-                <Link key={c.title} href={c.href}>
-                  <Card className="relative overflow-hidden bg-hl-panel border-hl-border p-0 h-44 flex flex-col card-hover-glow group cursor-pointer">
-                    {/* Art region with centered circular icon */}
-                    <div className={`relative flex-1 flex items-center justify-center bg-gradient-to-b ${c.accent} to-hl-base/0`}>
-                      <div className="w-16 h-16 rounded-full bg-hl-base/70 border border-hl-gold/30 flex items-center justify-center group-hover:border-hl-gold/60 transition-colors">
+              const inner = (
+                  <Card className={`relative overflow-hidden bg-hl-panel border-hl-border p-0 h-48 flex flex-col ${c.soon ? "opacity-70" : "card-hover-glow group cursor-pointer"}`}>
+                    <div
+                      className={`relative flex-1 flex items-center justify-center bg-gradient-to-t ${c.glow} via-transparent to-transparent`}
+                    >
+                      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-hl-gold/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <div className="relative w-16 h-16 rounded-full bg-hl-base/80 border border-hl-gold/30 flex items-center justify-center group-hover:border-hl-gold/70 group-hover:shadow-[0_0_24px_rgba(255,85,0,0.35)] transition-all">
                         <Icon className="w-7 h-7 text-hl-gold" />
                       </div>
                     </div>
-                    {/* Label region */}
-                    <div className="text-center py-3 px-2 border-t border-hl-border">
-                      <div className="font-bold text-white text-sm group-hover:text-hl-gold transition-colors">{c.title}</div>
+                    <div className="text-center py-3 px-2 border-t border-hl-border bg-hl-panel">
+                      <div className="font-black text-white text-sm group-hover:text-hl-gold transition-colors">
+                        {c.title}
+                      </div>
                       <div className="text-[11px] text-hl-muted mt-0.5">{c.desc}</div>
                     </div>
                   </Card>
+              );
+              if (c.soon) {
+                return (
+                  <div key={c.title} className="block h-full" title="Coming soon">
+                    {inner}
+                  </div>
+                );
+              }
+              return (
+                <Link key={c.title} href={c.href} className="block h-full">
+                  {inner}
                 </Link>
               );
             })}
           </div>
 
-          {/* Latest post (announcements) */}
+          {/* Latest post */}
           <Card className="bg-hl-panel border-hl-border p-5">
-            <h2 className="text-sm font-bold text-white header-caps mb-4 flex items-center gap-2">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-white header-caps flex items-center gap-2">
               <Megaphone className="w-4 h-4 text-hl-gold" /> Latest Post
             </h2>
+            <Link href="/feed" className="text-xs text-hl-gold hover:underline">
+              Feed
+            </Link>
+          </div>
             {announcement ? (
               <div className="flex gap-3">
                 <Avatar className="w-10 h-10 border border-hl-border shrink-0">
@@ -201,7 +269,7 @@ export function Dashboard({ session }: DashboardProps) {
             )}
           </Card>
 
-          {/* Recent match cards */}
+          {/* Recent matches */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-white header-caps">Recent Matches</h2>
@@ -220,8 +288,12 @@ export function Dashboard({ session }: DashboardProps) {
                     <Card className="bg-hl-panel border-hl-border p-4 card-hover-glow group cursor-pointer">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="font-bold text-white group-hover:text-hl-gold transition-colors">{m.map}</div>
-                          <div className="text-xs text-hl-muted mt-0.5">{m.region} · {m.date}</div>
+                          <div className="font-bold text-white group-hover:text-hl-gold transition-colors">
+                            {m.map}
+                          </div>
+                          <div className="text-xs text-hl-muted mt-0.5">
+                            {m.region} · {m.date}
+                          </div>
                         </div>
                         <ArrowUpRight className="w-4 h-4 text-hl-muted group-hover:text-hl-gold" />
                       </div>
@@ -233,15 +305,16 @@ export function Dashboard({ session }: DashboardProps) {
           </div>
         </div>
 
-        {/* Right panel */}
-        <div className="space-y-6">
-          {/* Parties */}
-          <Card className="bg-hl-panel border-hl-border p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-white header-caps flex items-center gap-2">
-                <Users className="w-4 h-4 text-hl-gold" /> Parties
+        {/* Right rail — Parties / Friends (FACEIT-style) */}
+        <div className="space-y-4">
+          <Card className="bg-hl-panel border-hl-border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-black text-white header-caps flex items-center gap-2">
+                Parties
+                <span className="text-[10px] font-bold text-hl-muted bg-hl-base border border-hl-border rounded px-1.5 py-0.5">
+                  {partyCount}
+                </span>
               </h2>
-              <span className="text-xs text-hl-muted">{partyCount} open</span>
             </div>
             {partyAvatars.length > 0 ? (
               <div className="flex items-center gap-2 mb-4">
@@ -255,35 +328,67 @@ export function Dashboard({ session }: DashboardProps) {
                     </Avatar>
                   ))}
                 </div>
-                <span className="text-xs text-hl-muted">looking for teammates</span>
+                <span className="text-xs text-hl-muted">+{Math.max(0, partyLooking - partyAvatars.length)}</span>
               </div>
             ) : (
-              <p className="text-sm text-hl-muted mb-4">Team up with other players before you queue.</p>
+              <p className="text-sm text-hl-muted mb-4">No open parties yet — start one and queue together.</p>
             )}
             <Link
               href="/party-finder"
-              className="inline-flex w-full items-center justify-center gap-2 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm hover:opacity-90 transition-opacity"
+              className="inline-flex w-full items-center justify-center gap-2 py-2.5 rounded-md bg-hl-panel-light border border-hl-border text-white font-black text-xs header-caps hover:border-hl-gold/50 hover:text-hl-gold transition-colors"
             >
               Party Finder
             </Link>
           </Card>
 
-          {/* Clubs / Tournaments */}
-          <Card className="bg-hl-panel border-hl-border p-5">
-            <h2 className="text-sm font-bold text-white header-caps flex items-center gap-2 mb-4">
+          <Card className="bg-hl-panel border-hl-border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-black text-white header-caps flex items-center gap-2">
+                Friends
+              </h2>
+              <UserPlus className="w-4 h-4 text-hl-muted" />
+            </div>
+            <p className="text-sm text-hl-muted mb-4">
+              Add friends, invite to party, and queue together across Discord + web.
+            </p>
+            <Link
+              href="/friends"
+              className="inline-flex w-full items-center justify-center gap-2 py-2.5 rounded-md bg-hl-panel-light border border-hl-border text-white font-black text-xs header-caps hover:border-hl-gold/50 hover:text-hl-gold transition-colors"
+            >
+              Open Friends
+            </Link>
+          </Card>
+
+          <Card className="bg-hl-panel border-hl-border p-4">
+            <h2 className="text-sm font-black text-white header-caps flex items-center gap-2 mb-3">
               <Trophy className="w-4 h-4 text-hl-gold" /> Clubs
+              <span className="text-[10px] font-bold text-hl-muted bg-hl-base border border-hl-border rounded px-1.5 py-0.5">
+                Soon
+              </span>
             </h2>
-            <div className="space-y-2">
-              <Link href="/tournaments" className="flex items-center justify-between p-3 rounded-lg bg-hl-panel-light/40 hover:bg-hl-panel-light transition-colors group">
-                <span className="text-sm text-white">Tournaments</span>
+            <p className="text-xs text-hl-muted mb-3">
+              Community clubs with their own queues and leaderboards are planned — not available yet.
+            </p>
+            <div className="space-y-1.5">
+              <Link
+                href="/leaderboards"
+                className="flex items-center justify-between p-2.5 rounded-md bg-hl-panel-light/40 hover:bg-hl-panel-light transition-colors group"
+              >
+                <span className="text-sm text-white">Season leaderboards</span>
                 <ChevronRight className="w-4 h-4 text-hl-muted group-hover:text-hl-gold" />
               </Link>
-              <Link href="/leaderboards" className="flex items-center justify-between p-3 rounded-lg bg-hl-panel-light/40 hover:bg-hl-panel-light transition-colors group">
-                <span className="text-sm text-white">Leaderboards</span>
-                <ChevronRight className="w-4 h-4 text-hl-muted group-hover:text-hl-gold" />
-              </Link>
-              <Link href="/ranks" className="flex items-center justify-between p-3 rounded-lg bg-hl-panel-light/40 hover:bg-hl-panel-light transition-colors group">
+              <Link
+                href="/ranks"
+                className="flex items-center justify-between p-2.5 rounded-md bg-hl-panel-light/40 hover:bg-hl-panel-light transition-colors group"
+              >
                 <span className="text-sm text-white">How ranks work</span>
+                <ChevronRight className="w-4 h-4 text-hl-muted group-hover:text-hl-gold" />
+              </Link>
+              <Link
+                href="/shop"
+                className="flex items-center justify-between p-2.5 rounded-md bg-hl-panel-light/40 hover:bg-hl-panel-light transition-colors group"
+              >
+                <span className="text-sm text-white">Shop / cosmetics</span>
                 <ChevronRight className="w-4 h-4 text-hl-muted group-hover:text-hl-gold" />
               </Link>
             </div>

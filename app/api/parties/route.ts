@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getParties, createParty } from "@/lib/parties";
+import { MATCH_MODE_LABEL, PARTY_MAX_SIZE } from "@/lib/match-mode";
 import { memberFromSession, withFreshCosmetics, withMemberStatus } from "@/lib/party-member";
 import { getPartyInvitePartyIds, getInvitesForParties } from "@/lib/social";
 
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
     const party = await createParty({
       name: body.name,
       game: body.game,
-      gameMode: body.gameMode,
+      gameMode: body.gameMode || MATCH_MODE_LABEL,
       matchType: body.matchType,
       region: body.region,
       minSkill: body.minSkill,
@@ -67,8 +68,7 @@ export async function POST(request: Request) {
       voiceRequired: body.voiceRequired,
       isPrivate: body.isPrivate,
       vibe: body.vibe,
-      // Party size follows the match type (Super caps at 3, Premium at 2).
-      maxSize: [2, 3, 5].includes(body.maxSize) ? body.maxSize : 5,
+      maxSize: PARTY_MAX_SIZE,
       leader: await memberFromSession(session),
     });
     return NextResponse.json({ party });

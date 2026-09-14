@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import {
@@ -11,7 +11,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { UserSession, PartyView } from "@/types";
 import { RANK_TIERS } from "@/data/ranks";
-import { Swords, Zap, Star, Check, ChevronDown } from "lucide-react";
+import { Swords, Check, ChevronDown } from "lucide-react";
+import { MATCH_MODE_LABEL, PARTY_MAX_SIZE } from "@/lib/match-mode";
 
 interface CreatePartyModalProps {
   open: boolean;
@@ -29,31 +30,15 @@ const SKILL_TIERS = RANK_TIERS.filter((t) => t.letter !== "UNRANKED");
 
 export const PARTY_VIBES = ["Chill", "Fun", "Balanced", "Serious", "Intense"];
 
-/** FACEIT-style match types with join rules; Super/Premium cap the party size. */
+/** FACEIT-style match types. Standard 1v1 while testing. */
 const MATCH_TYPE_OPTIONS = [
   {
     id: "Standard",
-    label: "5v5 Match",
-    desc: "A competitive experience, with fast balanced matches for no cost.",
+    label: `${MATCH_MODE_LABEL} Match`,
+    desc: `Ranked Strike Force matchmaking. Party of ${PARTY_MAX_SIZE}.`,
     green: false,
     icon: Swords,
-    maxSize: 5,
-  },
-  {
-    id: "Super",
-    label: "5v5 Super Match",
-    desc: "Better balanced matches with extra join requirements. Max party size: 3.",
-    green: true,
-    icon: Zap,
-    maxSize: 3,
-  },
-  {
-    id: "Premium",
-    label: "5v5 Premium Match",
-    desc: "Most exclusive matchmaking experience for verified players. Max party size: 2.",
-    green: true,
-    icon: Star,
-    maxSize: 2,
+    maxSize: PARTY_MAX_SIZE,
   },
 ];
 
@@ -80,8 +65,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 export function CreatePartyModal({ open, onOpenChange, session, onCreated }: CreatePartyModalProps) {
   const [name, setName] = useState("");
-  const [game] = useState("Blox Strike");
-  const [gameMode, setGameMode] = useState("5v5");
+  const [game] = useState("Strike Force");
+  const [gameMode, setGameMode] = useState(MATCH_MODE_LABEL);
   const [matchType, setMatchType] = useState("Standard");
   const [matchTypeOpen, setMatchTypeOpen] = useState(false);
   const [minSkill, setMinSkill] = useState("D");
@@ -105,7 +90,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name || `team_${session?.username ?? "SFHL"}`,
+          name: name || `team_${session?.username ?? "HL"}`,
           game,
           gameMode,
           matchType,
@@ -162,7 +147,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
               <div>
                 <label className={LABEL_CLS}>Game</label>
                 <select className={SELECT_CLS} value={game} disabled>
-                  <option>Blox Strike</option>
+                  <option>Strike Force</option>
                 </select>
               </div>
             </div>
@@ -170,10 +155,8 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={LABEL_CLS}>Game mode</label>
-                <select className={SELECT_CLS} value={gameMode} onChange={(e) => setGameMode(e.target.value)}>
-                  <option value="5v5">Europe 5v5 Queue</option>
-                  <option value="2v2">Europe 2v2 Queue</option>
-                  <option value="1v1">Europe 1v1 Queue</option>
+                <select className={SELECT_CLS} value={gameMode} disabled>
+                  <option value={MATCH_MODE_LABEL}>Europe {MATCH_MODE_LABEL} Queue</option>
                 </select>
               </div>
               <div className="relative">
@@ -278,7 +261,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
                         : "border-hl-border text-hl-muted hover:text-white"
                     }`}
                   >
-                    ✦ {v}
+                    âœ¦ {v}
                   </button>
                 ))}
               </div>
@@ -336,7 +319,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
                 <div>
                   <div className="text-sm font-bold text-white">Private party</div>
                   <div className="text-xs text-hl-muted mt-0.5">
-                    Hidden from the party list — joinable only via invite
+                    Hidden from the party list â€” joinable only via invite
                   </div>
                 </div>
                 <Toggle checked={isPrivate} onChange={setIsPrivate} />
@@ -357,7 +340,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
                 disabled={submitting}
                 className="px-6 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm header-caps hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {submitting ? "Creating…" : "Create"}
+                {submitting ? "Creatingâ€¦" : "Create"}
               </button>
             </div>
           </div>

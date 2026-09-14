@@ -1,24 +1,35 @@
 import { NextResponse } from "next/server";
 import { getSession, isUserInGuildCached } from "@/lib/auth";
-import { getWebQueue, joinWebQueue, leaveWebQueue, isInWebQueue, getQueueTeamSize } from "@/lib/db";
+import { getWebQueue, joinWebQueue, leaveWebQueue, isInWebQueue, getQueueTeamSize, getQueueGate } from "@/lib/db";
 import { getPartyForMember } from "@/lib/parties";
 import { getActiveLobbyMemberIds } from "@/lib/lobby";
 import { upsertWebUser } from "@/lib/social";
+import { isPlayRegion, regionMeta } from "@/lib/regions";
+import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 
-/** GET — returns current web queue state + the global queue format (5v5/1v1,
- *  toggled by the bot's /gamemode command via the bot_state table). */
+/** GET — returns current web queue state (1v1 while testing). */
 export async function GET() {
   try {
-    const [queue, teamSize] = await Promise.all([getWebQueue(), getQueueTeamSize()]);
-    return NextResponse.json({ queue, count: queue.length, teamSize });
+    const [queue, teamSize, gate] = await Promise.all([
+      getWebQueue(),
+      getQueueTeamSize(),
+      getQueueGate(),
+    ]);
+    return NextResponse.json({
+      queue,
+      count: queue.length,
+      teamSize,
+      open: gate.open,
+      region: gate.region,
+    });
   } catch (error) {
     console.error("Error fetching queue:", error);
-    return NextResponse.json({ queue: [], count: 0, teamSize: 5 });
+    return NextResponse.json({ queue: [], count: 0, teamSize: MATCH_TEAM_SIZE, open: false, region: null });
   }
 }
 
-/** POST — join the queue (requires auth + guild membership) */
-export async function POST() {
+/** POST — join the queue (requires auth + guild membership + an open region queue) */
+export async function POST(request: Request) {
   const session = await getSession();
 
   if (!session) {
@@ -28,20 +39,45 @@ export async function POST() {
     );
   }
 
+  const body = await request.json().catch(() => ({} as { region?: unknown }));
+  const requested = typeof body.region === "string" ? body.region.toUpperCase() : "";
+  if (!isPlayRegion(requested)) {
+    return NextResponse.json(
+      { error: "Pick a region in Servers before finding a match." },
+      { status: 400 }
+    );
+  }
+
+  const gate = await getQueueGate();
+  if (!gate.open || !gate.region) {
+    return NextResponse.json(
+      { error: "No matchmaking queue is open. Wait for Match Staff to open a region queue in Discord." },
+      { status: 403 }
+    );
+  }
+  if (requested !== gate.region) {
+    return NextResponse.json(
+      {
+        error: `The open queue is ${regionMeta(gate.region).label}. Switch to that region in Servers to join.`,
+      },
+      { status: 403 }
+    );
+  }
+
   // Verified = currently in the guild. Re-check live (cached) rather than
   // trusting the login-time session flag — someone who left the server since
   // logging in must not be able to queue.
   const liveInGuild = await isUserInGuildCached(session.discordId);
   if (liveInGuild === false || (!session.inGuild && liveInGuild !== true)) {
     return NextResponse.json(
-      { error: "You must be a member of the SFHL Discord server to join the queue" },
+      { error: "You must be a member of the HyperLeague Discord server to join the queue" },
       { status: 403 }
     );
   }
 
   if (!session.playerName) {
     return NextResponse.json(
-      { error: "Your Discord account is not linked to an SFHL player. Contact an admin." },
+      { error: "Your Discord account is not linked to a HyperLeague player. Contact an admin." },
       { status: 403 }
     );
   }

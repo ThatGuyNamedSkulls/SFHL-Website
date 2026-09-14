@@ -51,7 +51,7 @@ export default function MatchesPage() {
       <PageHeader
         icon={Swords}
         title="Matches"
-        subtitle="Every recorded SFHL match"
+        subtitle="Every recorded HyperLeague match"
         actions={
           !loading && matches.length > 0 ? (
             <div className="flex items-center gap-2">

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { client, getMatchesByMatchId, mapRank } from "@/lib/db";
-import { avatarUrl, prettyMap, prettyRegion } from "@/lib/format";
+import { client, getMatchesByMatchId, mapRank, ensurePlayerDiscordColumns } from "@/lib/db";
+import { prettyMap, prettyRegion } from "@/lib/format";
+import { resolveAvatarMap } from "@/lib/avatar";
 
 export async function GET(
   _request: Request,
@@ -61,15 +62,35 @@ export async function GET(
     if (rows.length > 0) {
       const placeholders = rows.map(() => "?").join(",");
       try {
+        await ensurePlayerDiscordColumns();
         const rs = await client.execute({
-          sql: `SELECT name, rank, roblox_avatar_image FROM players WHERE name IN (${placeholders})`,
+          sql: `SELECT name, rank, roblox_avatar_image, discord_avatar,
+                       CAST(discord_id AS TEXT) AS discord_id
+                FROM players WHERE name IN (${placeholders})`,
           args: rows.map((r) => r.player_name),
         });
-        for (const r of rs.rows as unknown as Record<string, unknown>[]) {
-          playerInfo.set(r.name as string, {
-            rank: mapRank((r.rank as string) || ""),
-            avatar: avatarUrl(r.roblox_avatar_image as string | null),
+        const playerRows = rs.rows as unknown as {
+          name: string;
+          rank: string;
+          roblox_avatar_image: string | null;
+          discord_avatar: string | null;
+          discord_id: string | null;
+        }[];
+        const avatars = await resolveAvatarMap(playerRows);
+        for (const r of playerRows) {
+          playerInfo.set(r.name, {
+            rank: mapRank(r.rank || ""),
+            avatar: avatars.get(r.name) ?? "",
           });
+        }
+        const missing = rows
+          .map((r) => r.player_name)
+          .filter((n) => !playerInfo.has(n));
+        if (missing.length > 0) {
+          const extra = await resolveAvatarMap(missing.map((name) => ({ name })));
+          for (const n of missing) {
+            playerInfo.set(n, { rank: "UNRANKED", avatar: extra.get(n) ?? "" });
+          }
         }
       } catch {
         /* players table unreadable — fall back to bare names below */

@@ -27,7 +27,12 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
       elo = player.elo;
       country = isValidCountry(player.country) ? player.country!.toLowerCase() : null;
       discordUsername = player.discord_username ?? discordUsername;
-      const dbAvatar = await resolvePlayerAvatar(session.playerName, player.roblox_avatar_image);
+      const dbAvatar = await resolvePlayerAvatar(
+        session.playerName,
+        player.roblox_avatar_image,
+        player.discord_avatar,
+        player.discord_id
+      );
       if (dbAvatar) avatar = dbAvatar;
     }
     try {

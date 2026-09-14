@@ -5,8 +5,8 @@ import { RANK_TIERS } from "@/data/ranks";
 import { Trophy, TrendingUp, Target, Award } from "lucide-react";
 
 export const metadata = {
-  title: "Ranks & Elo — SFHL",
-  description: "The SFHL rank tiers, Elo ranges, and how ranking works.",
+  title: "Ranks & Elo — HyperLeague",
+  description: "The HyperLeague rank tiers, Elo ranges, and how ranking works.",
 };
 
 export default function RanksPage() {
@@ -18,7 +18,7 @@ export default function RanksPage() {
       <PageHeader
         icon={Trophy}
         title="Ranks & Elo"
-        subtitle="How the SFHL ranking system works"
+        subtitle="How the HyperLeague ranking system works"
       />
 
       {/* How it works */}
@@ -44,7 +44,7 @@ export default function RanksPage() {
           <h3 className="text-sm font-bold text-white mb-1">Reaching ★</h3>
           <p className="text-xs text-hl-muted leading-relaxed">
             Climb from D through the A and S tiers. Passing 2500 Elo earns the top
-            ★ (Star) rank — the highest tier in SFHL.
+            ★ (Star) rank — the highest tier in HyperLeague.
           </p>
         </Card>
       </div>

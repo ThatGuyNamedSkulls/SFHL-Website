@@ -1,13 +1,66 @@
-import { createClient } from "@libsql/client";
+import { createClient, type Client, type ResultSet } from "@libsql/client";
+import { isPlayRegion } from "@/lib/regions";
+import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 
 // Ensure we have a database URL
 if (!process.env.TURSO_DATABASE_URL) {
   throw new Error("TURSO_DATABASE_URL is not set in environment variables");
 }
 
-export const client = createClient({
+/** Discord snowflakes (and other 64-bit ints) overflow JS numbers. Read them as
+ *  bigint, then keep safe values as Number and oversized ones as strings so
+ *  `getPlayer` / leaderboards don't 500. */
+const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+
+function coerceValue(v: unknown): unknown {
+  if (typeof v === "bigint") {
+    return v >= MIN_SAFE_BIGINT && v <= MAX_SAFE_BIGINT ? Number(v) : v.toString();
+  }
+  return v;
+}
+
+function coerceResult(rs: ResultSet): ResultSet {
+  const rows = rs.rows.map((row) => {
+    // Plain object (not an Array): JSON.stringify drops named keys on arrays, which
+    // crashed the profile page when `playedWith` rows lost `.name`.
+    const next: Record<string | number, unknown> = {};
+    for (let i = 0; i < rs.columns.length; i++) {
+      const col = rs.columns[i];
+      const val = coerceValue(row[i] ?? row[col]);
+      next[i] = val;
+      next[col] = val;
+    }
+    Object.defineProperty(next, "length", { value: rs.columns.length, enumerable: false });
+    return next as (typeof rs.rows)[number];
+  });
+  return { ...rs, rows };
+}
+
+const rawClient = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
+  intMode: "bigint",
+});
+
+export const client: Client = new Proxy(rawClient, {
+  get(target, prop, _receiver) {
+    if (prop === "execute") {
+      return async (stmt: Parameters<Client["execute"]>[0], args?: Parameters<Client["execute"]>[1]) => {
+        const rs =
+          typeof stmt === "string" ? await target.execute(stmt, args) : await target.execute(stmt);
+        return coerceResult(rs);
+      };
+    }
+    if (prop === "batch") {
+      return async (...args: Parameters<Client["batch"]>) => {
+        const results = await target.batch(...args);
+        return results.map(coerceResult);
+      };
+    }
+    const value = Reflect.get(target, prop, target);
+    return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+  },
 });
 
 // ---------------------------------------------------------------------------
@@ -57,6 +110,8 @@ export interface DbPlayer {
   roblox_avatar_image: string | null;
   placement_done: number;
   placement_games_played: number;
+  /** Discord snowflake, when the bot or a website login has linked this row. */
+  discord_id: string | number | null;
   /** Discord @handle, synced from the guild by the bot (null until synced). */
   discord_username: string | null;
   /** Discord profile-picture URL, synced hourly by the bot. This is what the
@@ -88,7 +143,8 @@ export async function getAllPlayers(): Promise<DbPlayer[]> {
             kd_ratio, total_mvps, total_score, total_headshot_percentage,
             avg_hs_percent, matches_played, matches_won, peak_elo,
             total_play_time, roblox_avatar_image, placement_done,
-            placement_games_played, discord_username, discord_avatar
+            placement_games_played, CAST(discord_id AS TEXT) AS discord_id,
+            discord_username, discord_avatar
      FROM players
      ORDER BY elo DESC`
   );
@@ -102,7 +158,8 @@ export async function getPlayer(name: string): Promise<DbPlayer | undefined> {
                  kd_ratio, total_mvps, total_score, total_headshot_percentage,
                  avg_hs_percent, matches_played, matches_won, peak_elo,
                  total_play_time, roblox_avatar_image, placement_done,
-                 placement_games_played, discord_username, discord_avatar
+                 placement_games_played, CAST(discord_id AS TEXT) AS discord_id,
+                 discord_username, discord_avatar
           FROM players
           WHERE name = ?`,
     args: [name]
@@ -115,13 +172,21 @@ export async function getPlayer(name: string): Promise<DbPlayer | undefined> {
 export async function setPlayerDiscordIdentity(
   name: string,
   discordId: string,
-  username: string
+  username: string,
+  avatar?: string | null
 ): Promise<void> {
   await ensurePlayerDiscordColumns();
-  await client.execute({
-    sql: "UPDATE players SET discord_id = ?, discord_username = ? WHERE name = ?",
-    args: [discordId, username, name],
-  });
+  if (avatar) {
+    await client.execute({
+      sql: "UPDATE players SET discord_id = ?, discord_username = ?, discord_avatar = ? WHERE name = ?",
+      args: [discordId, username, avatar, name],
+    });
+  } else {
+    await client.execute({
+      sql: "UPDATE players SET discord_id = ?, discord_username = ? WHERE name = ?",
+      args: [discordId, username, name],
+    });
+  }
 }
 
 export async function getPlayerCountry(name: string): Promise<string | null> {
@@ -381,13 +446,14 @@ export async function getModeRatings(playerName: string): Promise<DbModeRating[]
  *  by Elo; still-placing players excluded). Joined with players for avatars. */
 export async function getModeLeaderboard(
   mode: string
-): Promise<(DbModeRating & { player_name: string; roblox_avatar_image: string | null; country: string | null; discord_username: string | null; discord_avatar: string | null })[]> {
+): Promise<(DbModeRating & { player_name: string; roblox_avatar_image: string | null; country: string | null; discord_username: string | null; discord_avatar: string | null; discord_id: string | number | null })[]> {
   try {
     const rs = await client.execute({
       sql: `SELECT mr.player_name, mr.mode, mr.elo, mr.rank, mr.peak_elo,
                    mr.matches_played, mr.matches_won, mr.placement_done,
                    mr.placement_games_played,
-                   p.roblox_avatar_image, p.country, p.discord_username, p.discord_avatar
+                   p.roblox_avatar_image, p.country, p.discord_username, p.discord_avatar,
+                   CAST(p.discord_id AS TEXT) AS discord_id
             FROM mode_ratings mr
             JOIN players p ON p.name = mr.player_name
             WHERE mr.mode = ? AND mr.placement_done = 1
@@ -400,6 +466,7 @@ export async function getModeLeaderboard(
       country: string | null;
       discord_username: string | null;
       discord_avatar: string | null;
+      discord_id: string | number | null;
     })[];
   } catch {
     return [];
@@ -437,10 +504,22 @@ export async function getAllMatchIds(): Promise<{ match_id: number; timestamp: s
 export async function getMostPlayedWith(
   playerName: string,
   limit = 10
-): Promise<{ name: string; count: number; discordUsername: string | null }[]> {
+): Promise<{
+  name: string;
+  count: number;
+  discordUsername: string | null;
+  roblox_avatar_image: string | null;
+  discord_avatar: string | null;
+  discord_id: string | null;
+}[]> {
   try {
     const rs = await client.execute({
-      sql: `SELECT other.player_name AS name, p.discord_username AS discordUsername, COUNT(*) AS count
+      sql: `SELECT other.player_name AS name,
+                   p.discord_username AS discordUsername,
+                   p.roblox_avatar_image AS roblox_avatar_image,
+                   p.discord_avatar AS discord_avatar,
+                   CAST(p.discord_id AS TEXT) AS discord_id,
+                   COUNT(*) AS count
             FROM match_history me
             JOIN match_history other
               ON me.match_id = other.match_id
@@ -453,7 +532,16 @@ export async function getMostPlayedWith(
             LIMIT ?`,
       args: [playerName, limit]
     });
-    return rs.rows as unknown as { name: string; count: number; discordUsername: string | null }[];
+    return rs.rows
+      .map((r) => ({
+        name: String(r.name ?? ""),
+        count: Number(r.count ?? 0),
+        discordUsername: (r.discordUsername as string) ?? null,
+        roblox_avatar_image: (r.roblox_avatar_image as string) ?? null,
+        discord_avatar: (r.discord_avatar as string) ?? null,
+        discord_id: (r.discord_id as string) ?? null,
+      }))
+      .filter((r) => r.name);
   } catch {
     return [];
   }
@@ -562,18 +650,9 @@ export async function leaveWebQueue(discordUserId: string): Promise<void> {
   } catch {}
 }
 
-/** The bot's global queue format (team size), set by the /gamemode command
- *  (bot_state key 'queue_mode'). Defaults to 5 (5v5) when unset. */
+/** Live queue format. Temporary 1v1 for friend testing — flip MATCH_TEAM_SIZE. */
 export async function getQueueTeamSize(): Promise<number> {
-  try {
-    const rs = await client.execute(
-      "SELECT value FROM bot_state WHERE key = 'queue_mode'"
-    );
-    const v = Number(rs.rows[0]?.value);
-    return v === 1 ? 1 : 5;
-  } catch {
-    return 5; // bot_state table may not exist yet
-  }
+  return MATCH_TEAM_SIZE;
 }
 
 export async function isInWebQueue(discordUserId: string): Promise<boolean> {
@@ -582,5 +661,28 @@ export async function isInWebQueue(discordUserId: string): Promise<boolean> {
     return rs.rows.length > 0;
   } catch {
     return false;
+  }
+}
+
+/** Whether Match Staff currently have a region queue open in Discord. */
+export async function getQueueGate(): Promise<{ open: boolean; region: string | null }> {
+  try {
+    const rs = await client.execute(
+      "SELECT key, value FROM bot_state WHERE key IN ('queue_open', 'queue_region')"
+    );
+    let open = false;
+    let region: string | null = null;
+    for (const row of rs.rows) {
+      const key = String(row.key);
+      const value = String(row.value ?? "");
+      if (key === "queue_open") open = value === "1";
+      if (key === "queue_region" && value) region = value.toUpperCase();
+    }
+    if (!open || !region || !isPlayRegion(region)) {
+      return { open: false, region: region && isPlayRegion(region) ? region : null };
+    }
+    return { open: true, region };
+  } catch {
+    return { open: false, region: null };
   }
 }

@@ -67,7 +67,7 @@ export function Navbar() {
               </span>
             </div>
             <span className="text-xl font-black text-white tracking-tight hidden sm:block">
-              SFHL
+              HL
             </span>
           </Link>
 

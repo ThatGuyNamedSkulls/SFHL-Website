@@ -87,3 +87,27 @@ export function avatarUrl(raw: string | null | undefined): string {
   const file = raw.replace(/^\/?avatars\//, "").replace(/^\/+/, "");
   return `/api/avatar/${encodeURIComponent(file)}`;
 }
+
+/**
+ * Turn the match-level `round_score` ("winnerRounds,loserRounds", e.g. "13,11")
+ * into a scoreline from this player's perspective ("13:11" on a win, "11:13"
+ * on a loss). Returns "" when no round score is stored.
+ */
+export function formatRoundScore(raw: string | null | undefined, result: string): string {
+  if (!raw) return "";
+  const nums = raw
+    .split(/[,:]/)
+    .map((p) => Number(p.trim()))
+    .filter((n) => !Number.isNaN(n));
+  if (nums.length < 2) return "";
+  const hi = Math.max(nums[0], nums[1]);
+  const lo = Math.min(nums[0], nums[1]);
+  return result === "W" ? `${hi}:${lo}` : `${lo}:${hi}`;
+}
+
+/** FACEIT-style "13 : 7" from a "13:7" / "13,7" scoreline. */
+export function formatScoreDisplay(rounds: string): string {
+  const parts = rounds.split(/[:]/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return rounds;
+  return `${parts[0]} : ${parts[1]}`;
+}

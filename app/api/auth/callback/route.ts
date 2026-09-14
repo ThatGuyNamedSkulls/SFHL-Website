@@ -9,7 +9,6 @@ import {
 } from "@/lib/auth";
 import { getPlayer, ensurePlayer, setPlayerDiscordIdentity } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
-import { resolvePlayerAvatar } from "@/lib/avatar";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -84,9 +83,10 @@ export async function GET(request: Request) {
     // player on first login if none exists — so signing in auto-registers them
     // in the SFHL database (matching how the bot keys players by display name).
     const displayName = userData.global_name || userData.username;
-    let avatar = userData.avatar
-      ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
-      : null;
+    const discordAvatar = userData.avatar
+      ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png?size=256`
+      : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(userData.id) >> BigInt(22)) % BigInt(6))}.png`;
+    let avatar: string | null = discordAvatar;
     let rank = "UNRANKED";
 
     let playerData = await getPlayer(displayName);
@@ -100,10 +100,6 @@ export async function GET(request: Request) {
     const playerName = playerData ? playerData.name : null;
 
     if (playerData) {
-      // Only override the Discord avatar when the stored one actually serves
-      // (on Vercel the bot's local avatar files don't exist).
-      const dbAvatar = await resolvePlayerAvatar(playerData.name, playerData.roblox_avatar_image);
-      if (dbAvatar) avatar = dbAvatar;
       rank = playerData.rank || "UNRANKED";
     }
 
@@ -129,7 +125,7 @@ export async function GET(request: Request) {
     // "name (@handle)" display works before the bot's hourly guild sync runs.
     if (playerName && userData.username) {
       try {
-        await setPlayerDiscordIdentity(playerName, userData.id, userData.username);
+        await setPlayerDiscordIdentity(playerName, userData.id, userData.username, discordAvatar);
       } catch (e) {
         console.error("Failed to record Discord identity:", e);
       }

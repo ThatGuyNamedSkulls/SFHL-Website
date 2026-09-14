@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -53,6 +53,8 @@ export default function FriendsPage() {
   const [results, setResults] = useState<Friend[]>([]);
   const [searching, setSearching] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [myPartyId, setMyPartyId] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -65,7 +67,17 @@ export default function FriendsPage() {
     } catch {
       /* ignore */
     }
-  }, []);
+    try {
+      const pRes = await fetch("/api/parties");
+      const pData = await pRes.json();
+      const mine = (pData.parties as { id: string; members: { discordId: string }[] }[] | undefined)?.find(
+        (p) => session?.discordId && p.members.some((m) => m.discordId === session.discordId)
+      );
+      setMyPartyId(mine?.id ?? null);
+    } catch {
+      /* ignore */
+    }
+  }, [session?.discordId]);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -76,6 +88,13 @@ export default function FriendsPage() {
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
   }, [load]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("add") === "1") {
+      searchRef.current?.focus();
+    }
+  }, []);
 
   // Debounced player search (all setState happens inside the timeout callback).
   useEffect(() => {
@@ -135,6 +154,17 @@ export default function FriendsPage() {
     await load();
   };
 
+  const inviteToParty = async (name: string) => {
+    if (!myPartyId) {
+      flash("Create a party first in Party Finder.");
+      return;
+    }
+    const res = await post(`/api/parties/${myPartyId}/invite`, { toName: name });
+    const data = await res.json();
+    if (!res.ok) flash(data.error || "Failed to invite.");
+    else flash(`Invited ${name} to your party.`);
+  };
+
   const outgoingNames = new Set(outgoing.map((r) => r.name));
   const friendNames = new Set(friends.map((f) => f.name));
 
@@ -154,7 +184,7 @@ export default function FriendsPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader icon={UserPlus} title="Friends" subtitle="Add friends and invite them to parties" />
-        <EmptyState icon={UserPlus} title="Link your player first" hint="Your Discord account isn't linked to an SFHL player yet. Ask an admin to add you, then you can add friends." />
+        <EmptyState icon={UserPlus} title="Link your player first" hint="Your Discord account isn't linked to a HyperLeague player yet. Ask an admin to add you, then you can add friends." />
       </div>
     );
   }
@@ -172,6 +202,7 @@ export default function FriendsPage() {
         <div className="relative">
           <Search className="w-4 h-4 text-hl-muted absolute left-3 top-1/2 -translate-y-1/2" />
           <input
+            ref={searchRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search players by name to add…"
@@ -249,9 +280,19 @@ export default function FriendsPage() {
                 key={f.name}
                 friend={f}
                 actions={
-                  <button onClick={() => remove(f.name)} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-md border border-hl-border text-hl-muted hover:text-hl-red hover:border-hl-red/40">
-                    <UserMinus className="w-3.5 h-3.5" /> Remove
-                  </button>
+                  <>
+                    {myPartyId && (
+                      <button
+                        onClick={() => inviteToParty(f.name)}
+                        className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-md bg-gold-gradient text-hl-base hover:opacity-90"
+                      >
+                        Invite
+                      </button>
+                    )}
+                    <button onClick={() => remove(f.name)} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-md border border-hl-border text-hl-muted hover:text-hl-red hover:border-hl-red/40">
+                      <UserMinus className="w-3.5 h-3.5" /> Remove
+                    </button>
+                  </>
                 }
               />
             ))}

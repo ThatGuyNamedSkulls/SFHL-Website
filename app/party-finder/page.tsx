@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -94,7 +94,7 @@ function FiltersModal({
                   className={chip(draft.vibe === v)}
                   onClick={() => setDraft({ ...draft, vibe: draft.vibe === v ? null : v })}
                 >
-                  ✦ {v}
+                  âœ¦ {v}
                 </button>
               ))}
             </div>
@@ -290,7 +290,7 @@ function PartyFinderContent() {
       if (res.ok && data.party) {
         setParties((prev) => prev.map((p) => (p.id === id ? data.party : p)));
       } else if (!res.ok) {
-        // Surface the reason (full, private, expired…) instead of failing silently.
+        // Surface the reason (full, private, expiredâ€¦) instead of failing silently.
         setNotice(data.error || "Failed to join party.");
         setTimeout(() => setNotice(null), 4000);
       }
@@ -324,11 +324,11 @@ function PartyFinderContent() {
       {/* Control bar (FACEIT-style) */}
       <div className="flex flex-wrap items-center gap-3 mb-8">
         <select className="bg-hl-panel border border-hl-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-hl-gold/50">
-          <option>Blox Strike</option>
+          <option>Strike Force</option>
         </select>
 
         <label className="flex items-center gap-2 text-sm text-white cursor-pointer bg-hl-panel border border-hl-border rounded-lg px-3 py-2">
-          <span className="text-hl-gold">★</span> Premium
+          <span className="text-hl-gold">â˜…</span> Premium
           <input type="checkbox" checked={premiumOnly} onChange={(e) => setPremiumOnly(e.target.checked)} className="accent-hl-gold" />
         </label>
 
@@ -386,7 +386,7 @@ function PartyFinderContent() {
         <EmptyState
           icon={Users}
           title="No open parties"
-          hint="Be the first — create a party and invite teammates to queue together."
+          hint="Be the first â€” create a party and invite teammates to queue together."
         />
       ) : (
         <div className="space-y-6">
@@ -419,7 +419,7 @@ function PartyFinderContent() {
 
 export default function PartyFinderPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-hl-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-hl-muted">Loadingâ€¦</div>}>
       <PartyFinderContent />
     </Suspense>
   );

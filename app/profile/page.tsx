@@ -8,10 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AvatarFrame } from "@/components/avatar-frame";
 import { RankBadge } from "@/components/rank-badge";
+import { GameSkillBar } from "@/components/game-skill-bar";
 import { PerformanceCard } from "@/components/performance-card";
 import { ConsistencyDonut } from "@/components/consistency-donut";
 import { EloGraphFaceit } from "@/components/elo-graph-faceit";
-import { ActivityHeatmap } from "@/components/activity-heatmap";
 import { MapStatsTable } from "@/components/map-stats-table";
 import { MetricChart } from "@/components/metric-chart";
 import { ProfileInventory } from "@/components/profile-inventory";
@@ -25,23 +25,23 @@ import {
   applyMatchFilters,
   MatchFilters,
 } from "@/components/stats-filters";
-import { RANK_TIERS, getRankByLetter, getNextRank } from "@/data/ranks";
+import { RANK_TIERS, getNextRank } from "@/data/ranks";
 import { Player, Match, RankTierLetter, ProfileCosmetics, InventoryItem } from "@/types";
 import {
-  Settings,
-  MoreHorizontal,
   UserPlus,
   MapPin,
   Users,
-  ArrowUp,
-  ArrowDown,
   ListChecks,
-  ArrowUpRight,
   Award,
   Globe,
+  Building2,
+  UsersRound,
+  Swords,
+  Share2,
+  Pencil,
 } from "lucide-react";
 
-type MainTab = "games" | "friends" | "inventory";
+type MainTab = "games" | "friends" | "inventory" | "guestbook" | "clubs" | "teams";
 type SubTab = "summary" | "matches" | "stats";
 
 interface ProfileFriend {
@@ -53,7 +53,7 @@ interface ProfileFriend {
 }
 
 interface ProfilePlayer extends Player {
-  playedWith?: { name: string; count: number; discordUsername?: string | null }[];
+  playedWith?: { name: string; count: number; discordUsername?: string | null; avatar?: string | null }[];
   matchHistory?: Match[];
   regionFlag?: string;
   country?: string | null;
@@ -107,7 +107,60 @@ function ProfileBadgeIcon({
   );
 }
 
-/** Ladder of ranked tiers shown on the Stats tab (with elo thresholds). */
+function formatMatchWhen(date: string): { day: string; time: string } {
+  const raw = date.trim();
+  const iso = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { day: date, time: "" };
+  const day = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const hasTime = /\d{1,2}:\d{2}/.test(raw);
+  const time = hasTime
+    ? d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })
+    : "";
+  return { day, time };
+}
+
+function formatMemberSince(date: string | null): string | null {
+  if (!date) return null;
+  const d = new Date(date.includes("T") ? date : `${date}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return `Member since ${date}`;
+  return `Member since ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+}
+
+function MatchHistoryRow({
+  match,
+  rank,
+}: {
+  match: Match;
+  rank: RankTierLetter;
+}) {
+  const win = match.result === "W";
+  const { day, time } = formatMatchWhen(match.date);
+  return (
+    <Link
+      href={match.matchId ? `/match/${match.matchId}` : "#"}
+      className={`grid grid-cols-[88px_1fr_72px_90px] md:grid-cols-[100px_1fr_80px_110px] gap-3 items-center px-4 py-3 hover:bg-white/[0.03] border-l-2 ${
+        win ? "border-l-[#2ecc71]" : "border-l-[#e74c3c]"
+      }`}
+    >
+      <span className="leading-tight">
+        <span className="block text-[13px] text-white">{day}</span>
+        {time ? <span className="block text-[11px] text-[#8a8a8a]">{time}</span> : null}
+      </span>
+      <span className="flex items-center gap-2 min-w-0">
+        <Swords className="w-3.5 h-3.5 text-[#8a8a8a] shrink-0" />
+        <RankBadge rank={rank} size="sm" showGlow={false} className="!w-6 !h-6" />
+        <span className="text-sm text-[#c8c8c8] truncate">{rank === "UNRANKED" ? "Unranked" : rank}</span>
+      </span>
+      <span className={`text-sm font-bold tabular-nums ${match.kdr >= 1 ? "text-[#2ecc71]" : "text-[#e74c3c]"}`}>
+        {match.kdr.toFixed(2)}
+      </span>
+      <span className="text-sm tabular-nums text-[#c8c8c8] text-right">
+        {match.kills} / {match.deaths} / {match.assists}
+      </span>
+    </Link>
+  );
+}
 const LADDER = RANK_TIERS.filter((t) =>
   ["D", "C", "B", "A1", "A2", "A3", "S1", "S2", "S3"].includes(t.letter)
 );
@@ -222,7 +275,7 @@ function ProfileContent() {
             target = me.user.playerName;
           } else if (me?.user) {
             // Logged in but Discord account isn't linked to an SFHL player yet.
-            setError("Your Discord account isn't linked to an SFHL player yet. Ask an admin to add you.");
+            setError("Your Discord account isn't linked to a HyperLeague player yet. Ask an admin to add you.");
             setLoading(false);
             return;
           } else {
@@ -308,7 +361,6 @@ function ProfileContent() {
   // Ladder position: STAR sits above the whole ladder, UNRANKED below it (-1).
   const currentTierIdx =
     player.rank === "STAR" ? LADDER.length : LADDER.findIndex((t) => t.letter === player.rank);
-  const tierColor = getRankByLetter(player.rank).color;
   const nextTier = getNextRank(player.rank);
   const eloNeeded =
     currentTierIdx >= 0 && nextTier && nextTier.minElo > player.elo
@@ -320,30 +372,28 @@ function ProfileContent() {
   const inventory = player.inventory ?? [];
 
   const statTiles = [
-    { label: "Wins %", value: `${s.winPercent.toFixed(0)}%` },
-    { label: "K/D/A", value: `${Math.round(s.kills / Math.max(1, s.matchesPlayed))}/${Math.round(s.deaths / Math.max(1, s.matchesPlayed))}/${Math.round(s.assists / Math.max(1, s.matchesPlayed))}` },
+    { label: "K/D/A", value: `${Math.round(s.kills / Math.max(1, s.matchesPlayed))} / ${Math.round(s.deaths / Math.max(1, s.matchesPlayed))} / ${Math.round(s.assists / Math.max(1, s.matchesPlayed))}` },
     { label: "K/D", value: s.kd.toFixed(2) },
     { label: "K/R", value: krRatio.toFixed(2) },
     { label: "HS %", value: `${s.headshotPercent.toFixed(0)}%` },
-    { label: "Score", value: s.scorePerGame.toString() },
   ];
 
   const performanceRow = (
     <div className="grid sm:grid-cols-3 gap-4">
-      <PerformanceCard label="K/D" value={s.kd.toFixed(2)} series={derived.kdSeries} accent="teal" />
-      <PerformanceCard label="Avg Swing" value={`±${derived.avgSwing.toFixed(0)}`} series={derived.swingSeries} accent="gold" />
-      <Card className="bg-hl-panel border-hl-border p-4 flex items-center justify-center">
+      <PerformanceCard label="K/D" value={s.kd.toFixed(2)} series={derived.kdSeries} accent="green" />
+      <PerformanceCard label="Swing" value={`±${derived.avgSwing.toFixed(0)}`} series={derived.swingSeries} accent="gold" />
+      <div className="rounded-xl bg-[#161616] border border-white/[0.06] p-4 flex items-center justify-center">
         <ConsistencyDonut percent={derived.consistency} />
-      </Card>
+      </div>
     </div>
   );
 
   const statTileRow = (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 gap-3">
       {statTiles.map((stat) => (
-        <div key={stat.label} className="bg-hl-panel border border-hl-border rounded-xl p-3 text-center">
-          <div className="stat-number text-lg text-white">{stat.value}</div>
-          <div className="text-[10px] text-hl-muted header-caps mt-0.5">{stat.label}</div>
+        <div key={stat.label} className="bg-[#1c1c1c] border border-white/[0.08] rounded-xl p-4">
+          <div className="stat-number text-2xl text-white">{stat.value}</div>
+          <div className="text-[12px] text-[#8a8a8a] mt-1">{stat.label}</div>
         </div>
       ))}
     </div>
@@ -352,10 +402,9 @@ function ProfileContent() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid lg:grid-cols-[300px_1fr] gap-6 items-start">
       {/* ================= LEFT SIDEBAR ================= */}
-      <div className="space-y-4">
-        {/* Portrait profile card (equipped card art as full background) */}
-        <Card className="bg-hl-panel border-hl-border p-0 overflow-hidden">
-          <div className="relative aspect-[3/4]">
+      <div className="space-y-5">
+        <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] overflow-hidden">
+          <div className="relative aspect-[4/5]">
             {cardArt ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -367,126 +416,108 @@ function ProfileContent() {
                     e.currentTarget.style.display = "none";
                   }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-hl-panel" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-[#1c1c1c]/40 to-[#1c1c1c]" />
               </>
             ) : (
-              <div className="absolute inset-0 bg-gradient-to-b from-hl-panel-light to-hl-base" />
+              <div className="absolute inset-0 bg-[#161616]" />
             )}
-            <div className="relative h-full flex flex-col items-center justify-center px-4 text-center">
+            <div className="relative h-full flex flex-col items-center justify-center px-5 text-center">
               <AvatarFrame frame={player.cosmetics?.frame?.asset}>
-                <Avatar className="w-28 h-28 border-4 border-hl-base/70 shadow-xl">
+                <Avatar className="w-[120px] h-[120px] border-0">
                   {player.avatarUrl ? <AvatarImage src={player.avatarUrl} alt={player.username} /> : null}
-                  <AvatarFallback className="bg-hl-panel-light text-2xl font-bold text-hl-gold">
-                    {player.username.slice(0, 2).toUpperCase()}
+                  <AvatarFallback className="bg-[#2a2a2a] text-2xl font-bold text-white">
+                    {(player.username || "?").slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </AvatarFrame>
-              <div className="flex items-center gap-2 mt-4">
-                <h1 className="text-xl font-black text-white drop-shadow">{formatUsername(player.username, player.discordUsername)}</h1>
-                {isOwn && (
-                  <Link href="/settings" className="text-hl-muted hover:text-white">
-                    <Settings className="w-4 h-4" />
-                  </Link>
-                )}
-              </div>
+              <h1 className="mt-5 text-xl font-bold text-white tracking-tight">
+                {formatUsername(player.username, player.discordUsername)}
+              </h1>
               {player.cosmetics?.title && (
-                <div className="text-xs font-semibold italic text-hl-gold mt-1 drop-shadow">
-                  {player.cosmetics.title}
-                </div>
+                <div className="text-xs font-semibold italic text-[#ff5500] mt-1">{player.cosmetics.title}</div>
               )}
             </div>
           </div>
-
-          {/* Action row */}
-          <div className="p-4 flex items-center gap-2 border-t border-hl-border">
+          <div className="grid grid-cols-2 border-t border-white/[0.08]">
             {isOwn ? (
               <Link
-                href="/friends"
-                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg border border-hl-border text-white font-bold text-sm hover:bg-hl-panel-light transition-colors"
+                href="/settings"
+                className="flex items-center justify-center gap-2 py-3 text-[12px] font-semibold text-[#c8c8c8] hover:text-white hover:bg-white/[0.03]"
               >
-                <Users className="w-4 h-4" /> Your Friends
+                <Pencil className="w-3.5 h-3.5" /> Edit profile
               </Link>
             ) : friendState === "friends" ? (
-              <button
-                disabled
-                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-hl-green/15 text-hl-green border border-hl-green/30 font-bold text-sm cursor-default"
-              >
-                <UserPlus className="w-4 h-4" /> Friends
-              </button>
+              <span className="flex items-center justify-center gap-2 py-3 text-[12px] font-semibold text-[#2ecc71]">
+                <UserPlus className="w-3.5 h-3.5" /> Friends
+              </span>
             ) : friendState === "pending" ? (
-              <button
-                disabled
-                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg border border-hl-border text-hl-muted font-bold text-sm cursor-default"
-              >
-                <UserPlus className="w-4 h-4" /> Requested
-              </button>
+              <span className="flex items-center justify-center gap-2 py-3 text-[12px] font-semibold text-[#8a8a8a]">
+                Requested
+              </span>
             ) : (
               <button
+                type="button"
                 onClick={() => addFriendByName(player.username, true)}
-                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm hover:opacity-90 transition-opacity"
+                className="flex items-center justify-center gap-2 py-3 text-[12px] font-semibold text-[#c8c8c8] hover:text-white hover:bg-white/[0.03]"
               >
-                <UserPlus className="w-4 h-4" /> Add Friend
+                <UserPlus className="w-3.5 h-3.5" /> Add friend
               </button>
             )}
-            <button className="p-2.5 rounded-lg border border-hl-border text-hl-muted hover:text-white hover:bg-hl-panel-light transition-colors">
-              <MoreHorizontal className="w-4 h-4" />
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href).then(
+                  () => setFriendMsg("Profile link copied"),
+                  () => setFriendMsg("Could not copy link")
+                );
+              }}
+              className="flex items-center justify-center gap-2 py-3 text-[12px] font-semibold text-[#c8c8c8] hover:text-white hover:bg-white/[0.03] border-l border-white/[0.08]"
+            >
+              <Share2 className="w-3.5 h-3.5" /> Share
             </button>
           </div>
-          {friendMsg && <div className="px-4 pb-3 text-xs text-hl-gold">{friendMsg}</div>}
-        </Card>
+          {friendMsg && <div className="px-4 py-2 text-xs text-[#ff5500] border-t border-white/[0.08]">{friendMsg}</div>}
+        </div>
 
-        {/* Member info */}
-        <Card className="bg-hl-panel border-hl-border p-5 space-y-3">
-          <div className="text-sm font-bold text-white">
-            {memberSince ? `Member since ${memberSince}` : "Member of Season 1"}
+        {player.cosmetics && player.cosmetics.badges.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap px-1">
+            {player.cosmetics.badges.map((b) => (
+              <ProfileBadgeIcon key={b.slug} badge={b} />
+            ))}
           </div>
-          <p className="text-sm text-hl-muted">
+        )}
+
+        <div className="px-1 space-y-3">
+          <div className="text-sm font-semibold text-white">
+            {formatMemberSince(memberSince) || "Member of Season 1"}
+          </div>
+          <p className="text-sm text-[#8a8a8a] leading-relaxed">
             Competing in HyperLeague Season 1. Grinding the ladder one match at a time.
           </p>
           {player.countryFlag && (
-            <div className="flex items-center gap-2 text-sm text-hl-muted">
+            <div className="flex items-center gap-2 text-sm text-[#c8c8c8]">
               <Flag src={player.countryFlag} name={player.countryName} className="w-5 h-3.5" />
               {player.countryName}
             </div>
           )}
-        </Card>
+        </div>
 
-        {/* Equipped badges */}
-        {player.cosmetics && player.cosmetics.badges.length > 0 && (
-          <Card className="bg-hl-panel border-hl-border p-5">
-            <div className="flex items-center gap-2 flex-wrap">
-              {player.cosmetics.badges.map((b) => (
-                <ProfileBadgeIcon key={b.slug} badge={b} />
-              ))}
+        <div className="px-1 pt-2">
+          <div className="text-sm font-semibold text-white mb-2">Game history</div>
+          <div className="rounded-lg border border-white/[0.08] bg-[#1c1c1c] px-3 py-2.5 flex items-center gap-3">
+            <span className="flex items-center justify-center w-8 h-8 rounded-md bg-[#ff5500]">
+              <Swords className="w-4 h-4 text-white" />
+            </span>
+            <div>
+              <div className="text-sm font-semibold text-white">Strike Force</div>
+              <div className="text-[12px] text-[#8a8a8a]">{s.matchesPlayed} matches</div>
             </div>
-            <button
-              onClick={() => setMainTab("inventory")}
-              className="mt-3 text-[11px] header-caps text-hl-muted hover:text-white transition-colors"
-            >
-              View all
-            </button>
-          </Card>
-        )}
-
-        {/* Activity heatmap */}
-        <Card className="bg-hl-panel border-hl-border p-5">
-          <h3 className="text-sm font-bold text-white mb-1">
-            Recent Activity <span className="text-hl-muted font-normal text-xs">Last 90 days</span>
-          </h3>
-          <div className="mt-3">
-            <ActivityHeatmap dates={matches.map((m) => m.date)} />
           </div>
-          <div className="mt-3 text-xs text-hl-muted">
-            <b className="text-white stat-number">{s.matchesPlayed}</b> Matches Played
-          </div>
-        </Card>
+        </div>
 
-        {/* Most Played With */}
-        <Card className="bg-hl-panel border-hl-border p-5">
-          <h3 className="text-sm font-bold text-white header-caps mb-4 flex items-center gap-2">
-            <Users className="w-4 h-4 text-hl-gold" /> Most Played With
-          </h3>
-          {player.playedWith && player.playedWith.length > 0 ? (
+        {player.playedWith && player.playedWith.length > 0 && (
+          <div className="px-1 pt-2">
+            <div className="text-sm font-semibold text-white mb-3">Most played with</div>
             <div className="space-y-2">
               {player.playedWith.map((p) => (
                 <Link
@@ -495,41 +526,41 @@ function ProfileContent() {
                   className="flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <Avatar className="w-7 h-7 border border-hl-border">
-                      <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
-                        {p.name.slice(0, 2).toUpperCase()}
+                    <Avatar className="w-7 h-7">
+                      {p.avatar ? <AvatarImage src={p.avatar} alt={p.name} /> : null}
+                      <AvatarFallback className="bg-[#2a2a2a] text-[10px] font-bold text-white">
+                        {(p.name || "?").slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-sm text-white truncate group-hover:text-hl-gold transition-colors">
-                      {formatUsername(p.name, p.discordUsername)}
-                    </span>
+                    <span className="text-sm text-white truncate group-hover:text-[#ff5500]">{formatUsername(p.name, p.discordUsername)}</span>
                   </div>
-                  <span className="text-xs text-hl-muted shrink-0">{p.count}×</span>
+                  <span className="text-xs text-[#8a8a8a] shrink-0">{p.count}×</span>
                 </Link>
               ))}
             </div>
-          ) : (
-            <p className="text-sm text-hl-muted">No shared matches recorded yet.</p>
-          )}
-        </Card>
+          </div>
+        )}
       </div>
 
       {/* ================= RIGHT CONTENT ================= */}
       <div className="space-y-6 min-w-0">
         {/* Top-level tabs (FACEIT: GAMES / FRIENDS / INVENTORY) */}
-        <div className="flex items-center gap-6 border-b border-hl-border">
+        <div className="flex items-center gap-5 border-b border-white/[0.08]">
           {(
             [
               { id: "games", label: "Games" },
-              { id: "friends", label: `Friends` },
+              { id: "friends", label: "Friends" },
+              { id: "guestbook", label: "Guestbook" },
               { id: "inventory", label: "Inventory" },
+              { id: "clubs", label: "Clubs" },
+              { id: "teams", label: "Teams" },
             ] as { id: MainTab; label: string }[]
           ).map((t) => (
             <button
               key={t.id}
               onClick={() => setMainTab(t.id)}
-              className={`pb-3 text-sm header-caps border-b-2 transition-colors ${
-                mainTab === t.id ? "text-hl-gold border-hl-gold" : "text-hl-muted border-transparent hover:text-white"
+              className={`pb-3 text-[13px] font-bold uppercase tracking-wide border-b-2 transition-colors ${
+                mainTab === t.id ? "text-[#ff5500] border-[#ff5500]" : "text-[#8a8a8a] border-transparent hover:text-white"
               }`}
             >
               {t.label}
@@ -541,184 +572,133 @@ function ProfileContent() {
         {mainTab === "games" && (
           <>
             {/* Sub-tabs + game label */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hl-border">
-              <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 rounded-md bg-[#1c1c1c] border border-white/[0.08] px-2.5 h-9">
+                <span className="flex items-center justify-center w-5 h-5 rounded bg-[#ff5500]">
+                  <Swords className="w-3 h-3 text-white" />
+                </span>
+                <span className="text-sm font-semibold text-white">Strike Force</span>
+              </div>
+              <div className="flex items-center gap-1 rounded-md bg-[#1c1c1c] border border-white/[0.08] p-1">
                 {(["summary", "matches", "stats"] as SubTab[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTab(t)}
-                    className={`pb-3 text-sm border-b-2 transition-colors font-semibold ${
-                      tab === t ? "text-hl-gold border-hl-gold" : "text-hl-muted border-transparent hover:text-white"
+                    className={`px-3 h-7 rounded text-[13px] font-semibold ${
+                      tab === t ? "bg-[#2a2a2a] text-white" : "text-[#8a8a8a] hover:text-white"
                     }`}
                   >
                     {t === "summary" ? "Summary" : t === "matches" ? "Match history" : "Stats"}
                   </button>
                 ))}
               </div>
-              <span className="text-sm text-hl-muted pb-3">Blox Strike</span>
             </div>
 
             {/* ---------------- SUMMARY ---------------- */}
             {tab === "summary" && (
               <div className="space-y-6">
-                {/* Season banner — glow tinted with the rank's own color */}
-                <Card className="relative overflow-hidden bg-hl-panel border-hl-border p-6">
-                  <div
-                    className="absolute inset-x-0 top-0 h-32 pointer-events-none"
-                    style={{ background: `linear-gradient(to bottom, ${tierColor}2b, transparent)` }}
-                  />
-                  <div
-                    className="absolute left-1/2 top-4 -translate-x-1/2 w-56 h-56 blur-3xl rounded-full pointer-events-none"
-                    style={{ backgroundColor: `${tierColor}26` }}
-                  />
-                  <div className="relative text-xs header-caps text-hl-muted">Season 1</div>
-                  <div className="relative flex flex-col items-center pt-2 pb-1">
-                    <RankBadge rank={player.rank} size="lg" />
-                    <div className="stat-number text-4xl text-white mt-2">{player.elo}</div>
-                  </div>
-                  <div className="relative flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-hl-border">
-                    <span className="text-sm text-hl-muted">
-                      <b className="text-white">{s.matchesPlayed}</b> matches ·{" "}
-                      <b className="text-white">{s.winPercent.toFixed(1)}%</b> wins
-                    </span>
-                    <div className="flex items-center gap-4">
-                      {player.countryFlag && countryRank && (
-                        <span
-                          className="flex items-center gap-1.5 text-sm text-hl-muted"
-                          title={`#${countryRank} in ${player.countryName}`}
-                        >
-                          <Flag src={player.countryFlag} name={player.countryName} className="w-5 h-3.5" />
-                          <b className="text-white stat-number">{countryRank.toLocaleString()}</b>
-                        </span>
-                      )}
-                      {overallRank && (
-                        <span
-                          className="flex items-center gap-1.5 text-sm text-hl-muted"
-                          title={`#${overallRank} overall`}
-                        >
-                          <Globe className="w-4 h-4 text-hl-gold" />
-                          <b className="text-white stat-number">{overallRank.toLocaleString()}</b>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </Card>
+                <GameSkillBar
+                  rank={player.rank}
+                  elo={player.elo}
+                  header={
+                    <>
+                      <div>
+                        <div className="text-[13px] font-semibold text-white">Season 1</div>
+                        <div className="text-[12px] text-[#8a8a8a]">Matchmaking</div>
+                      </div>
+                      <div className="text-right text-[13px] text-[#8a8a8a]">
+                        <b className="text-white">{s.matchesPlayed}</b> Matches ·{" "}
+                        <b className="text-white">{s.winPercent.toFixed(1)}%</b> Win rate
+                      </div>
+                    </>
+                  }
+                  footer={
+                    (player.countryFlag && countryRank) || overallRank ? (
+                      <>
+                        {player.countryFlag && countryRank && (
+                          <span
+                            className="flex items-center gap-1.5 text-sm text-[#8a8a8a]"
+                            title={`#${countryRank} in ${player.countryName}`}
+                          >
+                            <Flag src={player.countryFlag} name={player.countryName} className="w-5 h-3.5" />
+                            <b className="text-white stat-number">{countryRank.toLocaleString()}</b>
+                          </span>
+                        )}
+                        {overallRank && (
+                          <span
+                            className="flex items-center gap-1.5 text-sm text-[#8a8a8a]"
+                            title={`#${overallRank} overall`}
+                          >
+                            <Globe className="w-4 h-4 text-[#ff5500]" />
+                            <b className="text-white stat-number">{overallRank.toLocaleString()}</b>
+                          </span>
+                        )}
+                      </>
+                    ) : undefined
+                  }
+                />
 
-                {/* Own-ladder gamemode ratings (e.g. the separate 1v1 ladder) */}
-                {(player.modes ?? []).length > 0 && (
-                  <Card className="bg-hl-panel border-hl-border p-4">
-                    <div className="text-xs header-caps text-hl-muted mb-3">Other ladders</div>
-                    <div className="flex flex-wrap gap-6">
-                      {player.modes!.map((m) => (
-                        <div key={m.mode} className="flex items-center gap-3">
-                          <span className="text-sm font-bold text-white">{m.mode}</span>
-                          {m.placementDone ? (
-                            <>
-                              <RankBadge rank={m.rank as RankTierLetter} size="sm" showGlow={false} />
-                              <span className="stat-number text-hl-gold">{m.elo}</span>
-                              <span className="text-xs text-hl-muted">
-                                {m.matchesPlayed} games ·{" "}
-                                {m.matchesPlayed > 0
-                                  ? ((m.matchesWon / m.matchesPlayed) * 100).toFixed(0)
-                                  : 0}
-                                % WR
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-xs text-hl-muted">
-                              Placement {m.placementGamesPlayed} games in
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                )}
+                {/* Own-ladder gamemodes are retired — 5v5 only. */}
 
                 {/* Recent performance */}
-                <div>
+                <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-5">
                   <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-sm font-bold text-white">Recent performance</h2>
-                    <button
-                      onClick={() => setTab("stats")}
-                      className="text-[11px] header-caps text-hl-gold hover:underline"
-                    >
-                      See more stats
-                    </button>
+                    <h2 className="text-[15px] font-bold text-white">Recent performance</h2>
                   </div>
-                  <div className="text-xs text-hl-muted mb-4">
-                    Last {Math.min(30, matches.length)} Matches
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-[#8a8a8a] mb-4">
+                    <span>
+                      Last {Math.min(30, matches.length)} Matches
+                    </span>
+                    <span className="flex items-center gap-3">
+                      <span>
+                        <b className="text-[#2ecc71]">W {matches.slice(0, 30).filter((m) => m.result === "W").length}</b>
+                        {" / "}
+                        <b className="text-[#e74c3c]">L {matches.slice(0, 30).filter((m) => m.result !== "W").length}</b>
+                      </span>
+                    </span>
                   </div>
                   {performanceRow}
                 </div>
 
                 {/* ELO graph */}
-                <Card className="bg-hl-panel border-hl-border p-5">
+                <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-5">
                   {player.eloHistory && player.eloHistory.length > 1 ? (
                     <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} eloResets={player.eloResets} />
                   ) : (
-                    <p className="text-sm text-hl-muted py-8 text-center">Not enough matches to chart yet.</p>
+                    <p className="text-sm text-[#8a8a8a] py-8 text-center">Not enough matches to chart yet.</p>
                   )}
-                </Card>
+                </div>
 
                 {statTileRow}
 
                 {/* Recent matches */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-bold text-white">Recent matches</h2>
+                    <h2 className="text-[15px] font-bold text-white">Recent matches</h2>
                     <button
                       onClick={() => setTab("matches")}
-                      className="text-[11px] header-caps text-hl-gold hover:underline"
+                      className="text-[12px] text-[#ff5500] hover:underline"
                     >
                       Full match history
                     </button>
                   </div>
-                  <Card className="bg-hl-panel border-hl-border p-0 overflow-hidden">
+                  <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] overflow-hidden">
                     {matches.length === 0 ? (
                       <EmptyState icon={ListChecks} title="No match history" hint="This player hasn't played any recorded matches yet." />
                     ) : (
-                      <div className="divide-y divide-hl-border">
-                        <div className="hidden md:grid grid-cols-[100px_100px_110px_1fr_60px_70px_110px] gap-3 px-4 py-2.5 text-[10px] header-caps text-hl-muted">
-                          <span>Date</span><span>Score</span><span>Rating</span><span>K / D / A</span><span className="text-right">K/D</span><span className="text-right">Score</span><span className="text-right">Map</span>
+                      <div>
+                        <div className="hidden md:grid grid-cols-[100px_1fr_80px_110px] gap-3 px-4 py-2.5 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+                          <span>Date</span>
+                          <span />
+                          <span>Rating</span>
+                          <span className="text-right">K/D/A</span>
                         </div>
-                        {matches.slice(0, 5).map((m) => {
-                          const win = m.result === "W";
-                          return (
-                            <Link
-                              key={m.id}
-                              href={m.matchId ? `/match/${m.matchId}` : "#"}
-                              className={`grid md:grid-cols-[100px_100px_110px_1fr_60px_70px_110px] grid-cols-2 gap-3 px-4 py-3 items-center hover:bg-hl-panel-light/40 transition-colors border-l-4 ${
-                                win ? "border-l-hl-green" : "border-l-hl-red"
-                              }`}
-                            >
-                              <span className="text-xs text-hl-muted">{m.date}</span>
-                              <span className={`inline-flex items-center gap-2 text-sm font-bold ${win ? "text-hl-green" : "text-hl-red"}`}>
-                                <span className={`w-5 text-center rounded ${win ? "bg-hl-green/15" : "bg-hl-red/15"}`}>{m.result}</span>
-                                {m.rounds || (win ? "13:—" : "—:13")}
-                              </span>
-                              <span className={`text-xs font-bold flex items-center ${m.eloChange >= 0 ? "text-hl-green" : "text-hl-red"}`}>
-                                {m.eloChange >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                                {Math.abs(m.eloChange)}
-                                <span className={`ml-2 px-1.5 rounded text-[10px] ${m.kdr >= 1 ? "bg-hl-green/15 text-hl-green" : "bg-hl-red/15 text-hl-red"}`}>
-                                  {m.kdr.toFixed(2)}
-                                </span>
-                              </span>
-                              <span className="hidden md:block text-sm font-mono text-white">
-                                {m.kills} <span className="text-hl-muted">/</span> <span className="text-hl-red">{m.deaths}</span> <span className="text-hl-muted">/</span> <span className="text-hl-teal">{m.assists}</span>
-                              </span>
-                              <span className={`hidden md:block text-right text-sm font-mono font-semibold ${m.kdr >= 1 ? "text-hl-green" : "text-hl-red"}`}>{m.kdr.toFixed(2)}</span>
-                              <span className="hidden md:block text-right text-sm text-hl-gold font-semibold">{m.score}</span>
-                              <span className="flex items-center justify-end gap-1 text-right text-sm text-white">
-                                {m.map}
-                                {m.matchId ? <ArrowUpRight className="w-3.5 h-3.5 text-hl-muted" /> : null}
-                              </span>
-                            </Link>
-                          );
-                        })}
+                        {matches.slice(0, 8).map((m) => (
+                          <MatchHistoryRow key={m.id} match={m} rank={player.rank} />
+                        ))}
                       </div>
                     )}
-                  </Card>
+                  </div>
                 </div>
               </div>
             )}
@@ -727,53 +707,25 @@ function ProfileContent() {
             {tab === "matches" && (
               <div>
                 <StatsFilters maps={mapsList} value={filters} onChange={setFilters} count={filteredMatches.length} />
-                <Card className="bg-hl-panel border-hl-border p-0 overflow-hidden">
+                <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] overflow-hidden">
                   {matches.length === 0 ? (
                     <EmptyState icon={ListChecks} title="No match history" hint="This player hasn't played any recorded matches yet." />
                   ) : filteredMatches.length === 0 ? (
                     <EmptyState icon={ListChecks} title="No matches match your filters" hint="Try widening the map, result, or time-range filters." />
                   ) : (
-                    <div className="divide-y divide-hl-border">
-                      {/* header row */}
-                      <div className="hidden md:grid grid-cols-[110px_120px_130px_1fr_70px_80px] gap-3 px-4 py-2.5 text-[10px] header-caps text-hl-muted">
-                        <span>Date</span><span>Score</span><span>Rating</span><span>K / D / A</span><span className="text-right">K/D</span><span className="text-right">Score</span>
+                    <div>
+                      <div className="hidden md:grid grid-cols-[100px_1fr_80px_110px] gap-3 px-4 py-2.5 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+                        <span>Date</span>
+                        <span />
+                        <span>Rating</span>
+                        <span className="text-right">K/D/A</span>
                       </div>
-                      {filteredMatches.map((m) => {
-                        const win = m.result === "W";
-                        return (
-                          <Link
-                            key={m.id}
-                            href={m.matchId ? `/match/${m.matchId}` : "#"}
-                            className={`grid md:grid-cols-[110px_120px_130px_1fr_70px_80px] grid-cols-2 gap-3 px-4 py-3 items-center hover:bg-hl-panel-light/40 transition-colors border-l-4 ${win ? "border-l-hl-green" : "border-l-hl-red"
-                              }`}
-                          >
-                            <span className="text-xs text-hl-muted">{m.date}</span>
-                            <span className={`inline-flex items-center gap-2 text-sm font-bold ${win ? "text-hl-green" : "text-hl-red"}`}>
-                              <span className={`w-5 text-center rounded ${win ? "bg-hl-green/15" : "bg-hl-red/15"}`}>{m.result}</span>
-                              {m.rounds || (win ? "13:—" : "—:13")}
-                            </span>
-                            <span className="flex items-center gap-2">
-                              <RankBadge rank={player.rank} size="sm" />
-                              <span className={`text-xs font-bold flex items-center ${m.eloChange >= 0 ? "text-hl-green" : "text-hl-red"}`}>
-                                {m.eloChange >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                                {Math.abs(m.eloChange)}
-                              </span>
-                            </span>
-                            <span className="hidden md:block text-sm font-mono text-white">
-                              {m.kills} <span className="text-hl-muted">/</span> <span className="text-hl-red">{m.deaths}</span> <span className="text-hl-muted">/</span> <span className="text-hl-teal">{m.assists}</span>
-                            </span>
-                            <span className={`hidden md:block text-right text-sm font-mono font-semibold ${m.kdr >= 1 ? "text-hl-green" : "text-hl-red"}`}>{m.kdr.toFixed(2)}</span>
-                            <span className="hidden md:flex items-center justify-end gap-1 text-right text-sm text-hl-gold font-semibold">
-                              {m.score}
-                              {m.matchId ? <ArrowUpRight className="w-3.5 h-3.5 text-hl-muted" /> : null}
-                            </span>
-                            <span className="md:hidden text-right text-sm text-white">{m.map}</span>
-                          </Link>
-                        );
-                      })}
+                      {filteredMatches.map((m) => (
+                        <MatchHistoryRow key={m.id} match={m} rank={player.rank} />
+                      ))}
                     </div>
                   )}
-                </Card>
+                </div>
               </div>
             )}
 
@@ -855,13 +807,13 @@ function ProfileContent() {
                 </div>
 
                 {/* ELO graph */}
-                <Card className="bg-hl-panel border-hl-border p-5">
+                <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-5">
                   {player.eloHistory && player.eloHistory.length > 1 ? (
                     <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} eloResets={player.eloResets} />
                   ) : (
-                    <p className="text-sm text-hl-muted py-8 text-center">Not enough matches to chart yet.</p>
+                    <p className="text-sm text-[#8a8a8a] py-8 text-center">Not enough matches to chart yet.</p>
                   )}
-                </Card>
+                </div>
 
                 {statTileRow}
 
@@ -889,7 +841,7 @@ function ProfileContent() {
         {/* ================= FRIENDS ================= */}
         {mainTab === "friends" && (
           <div>
-            <span className="inline-block bg-gold-gradient text-hl-base rounded-full px-3 py-1 text-xs font-bold mb-4">
+            <span className="inline-flex items-center rounded-full bg-[#2a2a2a] text-white px-3 py-1 text-xs font-bold mb-4">
               All ({friends.length})
             </span>
             {friends.length === 0 ? (
@@ -899,26 +851,26 @@ function ProfileContent() {
                 {friends.map((f) => (
                   <div
                     key={f.name}
-                    className="flex items-center gap-3 rounded-lg bg-hl-panel border border-hl-border px-3 py-2.5 hover:bg-hl-panel-light/40 transition-colors"
+                    className="flex items-center gap-3 rounded-lg bg-[#1c1c1c] border border-white/[0.08] px-3 py-2.5 hover:bg-white/[0.03] transition-colors"
                   >
                     <Link href={`/profile?player=${encodeURIComponent(f.name)}`} className="flex items-center gap-3 flex-1 min-w-0">
-                      <Avatar className="w-9 h-9 border border-hl-border">
+                      <Avatar className="w-9 h-9">
                         {f.avatar ? <AvatarImage src={f.avatar} /> : null}
-                        <AvatarFallback className="bg-hl-panel-light text-[11px] font-bold text-hl-gold">
-                          {f.name.slice(0, 2).toUpperCase()}
+                        <AvatarFallback className="bg-[#2a2a2a] text-[11px] font-bold text-white">
+                          {(f.name || "?").slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-sm font-bold text-white truncate">{formatUsername(f.name, f.discordUsername)}</span>
+                      <span className="text-sm font-semibold text-white truncate">{formatUsername(f.name, f.discordUsername)}</span>
                       {f.country && (
                         <Flag src={flagPath(f.country)} name={countryLabel(f.country)} className="w-4 h-3 shrink-0" />
                       )}
                     </Link>
-                    <RankBadge rank={(f.rank || "UNRANKED") as RankTierLetter} size="sm" showGlow={false} />
+                    <RankBadge rank={(f.rank || "UNRANKED") as RankTierLetter} size="sm" showGlow={false} className="!w-6 !h-6" />
                     {myName && f.name !== myName && (
                       <button
                         onClick={() => addFriendByName(f.name, false)}
                         title={`Add ${f.name} as a friend`}
-                        className="p-1.5 rounded-lg border border-hl-border text-hl-muted hover:text-hl-gold hover:border-hl-gold/40 transition-colors"
+                        className="p-1.5 rounded-md text-[#8a8a8a] hover:text-[#ff5500]"
                       >
                         <UserPlus className="w-4 h-4" />
                       </button>
@@ -934,7 +886,112 @@ function ProfileContent() {
         {mainTab === "inventory" && (
           <ProfileInventory key={player.username} items={inventory} isOwn={isOwn} />
         )}
+
+        {mainTab === "guestbook" && (
+          <GuestbookPanel profileName={player.username} canPost={!!myName} />
+        )}
+
+        {mainTab === "clubs" && (
+          <EmptyState icon={Building2} title="Clubs" hint="Coming soon." />
+        )}
+
+        {mainTab === "teams" && (
+          <EmptyState icon={UsersRound} title="Teams" hint="Coming soon." />
+        )}
       </div>
+    </div>
+  );
+}
+
+function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost: boolean }) {
+  const [entries, setEntries] = useState<{ id: number; fromName: string; message: string; createdAt: number }[]>([]);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/guestbook?player=${encodeURIComponent(profileName)}`)
+      .then((r) => r.json())
+      .then((d) => setEntries(Array.isArray(d.entries) ? d.entries : []))
+      .catch(() => setEntries([]));
+  }, [profileName]);
+
+  const post = async () => {
+    const text = message.trim();
+    if (!text || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/guestbook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toName: profileName, message: text }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to post");
+      } else if (data.entry) {
+        setEntries((prev) => [data.entry, ...prev]);
+        setMessage("");
+      }
+    } catch {
+      setError("Failed to post");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {canPost && (
+        <Card className="bg-hl-panel border-hl-border p-4">
+          <div className="text-xs header-caps text-hl-muted mb-2">Write a message</div>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value.slice(0, 280))}
+            rows={3}
+            placeholder="Say something…"
+            className="w-full bg-hl-base border border-hl-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
+          />
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-[11px] text-hl-muted">{message.length}/280</span>
+            <button
+              type="button"
+              onClick={post}
+              disabled={busy || !message.trim()}
+              className="px-4 py-1.5 rounded-md bg-gold-gradient text-hl-base text-xs font-black header-caps disabled:opacity-50"
+            >
+              {busy ? "Posting…" : "Post"}
+            </button>
+          </div>
+          {error && <p className="text-xs text-hl-red mt-2">{error}</p>}
+        </Card>
+      )}
+      {entries.length === 0 ? (
+        <div className="py-16 text-center">
+          <h5 className="text-lg font-semibold text-white">The guestbook is empty</h5>
+          <p className="text-sm text-[#8a8a8a] mt-1">Be the first to leave a message.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {entries.map((e) => (
+            <Card key={e.id} className="bg-hl-panel border-hl-border px-4 py-3">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <Link
+                  href={`/profile?player=${encodeURIComponent(e.fromName)}`}
+                  className="text-sm font-bold text-white hover:text-hl-gold"
+                >
+                  {e.fromName}
+                </Link>
+                <span className="text-[11px] text-hl-muted">
+                  {new Date(e.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+              <p className="text-sm text-hl-muted whitespace-pre-wrap">{e.message}</p>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

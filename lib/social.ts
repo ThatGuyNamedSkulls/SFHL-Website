@@ -13,7 +13,7 @@
  */
 
 import { client, mapRank } from "@/lib/db";
-import { avatarUrl } from "@/lib/format";
+import { pickAvatar } from "@/lib/avatar";
 
 export interface Friend {
   name: string;
@@ -125,7 +125,11 @@ function rowToFriend(r: Record<string, unknown>): Friend {
   return {
     name: r.name as string,
     rank: mapRank((r.rank as string) || ""),
-    avatar: avatarUrl(r.roblox_avatar_image as string | null),
+    avatar: pickAvatar(
+      r.roblox_avatar_image as string | null,
+      r.discord_avatar as string | null,
+      r.discord_id as string | number | null
+    ) || null,
     country: (r.country as string) ?? null,
     discordUsername: (r.discord_username as string) ?? null,
   };
@@ -136,7 +140,8 @@ async function resolvePlayers(names: string[]): Promise<Map<string, Friend>> {
   if (names.length === 0) return map;
   const placeholders = names.map(() => "?").join(",");
   const rs = await client.execute({
-    sql: `SELECT name, rank, roblox_avatar_image, country, discord_username FROM players WHERE name IN (${placeholders})`,
+    sql: `SELECT name, rank, roblox_avatar_image, country, discord_username, discord_avatar,
+                 CAST(discord_id AS TEXT) AS discord_id FROM players WHERE name IN (${placeholders})`,
     args: names,
   });
   for (const r of rs.rows as unknown as Record<string, unknown>[]) {
@@ -158,7 +163,8 @@ export async function playerExists(name: string): Promise<boolean> {
 /** Search the player base by name to add friends (excludes yourself). */
 export async function searchPlayers(query: string, selfName: string): Promise<Friend[]> {
   const rs = await client.execute({
-    sql: `SELECT name, rank, roblox_avatar_image, country, discord_username FROM players
+    sql: `SELECT name, rank, roblox_avatar_image, country, discord_username, discord_avatar,
+                 CAST(discord_id AS TEXT) AS discord_id FROM players
           WHERE name != ? AND name LIKE ? ORDER BY name LIMIT 20`,
     args: [selfName, `%${query.trim()}%`],
   });

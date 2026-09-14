@@ -4,7 +4,9 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "@/components/sidebar";
 import { RightSidebar } from "@/components/right-sidebar";
+import { TopBar } from "@/components/top-bar";
 import { CountryPrompt } from "@/components/country-prompt";
+import { MatchReadyModal } from "@/components/match-ready-modal";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,9 +20,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HyperLeague — Counter-Strike League & Matchmaking",
+  title: "HyperLeague — Strike Force Matchmaking",
   description:
-    "HyperLeague competitive Counter-Strike league. Ranked matchmaking, ELO tracking, leaderboards, match history, and stats — synced live with the HyperLeague Discord.",
+    "HyperLeague competitive Strike Force league. Ranked 5v5 matchmaking, ELO tracking, leaderboards, match history, and stats — synced live with the HyperLeague Discord.",
 };
 
 export default function RootLayout({
@@ -35,12 +37,16 @@ export default function RootLayout({
     >
       <body className="h-full bg-hl-base text-white">
         <TooltipProvider>
-          <div className="flex h-screen overflow-hidden">
+          <div className="flex h-screen overflow-hidden bg-[#111]">
             <Sidebar />
-            <main className="flex-1 overflow-y-auto">{children}</main>
+            <div className="flex-1 min-w-0 flex flex-col">
+              <TopBar />
+              <main className="flex-1 overflow-y-auto">{children}</main>
+            </div>
             <RightSidebar />
           </div>
           <CountryPrompt />
+          <MatchReadyModal />
         </TooltipProvider>
         <SpeedInsights />
       </body>

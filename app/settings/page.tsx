@@ -102,7 +102,7 @@ export default function SettingsPage() {
       <PageHeader
         icon={User}
         title="Settings"
-        subtitle="Manage your SFHL account and connection"
+        subtitle="Manage your HyperLeague account and connection"
       />
 
       {/* Account card */}
@@ -129,7 +129,7 @@ export default function SettingsPage() {
       {/* Connection card */}
       <Card className="bg-hl-panel border-hl-border p-6 mb-6">
         <h2 className="text-sm font-bold text-white header-caps mb-4">
-          SFHL Connection
+          HyperLeague Connection
         </h2>
         <div className="space-y-3">
           <div className="flex items-center justify-between py-2 border-b border-hl-border">
@@ -163,8 +163,8 @@ export default function SettingsPage() {
           <div className="mt-4 flex items-start gap-3 rounded-lg border border-hl-red/20 bg-hl-red/10 px-4 py-3">
             <ShieldAlert className="w-5 h-5 text-hl-red shrink-0 mt-0.5" />
             <p className="text-sm text-hl-muted">
-              Your Discord account isn&apos;t linked to an SFHL player yet. Linking is
-              done by Match Staff in the Discord server — your in-game name must
+              Your Discord account isn&apos;t linked to a HyperLeague player yet. Linking is
+              done by Match Staff in Discord — your in-game name must
               match your Discord display name to appear here.
             </p>
           </div>
@@ -240,11 +240,22 @@ export default function SettingsPage() {
         <div className="flex items-start gap-3">
           <Info className="w-5 h-5 text-hl-gold shrink-0 mt-0.5" />
           <p className="text-sm text-hl-muted">
-            Your rating, rank, and match stats are managed by the SFHL Discord bot
+            Your rating, rank, and match stats are managed by the HyperLeague Discord bot
             and can&apos;t be edited here. This page controls your website session and
             shows how your account is connected.
           </p>
         </div>
+      </Card>
+
+      <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+        <h2 className="text-sm font-bold text-white header-caps mb-2 flex items-center gap-2">
+          <Gamepad2 className="w-4 h-4 text-hl-gold" /> Roblox login
+        </h2>
+        <p className="text-sm text-hl-muted">
+          Discord is the current login. Roblox OAuth will link your Strike Force account
+          once you create the app — steps are in the repo at{" "}
+          <code className="text-hl-gold">docs/ROBLOX_OAUTH.md</code>.
+        </p>
       </Card>
 
       {/* Actions */}

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Turso-backed party store for the HyperLeague website.
  *
  * Parties are ephemeral matchmaking lobbies. They used to live in a JSON file
@@ -16,6 +16,13 @@
 import { randomUUID } from "crypto";
 import { client } from "@/lib/db";
 import { clearInvitesForParties } from "@/lib/social";
+import { MATCH_MODE_LABEL, PARTY_MAX_SIZE } from "@/lib/match-mode";
+import {
+  createPartyVoiceChannel,
+  deletePartyVoiceChannel,
+  promptJoinPartyVoice,
+  syncPartyVoiceMembers,
+} from "@/lib/discord-party-voice";
 
 /** 30 minutes without any party operation (create/join/leave) before a party
  *  is auto-disbanded. */
@@ -64,6 +71,10 @@ export interface Party {
   vibe?: string;
   createdAt: number;
   updatedAt: number;
+  /** Private Discord party voice (created on party create). */
+  voiceChannelId?: string | null;
+  voiceChannelUrl?: string | null;
+  guildId?: string | null;
 }
 
 let schemaReady: Promise<void> | null = null;
@@ -93,6 +104,7 @@ export async function getParties(): Promise<Party[]> {
   const live: Party[] = [];
   const expiredIds: string[] = [];
   const expiredMembers: PartyMember[] = [];
+  const expiredVoiceIds: string[] = [];
   for (const row of rs.rows) {
     let party: Party;
     try {
@@ -106,6 +118,7 @@ export async function getParties(): Promise<Party[]> {
     } else {
       expiredIds.push(row.id as string);
       expiredMembers.push(...party.members);
+      if (party.voiceChannelId) expiredVoiceIds.push(party.voiceChannelId);
     }
   }
 
@@ -118,13 +131,20 @@ export async function getParties(): Promise<Party[]> {
         args: [id],
       }))
     );
+    for (const vid of expiredVoiceIds) {
+      try {
+        await deletePartyVoiceChannel(vid);
+      } catch {
+        /* Discord may already have dropped the channel */
+      }
+    }
     // Tidy up any invites/notifications pointing at the now-dead parties so
     // they can't linger as un-joinable invites. Best-effort: the social tables
     // may not exist yet on a brand-new DB.
     try {
       await clearInvitesForParties(expiredIds);
     } catch {
-      /* social schema not ready — nothing to clean */
+      /* social schema not ready â€” nothing to clean */
     }
   }
   return live;
@@ -173,7 +193,7 @@ async function dequeueMembers(members: PartyMember[]): Promise<void> {
 }
 
 export interface CreatePartyInput {
-  name: string;
+  name?: string;
   game?: string;
   gameMode?: string;
   matchType?: string;
@@ -200,23 +220,39 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
     await dequeueMembers(p.members);
     const members = p.members.filter((m) => m.discordId !== input.leader.discordId);
     if (members.length === 0 || p.leaderId === input.leader.discordId) {
+      try {
+        await deletePartyVoiceChannel(p.voiceChannelId);
+      } catch {
+        /* ignore */
+      }
       await remove(p.id);
     } else {
       await upsert({ ...p, members, updatedAt: Date.now() });
+      if (p.voiceChannelId) {
+        try {
+          await syncPartyVoiceMembers(
+            p.voiceChannelId,
+            members.map((m) => m.discordId),
+            p.members.map((m) => m.discordId)
+          );
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }
 
   const now = Date.now();
-  const party: Party = {
+  let party: Party = {
     id: randomUUID().slice(0, 8),
-    name: input.name.trim().slice(0, 40) || "New Party",
-    game: input.game || "Blox Strike",
-    gameMode: input.gameMode || "5v5",
+    name: (input.name ?? "").trim().slice(0, 40) || "New Party",
+    game: input.game || "Strike Force",
+    gameMode: input.gameMode || MATCH_MODE_LABEL,
     matchType: input.matchType || "Standard",
     region: input.region || "EU",
     leaderId: input.leader.discordId,
     members: [input.leader],
-    maxSize: input.maxSize || 5,
+    maxSize: PARTY_MAX_SIZE,
     minSkill: input.minSkill || "D",
     maxSkill: input.maxSkill || "STAR",
     language: input.language || "Any",
@@ -227,9 +263,26 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
     vibe: input.vibe || "Balanced",
     createdAt: now,
     updatedAt: now,
+    voiceChannelId: null,
+    voiceChannelUrl: null,
+    guildId: null,
   };
 
   await upsert(party);
+  try {
+    const voice = await createPartyVoiceChannel(
+      party.id,
+      input.leader.username || input.leader.playerName || "hl",
+      [input.leader.discordId]
+    );
+    if (voice) {
+      party = { ...party, ...voice, updatedAt: Date.now() };
+      await upsert(party);
+      await promptJoinPartyVoice(input.leader.playerName, voice.voiceChannelUrl);
+    }
+  } catch (err) {
+    console.error("Failed to create party voice channel", err);
+  }
   return party;
 }
 
@@ -243,18 +296,34 @@ async function removeMemberFromOtherParties(discordId: string, exceptId: string)
     await dequeueMembers(p.members);
     const members = p.members.filter((m) => m.discordId !== discordId);
     if (members.length === 0) {
+      try {
+        await deletePartyVoiceChannel(p.voiceChannelId);
+      } catch {
+        /* ignore */
+      }
       await remove(p.id);
     } else {
       const leaderId = p.leaderId === discordId ? members[0].discordId : p.leaderId;
       await upsert({ ...p, members, leaderId, updatedAt: Date.now() });
+      if (p.voiceChannelId) {
+        try {
+          await syncPartyVoiceMembers(
+            p.voiceChannelId,
+            members.map((m) => m.discordId),
+            p.members.map((m) => m.discordId)
+          );
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }
 }
 
 /**
  * Join a party under optimistic concurrency. On Vercel each request is a
- * separate serverless instance with no shared lock, so a naive read-all →
- * modify → write-back loses updates when two people join at once (both read the
+ * separate serverless instance with no shared lock, so a naive read-all â†’
+ * modify â†’ write-back loses updates when two people join at once (both read the
  * same members list, both write their own +1, last write wins). We instead read
  * just this party's row with its `updated_at` token and commit with
  * `WHERE updated_at = <token>`; if someone else changed the row first the update
@@ -285,6 +354,7 @@ export async function joinParty(
     if (party.members.some((m) => m.discordId === member.discordId)) return party;
     if (party.members.length >= party.maxSize) return { error: "Party is full" };
 
+    const previousIds = party.members.map((m) => m.discordId);
     party.members.push(member);
     // Strictly-increasing token so the compare-and-set below can never collide
     // with the value we just read.
@@ -296,11 +366,40 @@ export async function joinParty(
     if (upd.rowsAffected > 0) {
       // Committed; now drop this member from any other party they were in.
       await removeMemberFromOtherParties(member.discordId, id);
+      try {
+        if (!party.voiceChannelId) {
+          const leader =
+            party.members.find((m) => m.discordId === party.leaderId) ?? party.members[0];
+          const voice = await createPartyVoiceChannel(
+            party.id,
+            leader?.username || leader?.playerName || "hl",
+            party.members.map((m) => m.discordId)
+          );
+          if (voice) {
+            party = { ...party, ...voice };
+            await upsert(party);
+            for (const m of party.members) {
+              await promptJoinPartyVoice(m.playerName, voice.voiceChannelUrl);
+            }
+          }
+        } else {
+          await syncPartyVoiceMembers(
+            party.voiceChannelId,
+            party.members.map((m) => m.discordId),
+            previousIds
+          );
+          if (party.voiceChannelUrl) {
+            await promptJoinPartyVoice(member.playerName, party.voiceChannelUrl);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to sync party voice", err);
+      }
       return party;
     }
-    // Lost the race — another writer touched the row. Re-read and retry.
+    // Lost the race â€” another writer touched the row. Re-read and retry.
   }
-  return { error: "Party is busy — please try again." };
+  return { error: "Party is busy â€” please try again." };
 }
 
 export async function leaveParty(id: string, discordId: string): Promise<Party[]> {
@@ -320,7 +419,7 @@ export async function leaveParty(id: string, discordId: string): Promise<Party[]
     const prevToken = Number(rs.rows[0].updated_at);
     if (!party.members.some((m) => m.discordId === discordId)) return getParties();
 
-    // A member leaving invalidates the whole party's queue entry — dequeue
+    // A member leaving invalidates the whole party's queue entry â€” dequeue
     // the full pre-leave roster (leaver included) once the write commits.
     const prevMembers = [...party.members];
     party.members = party.members.filter((m) => m.discordId !== discordId);
@@ -334,6 +433,11 @@ export async function leaveParty(id: string, discordId: string): Promise<Party[]
       });
       if (del.rowsAffected > 0) {
         await dequeueMembers(prevMembers);
+        try {
+          await deletePartyVoiceChannel(party.voiceChannelId);
+        } catch {
+          /* ignore */
+        }
         try {
           await clearInvitesForParties([id]);
         } catch {
@@ -350,10 +454,42 @@ export async function leaveParty(id: string, discordId: string): Promise<Party[]
       });
       if (upd.rowsAffected > 0) {
         await dequeueMembers(prevMembers);
+        if (party.voiceChannelId) {
+          try {
+            await syncPartyVoiceMembers(
+              party.voiceChannelId,
+              party.members.map((m) => m.discordId),
+              prevMembers.map((m) => m.discordId)
+            );
+          } catch {
+            /* ignore */
+          }
+        }
         return getParties();
       }
     }
-    // Lost the race — re-read and retry.
+    // Lost the race â€” re-read and retry.
   }
   return getParties();
+}
+
+/** Leader removes another member. Same write path as leave. */
+export async function kickMember(
+  id: string,
+  leaderDiscordId: string,
+  targetDiscordId: string
+): Promise<{ error?: string }> {
+  if (leaderDiscordId === targetDiscordId) {
+    return { error: "Leave the party instead of kicking yourself." };
+  }
+  const party = await getParty(id);
+  if (!party) return { error: "Party not found or expired" };
+  if (party.leaderId !== leaderDiscordId) {
+    return { error: "Only the party leader can kick players." };
+  }
+  if (!party.members.some((m) => m.discordId === targetDiscordId)) {
+    return { error: "They are not in this party." };
+  }
+  await leaveParty(id, targetDiscordId);
+  return {};
 }

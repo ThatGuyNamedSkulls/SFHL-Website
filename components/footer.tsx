@@ -16,7 +16,7 @@ export function Footer() {
               </span>
             </div>
             <span className="text-sm font-semibold text-hl-muted">
-              SFHL &copy; {new Date().getFullYear()} — Counter-Strike League
+              HyperLeague &copy; {new Date().getFullYear()} — Strike Force League
             </span>
           </div>
 
@@ -34,8 +34,8 @@ export function Footer() {
             <Link href="/ranks" className="hover:text-white transition-colors">
               Ranks
             </Link>
-            <Link href="/tournaments" className="hover:text-white transition-colors">
-              Tournaments
+            <Link href="/queue" className="hover:text-white transition-colors">
+              Play
             </Link>
             <span className="text-hl-border">|</span>
             <span>Terms</span>

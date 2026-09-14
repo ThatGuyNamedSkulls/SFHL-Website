@@ -45,7 +45,7 @@ export async function GET() {
 
   try {
     const res = await fetch(
-      `${DISCORD_API}/channels/${ANNOUNCEMENTS_CHANNEL_ID}/messages?limit=5`,
+        `${DISCORD_API}/channels/${ANNOUNCEMENTS_CHANNEL_ID}/messages?limit=20`,
       {
         headers: { Authorization: `Bot ${token}` },
         // Never cache at the fetch layer — we manage our own TTL above.

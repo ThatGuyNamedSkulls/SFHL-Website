@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getParty } from "@/lib/parties";
-import { areFriends, createPartyInvite } from "@/lib/social";
+import { createPartyInvite, playerExists } from "@/lib/social";
 
-/** POST { toName } — invite a friend (by player name) to the party. */
+/** POST { toName } — invite any player (by name) to the party. */
 export async function POST(
   request: Request,
   ctx: { params: Promise<{ id: string }> }
@@ -29,9 +29,8 @@ export async function POST(
     if (!party.members.some((m) => m.discordId === session.discordId)) {
       return NextResponse.json({ error: "You are not in this party" }, { status: 403 });
     }
-    // You can only invite people you're friends with.
-    if (!(await areFriends(me, toName))) {
-      return NextResponse.json({ error: "You can only invite friends" }, { status: 403 });
+    if (!(await playerExists(toName))) {
+      return NextResponse.json({ error: "Player not found" }, { status: 404 });
     }
     if (party.members.some((m) => m.playerName === toName)) {
       return NextResponse.json({ error: "They are already in the party" }, { status: 409 });

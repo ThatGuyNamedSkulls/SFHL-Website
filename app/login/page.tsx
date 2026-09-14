@@ -48,10 +48,10 @@ function LoginContent() {
             <Gamepad2 className="w-8 h-8 text-hl-base" />
           </div>
           <h1 className="text-3xl font-black text-white tracking-tight mb-2">
-            Welcome to SFHL
+            Welcome to HyperLeague
           </h1>
           <p className="text-hl-muted">
-            Sign in with Discord to access the queue, view your profile, and join tournaments.
+            Sign in with Discord to queue, view your profile, and play Strike Force 5v5.
           </p>
         </div>
 
@@ -77,7 +77,7 @@ function LoginContent() {
 
             <div className="text-center text-xs text-hl-muted mt-6">
               <p>
-                By signing in, you agree to the SFHL{" "}
+                By signing in, you agree to the HyperLeague{" "}
                 <Link href="#" className="text-hl-gold hover:underline">
                   Terms of Service
                 </Link>{" "}
@@ -88,7 +88,7 @@ function LoginContent() {
                 .
               </p>
               <p className="mt-2">
-                You must be a member of the SFHL Discord server to log in.
+                You must be a member of the HyperLeague Discord server to log in.
               </p>
             </div>
           </div>

@@ -3,28 +3,9 @@ import { getPlayer, getMatchesForPlayer, getEloChanges, getModeRatings, getMostP
 import { buildEloTimeline } from "@/lib/elo-timeline";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
-import { resolvePlayerAvatar } from "@/lib/avatar";
-import { prettyMap, prettyRegion, regionMeta } from "@/lib/format";
+import { resolvePlayerAvatar, resolveAvatarMap } from "@/lib/avatar";
+import { prettyMap, prettyRegion, regionMeta, formatRoundScore } from "@/lib/format";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
-
-/**
- * Turn the match-level `round_score` ("winnerRounds,loserRounds", e.g. "13,11")
- * into a scoreline from this player's perspective ("13:11" on a win, "11:13"
- * on a loss). Returns "" when no round score is stored.
- */
-function formatRoundScore(raw: string | null, result: string): string {
-  if (!raw) return "";
-  const nums = raw
-    .split(/[,:]/)
-    .map((p) => Number(p.trim()))
-    .filter((n) => !Number.isNaN(n));
-  if (nums.length < 2) return "";
-  // The winner always holds the higher round count, so derive the player's
-  // perspective from the result rather than trusting the stored order.
-  const hi = Math.max(nums[0], nums[1]);
-  const lo = Math.min(nums[0], nums[1]);
-  return result === "W" ? `${hi}:${lo}` : `${lo}:${hi}`;
-}
 
 export async function GET(
   _request: Request,
@@ -44,11 +25,11 @@ export async function GET(
 
     // These are all independent of one another — fetch them concurrently
     // instead of one sequential await per data source.
-    const [matches, eloChanges, avatar, playedWith, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings, seasonResets, seasonFinalElos] =
+    const [matches, eloChanges, avatar, playedWithRaw, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings, seasonResets, seasonFinalElos] =
       await Promise.all([
         getMatchesForPlayer(decodedName),
         getEloChanges(decodedName),
-        resolvePlayerAvatar(decodedName, player.roblox_avatar_image, player.discord_avatar),
+        resolvePlayerAvatar(decodedName, player.roblox_avatar_image, player.discord_avatar, player.discord_id),
         getMostPlayedWith(decodedName, 10),
         getPlayerRankings(decodedName).catch(() => ({ overall: null, country: null })),
         getEquippedCosmetics(decodedName).catch(() => ({
@@ -64,6 +45,14 @@ export async function GET(
         getSeasonResets(),
         getSeasonFinalElos(decodedName),
       ]);
+
+    const playedAvatars = await resolveAvatarMap(playedWithRaw);
+    const playedWith = playedWithRaw.map((p) => ({
+      name: p.name,
+      count: p.count,
+      discordUsername: p.discordUsername,
+      avatar: playedAvatars.get(p.name) || null,
+    }));
 
     // Dominant server region for this player (most-played region across matches).
     const regionCounts: Record<string, number> = {};
@@ -146,7 +135,7 @@ export async function GET(
       inventory,
       matchHistory: matches.map((m) => ({
         id: `M-${m.id}`,
-        date: m.timestamp?.split(" ")[0] || "",
+        date: m.timestamp || "",
         region: prettyRegion(m.region),
         map: prettyMap(m.map_name),
         mode: "Competitive" as const,
