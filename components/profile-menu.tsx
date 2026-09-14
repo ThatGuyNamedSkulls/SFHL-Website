@@ -66,7 +66,7 @@ export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
         title={label}
         className="relative rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-hl-gold"
       >
-        <Avatar className="w-8 h-8 border border-hl-border">
+        <Avatar className="w-9 h-9 border border-hl-border">
           {session?.avatar ? <AvatarImage src={session.avatar} /> : null}
           <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
             {(session?.username ?? "?").slice(0, 2).toUpperCase()}

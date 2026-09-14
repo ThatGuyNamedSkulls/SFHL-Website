@@ -180,7 +180,7 @@ const LADDER_COLORS: Record<string, string> = {
 
 function ProfileSkeleton() {
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid lg:grid-cols-[300px_1fr] gap-6">
+    <div className="hl-page-wide grid lg:grid-cols-[300px_1fr] gap-6">
       <Skeleton className="h-[520px] rounded-xl" />
       <div className="space-y-4">
         <Skeleton className="h-10 w-72 rounded-lg" />
@@ -346,7 +346,7 @@ function ProfileContent() {
 
   if (error || !player) {
     return (
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+      <div className="hl-page-wide py-16 text-center">
         <h1 className="text-2xl font-bold text-white mb-4">{error || "Player not found"}</h1>
         <Link href="/leaderboards" className="text-hl-gold hover:underline">Return to Rankings</Link>
       </div>
@@ -400,7 +400,7 @@ function ProfileContent() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid lg:grid-cols-[300px_1fr] gap-6 items-start">
+    <div className="hl-page-wide grid lg:grid-cols-[300px_1fr] gap-6 items-start">
       {/* ================= LEFT SIDEBAR ================= */}
       <div className="space-y-5">
         <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] overflow-hidden">
@@ -904,7 +904,7 @@ function ProfileContent() {
 }
 
 function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost: boolean }) {
-  const [entries, setEntries] = useState<{ id: number; fromName: string; message: string; createdAt: number }[]>([]);
+  const [entries, setEntries] = useState<{ id: number; fromName: string; message: string; createdAt: number; rank?: string }[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -979,9 +979,15 @@ function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost
               <div className="flex items-center justify-between gap-2 mb-1">
                 <Link
                   href={`/profile?player=${encodeURIComponent(e.fromName)}`}
-                  className="text-sm font-bold text-white hover:text-hl-gold"
+                  className="text-sm font-bold text-white hover:text-hl-gold flex items-center gap-2 min-w-0"
                 >
-                  {e.fromName}
+                  <RankBadge
+                    rank={(e.rank || "UNRANKED") as RankTierLetter}
+                    size="sm"
+                    showGlow={false}
+                    className="!w-5 !h-5 shrink-0"
+                  />
+                  <span className="truncate">{e.fromName}</span>
                 </Link>
                 <span className="text-[11px] text-hl-muted">
                   {new Date(e.createdAt).toLocaleDateString()}

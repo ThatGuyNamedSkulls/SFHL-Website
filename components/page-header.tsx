@@ -18,7 +18,7 @@ export function PageHeader({
   className = "",
 }: PageHeaderProps) {
   return (
-    <div className={`mb-8 flex flex-wrap items-start justify-between gap-4 ${className}`}>
+    <div className={`mb-6 flex flex-wrap items-center justify-between gap-4 ${className}`}>
       <div>
         <h1 className="text-2xl font-bold text-white header-caps flex items-center gap-3">
           {Icon && <Icon className="w-6 h-6 text-hl-gold" />}

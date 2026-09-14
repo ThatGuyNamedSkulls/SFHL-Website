@@ -27,16 +27,16 @@ export function TopBar() {
   const onRank = pathname === "/leaderboards";
 
   return (
-    <header className="h-12 shrink-0 flex items-stretch px-4 gap-3 relative z-30 bg-[#111] border-b border-white/[0.06]">
+    <header className="h-[var(--hl-topbar-h)] shrink-0 flex items-stretch px-5 gap-3 relative z-30 bg-[#111] border-b border-white/[0.06]">
       <div className="flex items-center gap-2 min-w-0">
-        <div className="flex items-center gap-1.5 rounded-md bg-[#1a1a1a] border border-white/10 px-1.5 py-1">
-          <Swords className="w-3.5 h-3.5 text-[#ff5500]" />
+        <div className="flex items-center gap-1.5 rounded-md bg-[#1a1a1a] border border-white/10 px-2 py-1.5">
+          <Swords className="w-4 h-4 text-[#ff5500]" />
         </div>
         <div className="relative">
           <button
             type="button"
             onClick={() => setRegionOpen((v) => !v)}
-            className="flex items-center gap-1 text-xs font-bold text-hl-muted hover:text-white px-1.5 py-1 rounded-md"
+            className="flex items-center gap-1 text-[13px] font-bold text-hl-muted hover:text-white px-1.5 py-1 rounded-md"
           >
             {meta.short}
             <ChevronDown className="w-3 h-3" />
@@ -71,7 +71,7 @@ export function TopBar() {
         </div>
       </div>
 
-      <nav className="absolute inset-x-0 top-0 h-full flex items-end justify-center gap-7 pointer-events-none">
+      <nav className="absolute inset-x-0 top-0 h-full flex items-end justify-center gap-8 pointer-events-none">
         {(onRank
           ? ([{ id: "matchmaking", label: "Matchmaking", href: "/leaderboards" as const }] as const)
           : CENTER_TABS
@@ -81,7 +81,7 @@ export function TopBar() {
               <span
                 key={tab.id}
                 title="Coming soon"
-                className="pointer-events-auto h-full flex items-center text-[13px] font-bold header-caps text-[#6a6a6a] cursor-default"
+                className="pointer-events-auto h-full flex items-center text-[14px] font-bold header-caps text-[#6a6a6a] cursor-default"
               >
                 {tab.label}
               </span>
@@ -92,7 +92,7 @@ export function TopBar() {
             <Link
               key={tab.id}
               href={tab.href}
-              className={`pointer-events-auto h-full flex items-center text-[13px] font-bold header-caps border-b-2 ${
+              className={`pointer-events-auto h-full flex items-center text-[14px] font-bold header-caps border-b-2 ${
                 active
                   ? "text-white border-[#ff5500]"
                   : "text-[#8a8a8a] border-transparent hover:text-white"

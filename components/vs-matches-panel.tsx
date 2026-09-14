@@ -175,8 +175,8 @@ export function VsMatchesPanel() {
   const searching = !inMatch && queuedAt != null;
   const past = matches.slice(0, inMatch ? 6 : 8);
   const active = inMatch || searching || open;
-  const icon =
-    "flex items-center justify-center w-9 h-9 rounded-md text-[#8b8b8b] hover:text-white hover:bg-white/5 transition-colors";
+    const icon =
+    "flex items-center justify-center w-11 h-11 rounded-md text-[#8b8b8b] hover:text-white hover:bg-white/5 transition-colors";
 
   const goMatchroom = () => {
     if (lobby) markMatchAccepted(lobby.channelId);
@@ -190,7 +190,7 @@ export function VsMatchesPanel() {
         type="button"
         title="Matches"
         onClick={() => setOpen((v) => !v)}
-        className={`${icon} mt-2 ${active ? "text-[#ff5500]" : ""}`}
+        className={`${icon} ${active ? "text-[#ff5500]" : ""}`}
       >
         <span className="text-[10px] font-black tracking-widest leading-none">VS</span>
       </button>
@@ -200,7 +200,7 @@ export function VsMatchesPanel() {
         createPortal(
           <div
             ref={panelRef}
-            className="fixed z-[80] top-2 bottom-2 right-[52px] w-[340px] flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#161616] shadow-2xl"
+            className="fixed z-[80] top-2 bottom-2 right-[calc(var(--hl-sidebar-w)+8px)] w-[340px] flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#161616] shadow-2xl"
           >
             <div className="flex items-center justify-between px-4 py-3 shrink-0">
               <span className="text-lg font-bold text-white">Matches</span>

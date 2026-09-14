@@ -29,9 +29,9 @@ function FriendsRailLink() {
   }, []);
 
   return (
-    <Link href="/friends" title="Friends" className="relative flex items-center justify-center w-9 h-9 rounded-md text-[#8b8b8b] hover:text-white hover:bg-white/5 transition-colors">
+    <Link href="/friends" title="Friends" className="relative flex items-center justify-center w-11 h-11 rounded-md text-[#8b8b8b] hover:text-white hover:bg-white/5 transition-colors">
       <span className="relative">
-        <Users className="w-[18px] h-[18px]" strokeWidth={1.75} />
+        <Users className="w-5 h-5" strokeWidth={1.75} />
         <RailBadge count={incoming} />
       </span>
     </Link>
@@ -41,8 +41,10 @@ function FriendsRailLink() {
 /** Narrow right-edge icon rail (FACEIT: avatar, VS, bell, friends, My Party). */
 export function RightSidebar() {
   return (
-    <aside className="hidden md:flex flex-col items-center gap-0.5 w-12 shrink-0 border-l border-white/[0.04] bg-[#181818] py-2.5 sticky top-0 h-screen z-40">
-      <ProfileMenu variant="rail" />
+    <aside className="hidden md:flex flex-col items-center gap-1 w-[var(--hl-sidebar-w)] shrink-0 border-l border-white/[0.04] bg-[#181818] sticky top-0 h-screen z-40">
+      <div className="h-[var(--hl-topbar-h)] flex items-center justify-center shrink-0">
+        <ProfileMenu variant="rail" />
+      </div>
 
       <VsMatchesPanel />
       <NotificationsBell variant="rail" />

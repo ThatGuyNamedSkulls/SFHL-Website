@@ -123,7 +123,7 @@ export default function LeaderboardsPage() {
   const ranked = !!me && me.rank !== "UNRANKED" && me.placementDone !== false;
 
   return (
-    <div className="px-8 py-5 w-full max-w-[1100px] mx-auto">
+    <div className="hl-page">
       {loggedIn && (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-5 text-[13px]">
           <span className="font-bold text-white">Your rankings</span>

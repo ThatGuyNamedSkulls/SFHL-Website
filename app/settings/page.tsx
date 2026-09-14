@@ -69,7 +69,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center text-hl-muted">
+      <div className="hl-page py-16 text-center text-hl-muted">
         Loading settings…
       </div>
     );
@@ -77,7 +77,7 @@ export default function SettingsPage() {
 
   if (!session) {
     return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+      <div className="hl-page py-16 text-center">
         <h1 className="text-2xl font-bold text-white mb-3">Settings</h1>
         <p className="text-hl-muted mb-6">
           You need to be signed in to view your account settings.
@@ -98,7 +98,7 @@ export default function SettingsPage() {
   )}`;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="hl-page">
       <PageHeader
         icon={User}
         title="Settings"

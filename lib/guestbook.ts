@@ -1,4 +1,4 @@
-import { client } from "@/lib/db";
+import { client, mapRank } from "@/lib/db";
 
 export interface GuestbookEntry {
   id: number;
@@ -6,6 +6,7 @@ export interface GuestbookEntry {
   fromName: string;
   message: string;
   createdAt: number;
+  rank: string;
 }
 
 let schemaReady: Promise<void> | null = null;
@@ -31,7 +32,12 @@ export function ensureGuestbookSchema(): Promise<void> {
 export async function listGuestbook(profileName: string): Promise<GuestbookEntry[]> {
   await ensureGuestbookSchema();
   const rs = await client.execute({
-    sql: "SELECT id, profile_name, from_name, message, created_at FROM guestbook WHERE profile_name = ? ORDER BY created_at DESC LIMIT 50",
+    sql: `SELECT g.id, g.profile_name, g.from_name, g.message, g.created_at, p.rank
+          FROM guestbook g
+          LEFT JOIN players p ON lower(p.name) = lower(g.from_name)
+          WHERE g.profile_name = ?
+          ORDER BY g.created_at DESC
+          LIMIT 50`,
     args: [profileName],
   });
   return rs.rows.map((row) => ({
@@ -40,7 +46,21 @@ export async function listGuestbook(profileName: string): Promise<GuestbookEntry
     fromName: String(row.from_name),
     message: String(row.message),
     createdAt: Number(row.created_at),
+    rank: mapRank(row.rank == null ? "" : String(row.rank)),
   }));
+}
+
+async function authorRank(fromName: string): Promise<string> {
+  try {
+    const rs = await client.execute({
+      sql: "SELECT rank FROM players WHERE lower(name) = lower(?) LIMIT 1",
+      args: [fromName],
+    });
+    const rank = rs.rows[0]?.rank;
+    return mapRank(rank != null ? String(rank) : "");
+  } catch {
+    return "UNRANKED";
+  }
 }
 
 export async function addGuestbookEntry(
@@ -60,5 +80,6 @@ export async function addGuestbookEntry(
     fromName,
     message,
     createdAt,
+    rank: await authorRank(fromName),
   };
 }

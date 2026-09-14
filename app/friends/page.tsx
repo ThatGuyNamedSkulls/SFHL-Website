@@ -170,7 +170,7 @@ export default function FriendsPage() {
 
   if (session === null) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="hl-page">
         <PageHeader icon={UserPlus} title="Friends" subtitle="Add friends and invite them to parties" />
         <EmptyState icon={UserPlus} title="Log in to manage friends" hint="Sign in with Discord to add friends and get party invites." />
         <div className="mt-4">
@@ -182,7 +182,7 @@ export default function FriendsPage() {
 
   if (session && !session.playerName) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="hl-page">
         <PageHeader icon={UserPlus} title="Friends" subtitle="Add friends and invite them to parties" />
         <EmptyState icon={UserPlus} title="Link your player first" hint="Your Discord account isn't linked to a HyperLeague player yet. Ask an admin to add you, then you can add friends." />
       </div>
@@ -190,7 +190,7 @@ export default function FriendsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="hl-page">
       <PageHeader icon={UserPlus} title="Friends" subtitle="Add friends and invite them to parties" />
 
       {notice && (

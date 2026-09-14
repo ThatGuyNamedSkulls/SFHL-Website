@@ -211,7 +211,7 @@ export function MyPartyRail() {
 
   const isLeader = !!(session && party && party.leaderId === session.discordId);
   const iconBtn =
-    "flex items-center justify-center w-9 h-8 text-[#8a8a8a] hover:text-white hover:bg-white/5";
+    "flex items-center justify-center w-11 h-10 text-[#8a8a8a] hover:text-white hover:bg-white/5";
 
   return (
     <div ref={wrapRef} className="relative">
@@ -223,7 +223,7 @@ export function MyPartyRail() {
           className={`${iconBtn} relative ${open && !inviteMode ? "text-[#ff5500]" : ""}`}
         >
           <span className="relative">
-            <UsersRound className="w-4 h-4" strokeWidth={1.75} />
+            <UsersRound className="w-[18px] h-[18px]" strokeWidth={1.75} />
             {party ? <RailBadge count={party.members.length} /> : null}
           </span>
         </button>
@@ -235,13 +235,13 @@ export function MyPartyRail() {
               type="button"
               title={label}
               onClick={() => openPanel(false)}
-              className="flex items-center justify-center w-9 h-8 hover:bg-white/5"
+              className="flex items-center justify-center w-11 h-10 hover:bg-white/5"
             >
               {m.avatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.avatar} alt="" referrerPolicy="no-referrer" className="w-[22px] h-[22px] rounded-md object-cover" />
+                <img src={m.avatar} alt="" referrerPolicy="no-referrer" className="w-6 h-6 rounded-md object-cover" />
               ) : (
-                <span className="w-[22px] h-[22px] rounded-md bg-[#2a2a2a] text-[8px] font-bold text-[#ff5500] flex items-center justify-center">
+                <span className="w-6 h-6 rounded-md bg-[#2a2a2a] text-[8px] font-bold text-[#ff5500] flex items-center justify-center">
                   {label.slice(0, 2).toUpperCase()}
                 </span>
               )}
@@ -276,7 +276,7 @@ export function MyPartyRail() {
             ref={panelRef}
             className="fixed z-[80] w-[300px] max-h-[70vh] overflow-y-auto rounded-xl border border-white/10 bg-[#161616] shadow-2xl"
             style={{
-              right: 56,
+              right: "calc(var(--hl-sidebar-w) + 8px)",
               top: wrapRef.current?.getBoundingClientRect().top ?? 120,
             }}
           >

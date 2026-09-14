@@ -129,7 +129,7 @@ export default function ShopPage() {
   const showCatalog = filter !== "cases";
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="hl-page">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hl-border mb-6 pb-3">
         <div>

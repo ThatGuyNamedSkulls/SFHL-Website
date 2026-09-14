@@ -134,7 +134,7 @@ export function Dashboard({ session }: DashboardProps) {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="hl-page-wide">
       {liveLobby && (
         <Card className="mb-5 border-hl-gold/50 bg-hl-panel p-4 flex flex-wrap items-center gap-3">
           <Swords className="w-5 h-5 text-hl-gold shrink-0" />

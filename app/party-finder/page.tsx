@@ -312,7 +312,7 @@ function PartyFinderContent() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="hl-page">
       <h1 className="text-xl font-black text-white mb-5">Party Finder</h1>
 
       {notice && (

@@ -42,7 +42,7 @@ export default function LiveMatchPage() {
 
   if (!lobby) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16">
+      <div className="hl-page py-16">
         <EmptyState
           icon={Swords}
           title="No live match"

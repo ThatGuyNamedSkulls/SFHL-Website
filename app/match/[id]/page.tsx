@@ -85,7 +85,7 @@ export default function MatchDetailPage({
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="hl-page-wide">
         <Skeleton className="h-4 w-32 mb-6" />
         <Skeleton className="h-32 w-full mb-6 rounded-xl" />
         <Skeleton className="h-9 w-64 mb-4 rounded-lg" />
@@ -96,7 +96,7 @@ export default function MatchDetailPage({
 
   if (error || !match) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+      <div className="hl-page-wide py-16 text-center">
         <h1 className="text-2xl font-bold text-white mb-4">Match Not Found</h1>
         <p className="text-hl-muted mb-6">
           Detailed scoreboard data is not available for this match.
@@ -122,7 +122,7 @@ export default function MatchDetailPage({
   const teamAWon = match.winner === "A";
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="hl-page-wide">
       {/* Back link */}
       <Link
         href="/matches"

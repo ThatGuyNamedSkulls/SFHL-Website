@@ -112,7 +112,7 @@ export function LiveMatchRoom({
   const [messages, setMessages] = useState<ChatLine[]>(lobby.messages ?? []);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatListRef = useRef<HTMLDivElement>(null);
 
   const team1 = lobby.members.filter((m) => m.team === 1);
   const team2 = lobby.members.filter((m) => m.team === 2);
@@ -157,7 +157,8 @@ export function LiveMatchRoom({
   }, [lobby.channelId]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = chatListRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
   const remainingSec = (turnEndsAt - now) / 1000;
@@ -213,8 +214,8 @@ export function LiveMatchRoom({
             : "Veto in progress";
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)]">
-      <div className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-4">
+    <div className="flex h-[calc(100dvh-var(--hl-topbar-h))] overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-y-auto px-6 py-5">
         <div className="flex items-center justify-between gap-3 mb-4">
           <h1 className="text-2xl font-bold text-white">Matchroom</h1>
           <div className="flex items-center gap-5">
@@ -355,8 +356,8 @@ export function LiveMatchRoom({
         )}
       </div>
 
-      <aside className="hidden xl:flex w-[280px] shrink-0 flex-col border-l border-white/[0.06] bg-[#141414]">
-        <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+      <aside className="hidden xl:flex w-[300px] shrink-0 flex-col min-h-0 h-full border-l border-white/[0.06] bg-[#141414]">
+        <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0">
           <span className="text-[12px] font-bold uppercase tracking-wide text-[#8a8a8a]">Room chat</span>
           <a
             href={lobby.channelUrl}
@@ -368,7 +369,7 @@ export function LiveMatchRoom({
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2">
+        <div ref={chatListRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3 space-y-2">
           {messages.length === 0 ? (
             <p className="text-[12px] text-[#8a8a8a]">No messages yet. Chat here or in Discord.</p>
           ) : (
@@ -382,10 +383,9 @@ export function LiveMatchRoom({
               </div>
             ))
           )}
-          <div ref={chatEndRef} />
         </div>
         <form
-          className="flex items-center gap-1.5 px-3 py-2 border-t border-white/[0.06]"
+          className="flex items-center gap-1.5 px-3 py-2 border-t border-white/[0.06] shrink-0"
           onSubmit={(e) => {
             e.preventDefault();
             sendChat();
@@ -407,10 +407,10 @@ export function LiveMatchRoom({
             <Send className="w-3.5 h-3.5" />
           </button>
         </form>
-        <div className="px-4 py-3 border-t border-b border-white/[0.06] text-[12px] font-bold uppercase tracking-wide text-[#8a8a8a]">
+        <div className="px-4 py-3 border-t border-b border-white/[0.06] text-[12px] font-bold uppercase tracking-wide text-[#8a8a8a] shrink-0">
           Connect
         </div>
-        <div className="p-4 space-y-2">
+        <div className="p-4 space-y-2 shrink-0">
           {lobby.server?.url ? (
             <a
               href={lobby.server.url}

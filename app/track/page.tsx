@@ -61,7 +61,7 @@ export default function TrackPage() {
 
   if (!session) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+      <div className="hl-page py-16 text-center">
         <TrendingUp className="w-8 h-8 text-hl-gold mx-auto mb-3" />
         <h1 className="text-2xl font-black text-white mb-2">Track</h1>
         <p className="text-sm text-hl-muted mb-6">Log in to see your Strike Force stats.</p>
@@ -74,7 +74,7 @@ export default function TrackPage() {
 
   if (!session.playerName) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+      <div className="hl-page py-16 text-center">
         <h1 className="text-2xl font-black text-white mb-2">Track</h1>
         <p className="text-sm text-hl-muted">
           Your Discord account isn&apos;t linked to a HyperLeague player yet. Ask an admin to add you.
@@ -94,7 +94,7 @@ export default function TrackPage() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="hl-page">
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="text-xs header-caps text-hl-gold mb-1">Strike Force</div>

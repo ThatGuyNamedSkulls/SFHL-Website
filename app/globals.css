@@ -123,6 +123,10 @@
 
   --radius: 0.625rem;
 
+  /* Chrome sizes — keep top bar and both side rails aligned */
+  --hl-topbar-h: 3.5rem;
+  --hl-sidebar-w: 4rem;
+
   /* Sidebar */
   --sidebar: #1f1f1f;
   --sidebar-foreground: #ffffff;
@@ -307,10 +311,21 @@
    FACEIT-style dashboard chrome
    ============================================================ */
 
+/* Shared page shell so every route uses the same horizontal inset */
+.hl-page,
+.hl-page-wide {
+  width: 100%;
+  margin-inline: auto;
+  padding: 1.5rem 1.5rem 2.5rem;
+}
+.hl-page { max-width: 1100px; }
+.hl-page-wide { max-width: 1280px; }
+
 /* Left sidebar — FACEIT: thin, icon-only, active = orange icon (no left bar) */
 .hl-sidebar {
   background: #181818;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
+  width: var(--hl-sidebar-w);
 }
 
 .hl-nav-item {

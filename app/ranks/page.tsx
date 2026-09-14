@@ -14,7 +14,7 @@ export default function RanksPage() {
   const ladder = RANK_TIERS.filter((t) => t.letter !== "UNRANKED").slice().reverse();
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="hl-page">
       <PageHeader
         icon={Trophy}
         title="Ranks & Elo"

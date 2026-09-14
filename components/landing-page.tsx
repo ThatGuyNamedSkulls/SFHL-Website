@@ -82,7 +82,7 @@ export function LandingPage() {
           }}
         />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
+        <div className="relative z-10 hl-page-wide py-24 md:py-32">
           <div className="max-w-3xl">
             <Badge className="mb-6 bg-hl-gold/10 text-hl-gold border-hl-gold/30 px-3 py-1 text-xs header-caps">
               <Zap className="w-3 h-3 mr-1.5" />
@@ -140,7 +140,7 @@ export function LandingPage() {
       </section>
 
       {/* RECENT MATCHES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <section className="hl-page-wide py-16">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-bold text-white header-caps">Recent Matches</h2>
@@ -180,7 +180,7 @@ export function LandingPage() {
       </section>
 
       {/* TOP PLAYERS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <section className="hl-page-wide py-16">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-bold text-white header-caps">Top Players</h2>
@@ -236,7 +236,7 @@ export function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <section className="hl-page-wide py-16">
         <Card className="relative overflow-hidden bg-hl-panel border-hl-border p-8 md:p-12">
           <div className="absolute inset-0 bg-hero-gradient opacity-40" />
           <div className="relative z-10 text-center max-w-2xl mx-auto">

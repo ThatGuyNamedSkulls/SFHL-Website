@@ -282,7 +282,7 @@ export default function QueuePage() {
   const wins = player?.wins ?? 0;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="hl-page">
       {/* Queue region pill — follows the server you picked in Servers */}
       <div className="flex justify-center mb-5">
         <span className="bg-gold-gradient text-hl-base rounded-full px-4 py-1.5 text-xs font-black header-caps">

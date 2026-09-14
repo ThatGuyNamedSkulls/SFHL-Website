@@ -94,7 +94,7 @@ export default function AlertsPage() {
 
   if (session === null) {
     return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="hl-page">
         <PageHeader icon={Bell} title="Alerts" subtitle="Friend requests, party invites and updates" />
         <EmptyState icon={Bell} title="Log in to see your alerts" hint="Sign in with Discord to get notifications." />
         <div className="mt-4">
@@ -105,7 +105,7 @@ export default function AlertsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="hl-page">
       <PageHeader icon={Bell} title="Alerts" subtitle="Friend requests, party invites and updates" />
 
       {items.length === 0 ? (

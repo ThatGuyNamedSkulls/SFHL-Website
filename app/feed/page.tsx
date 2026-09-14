@@ -27,7 +27,7 @@ export default function FeedPage() {
   }, []);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="hl-page">
       <div className="flex items-center gap-2 mb-6">
         <Rss className="w-5 h-5 text-hl-gold" />
         <h1 className="text-2xl font-black text-white">Feed</h1>

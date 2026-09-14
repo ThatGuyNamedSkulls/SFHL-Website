@@ -52,21 +52,21 @@ function NavButton({
   onSearch: () => void;
 }) {
   const Icon = item.icon;
-  const className = `hl-nav-item flex items-center justify-center h-[42px] w-full ${
+  const className = `hl-nav-item flex items-center justify-center h-12 w-full ${
     active ? "text-[#ff5500]" : "text-[#8b8b8b] hover:text-white"
   }`;
 
   const icon = item.create ? (
     <span
-      className={`flex items-center justify-center w-[22px] h-[22px] rounded-[5px] border ${
+      className={`flex items-center justify-center w-6 h-6 rounded-[6px] border ${
         active ? "border-[#ff5500]" : "border-current"
       }`}
     >
-      <Plus className="w-3 h-3" strokeWidth={2.2} />
+      <Plus className="w-3.5 h-3.5" strokeWidth={2.2} />
     </span>
   ) : (
     <Icon
-      className={`w-[20px] h-[20px] ${item.href === "/queue" && active ? "fill-current" : ""}`}
+      className={`w-[22px] h-[22px] ${item.href === "/queue" && active ? "fill-current" : ""}`}
       strokeWidth={1.75}
       fill={item.label === "Play" && active ? "currentColor" : "none"}
     />
@@ -100,12 +100,12 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="hl-sidebar w-12 shrink-0 h-screen flex flex-col overflow-hidden z-40">
-        <Link href="/" className="flex items-center justify-center h-[52px] shrink-0" title="HyperLeague">
-          <Play className="w-[17px] h-[17px] text-[#ff5500] fill-[#ff5500] -rotate-[20deg]" />
+      <aside className="hl-sidebar shrink-0 h-screen flex flex-col overflow-hidden z-40">
+        <Link href="/" className="flex items-center justify-center h-[var(--hl-topbar-h)] shrink-0" title="HyperLeague">
+          <Play className="w-5 h-5 text-[#ff5500] fill-[#ff5500] -rotate-[20deg]" />
         </Link>
 
-        <nav className="flex-1 pt-0.5 flex flex-col gap-0.5">
+        <nav className="flex-1 pt-1 flex flex-col gap-0.5">
           {TOP_NAV.map((item) => (
             <NavButton
               key={item.label}
@@ -129,9 +129,9 @@ export function Sidebar() {
           <div className="flex-1" />
           <span
             title="Coming soon"
-            className="hl-nav-item flex items-center justify-center h-[42px] w-full text-[#8b8b8b]"
+            className="hl-nav-item flex items-center justify-center h-12 w-full text-[#8b8b8b]"
           >
-            <Trophy className="w-[20px] h-[20px]" strokeWidth={1.75} />
+            <Trophy className="w-[22px] h-[22px]" strokeWidth={1.75} />
           </span>
         </nav>
       </aside>
