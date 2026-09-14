@@ -76,6 +76,8 @@ export interface Player {
   joinedDate: string;
   placementDone?: boolean;
   placementGamesPlayed?: number;
+  placementGamesTotal?: number;
+  placementMatches?: Match[];
 }
 
 /** Cosmetic item types (profile customization inventory). */
@@ -136,6 +138,7 @@ export interface Match {
   rounds: string;
   mvp: boolean;
   matchId?: number;
+  mvps?: number;
 }
 
 /** Tournament status */
@@ -193,15 +196,23 @@ export interface MatchPlayerStats {
   clutches: number;
   plants: number;
   defuses: number;
+  elo?: number;
+  country?: string | null;
+  countryFlag?: string | null;
+  rating?: number;
+  swing?: number;
+  kpr?: number | null;
+  mvps?: number;
 }
 
 /** Detailed match with full scoreboard and round-by-round data */
 export interface MatchDetail {
   id: string;
   date: string;
+  timestamp?: string;
   region: string;
   map: string;
-  mode: GameMode;
+  mode: GameMode | string;
   teamAName: string;
   teamBName: string;
   teamAScore: number;
@@ -217,6 +228,9 @@ export interface MatchDetail {
   rounds: RoundEvent[];
   duration: string;
   mapVeto?: MapVeto[];
+  modeLabel?: string;
+  teamAAvatar?: string;
+  teamBAvatar?: string;
 }
 
 /** Round-by-round event */

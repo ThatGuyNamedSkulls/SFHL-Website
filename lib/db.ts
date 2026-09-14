@@ -318,6 +318,24 @@ export async function getMatchesForPlayer(playerName: string, limit = 100): Prom
   return rs.rows as unknown as DbMatch[];
 }
 
+/** Placement (pre-rank) games, oldest first — used by the profile placement track. */
+export async function getPlacementMatchesForPlayer(playerName: string): Promise<DbMatch[]> {
+  try {
+    const rs = await client.execute({
+      sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
+                   hs_percentage, elo_change, result, points, mvps, match_id,
+                   timestamp, executed_by, round_score
+            FROM match_history
+            WHERE player_name = ? AND COALESCE(is_placement, 0) = 1
+            ORDER BY id ASC`,
+      args: [playerName],
+    });
+    return rs.rows as unknown as DbMatch[];
+  } catch {
+    return [];
+  }
+}
+
 /** Just the Elo deltas of a player's non-placement matches (newest first,
  *  capped) — enough to draw the profile Elo curve without hydrating every
  *  column of every match. Timestamps come along so the curve can be split at

@@ -12,6 +12,7 @@ import { GameSkillBar } from "@/components/game-skill-bar";
 import { PerformanceCard } from "@/components/performance-card";
 import { ConsistencyDonut } from "@/components/consistency-donut";
 import { EloGraphFaceit } from "@/components/elo-graph-faceit";
+import { RecentPerformance } from "@/components/recent-performance";
 import { MapStatsTable } from "@/components/map-stats-table";
 import { MetricChart } from "@/components/metric-chart";
 import { ProfileInventory } from "@/components/profile-inventory";
@@ -641,35 +642,15 @@ function ProfileContent() {
                 {/* Own-ladder gamemodes are retired — 5v5 only. */}
 
                 {/* Recent performance */}
-                <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-5">
-                  <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-[15px] font-bold text-white">Recent performance</h2>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-[#8a8a8a] mb-4">
-                    <span>
-                      Last {Math.min(30, matches.length)} Matches
-                    </span>
-                    <span className="flex items-center gap-3">
-                      <span>
-                        <b className="text-[#2ecc71]">W {matches.slice(0, 30).filter((m) => m.result === "W").length}</b>
-                        {" / "}
-                        <b className="text-[#e74c3c]">L {matches.slice(0, 30).filter((m) => m.result !== "W").length}</b>
-                      </span>
-                    </span>
-                  </div>
-                  {performanceRow}
-                </div>
-
-                {/* ELO graph */}
-                <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-5">
-                  {player.eloHistory && player.eloHistory.length > 1 ? (
-                    <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} eloResets={player.eloResets} />
-                  ) : (
-                    <p className="text-sm text-[#8a8a8a] py-8 text-center">Not enough matches to chart yet.</p>
-                  )}
-                </div>
-
-                {statTileRow}
+                <RecentPerformance
+                  eloHistory={player.eloHistory || []}
+                  matches={matches}
+                  placementDone={!!player.placementDone}
+                  placementGamesPlayed={player.placementGamesPlayed ?? 0}
+                  placementGamesTotal={player.placementGamesTotal ?? 3}
+                  placementMatches={player.placementMatches ?? []}
+                  rank={player.rank}
+                />
 
                 {/* Recent matches */}
                 <div>

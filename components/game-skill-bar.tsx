@@ -16,7 +16,7 @@ function SkillLevelBox({
 }) {
   const letter = rank ?? "UNRANKED";
   const color = getRankByLetter(letter).color;
-  const hasSkill = rank != null && elo != null;
+  const hasSkill = !!rank && rank !== "UNRANKED" && elo != null && elo > 0;
 
   return (
     <div className="relative inline-flex items-center gap-4 rounded-xl border border-white/[0.1] bg-[#121212] pl-5 pr-6 py-3.5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
@@ -43,7 +43,12 @@ function SkillLevelBox({
           </span>
         </>
       ) : (
-        <span className="relative text-xl font-black text-white">Unranked</span>
+        <>
+          <span className="relative flex items-center justify-center w-14 h-14 shrink-0">
+            <RankBadge rank="UNRANKED" size="md" showGlow={false} className="relative !w-12 !h-12" />
+          </span>
+          <span className="relative text-[28px] leading-none font-black text-white">Unranked</span>
+        </>
       )}
     </div>
   );
@@ -82,7 +87,7 @@ export function GameSkillBar({
 }) {
   const letter = rank ?? "UNRANKED";
   const color = getRankByLetter(letter).color;
-  const hasSkill = rank != null && elo != null;
+  const hasSkill = !!rank && rank !== "UNRANKED" && elo != null && elo > 0;
 
   return (
     <div

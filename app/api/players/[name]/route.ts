@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPlayer, getMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, mapRank } from "@/lib/db";
+import { getPlayer, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, mapRank } from "@/lib/db";
 import { buildEloTimeline } from "@/lib/elo-timeline";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
@@ -25,9 +25,10 @@ export async function GET(
 
     // These are all independent of one another — fetch them concurrently
     // instead of one sequential await per data source.
-    const [matches, eloChanges, avatar, playedWithRaw, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings, seasonResets, seasonFinalElos] =
+    const [matches, placementRows, eloChanges, avatar, playedWithRaw, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings, seasonResets, seasonFinalElos] =
       await Promise.all([
         getMatchesForPlayer(decodedName),
+        getPlacementMatchesForPlayer(decodedName),
         getEloChanges(decodedName),
         resolvePlayerAvatar(decodedName, player.roblox_avatar_image, player.discord_avatar, player.discord_id),
         getMostPlayedWith(decodedName, 10),
@@ -116,6 +117,25 @@ export async function GET(
       placementDone: player.placement_done === 1,
       placementGamesPlayed: player.placement_games_played,
       placementGamesTotal,
+      placementMatches: placementRows.map((m) => ({
+        id: `M-${m.id}`,
+        date: m.timestamp || "",
+        region: prettyRegion(m.region),
+        map: prettyMap(m.map_name),
+        mode: "Competitive" as const,
+        result: m.result as "W" | "L",
+        kills: m.kills,
+        deaths: m.deaths,
+        assists: m.assists,
+        kdr: m.deaths > 0 ? +(m.kills / m.deaths).toFixed(2) : m.kills,
+        headshotPercent: m.hs_percentage,
+        eloChange: m.elo_change,
+        score: m.points,
+        rounds: formatRoundScore(m.round_score, m.result),
+        mvp: (m.mvps || 0) > 0,
+        matchId: m.match_id,
+        mvps: m.mvps || 0,
+      })),
       // Own-ladder gamemode ratings (e.g. the separate 1v1 ladder).
       modes: modeRatings.map((mr) => ({
         mode: mr.mode,
@@ -150,6 +170,7 @@ export async function GET(
         rounds: formatRoundScore(m.round_score, m.result),
         mvp: (m.mvps || 0) > 0,
         matchId: m.match_id,
+        mvps: m.mvps || 0,
       })),
     };
 

@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 import { client, getMatchesByMatchId, mapRank, ensurePlayerDiscordColumns } from "@/lib/db";
 import { prettyMap, prettyRegion } from "@/lib/format";
 import { resolveAvatarMap } from "@/lib/avatar";
+import { isValidCountry, countryName, flagPath } from "@/lib/countries";
+import {
+  performanceRating,
+  killsPerRound,
+  swingPercent,
+  kdRatio,
+  roundCount,
+  teamHandle,
+  avg,
+} from "@/lib/match-stats";
+import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 
 export async function GET(
   _request: Request,
@@ -57,14 +68,17 @@ export async function GET(
     const mvpName =
       mvpRow && (mvpRow.mvps || 0) > 0 ? mvpRow.player_name : null;
 
-    // One query for every player's current rank/avatar (was one per player).
-    const playerInfo = new Map<string, { rank: string; avatar: string }>();
+    // One query for every player's current rank/avatar/elo/country.
+    const playerInfo = new Map<
+      string,
+      { rank: string; avatar: string; elo: number; country: string | null; countryFlag: string | null }
+    >();
     if (rows.length > 0) {
       const placeholders = rows.map(() => "?").join(",");
       try {
         await ensurePlayerDiscordColumns();
         const rs = await client.execute({
-          sql: `SELECT name, rank, roblox_avatar_image, discord_avatar,
+          sql: `SELECT name, rank, elo, country, roblox_avatar_image, discord_avatar,
                        CAST(discord_id AS TEXT) AS discord_id
                 FROM players WHERE name IN (${placeholders})`,
           args: rows.map((r) => r.player_name),
@@ -72,15 +86,21 @@ export async function GET(
         const playerRows = rs.rows as unknown as {
           name: string;
           rank: string;
+          elo: number;
+          country: string | null;
           roblox_avatar_image: string | null;
           discord_avatar: string | null;
           discord_id: string | null;
         }[];
         const avatars = await resolveAvatarMap(playerRows);
         for (const r of playerRows) {
+          const cc = isValidCountry(r.country) ? r.country!.toLowerCase() : null;
           playerInfo.set(r.name, {
             rank: mapRank(r.rank || ""),
             avatar: avatars.get(r.name) ?? "",
+            elo: Number(r.elo ?? 0),
+            country: cc ? countryName(cc) : null,
+            countryFlag: cc ? flagPath(cc) : null,
           });
         }
         const missing = rows
@@ -89,7 +109,13 @@ export async function GET(
         if (missing.length > 0) {
           const extra = await resolveAvatarMap(missing.map((name) => ({ name })));
           for (const n of missing) {
-            playerInfo.set(n, { rank: "UNRANKED", avatar: extra.get(n) ?? "" });
+            playerInfo.set(n, {
+              rank: "UNRANKED",
+              avatar: extra.get(n) ?? "",
+              elo: 0,
+              country: null,
+              countryFlag: null,
+            });
           }
         }
       } catch {
@@ -97,25 +123,42 @@ export async function GET(
       }
     }
 
-    // Build player stats for each team
-    const buildPlayerStats = (players: typeof rows, team: "A" | "B") =>
+    const firstRow = rows[0];
+    const rounds = roundCount(firstRow?.round_score);
+
+    const ratingsFor = (players: typeof rows) =>
+      players.map((p) => performanceRating(p.kills, p.deaths, p.assists, rounds));
+
+    const teamARatings = ratingsFor(teamAPlayers);
+    const teamBRatings = ratingsFor(teamBPlayers);
+    const avgA = avg(teamARatings);
+    const avgB = avg(teamBRatings);
+
+    const buildPlayerStats = (players: typeof rows, team: "A" | "B", teamAvg: number) =>
       players.map((p) => {
         const info = playerInfo.get(p.player_name);
+        const rating = performanceRating(p.kills, p.deaths, p.assists, rounds);
         return {
           playerId: p.player_name,
           username: p.player_name,
           avatarUrl: info?.avatar ?? "",
           rank: info?.rank ?? "UNRANKED",
+          elo: info?.elo ?? 0,
+          country: info?.country ?? null,
+          countryFlag: info?.countryFlag ?? null,
           team,
           kills: p.kills,
           deaths: p.deaths,
           assists: p.assists,
-          kdr: p.deaths > 0 ? +(p.kills / p.deaths).toFixed(2) : p.kills,
+          kdr: kdRatio(p.kills, p.deaths),
           headshotPercent: p.hs_percentage,
           score: p.points,
           mvp: p.player_name === mvpName,
+          mvps: p.mvps || 0,
           eloChange: p.elo_change,
-          // These fields aren't in the DB but kept for UI compatibility
+          rating,
+          swing: swingPercent(rating, teamAvg),
+          kpr: killsPerRound(p.kills, rounds),
           firstKills: 0,
           clutches: 0,
           plants: 0,
@@ -123,7 +166,6 @@ export async function GET(
         };
       });
 
-    const firstRow = rows[0];
     const dateStr = firstRow.timestamp?.split(" ")[0] || "";
 
     // Preferred headline: the real team round score stored as "winners,losers"
@@ -148,28 +190,32 @@ export async function GET(
       scoreType = "points";
     }
 
+    const capA = teamAPlayers[0]?.player_name || "team";
+    const capB = teamBPlayers[0]?.player_name || "team";
     const detail = {
       id: matchId,
       date: dateStr,
+      timestamp: firstRow.timestamp || "",
       region: prettyRegion(firstRow.region),
       map: prettyMap(firstRow.map_name),
-      // The real gamemode when the bot recorded one ("1v1"/"2v2"/"5v5");
-      // legacy rows fall back to the generic label.
       mode: firstRow.mode ? `Competitive ${firstRow.mode}` : "Competitive",
-      teamAName: isTie ? "Team 1 (Tie)" : winners.length > 0 ? "Winners" : "Team 1",
-      teamBName: isTie ? "Team 2 (Tie)" : winners.length > 0 ? "Defeated" : "Team 2",
+      modeLabel: firstRow.mode || MATCH_MODE_LABEL,
+      teamAName: teamHandle(capA),
+      teamBName: teamHandle(capB),
+      teamAAvatar: playerInfo.get(capA)?.avatar ?? "",
+      teamBAvatar: playerInfo.get(capB)?.avatar ?? "",
       teamAScore,
       teamBScore,
       scoreType,
-      winner: "A" as const,
+      winner: (isTie ? "A" : winners.length > 0 ? "A" : "B") as "A" | "B",
       teamARoundsFirstHalf: 0,
       teamBRoundsFirstHalf: 0,
       teamARoundsSecondHalf: 0,
       teamBRoundsSecondHalf: 0,
       duration: "",
       players: [
-        ...buildPlayerStats(teamAPlayers, "A"),
-        ...buildPlayerStats(teamBPlayers, "B"),
+        ...buildPlayerStats(teamAPlayers, "A", avgA),
+        ...buildPlayerStats(teamBPlayers, "B", avgB),
       ],
       rounds: [],
     };

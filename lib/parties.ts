@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Turso-backed party store for the HyperLeague website.
  *
  * Parties are ephemeral matchmaking lobbies. They used to live in a JSON file
