@@ -19,10 +19,12 @@ import {
   Medal,
   Star,
   Server,
+  Zap,
 } from "lucide-react";
 import { usePlayRegion } from "@/components/use-play-region";
 import { QUEUE_REGIONS, regionQueueLabel } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
+import { QUEUE_MODE_SUPER, SUPER_PARTY_MAX, SUPER_ELO_RANGE, parseQueueMode } from "@/lib/queue-modes";
 
 interface WebQueueEntry {
   id: number;
@@ -30,6 +32,7 @@ interface WebQueueEntry {
   discord_username: string;
   player_name: string | null;
   joined_at: string;
+  queue_mode?: string | null;
 }
 
 interface PlayerInfo {
@@ -77,15 +80,29 @@ const MATCH_TYPES: {
   id: string;
   label: string;
   green?: boolean;
+  icon: typeof Swords;
   features: MatchTypeFeature[];
 }[] = [
   {
     id: "standard",
     label: "Standard Match",
+    icon: Swords,
     features: [
       { icon: Users, text: "Party of 5" },
       { icon: ShieldCheck, text: "Verified Matching", star: true },
       { icon: Activity, text: "No Elo restrictions" },
+      { icon: Medal, text: "5v5 Strike Force" },
+    ],
+  },
+  {
+    id: "super",
+    label: "Super Match",
+    green: true,
+    icon: Zap,
+    features: [
+      { icon: Users, text: "Solo, duo, trio" },
+      { icon: ShieldCheck, text: "Verified Matching", star: true },
+      { icon: Activity, text: `${SUPER_ELO_RANGE} Elo range` },
       { icon: Medal, text: "5v5 Strike Force" },
     ],
   },
@@ -111,6 +128,7 @@ export default function QueuePage() {
   const [playTab, setPlayTab] = useState<"type" | "servers">("type");
   const [queueOpen, setQueueOpen] = useState(false);
   const [openRegions, setOpenRegions] = useState<string[]>([]);
+  const [openModes, setOpenModes] = useState<Record<string, string[]>>({});
   const { region, setRegion } = usePlayRegion();
   // While a join/leave POST is in flight (and briefly after), ignore the 5s
   // poll's queue snapshot so a poll that started before the action can't land
@@ -135,6 +153,9 @@ export default function QueuePage() {
             : [];
         setOpenRegions(regions);
         setQueueOpen(regions.length > 0);
+        if (qData.openModes && typeof qData.openModes === "object") {
+          setOpenModes(qData.openModes as Record<string, string[]>);
+        }
         const sData = await sRes.json();
         const me = sData.user as UserSession | undefined;
         if (me) setSession(me);
@@ -179,6 +200,7 @@ export default function QueuePage() {
   }, [session?.playerName]);
 
   const inQueue = session ? queue.some((q) => q.discord_user_id === session.discordId) : false;
+  const visibleQueue = queue.filter((e) => parseQueueMode(e.queue_mode) === matchType);
   const canQueue = !!session?.inGuild && !!session?.playerName;
 
   const handleJoin = async () => {
@@ -189,7 +211,7 @@ export default function QueuePage() {
       const res = await fetch("/api/queue", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ region }),
+        body: JSON.stringify({ region, mode: matchType }),
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || "Failed to join queue");
@@ -266,18 +288,25 @@ export default function QueuePage() {
 
   const modeLabel = `${teamSize}v${teamSize}`;
   const regionOk = openRegions.includes(region);
+  const modesForRegion = openModes[region] ?? (queueOpen && regionOk ? ["standard", "super"] : []);
+  const modeOk = modesForRegion.includes(matchType);
+  const superPartyTooBig = matchType === QUEUE_MODE_SUPER && lobbyMembers.length > SUPER_PARTY_MAX;
   const findDisabled =
-    actionLoading || loading || ((!canQueue || partyBlocked || !regionOk) && !inQueue);
+    actionLoading || loading || ((!canQueue || partyBlocked || !regionOk || !modeOk || superPartyTooBig) && !inQueue);
   const findHint = !session
     ? null
     : !canQueue
       ? null
       : partyBlocked
         ? null
-        : !queueOpen
+        : superPartyTooBig
+          ? `Super Match only allows solo, duo, or trio. Leave extra party members first.`
+          : !queueOpen
           ? "No Discord queue is open. Match Staff need to run /queue with a region first."
           : !regionOk
             ? `Open now: ${openRegions.join(", ")}. Switch to one of those regions in Servers to find a match.`
+            : !modeOk
+              ? `${matchType === QUEUE_MODE_SUPER ? "Super Match" : "Standard Match"} is closed in ${region}.`
             : null;
 
   // Header banner state: placement progress until ranked, tier ladder after.
@@ -455,9 +484,10 @@ export default function QueuePage() {
           </div>
         </div>
         {playTab === "type" ? (
-        <div className="grid md:grid-cols-1 max-w-xl gap-4 items-start">
+        <div className="grid md:grid-cols-2 max-w-4xl gap-4 items-start">
           {MATCH_TYPES.map((mt) => {
             const active = matchType === mt.id;
+            const TypeIcon = mt.icon;
             return (
               <button
                 key={mt.id}
@@ -471,8 +501,8 @@ export default function QueuePage() {
                 )}
                 <div className="relative flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <Swords className="w-4 h-4 text-white shrink-0" />
-                    <span className="text-sm font-bold truncate text-white">
+                    <TypeIcon className={`w-4 h-4 shrink-0 ${mt.green ? "text-hl-green" : "text-white"}`} />
+                    <span className={`text-sm font-bold truncate ${mt.green ? "text-hl-green" : "text-white"}`}>
                       {mt.label}
                     </span>
                     <span className="text-xs text-hl-muted shrink-0">· {modeLabel}</span>
@@ -531,17 +561,17 @@ export default function QueuePage() {
       <Card className="bg-hl-panel border-hl-border overflow-hidden">
         <div className="px-5 py-4 border-b border-hl-border flex items-center justify-between bg-hl-panel-light/30">
           <h3 className="font-bold text-white header-caps flex items-center gap-2">
-            <Users className="w-4 h-4 text-hl-gold" /> Players from Web ({queue.length})
+            <Users className="w-4 h-4 text-hl-gold" /> Players from Web ({visibleQueue.length})
           </h3>
           <Badge className="bg-hl-gold/10 text-hl-gold border-hl-gold/30">Syncs to Discord</Badge>
         </div>
         <div className="divide-y divide-hl-border">
-          {queue.length === 0 ? (
+          {visibleQueue.length === 0 ? (
             <div className="px-5 py-8 text-center text-hl-muted text-sm">
               No one has joined from the web yet. Check the Discord bot for full queue status.
             </div>
           ) : (
-            queue.map((entry, idx) => (
+            visibleQueue.map((entry, idx) => (
               <div key={entry.id} className="flex items-center justify-between px-5 py-3 hover:bg-hl-panel-light/50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="text-xs text-hl-muted w-4">{idx + 1}.</div>

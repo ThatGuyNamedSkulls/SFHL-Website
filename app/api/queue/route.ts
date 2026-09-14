@@ -1,11 +1,26 @@
 import { NextResponse } from "next/server";
 import { getSession, isUserInGuildCached } from "@/lib/auth";
-import { getWebQueue, joinWebQueue, leaveWebQueue, getWebQueueRegion, getQueueTeamSize, getQueueGate } from "@/lib/db";
+import {
+  getWebQueue,
+  joinWebQueue,
+  leaveWebQueue,
+  getWebQueueSpot,
+  getQueueTeamSize,
+  getQueueGate,
+  getPlayer,
+} from "@/lib/db";
 import { getPartyForMember } from "@/lib/parties";
 import { getActiveLobbyMemberIds } from "@/lib/lobby";
 import { upsertWebUser } from "@/lib/social";
 import { isQueueRegion, regionMeta } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
+import {
+  QUEUE_MODE_SUPER,
+  SUPER_PARTY_MAX,
+  SUPER_ELO_RANGE,
+  eloRangeOk,
+  parseQueueMode,
+} from "@/lib/queue-modes";
 
 /** GET — returns current web queue state. */
 export async function GET(request: Request) {
@@ -25,6 +40,7 @@ export async function GET(request: Request) {
       open: gate.open,
       region: gate.region,
       openRegions: gate.openRegions,
+      openModes: gate.openModes,
     });
   } catch (error) {
     console.error("Error fetching queue:", error);
@@ -35,6 +51,7 @@ export async function GET(request: Request) {
       open: false,
       region: null,
       openRegions: [],
+      openModes: {},
     });
   }
 }
@@ -50,8 +67,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json().catch(() => ({} as { region?: unknown }));
+  const body = await request.json().catch(() => ({} as { region?: unknown; mode?: unknown }));
   const requested = typeof body.region === "string" ? body.region.toUpperCase() : "";
+  const mode = parseQueueMode(body.mode);
   if (!isQueueRegion(requested)) {
     return NextResponse.json(
       { error: "Pick a region in Servers before finding a match." },
@@ -72,6 +90,14 @@ export async function POST(request: Request) {
       {
         error: `That region is closed. Open now: ${openLabels}. Switch in Servers to join.`,
       },
+      { status: 403 }
+    );
+  }
+  const regionModes = gate.openModes[requested] ?? ["standard", "super"];
+  if (!regionModes.includes(mode)) {
+    const label = mode === QUEUE_MODE_SUPER ? "Super Match" : "Standard Match";
+    return NextResponse.json(
+      { error: `${label} is closed in ${requested}. Wait for Match Staff to reopen that queue.` },
       { status: 403 }
     );
   }
@@ -98,14 +124,16 @@ export async function POST(request: Request) {
     // Remember this player's Discord id so the bot can DM them by id.
     upsertWebUser(session.discordId, session.playerName, session.username).catch(() => {});
 
-    const alreadyRegion = await getWebQueueRegion(session.discordId);
-    if (alreadyRegion) {
+    const already = await getWebQueueSpot(session.discordId);
+    if (already) {
+      const where =
+        already.mode === QUEUE_MODE_SUPER ? `${already.region} Super Match` : `${already.region} queue`;
       return NextResponse.json(
         {
           error:
-            alreadyRegion === requested
+            already.region === requested && already.mode === mode
               ? "You are already in the queue"
-              : `You're already in the ${alreadyRegion} queue. Leave that one first.`,
+              : `You're already in the ${where}. Leave that one first.`,
         },
         { status: 409 }
       );
@@ -155,6 +183,33 @@ export async function POST(request: Request) {
       }
     }
 
+    if (mode === QUEUE_MODE_SUPER) {
+      const group = party?.members ?? [
+        { playerName: session.playerName, username: session.username, elo: 0 },
+      ];
+      if (group.length > SUPER_PARTY_MAX) {
+        return NextResponse.json(
+          { error: "Super Match only allows solo, duo, or trio parties." },
+          { status: 403 }
+        );
+      }
+      const elos: number[] = [];
+      for (const m of group) {
+        const name = m.playerName;
+        if (!name) continue;
+        const row = await getPlayer(name);
+        elos.push(Number(row?.elo ?? 0));
+      }
+      if (!eloRangeOk(elos, SUPER_ELO_RANGE)) {
+        return NextResponse.json(
+          {
+            error: `Super Match requires everyone in your party to be within ${SUPER_ELO_RANGE} Elo of each other.`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const toQueue = party
       ? party.members
       : [
@@ -165,16 +220,18 @@ export async function POST(request: Request) {
           },
         ];
     for (const m of toQueue) {
-      const other = await getWebQueueRegion(m.discordId);
-      if (other && other !== requested) {
+      const other = await getWebQueueSpot(m.discordId);
+      if (other && (other.region !== requested || other.mode !== mode)) {
+        const where =
+          other.mode === QUEUE_MODE_SUPER ? `${other.region} Super Match` : `${other.region} queue`;
         return NextResponse.json(
           {
-            error: `${m.playerName || m.username} is already in the ${other} queue. Leave that one first.`,
+            error: `${m.playerName || m.username} is already in the ${where}. Leave that one first.`,
           },
           { status: 409 }
         );
       }
-      await joinWebQueue(m.discordId, m.username, m.playerName, requested);
+      await joinWebQueue(m.discordId, m.username, m.playerName, requested, mode);
     }
 
     const queue = await getWebQueue(requested);

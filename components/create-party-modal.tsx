@@ -11,8 +11,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { UserSession, PartyView } from "@/types";
 import { RANK_TIERS } from "@/data/ranks";
-import { Swords, Check, ChevronDown } from "lucide-react";
+import { Swords, Check, ChevronDown, Zap } from "lucide-react";
 import { MATCH_MODE_LABEL, PARTY_MAX_SIZE } from "@/lib/match-mode";
+import { SUPER_PARTY_MAX } from "@/lib/queue-modes";
 
 interface CreatePartyModalProps {
   open: boolean;
@@ -39,6 +40,14 @@ const MATCH_TYPE_OPTIONS = [
     green: false,
     icon: Swords,
     maxSize: PARTY_MAX_SIZE,
+  },
+  {
+    id: "Super",
+    label: "Super Match",
+    desc: `Solo, duo or trio. Verified matching. ${SUPER_PARTY_MAX} max. 400 Elo range.`,
+    green: true,
+    icon: Zap,
+    maxSize: SUPER_PARTY_MAX,
   },
 ];
 

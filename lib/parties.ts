@@ -16,7 +16,8 @@
 import { randomUUID } from "crypto";
 import { client } from "@/lib/db";
 import { clearInvitesForParties } from "@/lib/social";
-import { MATCH_MODE_LABEL, PARTY_MAX_SIZE } from "@/lib/match-mode";
+import { MATCH_MODE_LABEL } from "@/lib/match-mode";
+import { partyMaxForMatchType } from "@/lib/queue-modes";
 import {
   createPartyVoiceChannel,
   deletePartyVoiceChannel,
@@ -252,7 +253,7 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
     region: input.region || "EU",
     leaderId: input.leader.discordId,
     members: [input.leader],
-    maxSize: PARTY_MAX_SIZE,
+    maxSize: partyMaxForMatchType(input.matchType),
     minSkill: input.minSkill || "D",
     maxSkill: input.maxSkill || "STAR",
     language: input.language || "Any",

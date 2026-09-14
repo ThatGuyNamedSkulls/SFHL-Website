@@ -2,6 +2,7 @@ import { createClient, type Client, type ResultSet } from "@libsql/client";
 import { isQueueRegion } from "@/lib/regions";
 import { countryToPlayRegion } from "@/lib/country-regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
+import { parseQueueMode, type QueueModeId } from "@/lib/queue-modes";
 
 // Ensure we have a database URL
 if (!process.env.TURSO_DATABASE_URL) {
@@ -632,10 +633,34 @@ export interface WebQueueEntry {
   player_name: string | null;
   joined_at: string;
   region?: string | null;
+  queue_mode?: string | null;
+}
+
+let webQueueModeReady: Promise<void> | null = null;
+export function ensureWebQueueModeColumn(): Promise<void> {
+  if (!webQueueModeReady) {
+    webQueueModeReady = (async () => {
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS web_queue (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          discord_user_id TEXT NOT NULL UNIQUE,
+          discord_username TEXT NOT NULL,
+          player_name TEXT,
+          joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          region TEXT,
+          queue_mode TEXT
+        )
+      `);
+      await client.execute("ALTER TABLE web_queue ADD COLUMN region TEXT").catch(() => {});
+      await client.execute("ALTER TABLE web_queue ADD COLUMN queue_mode TEXT").catch(() => {});
+    })();
+  }
+  return webQueueModeReady;
 }
 
 export async function getWebQueue(region?: string): Promise<WebQueueEntry[]> {
   try {
+    await ensureWebQueueModeColumn();
     if (region) {
       const rs = await client.execute({
         sql: "SELECT * FROM web_queue WHERE region = ? ORDER BY joined_at ASC",
@@ -654,27 +679,14 @@ export async function joinWebQueue(
   discordUserId: string,
   discordUsername: string,
   playerName: string | null,
-  region: string
+  region: string,
+  mode: QueueModeId = "standard"
 ): Promise<void> {
-  await client.execute(`
-    CREATE TABLE IF NOT EXISTS web_queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      discord_user_id TEXT NOT NULL UNIQUE,
-      discord_username TEXT NOT NULL,
-      player_name TEXT,
-      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      region TEXT
-    )
-  `);
-  try {
-    await client.execute("ALTER TABLE web_queue ADD COLUMN region TEXT");
-  } catch {
-    /* already present */
-  }
+  await ensureWebQueueModeColumn();
   await client.execute({
-    sql: `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name, region)
-          VALUES (?, ?, ?, ?)`,
-    args: [discordUserId, discordUsername, playerName, region]
+    sql: `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name, region, queue_mode)
+          VALUES (?, ?, ?, ?, ?)`,
+    args: [discordUserId, discordUsername, playerName, region, mode]
   });
 }
 
@@ -700,14 +712,23 @@ export async function isInWebQueue(discordUserId: string): Promise<boolean> {
 
 /** Which region queue this Discord user is waiting in, if any. */
 export async function getWebQueueRegion(discordUserId: string): Promise<string | null> {
+  const spot = await getWebQueueSpot(discordUserId);
+  return spot?.region ?? null;
+}
+
+export async function getWebQueueSpot(
+  discordUserId: string
+): Promise<{ region: string; mode: QueueModeId } | null> {
   try {
+    await ensureWebQueueModeColumn();
     const rs = await client.execute({
-      sql: "SELECT region FROM web_queue WHERE discord_user_id = ?",
+      sql: "SELECT region, queue_mode FROM web_queue WHERE discord_user_id = ?",
       args: [discordUserId],
     });
     if (!rs.rows.length) return null;
     const raw = String(rs.rows[0].region ?? "").toUpperCase();
-    return isQueueRegion(raw) ? raw : null;
+    if (!isQueueRegion(raw)) return null;
+    return { region: raw, mode: parseQueueMode(rs.rows[0].queue_mode) };
   } catch {
     return null;
   }
@@ -718,14 +739,16 @@ export async function getQueueGate(): Promise<{
   open: boolean;
   region: string | null;
   openRegions: string[];
+  openModes: Record<string, QueueModeId[]>;
 }> {
   try {
     const rs = await client.execute(
-      "SELECT key, value FROM bot_state WHERE key IN ('queue_open_regions', 'queue_open', 'queue_region')"
+      "SELECT key, value FROM bot_state WHERE key IN ('queue_open_regions', 'queue_open', 'queue_region', 'queue_open_modes')"
     );
     let openRegions: string[] = [];
     let legacyOpen = false;
     let legacyRegion: string | null = null;
+    let openModes: Record<string, QueueModeId[]> = {};
     for (const row of rs.rows) {
       const key = String(row.key);
       const value = String(row.value ?? "");
@@ -737,16 +760,33 @@ export async function getQueueGate(): Promise<{
       }
       if (key === "queue_open") legacyOpen = value === "1";
       if (key === "queue_region" && value) legacyRegion = value.toUpperCase();
+      if (key === "queue_open_modes" && value) {
+        for (const part of value.split(",")) {
+          const [codeRaw, modeRaw] = part.split(":");
+          const code = (codeRaw || "").trim().toUpperCase();
+          const mode = parseQueueMode((modeRaw || "").trim());
+          if (!isQueueRegion(code)) continue;
+          const list = openModes[code] ?? [];
+          if (!list.includes(mode)) list.push(mode);
+          openModes[code] = list;
+        }
+      }
     }
     if (!openRegions.length && legacyOpen && legacyRegion && isQueueRegion(legacyRegion)) {
       openRegions = [legacyRegion];
+    }
+    if (openRegions.length && !Object.keys(openModes).length) {
+      openModes = Object.fromEntries(
+        openRegions.map((code) => [code, ["standard", "super"] as QueueModeId[]])
+      );
     }
     return {
       open: openRegions.length > 0,
       region: openRegions[0] ?? null,
       openRegions,
+      openModes,
     };
   } catch {
-    return { open: false, region: null, openRegions: [] };
+    return { open: false, region: null, openRegions: [], openModes: {} };
   }
 }

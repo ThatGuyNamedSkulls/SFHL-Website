@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getParties, createParty } from "@/lib/parties";
-import { MATCH_MODE_LABEL, PARTY_MAX_SIZE } from "@/lib/match-mode";
+import { MATCH_MODE_LABEL } from "@/lib/match-mode";
+import { partyMaxForMatchType } from "@/lib/queue-modes";
 import { memberFromSession, withFreshCosmetics, withMemberStatus } from "@/lib/party-member";
 import { getPartyInvitePartyIds, getInvitesForParties } from "@/lib/social";
 
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
       voiceRequired: body.voiceRequired,
       isPrivate: body.isPrivate,
       vibe: body.vibe,
-      maxSize: PARTY_MAX_SIZE,
+      maxSize: partyMaxForMatchType(body.matchType),
       leader: await memberFromSession(session),
     });
     return NextResponse.json({ party });
