@@ -7,7 +7,7 @@ import { upsertWebUser } from "@/lib/social";
 import { isPlayRegion, regionMeta } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 
-/** GET — returns current web queue state (1v1 while testing). */
+/** GET — returns current web queue state. */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

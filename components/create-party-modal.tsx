@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import {
@@ -30,7 +30,7 @@ const SKILL_TIERS = RANK_TIERS.filter((t) => t.letter !== "UNRANKED");
 
 export const PARTY_VIBES = ["Chill", "Fun", "Balanced", "Serious", "Intense"];
 
-/** FACEIT-style match types. Standard 1v1 while testing. */
+/** FACEIT-style match types. */
 const MATCH_TYPE_OPTIONS = [
   {
     id: "Standard",

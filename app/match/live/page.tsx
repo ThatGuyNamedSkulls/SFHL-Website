@@ -46,7 +46,7 @@ export default function LiveMatchPage() {
         <EmptyState
           icon={Swords}
           title="No live match"
-          hint="When a 1v1 queue fills, this room opens with teams, map veto, and a Discord voice link."
+          hint="When a 5v5 queue fills, this room opens with teams, map veto, and a Discord voice link."
         />
         <div className="mt-4 text-center">
           <Link href="/queue" className="inline-flex px-5 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-bold text-sm">

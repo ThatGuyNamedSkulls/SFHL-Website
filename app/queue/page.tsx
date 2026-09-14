@@ -72,7 +72,7 @@ interface MatchTypeFeature {
   star?: boolean;
 }
 
-/** FACEIT-style match-type cards. Premium variants are deferred — Standard 1v1 while testing. */
+/** FACEIT-style match-type cards. */
 const MATCH_TYPES: {
   id: string;
   label: string;
@@ -83,10 +83,10 @@ const MATCH_TYPES: {
     id: "standard",
     label: "Standard Match",
     features: [
-      { icon: Users, text: "Party of 2" },
+      { icon: Users, text: "Party of 5" },
       { icon: ShieldCheck, text: "Verified Matching", star: true },
       { icon: Activity, text: "No Elo restrictions" },
-      { icon: Medal, text: "1v1 Strike Force" },
+      { icon: Medal, text: "5v5 Strike Force" },
     ],
   },
 ];
@@ -102,7 +102,7 @@ export default function QueuePage() {
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
   const [party, setParty] = useState<PartyLite | null>(null);
   const [queue, setQueue] = useState<WebQueueEntry[]>([]);
-  // Global queue format — 1v1 while testing with friends.
+  // Live queue format (5v5).
   const [teamSize, setTeamSize] = useState(MATCH_TEAM_SIZE);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);

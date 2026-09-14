@@ -683,7 +683,7 @@ export async function leaveWebQueue(discordUserId: string): Promise<void> {
   } catch {}
 }
 
-/** Live queue format. Temporary 1v1 for friend testing — flip MATCH_TEAM_SIZE. */
+/** Live queue format. */
 export async function getQueueTeamSize(): Promise<number> {
   return MATCH_TEAM_SIZE;
 }
