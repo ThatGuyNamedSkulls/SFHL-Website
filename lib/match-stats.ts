@@ -17,6 +17,10 @@ export const SWING_SCALE = 20;
 export const TYPICAL_SPR = 2.5;
 export const RATING_MIN = 0.2;
 export const RATING_MAX = 2.5;
+export const RATING_GREAT = 1.4;
+export const SWING_GOOD = 0.05;
+/** Matches a 1.40 rating: (1.40 − 1.10) × 20 = +6%. */
+export const SWING_GREAT = (RATING_GREAT - RATING_BASELINE) * SWING_SCALE;
 
 export const STAT_ESTIMATE_HINT = "Estimate from scoreboard stats (no demo).";
 
@@ -103,17 +107,37 @@ export function avg(nums: number[]): number {
   return nums.reduce((a, b) => a + b, 0) / nums.length;
 }
 
+const COLOR_GOLD = "#ffc44d";
+const COLOR_GREEN = "#2ecc71";
+const COLOR_RED = "#e74c3c";
+const COLOR_NEUTRAL = "#8a8a8a";
+const COLOR_WHITE = "#e8e8e8";
+const COLOR_ORANGE = "#ff5500";
+
 export function ratingColor(rating: number): string {
-  if (rating >= 1.4) return "#ff5500";
-  if (rating >= 1.25) return "#2ecc71";
-  if (rating >= 0.8) return "#e8e8e8";
-  return "#e74c3c";
+  if (rating >= RATING_GREAT) return COLOR_ORANGE;
+  if (rating >= 1.25) return COLOR_GREEN;
+  if (rating >= 0.8) return COLOR_WHITE;
+  return COLOR_RED;
 }
 
+/** Positive = green, extra-good (≥ +6%, FACEIT 1.40) = gold. */
 export function swingColor(swing: number): string {
-  if (swing > 0.05) return "#2ecc71";
-  if (swing < -0.05) return "#e74c3c";
-  return "#8a8a8a";
+  if (swing >= SWING_GREAT) return COLOR_GOLD;
+  if (swing > SWING_GOOD) return COLOR_GREEN;
+  if (swing < -SWING_GOOD) return COLOR_RED;
+  return COLOR_NEUTRAL;
+}
+
+export function eloChangeColor(delta: number): string {
+  if (delta > 0) return COLOR_GREEN;
+  if (delta < 0) return COLOR_RED;
+  return COLOR_NEUTRAL;
+}
+
+export function formatSigned(n: number, digits?: number): string {
+  const body = digits != null ? n.toFixed(digits) : String(Math.round(n));
+  return n > 0 ? `+${body}` : body;
 }
 
 export function teamHandle(name: string | null | undefined): string {

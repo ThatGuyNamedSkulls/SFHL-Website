@@ -23,6 +23,7 @@ import {
   ratingColor,
   swingColor,
   swingPercent,
+  formatSigned,
 } from "@/lib/match-stats";
 import { formatScoreDisplay } from "@/lib/format";
 import { Shield } from "lucide-react";
@@ -109,7 +110,7 @@ function GraphTooltip({
         <TipRow label="Rating" value={rating.toFixed(2)} color={ratingColor(rating)} />
         <TipRow
           label="Swing"
-          value={`${swing >= 0 ? "+" : ""}${swing.toFixed(2)}%`}
+          value={`${formatSigned(swing, 2)}%`}
           color={swingColor(swing)}
         />
         <TipRow label="K/D/A" value={`${m.kills} / ${m.deaths} / ${m.assists}`} />
@@ -373,7 +374,7 @@ export function RecentPerformance({
         <StatCard label="K/R" value={cards.kr != null ? cards.kr.toFixed(2) : "—"} />
         <StatCard
           label="Swing"
-          value={statSource.length ? `${cards.swing >= 0 ? "+" : ""}${cards.swing.toFixed(2)}%` : "—"}
+          value={statSource.length ? `${formatSigned(cards.swing, 2)}%` : "—"}
           color={swingColor(cards.swing)}
         />
         <StatCard

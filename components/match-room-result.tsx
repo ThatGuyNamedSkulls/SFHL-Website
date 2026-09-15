@@ -6,7 +6,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { MapThumb } from "@/components/map-thumb";
 import { MatchDetail, MatchPlayerStats, RankTierLetter } from "@/types";
-import { ratingColor, swingColor, STAT_ESTIMATE_HINT } from "@/lib/match-stats";
+import {
+  ratingColor,
+  swingColor,
+  eloChangeColor,
+  formatSigned,
+  SWING_GREAT,
+  STAT_ESTIMATE_HINT,
+} from "@/lib/match-stats";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 import { cn } from "@/lib/utils";
 import { Calendar, Star, Swords } from "lucide-react";
@@ -40,6 +47,12 @@ function PlayerCard({
       {typeof player.elo === "number" && player.elo > 0 && (
         <span className="text-[12px] tabular-nums text-[#8a8a8a] shrink-0">{player.elo}</span>
       )}
+      <span
+        className="text-[12px] font-bold tabular-nums shrink-0"
+        style={{ color: eloChangeColor(player.eloChange ?? 0) }}
+      >
+        {formatSigned(player.eloChange ?? 0)}
+      </span>
       <RankBadge
         rank={(player.rank || "UNRANKED") as RankTierLetter}
         size="sm"
@@ -111,13 +124,25 @@ function Num({
   value,
   color,
   className,
+  glow,
 }: {
   value: string | number;
   color?: string;
   className?: string;
+  glow?: boolean;
 }) {
   return (
-    <span className={cn("tabular-nums", className)} style={color ? { color } : undefined}>
+    <span
+      className={cn("tabular-nums", className)}
+      style={
+        color
+          ? {
+              color,
+              textShadow: glow ? "0 0 14px rgba(255, 196, 77, 0.7)" : undefined,
+            }
+          : undefined
+      }
+    >
       {value}
     </span>
   );
@@ -155,6 +180,7 @@ function StatsTable({
             <tr className="text-[#6a6a6a] text-[10px] uppercase tracking-wide border-b border-white/[0.06]">
               <th className="text-left font-semibold px-3 py-2">Player</th>
               <th className="font-semibold px-2 py-2">Rank</th>
+              <th className="font-semibold px-2 py-2">Elo</th>
               <th className="font-semibold px-2 py-2 cursor-help" title={STAT_ESTIMATE_HINT}>
                 Rating
               </th>
@@ -208,12 +234,19 @@ function StatsTable({
                     <RankBadge rank={p.rank} size="sm" showGlow={false} className="!w-5 !h-5 mx-auto" />
                   </td>
                   <td className="px-2 py-2 font-bold">
+                    <Num
+                      value={formatSigned(p.eloChange ?? 0)}
+                      color={eloChangeColor(p.eloChange ?? 0)}
+                    />
+                  </td>
+                  <td className="px-2 py-2 font-bold">
                     <Num value={rating.toFixed(2)} color={ratingColor(rating)} />
                   </td>
                   <td className="px-2 py-2 font-semibold">
                     <Num
-                      value={`${swing >= 0 ? "+" : ""}${swing.toFixed(2)}%`}
+                      value={`${formatSigned(swing, 2)}%`}
                       color={swingColor(swing)}
+                      glow={swing >= SWING_GREAT}
                     />
                   </td>
                   <td className="px-2 py-2 text-white">{p.kills}</td>
@@ -321,12 +354,29 @@ function Stats({ match }: { match: MatchDetail }) {
             </div>
             <div className="grid grid-cols-2 gap-3 text-[13px]">
               <div>
+                <div className="text-[#8a8a8a] text-[11px]">Elo</div>
+                <div
+                  className="font-bold tabular-nums"
+                  style={{ color: eloChangeColor(selected.eloChange ?? 0) }}
+                >
+                  {formatSigned(selected.eloChange ?? 0)}
+                </div>
+              </div>
+              <div>
                 <div className="text-[#8a8a8a] text-[11px] cursor-help" title={STAT_ESTIMATE_HINT}>
                   Swing
                 </div>
-                <div className="font-bold tabular-nums" style={{ color: swingColor(selected.swing ?? 0) }}>
-                  {(selected.swing ?? 0) >= 0 ? "+" : ""}
-                  {(selected.swing ?? 0).toFixed(2)}%
+                <div
+                  className="font-bold tabular-nums"
+                  style={{
+                    color: swingColor(selected.swing ?? 0),
+                    textShadow:
+                      (selected.swing ?? 0) >= SWING_GREAT
+                        ? "0 0 14px rgba(255, 196, 77, 0.7)"
+                        : undefined,
+                  }}
+                >
+                  {formatSigned(selected.swing ?? 0, 2)}%
                 </div>
               </div>
               <div>
