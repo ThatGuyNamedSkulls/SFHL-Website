@@ -19,8 +19,8 @@ export const RATING_MIN = 0.2;
 export const RATING_MAX = 2.5;
 export const RATING_GREAT = 1.4;
 export const SWING_GOOD = 0.05;
-/** Matches a 1.40 rating: (1.40 − 1.10) × 20 = +6%. */
-export const SWING_GREAT = (RATING_GREAT - RATING_BASELINE) * SWING_SCALE;
+/** Extra-good / gold swing. */
+export const SWING_GREAT = 9;
 
 export const STAT_ESTIMATE_HINT = "Estimate from scoreboard stats (no demo).";
 
@@ -121,7 +121,7 @@ export function ratingColor(rating: number): string {
   return COLOR_RED;
 }
 
-/** Positive = green, extra-good (≥ +6%, FACEIT 1.40) = gold. */
+/** Positive = green, extra-good (≥ +9%) = gold. */
 export function swingColor(swing: number): string {
   if (swing >= SWING_GREAT) return COLOR_GOLD;
   if (swing > SWING_GOOD) return COLOR_GREEN;
