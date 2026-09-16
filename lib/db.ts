@@ -1,4 +1,4 @@
-import { createClient, type Client, type ResultSet } from "@libsql/client";
+import { createClient, type Client, type ResultSet, type InArgs } from "@libsql/client";
 import { isQueueRegion } from "@/lib/regions";
 import { countryToPlayRegion } from "@/lib/country-regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
@@ -310,7 +310,7 @@ const MATCH_BASE_COLS = `id, player_name, map_name, region, kills, deaths, assis
                  timestamp, executed_by, round_score`;
 const MATCH_SUB_COLS = `${MATCH_BASE_COLS}, COALESCE(is_sub, 0) AS is_sub, COALESCE(left_early, 0) AS left_early, sub_share`;
 
-async function selectMatchRows(whereSql: string, args: unknown[]): Promise<DbMatch[]> {
+async function selectMatchRows(whereSql: string, args: InArgs): Promise<DbMatch[]> {
   try {
     const rs = await client.execute({
       sql: `SELECT ${MATCH_SUB_COLS} ${whereSql}`,
