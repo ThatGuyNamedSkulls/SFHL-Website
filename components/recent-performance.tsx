@@ -17,7 +17,6 @@ import { getRankForElo } from "@/data/ranks";
 import {
   performanceRating,
   kdRatio,
-  killsPerRound,
   roundCount,
   avg,
   ratingColor,
@@ -167,6 +166,77 @@ interface GraphPoint {
 
 const GRAPH_MATCHES = 20;
 const Y_PAD = 100;
+const PREV_COLOR = "#e74c3c";
+const CURR_COLOR = "#ff5500";
+
+function tailElo(series: number[], matchCount: number, fallback?: number | null): number[] {
+  if (matchCount > 0 && series.length >= matchCount + 1) return series.slice(-(matchCount + 1));
+  if (matchCount > 0 && series.length > 0) return series;
+  if (fallback != null && fallback > 0) return [fallback];
+  return [];
+}
+
+function toGraphPoints(series: number[], chrono: Match[]): GraphPoint[] {
+  return series.map((elo, i) => ({
+    matchN: i,
+    elo,
+    match: i === 0 ? null : chrono[i - 1] ?? null,
+  }));
+}
+
+function EloSegmentChart({
+  points,
+  color,
+  fillId,
+  yMin,
+  yMax,
+  yTicks,
+  showAxis,
+}: {
+  points: GraphPoint[];
+  color: string;
+  fillId: string;
+  yMin: number;
+  yMax: number;
+  yTicks: number[];
+  showAxis: boolean;
+}) {
+  if (!points.length) return null;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={points} margin={{ top: 12, right: 6, left: showAxis ? -8 : 4, bottom: 0 }}>
+        <defs>
+          <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.32} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <XAxis dataKey="matchN" hide />
+        <YAxis
+          hide={!showAxis}
+          domain={[yMin, yMax]}
+          ticks={yTicks}
+          tick={{ fill: "#6a6a6a", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+          width={showAxis ? 40 : 0}
+        />
+        <Tooltip cursor={{ stroke: "rgba(255,255,255,0.12)" }} content={<GraphTooltip />} />
+        <Area
+          type="linear"
+          dataKey="elo"
+          stroke={color}
+          strokeWidth={2}
+          fill={`url(#${fillId})`}
+          dot={points.length < 8 ? { r: 3, fill: color, stroke: "#111", strokeWidth: 2 } : false}
+          activeDot={{ r: 5, fill: color, stroke: "#111", strokeWidth: 2 }}
+          connectNulls={false}
+          isAnimationActive={false}
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
 
 export function RecentPerformance({
   eloHistory,
@@ -181,18 +251,26 @@ export function RecentPerformance({
   currentElo,
 }: RecentPerformanceProps) {
   const placing = !placementDone;
-  const seasonMatches = useMemo(
+  const windowAll = useMemo(() => matches.slice(0, GRAPH_MATCHES), [matches]);
+  const currMatches = useMemo(
     () =>
-      lastResetAt ? matches.filter((m) => m.date && m.date >= lastResetAt) : matches,
-    [matches, lastResetAt]
+      lastResetAt ? windowAll.filter((m) => m.date && m.date >= lastResetAt) : windowAll,
+    [windowAll, lastResetAt]
   );
-  const windowMatches = useMemo(
-    () => seasonMatches.slice(0, GRAPH_MATCHES),
-    [seasonMatches]
+  const prevMatches = useMemo(
+    () =>
+      lastResetAt ? windowAll.filter((m) => !m.date || m.date < lastResetAt) : [],
+    [windowAll, lastResetAt]
   );
-  const chrono = useMemo(() => [...windowMatches].reverse(), [windowMatches]);
+  const prevChrono = useMemo(() => [...prevMatches].reverse(), [prevMatches]);
+  const currChrono = useMemo(() => [...currMatches].reverse(), [currMatches]);
+  const windowCount = prevMatches.length + currMatches.length;
   const statSource =
-    placing && placementMatches.length ? placementMatches : windowMatches.length ? windowMatches : matches.slice(0, GRAPH_MATCHES);
+    placing && placementMatches.length
+      ? placementMatches
+      : windowAll.length
+        ? windowAll
+        : matches.slice(0, GRAPH_MATCHES);
 
   const cards = useMemo(() => {
     const n = statSource.length;
@@ -231,55 +309,60 @@ export function RecentPerformance({
     };
   }, [statSource]);
 
-  const { points, nowValues } = useMemo(() => {
+  const { prevPoints, currPoints, nowValues } = useMemo(() => {
     const lastNull = eloHistory.lastIndexOf(null);
-    const season = (
+    const prevEloAll =
+      lastNull === -1
+        ? []
+        : eloHistory.slice(0, lastNull).filter((e): e is number => e !== null);
+    const currEloAll = (
       lastNull === -1 ? eloHistory : eloHistory.slice(lastNull + 1)
     ).filter((e): e is number => e !== null);
-    const n = windowMatches.length;
-    const nowSeries =
-      n === 0
-        ? [season[0] ?? currentElo ?? 0]
-        : season.length >= n + 1
-          ? season.slice(-(n + 1))
-          : season.length
-            ? season
-            : [currentElo ?? 0];
-    const built: GraphPoint[] = [];
-    if (lastSeason) {
-      built.push({ matchN: 0, elo: lastSeason.elo, match: null });
-      built.push({ matchN: 1, elo: null, match: null });
-    }
-    const offset = built.length;
-    nowSeries.forEach((elo, i) => {
-      built.push({
-        matchN: offset + i,
-        elo,
-        match: i === 0 ? null : chrono[i - 1] ?? null,
-      });
-    });
-    return { points: built, nowValues: nowSeries };
-  }, [eloHistory, windowMatches.length, chrono, lastSeason, currentElo]);
 
-  const values = points.map((p) => p.elo).filter((e): e is number => e !== null);
+    let prevSeries = tailElo(prevEloAll, prevMatches.length, lastSeason?.elo);
+    if (lastSeason && prevSeries.length === 0 && currMatches.length < GRAPH_MATCHES) {
+      prevSeries = [lastSeason.elo];
+    }
+    const currSeries = tailElo(currEloAll, currMatches.length, currentElo);
+
+    return {
+      prevPoints: toGraphPoints(prevSeries, prevChrono),
+      currPoints: toGraphPoints(currSeries, currChrono),
+      nowValues: currSeries,
+    };
+  }, [
+    eloHistory,
+    prevMatches.length,
+    currMatches.length,
+    prevChrono,
+    currChrono,
+    lastSeason,
+    currentElo,
+  ]);
+
+  const values = [...prevPoints, ...currPoints]
+    .map((p) => p.elo)
+    .filter((e): e is number => e !== null);
   const minElo = values.length ? Math.min(...values) : 0;
   const maxElo = values.length ? Math.max(...values) : 0;
   const yMin = Math.max(0, Math.floor(minElo - Y_PAD));
   const yMax = Math.ceil(maxElo + Y_PAD);
   const yMid = Math.round((yMin + yMax) / 2);
+  const yTicks = [yMin, yMid, yMax];
+  const showCut = prevPoints.length > 0 && currPoints.length > 0;
   const eloChange =
     nowValues.length > 1 ? nowValues[nowValues.length - 1] - nowValues[0] : 0;
-  const avgSkill = nowValues.length ? Math.round(avg(nowValues)) : 0;
-  const wins = windowMatches.filter((m) => m.result === "W").length;
-  const losses = windowMatches.length - wins;
+  const avgSkill = values.length ? Math.round(avg(values)) : 0;
+  const wins = windowAll.filter((m) => m.result === "W").length;
+  const losses = windowAll.length - wins;
 
   return (
     <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-5">
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-[15px] font-bold text-white">Recent performance</h2>
-        {!placing && windowMatches.length > 0 && (
+        {!placing && windowCount > 0 && (
           <span className="text-[13px] text-[#8a8a8a] flex items-center gap-3">
-            Last {windowMatches.length} Matches
+            Last {windowCount} Matches
             {avgSkill > 0 && (
               <span className="inline-flex items-center gap-1">
                 <Shield className="w-3.5 h-3.5 text-[#ff5500]" />
@@ -329,7 +412,7 @@ export function RecentPerformance({
             </span>
           </div>
 
-          {(lastSeason || placementMatches.length > 0 || chrono.length > 0) && (
+          {(lastSeason || prevChrono.length > 0 || currChrono.length > 0) && (
             <div className="flex items-center gap-1.5 flex-wrap px-8 mb-2">
               {lastSeason && (
                 <RankBadge
@@ -339,12 +422,11 @@ export function RecentPerformance({
                   className="!w-5 !h-5"
                 />
               )}
-              {lastSeason && <span className="w-px h-4 bg-white/25 mx-0.5" title="Season reset" />}
-              {placementMatches.map((m) => (
+              {prevChrono.map((m) => (
                 <Link
-                  key={`p-${m.id}`}
+                  key={`prev-${m.id}`}
                   href={m.matchId ? `/match/${m.matchId}` : "#"}
-                  title={`Placement — ${m.map} ${m.result}`}
+                  title={`${m.map} — ${m.result}`}
                   className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                     m.result === "W" ? "bg-[#2ecc71]" : "bg-[#e74c3c]"
                   }`}
@@ -353,9 +435,9 @@ export function RecentPerformance({
               {rank && rank !== "UNRANKED" && (
                 <RankBadge rank={rank} size="sm" showGlow={false} className="!w-5 !h-5 mx-0.5" />
               )}
-              {chrono.map((m) => (
+              {currChrono.map((m) => (
                 <Link
-                  key={m.id}
+                  key={`curr-${m.id}`}
                   href={m.matchId ? `/match/${m.matchId}` : "#"}
                   title={`${m.map} — ${m.result}`}
                   className={`w-2.5 h-2.5 rounded-full shrink-0 ${
@@ -366,42 +448,52 @@ export function RecentPerformance({
             </div>
           )}
 
-          {points.filter((p) => p.elo != null).length > 1 ? (
-            <div className="w-full h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={points} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="eloFillRecent" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ff5500" stopOpacity={0.32} />
-                      <stop offset="100%" stopColor="#ff5500" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="matchN" hide />
-                  <YAxis
-                    domain={[yMin, yMax]}
-                    ticks={[yMin, yMid, yMax]}
-                    tick={{ fill: "#6a6a6a", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={40}
+          {values.length > 0 ? (
+            <div className="flex h-[220px] items-stretch">
+              {prevPoints.length > 0 && (
+                <div
+                  className="min-w-0 h-full"
+                  style={{ flex: showCut ? 1 : Math.max(prevPoints.length, 2) }}
+                >
+                  <EloSegmentChart
+                    points={prevPoints}
+                    color={PREV_COLOR}
+                    fillId="eloFillPrev"
+                    yMin={yMin}
+                    yMax={yMax}
+                    yTicks={yTicks}
+                    showAxis
                   />
-                  <Tooltip
-                    cursor={{ stroke: "rgba(255,255,255,0.12)" }}
-                    content={<GraphTooltip />}
+                </div>
+              )}
+              {showCut && (
+                <div className="relative w-11 shrink-0 flex flex-col items-center py-2">
+                  <span className="flex-1 w-0 border-l border-dashed border-white/30" />
+                  <RankBadge
+                    rank={rank && rank !== "UNRANKED" ? rank : lastSeason?.rank || "UNRANKED"}
+                    size="sm"
+                    showGlow
+                    className="!w-9 !h-9 my-1"
                   />
-                  <Area
-                    type="linear"
-                    dataKey="elo"
-                    stroke="#ff5500"
-                    strokeWidth={2}
-                    fill="url(#eloFillRecent)"
-                    dot={false}
-                    activeDot={{ r: 5, fill: "#ff5500", stroke: "#111", strokeWidth: 2 }}
-                    connectNulls={false}
-                    isAnimationActive={false}
+                  <span className="flex-1 w-0 border-l border-dashed border-white/30" />
+                </div>
+              )}
+              {currPoints.length > 0 && (
+                <div
+                  className="min-w-0 h-full"
+                  style={{ flex: showCut ? 1 : Math.max(currPoints.length, 2) }}
+                >
+                  <EloSegmentChart
+                    points={currPoints}
+                    color={CURR_COLOR}
+                    fillId="eloFillCurr"
+                    yMin={yMin}
+                    yMax={yMax}
+                    yTicks={yTicks}
+                    showAxis={!prevPoints.length}
                   />
-                </AreaChart>
-              </ResponsiveContainer>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-sm text-[#8a8a8a] py-8 text-center">Not enough matches to chart yet.</p>
