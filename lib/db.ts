@@ -428,14 +428,12 @@ export async function getLastSeasonArchive(
             LIMIT 1`,
       args: [playerName],
     });
-    const row = rs.rows[0] as
-      | { season_name: string; elo: number | null; rank: string | null }
-      | undefined;
+    const row = rs.rows[0];
     if (!row) return null;
     return {
-      season_name: row.season_name,
+      season_name: String(row.season_name ?? ""),
       elo: Number(row.elo ?? 0),
-      rank: row.rank || "[?] Unranked",
+      rank: String(row.rank || "[?] Unranked"),
     };
   } catch {
     return null;
