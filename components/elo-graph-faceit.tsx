@@ -40,9 +40,11 @@ export function EloGraphFaceit({ eloHistory, matches }: EloGraphFaceitProps) {
     () => data.map((d) => d.elo).filter((e): e is number => e !== null),
     [data]
   );
-  const minElo = values.length ? Math.min(...values) : 0;
-  const maxElo = values.length ? Math.max(...values) : 0;
-  const yMax = Math.max(100, Math.ceil(maxElo / 100) * 100);
+    const minElo = values.length ? Math.min(...values) : 0;
+    const maxElo = values.length ? Math.max(...values) : 0;
+    const yMin = Math.max(0, Math.floor(minElo - 100));
+    const yMax = Math.ceil(maxElo + 100);
+    const yMid = Math.round((yMin + yMax) / 2);
 
   const wins = matches.filter((m) => m.result === "W").length;
   const losses = matches.length - wins;
@@ -81,8 +83,8 @@ export function EloGraphFaceit({ eloHistory, matches }: EloGraphFaceitProps) {
               </defs>
               <XAxis dataKey="match" hide />
               <YAxis
-                domain={[0, yMax]}
-                ticks={[0, yMax / 2, yMax].map((n) => Math.round(n))}
+                domain={[yMin, yMax]}
+                ticks={[yMin, yMid, yMax]}
                 tick={{ fill: "#6a6a6a", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}

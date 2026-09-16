@@ -28,7 +28,7 @@ export function PlacementTrack({
   const slots = Math.max(1, total);
   const nodes = Array.from({ length: slots }, (_, i) => {
     const game = games[i] ?? null;
-    const done = i < played || !!game;
+    const done = i < played;
     return { i, game, done, win: game?.result === "W" };
   });
 

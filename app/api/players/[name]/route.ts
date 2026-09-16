@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPlayer, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, mapRank } from "@/lib/db";
+import { getPlayer, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, mapRank } from "@/lib/db";
 import { buildEloTimeline } from "@/lib/elo-timeline";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
@@ -27,7 +27,7 @@ export async function GET(
 
     // These are all independent of one another — fetch them concurrently
     // instead of one sequential await per data source.
-    const [matches, placementRows, eloChanges, avatar, playedWithRaw, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings, seasonResets, seasonFinalElos] =
+    const [matches, placementRows, eloChanges, avatar, playedWithRaw, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings, seasonResets, seasonFinalElos, careerMatchesPlayed, lastSeasonArchive] =
       await Promise.all([
         getMatchesForPlayer(decodedName),
         getPlacementMatchesForPlayer(decodedName),
@@ -47,6 +47,8 @@ export async function GET(
         getModeRatings(decodedName),
         getSeasonResets(),
         getSeasonFinalElos(decodedName),
+        getCareerMatchCount(decodedName),
+        getLastSeasonArchive(decodedName),
       ]);
 
     const playedAvatars = await resolveAvatarMap(playedWithRaw);
@@ -71,6 +73,20 @@ export async function GET(
       seasonResets,
       seasonFinalElos
     );
+
+    const lastResetAt = seasonResets.length
+      ? seasonResets[seasonResets.length - 1].reset_at
+      : null;
+    const placementThisSeason = lastResetAt
+      ? placementRows.filter((m) => (m.timestamp || "") >= lastResetAt)
+      : placementRows;
+    const seasonRanked = lastResetAt
+      ? matches.filter((m) => (m.timestamp || "") >= lastResetAt)
+      : matches;
+    const seasonMatchesPlayed = seasonRanked.length;
+    const seasonWins = seasonRanked.filter((m) => m.result === "W").length;
+    const seasonWinPercent =
+      seasonMatchesPlayed > 0 ? (seasonWins / seasonMatchesPlayed) * 100 : 0;
 
     const mapped = {
       id: `p${player.id}`,
@@ -111,10 +127,21 @@ export async function GET(
       eloHistory,
       /** Season boundaries in eloHistory (index of the break + season name). */
       eloResets,
+      careerMatchesPlayed,
+      seasonMatchesPlayed,
+      seasonWinPercent,
+      lastResetAt,
+      lastSeason: lastSeasonArchive
+        ? {
+            name: lastSeasonArchive.season_name,
+            elo: lastSeasonArchive.elo,
+            rank: mapRank(lastSeasonArchive.rank),
+          }
+        : null,
       placementDone: player.placement_done === 1,
       placementGamesPlayed: player.placement_games_played,
       placementGamesTotal,
-      placementMatches: placementRows.map((m) => ({
+      placementMatches: placementThisSeason.map((m) => ({
         id: `M-${m.id}`,
         date: m.timestamp || "",
         region: prettyRegion(m.region),

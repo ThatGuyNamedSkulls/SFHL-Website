@@ -403,6 +403,45 @@ export async function getSeasonFinalElos(
   return out;
 }
 
+/** Lifetime match count (placements included). Survives /seasonreset. */
+export async function getCareerMatchCount(playerName: string): Promise<number> {
+  try {
+    const rs = await client.execute({
+      sql: "SELECT COUNT(*) AS n FROM match_history WHERE player_name = ?",
+      args: [playerName],
+    });
+    return Number(rs.rows[0]?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+/** Most recently archived season for a player (the one /seasonreset just ended). */
+export async function getLastSeasonArchive(
+  playerName: string
+): Promise<{ season_name: string; elo: number; rank: string } | null> {
+  try {
+    const rs = await client.execute({
+      sql: `SELECT season_name, elo, rank FROM season_stats
+            WHERE player_name = ?
+            ORDER BY archived_at DESC
+            LIMIT 1`,
+      args: [playerName],
+    });
+    const row = rs.rows[0] as
+      | { season_name: string; elo: number | null; rank: string | null }
+      | undefined;
+    if (!row) return null;
+    return {
+      season_name: row.season_name,
+      elo: Number(row.elo ?? 0),
+      rank: row.rank || "[?] Unranked",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
   // COALESCE(team, ...) keeps this working on DBs from before the bot added
   // the team column (it backfills via ALTER, but a not-yet-restarted bot

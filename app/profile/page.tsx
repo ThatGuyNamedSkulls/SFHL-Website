@@ -512,7 +512,9 @@ function ProfileContent() {
             </span>
             <div>
               <div className="text-sm font-semibold text-white">Strike Force</div>
-              <div className="text-[12px] text-[#8a8a8a]">{s.matchesPlayed} matches</div>
+              <div className="text-[12px] text-[#8a8a8a]">
+                {player.careerMatchesPlayed ?? s.matchesPlayed} matches
+              </div>
             </div>
           </div>
         </div>
@@ -609,8 +611,11 @@ function ProfileContent() {
                         <div className="text-[12px] text-[#8a8a8a]">Matchmaking</div>
                       </div>
                       <div className="text-right text-[13px] text-[#8a8a8a]">
-                        <b className="text-white">{s.matchesPlayed}</b> Matches ·{" "}
-                        <b className="text-white">{s.winPercent.toFixed(1)}%</b> Win rate
+                        <b className="text-white">{player.seasonMatchesPlayed ?? s.matchesPlayed}</b> Matches ·{" "}
+                        <b className="text-white">
+                          {(player.seasonWinPercent ?? s.winPercent).toFixed(1)}%
+                        </b>{" "}
+                        Win rate
                       </div>
                     </>
                   }
@@ -660,6 +665,9 @@ function ProfileContent() {
                   placementGamesTotal={player.placementGamesTotal ?? 3}
                   placementMatches={player.placementMatches ?? []}
                   rank={player.rank}
+                  lastSeason={player.lastSeason}
+                  lastResetAt={player.lastResetAt}
+                  currentElo={player.elo}
                 />
 
                 {/* Recent matches */}

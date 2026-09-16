@@ -28,6 +28,12 @@ import {
 import { formatScoreDisplay } from "@/lib/format";
 import { Shield } from "lucide-react";
 
+interface LastSeason {
+  name: string;
+  elo: number;
+  rank: RankTierLetter;
+}
+
 interface RecentPerformanceProps {
   eloHistory: (number | null)[];
   matches: Match[];
@@ -36,6 +42,9 @@ interface RecentPerformanceProps {
   placementGamesTotal: number;
   placementMatches: Match[];
   rank: RankTierLetter;
+  lastSeason?: LastSeason | null;
+  lastResetAt?: string | null;
+  currentElo?: number;
 }
 
 function roundsOf(m: Match): number | null {
@@ -85,7 +94,7 @@ function GraphTooltip({
   if (!p.match) {
     return (
       <div className="rounded-lg bg-[#1c1c1c] border border-white/10 px-3 py-2 text-xs text-[#c8c8c8] shadow-xl">
-        Start
+        {p.elo != null ? `Elo ${Math.round(p.elo)}` : "Season reset"}
       </div>
     );
   }
@@ -156,6 +165,9 @@ interface GraphPoint {
   match: Match | null;
 }
 
+const GRAPH_MATCHES = 20;
+const Y_PAD = 100;
+
 export function RecentPerformance({
   eloHistory,
   matches,
@@ -164,12 +176,23 @@ export function RecentPerformance({
   placementGamesTotal,
   placementMatches,
   rank,
+  lastSeason,
+  lastResetAt,
+  currentElo,
 }: RecentPerformanceProps) {
-  const recent = matches.slice(0, 30);
-  const chrono = useMemo(() => [...recent].reverse(), [recent]);
   const placing = !placementDone;
-
-  const statSource = placing && placementMatches.length ? placementMatches : recent;
+  const seasonMatches = useMemo(
+    () =>
+      lastResetAt ? matches.filter((m) => m.date && m.date >= lastResetAt) : matches,
+    [matches, lastResetAt]
+  );
+  const windowMatches = useMemo(
+    () => seasonMatches.slice(0, GRAPH_MATCHES),
+    [seasonMatches]
+  );
+  const chrono = useMemo(() => [...windowMatches].reverse(), [windowMatches]);
+  const statSource =
+    placing && placementMatches.length ? placementMatches : windowMatches.length ? windowMatches : matches.slice(0, GRAPH_MATCHES);
 
   const cards = useMemo(() => {
     const n = statSource.length;
@@ -208,40 +231,55 @@ export function RecentPerformance({
     };
   }, [statSource]);
 
-  const points: GraphPoint[] = useMemo(() => {
+  const { points, nowValues } = useMemo(() => {
     const lastNull = eloHistory.lastIndexOf(null);
     const season = (
       lastNull === -1 ? eloHistory : eloHistory.slice(lastNull + 1)
     ).filter((e): e is number => e !== null);
-    const windowMatches = [...matches].slice(0, 30).reverse();
-    const windowElo = season.slice(-(windowMatches.length + 1));
-    return windowElo.map((elo, i) => ({
-      matchN: i,
-      elo,
-      match: i === 0 ? null : windowMatches[i - 1] ?? null,
-    }));
-  }, [eloHistory, matches]);
+    const n = windowMatches.length;
+    const nowSeries =
+      n === 0
+        ? [season[0] ?? currentElo ?? 0]
+        : season.length >= n + 1
+          ? season.slice(-(n + 1))
+          : season.length
+            ? season
+            : [currentElo ?? 0];
+    const built: GraphPoint[] = [];
+    if (lastSeason) {
+      built.push({ matchN: 0, elo: lastSeason.elo, match: null });
+      built.push({ matchN: 1, elo: null, match: null });
+    }
+    const offset = built.length;
+    nowSeries.forEach((elo, i) => {
+      built.push({
+        matchN: offset + i,
+        elo,
+        match: i === 0 ? null : chrono[i - 1] ?? null,
+      });
+    });
+    return { points: built, nowValues: nowSeries };
+  }, [eloHistory, windowMatches.length, chrono, lastSeason, currentElo]);
 
   const values = points.map((p) => p.elo).filter((e): e is number => e !== null);
+  const minElo = values.length ? Math.min(...values) : 0;
   const maxElo = values.length ? Math.max(...values) : 0;
-  const yMax = Math.max(100, Math.ceil(maxElo / 100) * 100);
-  const lastBreak = eloHistory.lastIndexOf(null);
-  const current = (lastBreak === -1 ? eloHistory : eloHistory.slice(lastBreak + 1)).filter(
-    (e): e is number => e !== null
-  );
-  const eloChange = current.length > 1 ? current[current.length - 1] - current[0] : 0;
-  const avgSkill = current.length ? Math.round(avg(current)) : 0;
-  const wins = recent.filter((m) => m.result === "W").length;
-  const losses = recent.length - wins;
-  const resultDots = chrono;
+  const yMin = Math.max(0, Math.floor(minElo - Y_PAD));
+  const yMax = Math.ceil(maxElo + Y_PAD);
+  const yMid = Math.round((yMin + yMax) / 2);
+  const eloChange =
+    nowValues.length > 1 ? nowValues[nowValues.length - 1] - nowValues[0] : 0;
+  const avgSkill = nowValues.length ? Math.round(avg(nowValues)) : 0;
+  const wins = windowMatches.filter((m) => m.result === "W").length;
+  const losses = windowMatches.length - wins;
 
   return (
     <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-5">
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-[15px] font-bold text-white">Recent performance</h2>
-        {!placing && recent.length > 0 && (
+        {!placing && windowMatches.length > 0 && (
           <span className="text-[13px] text-[#8a8a8a] flex items-center gap-3">
-            Last {recent.length} Matches
+            Last {windowMatches.length} Matches
             {avgSkill > 0 && (
               <span className="inline-flex items-center gap-1">
                 <Shield className="w-3.5 h-3.5 text-[#ff5500]" />
@@ -291,8 +329,17 @@ export function RecentPerformance({
             </span>
           </div>
 
-          {(placementMatches.length > 0 || resultDots.length > 0) && (
+          {(lastSeason || placementMatches.length > 0 || chrono.length > 0) && (
             <div className="flex items-center gap-1.5 flex-wrap px-8 mb-2">
+              {lastSeason && (
+                <RankBadge
+                  rank={lastSeason.rank}
+                  size="sm"
+                  showGlow={false}
+                  className="!w-5 !h-5"
+                />
+              )}
+              {lastSeason && <span className="w-px h-4 bg-white/25 mx-0.5" title="Season reset" />}
               {placementMatches.map((m) => (
                 <Link
                   key={`p-${m.id}`}
@@ -303,10 +350,10 @@ export function RecentPerformance({
                   }`}
                 />
               ))}
-              {placementMatches.length > 0 && rank && rank !== "UNRANKED" && (
+              {rank && rank !== "UNRANKED" && (
                 <RankBadge rank={rank} size="sm" showGlow={false} className="!w-5 !h-5 mx-0.5" />
               )}
-              {resultDots.map((m) => (
+              {chrono.map((m) => (
                 <Link
                   key={m.id}
                   href={m.matchId ? `/match/${m.matchId}` : "#"}
@@ -331,8 +378,8 @@ export function RecentPerformance({
                   </defs>
                   <XAxis dataKey="matchN" hide />
                   <YAxis
-                    domain={[0, yMax]}
-                    ticks={[0, yMax / 2, yMax].map((n) => Math.round(n))}
+                    domain={[yMin, yMax]}
+                    ticks={[yMin, yMid, yMax]}
                     tick={{ fill: "#6a6a6a", fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}

@@ -73,6 +73,13 @@ export interface Player {
   eloHistory: (number | null)[];
   /** Season resets: index of each break in eloHistory + the season's name. */
   eloResets?: { index: number; label: string }[];
+  /** Lifetime match count (not reset with the season). */
+  careerMatchesPlayed?: number;
+  /** Ranked matches in the current season. */
+  seasonMatchesPlayed?: number;
+  seasonWinPercent?: number;
+  lastResetAt?: string | null;
+  lastSeason?: { name: string; elo: number; rank: RankTierLetter } | null;
   joinedDate: string;
   placementDone?: boolean;
   placementGamesPlayed?: number;
