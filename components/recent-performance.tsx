@@ -426,10 +426,10 @@ export function RecentPerformance({
                 <Link
                   key={`prev-${m.id}`}
                   href={m.matchId ? `/match/${m.matchId}` : "#"}
-                  title={`${m.map} — ${m.result}`}
+                  title={`${m.map} — ${m.result}${m.isSub ? " · SUB" : m.leftEarly ? " · LEFT" : ""}`}
                   className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                     m.result === "W" ? "bg-[#2ecc71]" : "bg-[#e74c3c]"
-                  }`}
+                  } ${m.isSub ? "ring-2 ring-hl-gold" : m.leftEarly ? "ring-2 ring-white/30" : ""}`}
                 />
               ))}
               {rank && rank !== "UNRANKED" && (
@@ -439,10 +439,10 @@ export function RecentPerformance({
                 <Link
                   key={`curr-${m.id}`}
                   href={m.matchId ? `/match/${m.matchId}` : "#"}
-                  title={`${m.map} — ${m.result}`}
+                  title={`${m.map} — ${m.result}${m.isSub ? " · SUB" : m.leftEarly ? " · LEFT" : ""}`}
                   className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                     m.result === "W" ? "bg-[#2ecc71]" : "bg-[#e74c3c]"
-                  }`}
+                  } ${m.isSub ? "ring-2 ring-hl-gold" : m.leftEarly ? "ring-2 ring-white/30" : ""}`}
                 />
               ))}
             </div>

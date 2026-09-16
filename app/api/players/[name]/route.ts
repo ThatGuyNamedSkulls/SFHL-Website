@@ -195,6 +195,9 @@ export async function GET(
         mvp: (m.mvps || 0) > 0,
         matchId: m.match_id,
         mvps: m.mvps || 0,
+        isSub: Number(m.is_sub) === 1,
+        leftEarly: Number(m.left_early) === 1,
+        subShare: m.sub_share == null ? null : Number(m.sub_share),
       })),
     };
 

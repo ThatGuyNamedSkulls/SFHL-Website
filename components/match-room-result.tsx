@@ -17,6 +17,7 @@ import {
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 import { cn } from "@/lib/utils";
 import { Calendar, Star, Swords } from "lucide-react";
+import { SubRolePill } from "@/components/sub-role-pill";
 
 function initials(name: string) {
   return (name || "?").slice(0, 2).toUpperCase();
@@ -44,6 +45,7 @@ function PlayerCard({
         </AvatarFallback>
       </Avatar>
       <span className="text-sm font-semibold text-white truncate flex-1">{player.username}</span>
+      <SubRolePill isSub={player.isSub} leftEarly={player.leftEarly} share={player.subShare} compact />
       {typeof player.elo === "number" && player.elo > 0 && (
         <span className="text-[12px] tabular-nums text-[#8a8a8a] shrink-0">{player.elo}</span>
       )}
@@ -227,6 +229,7 @@ function StatsTable({
                       <span className="text-white font-semibold truncate max-w-[140px]">
                         {p.username}
                       </span>
+                      <SubRolePill isSub={p.isSub} leftEarly={p.leftEarly} share={p.subShare} />
                       {p.mvp && <Star className="w-3 h-3 text-[#ff5500] fill-[#ff5500] shrink-0" />}
                     </Link>
                   </td>
@@ -314,6 +317,7 @@ function Stats({ match }: { match: MatchDetail }) {
             <span className="text-[12px] font-semibold text-white max-w-[90px] truncate">
               {p.username}
             </span>
+            <SubRolePill isSub={p.isSub} leftEarly={p.leftEarly} compact />
           </button>
         ))}
       </div>
@@ -335,11 +339,18 @@ function Stats({ match }: { match: MatchDetail }) {
                 >
                   {selected.username}
                 </Link>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <SubRolePill
+                    isSub={selected.isSub}
+                    leftEarly={selected.leftEarly}
+                    share={selected.subShare}
+                  />
                 {selected.mvp && (
-                  <div className="text-[11px] font-black text-[#ff5500] uppercase tracking-wide mt-0.5">
+                  <div className="text-[11px] font-black text-[#ff5500] uppercase tracking-wide">
                     ★ MVP
                   </div>
                 )}
+                </div>
               </div>
             </div>
             <div

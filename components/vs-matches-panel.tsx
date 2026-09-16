@@ -8,6 +8,8 @@ import { Clock, X } from "lucide-react";
 import { LiveLobby } from "@/components/live-match-room";
 import { markMatchAccepted } from "@/components/match-ready-modal";
 import { formatScoreDisplay } from "@/lib/format";
+import { SWING_GREAT } from "@/lib/match-stats";
+import { SubRolePill } from "@/components/sub-role-pill";
 
 interface RecentMatch {
   id: number;
@@ -17,24 +19,20 @@ interface RecentMatch {
   result: "W" | "L";
   rounds: string;
   mode: string;
+  swing?: number;
+  isSub?: boolean;
+  leftEarly?: boolean;
+  subShare?: number | null;
 }
 
-const MAP_WASH: Record<string, string> = {
-  mirage: "#b89563",
-  dust2: "#c9a44a",
-  "dust ii": "#c9a44a",
-  inferno: "#c45a2d",
-  overpass: "#4a7ea8",
-  vertigo: "#6b8f3a",
-  nuke: "#8a9a4a",
-  ancient: "#3d6b4f",
-  anubis: "#c4a35a",
-  cache: "#5a7a3a",
-  train: "#6a7a88",
-};
+const WASH_WIN = "#2ecc71";
+const WASH_LOSS = "#e74c3c";
+const WASH_GOLD = "#ffc44d";
 
-function mapWash(map: string): string {
-  return MAP_WASH[map.toLowerCase()] ?? "#5a5a5a";
+function resultWash(match: RecentMatch): string {
+  if (match.result !== "W") return WASH_LOSS;
+  if ((match.swing ?? 0) >= SWING_GREAT) return WASH_GOLD;
+  return WASH_WIN;
 }
 
 function formatPastWhen(date: string): string {
@@ -67,13 +65,17 @@ function parseJoinedAt(raw: string): number {
 
 function PastMatchCard({ match }: { match: RecentMatch }) {
   const win = match.result === "W";
+  const gold = win && (match.swing ?? 0) >= SWING_GREAT;
   const href = match.matchId ? `/match/${match.matchId}` : "#";
-  const wash = mapWash(match.map);
+  const wash = resultWash(match);
   const title = match.matchId ? `match_${match.matchId}` : `match_${match.id}`;
 
   return (
     <Link href={href} className="relative overflow-hidden rounded-lg bg-[#1c1c1c] block h-[88px]">
-      <span className={`absolute inset-y-0 left-0 w-[3px] ${win ? "bg-[#2ecc71]" : "bg-[#e74c3c]"}`} />
+      <span
+        className="absolute inset-y-0 left-0 w-[3px]"
+        style={{ background: gold ? WASH_GOLD : win ? WASH_WIN : WASH_LOSS }}
+      />
       <span
         className="absolute inset-y-0 right-0 w-[46%] pointer-events-none"
         style={{ background: `linear-gradient(90deg, #1c1c1c 0%, ${wash}55 55%, ${wash}88 100%)` }}
@@ -90,7 +92,11 @@ function PastMatchCard({ match }: { match: RecentMatch }) {
         <div className="flex items-center gap-2 mt-0.5">
           <span
             className={`inline-flex items-center justify-center min-w-[18px] h-[16px] px-1 rounded text-[10px] font-black ${
-              win ? "bg-[#2ecc71] text-[#0b1a10]" : "bg-[#e74c3c] text-white"
+              gold
+                ? "bg-[#ffc44d] text-[#1a1400]"
+                : win
+                  ? "bg-[#2ecc71] text-[#0b1a10]"
+                  : "bg-[#e74c3c] text-white"
             }`}
           >
             {match.result}
@@ -100,6 +106,7 @@ function PastMatchCard({ match }: { match: RecentMatch }) {
               {formatScoreDisplay(match.rounds)}
             </span>
           ) : null}
+          <SubRolePill isSub={match.isSub} leftEarly={match.leftEarly} share={match.subShare} compact />
         </div>
       </div>
     </Link>

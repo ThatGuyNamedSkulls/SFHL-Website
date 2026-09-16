@@ -19,6 +19,8 @@ export interface LobbyMemberView {
   avatar: string | null;
   rank: string;
   elo: number;
+  left?: boolean;
+  sub?: boolean;
 }
 
 export interface VetoHistoryEntry {
@@ -72,7 +74,7 @@ interface RawLobby {
   captains?: { team1?: string; team2?: string };
   veto?: Partial<VetoState> | null;
   createdAt: number;
-  members: { discordId: string; name: string; team: number }[];
+  members: { discordId: string; name: string; team: number; left?: boolean; sub?: boolean }[];
   server?: { url?: string } | null;
 }
 
@@ -158,6 +160,8 @@ async function enrich(raw: RawLobby): Promise<LobbyView> {
       avatar: byDiscordId.get(m.discordId) || byName.get(m.name)?.avatar || null,
       rank: byName.get(m.name)?.rank ?? "UNRANKED",
       elo: byName.get(m.name)?.elo ?? 0,
+      left: !!m.left,
+      sub: !!m.sub,
     })),
     server: serverUrl ? { url: serverUrl } : null,
     messages,

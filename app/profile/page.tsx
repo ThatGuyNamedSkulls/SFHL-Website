@@ -28,6 +28,7 @@ import {
 } from "@/components/stats-filters";
 import { RANK_TIERS, getNextRank } from "@/data/ranks";
 import { Player, Match, RankTierLetter, ProfileCosmetics, InventoryItem } from "@/types";
+import { SubRolePill } from "@/components/sub-role-pill";
 import {
   UserPlus,
   MapPin,
@@ -152,6 +153,7 @@ function MatchHistoryRow({
         <Swords className="w-3.5 h-3.5 text-[#8a8a8a] shrink-0" />
         <RankBadge rank={rank} size="sm" showGlow={false} className="!w-6 !h-6" />
         <span className="text-sm text-[#c8c8c8] truncate">{rank === "UNRANKED" ? "Unranked" : rank}</span>
+        <SubRolePill isSub={match.isSub} leftEarly={match.leftEarly} share={match.subShare} />
       </span>
       <span className={`text-sm font-bold tabular-nums ${match.kdr >= 1 ? "text-[#2ecc71]" : "text-[#e74c3c]"}`}>
         {match.kdr.toFixed(2)}

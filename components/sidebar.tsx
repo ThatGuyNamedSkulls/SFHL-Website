@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SearchOverlay } from "@/components/search-overlay";
@@ -81,9 +81,39 @@ function NavButton({
   }
 
   return (
-    <Link href={item.href!} data-active={active} className={className} title={item.label}>
+    <Link href={item.href!} data-active={active} className={`${className} relative`} title={item.label}>
       {icon}
+      {item.href === "/queue" && <PlaySubBadge />}
     </Link>
+  );
+}
+
+function PlaySubBadge() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/subs");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setCount(Number(data.count ?? 0));
+      } catch {
+        /* ignore */
+      }
+    };
+    load();
+    const id = setInterval(load, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+  if (count <= 0) return null;
+  return (
+    <span className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] px-[3px] rounded-full bg-[#ffc44d] text-[#1a1400] text-[9px] font-black leading-[14px] text-center">
+      {count > 9 ? "9+" : count}
+    </span>
   );
 }
 

@@ -146,6 +146,9 @@ export interface Match {
   mvp: boolean;
   matchId?: number;
   mvps?: number;
+  isSub?: boolean;
+  leftEarly?: boolean;
+  subShare?: number | null;
 }
 
 /** Tournament status */
@@ -210,6 +213,12 @@ export interface MatchPlayerStats {
   swing?: number;
   kpr?: number | null;
   mvps?: number;
+  /** This row is a substitute appearance. */
+  isSub?: boolean;
+  /** This row is the player who left mid-match. */
+  leftEarly?: boolean;
+  /** Fraction of the match this player was present for (drives the SUB · 58% tag). */
+  subShare?: number | null;
 }
 
 /** Detailed match with full scoreboard and round-by-round data */
@@ -333,6 +342,40 @@ export interface PartyView {
   voiceChannelId?: string | null;
   voiceChannelUrl?: string | null;
   guildId?: string | null;
+}
+
+/**
+ * One open substitute slot: a live match whose player left, waiting for
+ * someone to finish it. Written by the bot (`sub_requests`), served by
+ * /api/subs, and annotated per viewer with whether they can claim it.
+ */
+export interface SubRequestView {
+  id: number;
+  /** Discord match channel id, which is also the lobby id. */
+  channelId: string;
+  guildId: string | null;
+  region: string | null;
+  mode: string | null;
+  /** Which side is short-handed (1 or 2). */
+  team: number;
+  map: string;
+  /** The player being replaced. */
+  leaver: string;
+  /** Their Elo — the centre of the band a claimer must fall inside. */
+  targetElo: number | null;
+  /** Round score when they left, e.g. "7,4". */
+  swapScore: string | null;
+  openedAt: number;
+  openSeconds: number;
+  /** Elo band around `targetElo` right now; null once open to everyone. */
+  band: number | null;
+  eligible: boolean;
+  /** Why not, when `eligible` is false. */
+  reason: string | null;
+  /** Seconds until the widening band admits this viewer, if that's the blocker. */
+  eligibleInSeconds: number | null;
+  /** Discord deep link to the match channel. */
+  channelUrl: string | null;
 }
 
 /** Auth session stored in cookie */

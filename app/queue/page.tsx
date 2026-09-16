@@ -20,6 +20,7 @@ import {
   Star,
   Server,
   Zap,
+  UserPlus,
 } from "lucide-react";
 import { usePlayRegion, setQueueLocked } from "@/components/use-play-region";
 import { QUEUE_REGIONS, regionQueueLabel, isQueueRegion } from "@/lib/regions";
@@ -130,6 +131,8 @@ export default function QueuePage() {
   const [openRegions, setOpenRegions] = useState<string[]>([]);
   const [openModes, setOpenModes] = useState<Record<string, string[]>>({});
   const [queuedSpot, setQueuedSpot] = useState<{ region: string; mode: string } | null>(null);
+  // Open substitute slots (live matches missing a player), for the CTA strip.
+  const [subCount, setSubCount] = useState(0);
   const { region, setRegion } = usePlayRegion();
   // While a join/leave POST is in flight (and briefly after), ignore the 5s
   // poll's queue snapshot so a poll that started before the action can't land
@@ -139,10 +142,11 @@ export default function QueuePage() {
   useEffect(() => {
     const fetchQueue = async () => {
       try {
-        const [qRes, sRes, pRes] = await Promise.all([
+        const [qRes, sRes, pRes, subRes] = await Promise.all([
           fetch(`/api/queue?region=${encodeURIComponent(region)}`),
           fetch("/api/auth/me"),
           fetch("/api/parties"),
+          fetch("/api/subs"),
         ]);
         const qData = await qRes.json();
         if (!actionInFlight.current) setQueue(qData.queue || []);
@@ -173,6 +177,8 @@ export default function QueuePage() {
             )
           : null;
         setParty(mine ?? null);
+        const subData = await subRes.json();
+        setSubCount(Number(subData?.count ?? 0));
         setLoading(false);
       } catch (err) {
         console.error("Queue poll error:", err);
@@ -483,6 +489,42 @@ export default function QueuePage() {
           )}
         </div>
       </Card>
+
+      {/* Substitute CTA — live matches missing a player. Hidden while queueing,
+          since you can't be waiting for a match and joining one at once. */}
+      {!inQueue && (
+        <Card
+          className={`bg-hl-panel p-5 mb-6 ${
+            subCount > 0 ? "border-hl-gold/40" : "border-hl-border"
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="w-11 h-11 shrink-0 rounded-xl bg-hl-gold/10 border border-hl-gold/30 flex items-center justify-center">
+              <UserPlus className="w-5 h-5 text-hl-gold" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-black text-white">
+                Only have time for a quick one? Join a match as a substitute!
+              </div>
+              <div className="text-sm text-hl-muted mt-0.5">
+                {subCount > 0
+                  ? `${subCount === 1 ? "1 live match needs" : `${subCount} live matches need`} a player right now — you earn Elo for the rounds you play.`
+                  : "No match needs a player right now. Slots open when someone leaves mid-game, and they fill fast."}
+              </div>
+            </div>
+            <Link
+              href="/subs"
+              className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm header-caps ${
+                subCount > 0
+                  ? "find-match-btn text-hl-base"
+                  : "bg-hl-panel-light text-white border border-hl-border hover:border-hl-gold/40 transition-colors"
+              }`}
+            >
+              {subCount > 0 && <Zap className="w-4 h-4" />} Join now
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {/* Match type / Servers (FACEIT-style). Maps stay post-match veto. */}
       <div className="mb-6">

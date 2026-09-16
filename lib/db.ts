@@ -297,6 +297,33 @@ export interface DbMatch {
   team: number | null;
   /** Gamemode ("5v5" / "2v2" / "1v1"); null on legacy rows (= main ladder). */
   mode?: string | null;
+  /** 1 if this row is a substitute appearance. */
+  is_sub?: number;
+  /** 1 if this row is the player who left mid-match. */
+  left_early?: number;
+  /** Presence fraction of the match; null on a full-game row. */
+  sub_share?: number | null;
+}
+
+const MATCH_BASE_COLS = `id, player_name, map_name, region, kills, deaths, assists,
+                 hs_percentage, elo_change, result, points, mvps, match_id,
+                 timestamp, executed_by, round_score`;
+const MATCH_SUB_COLS = `${MATCH_BASE_COLS}, COALESCE(is_sub, 0) AS is_sub, COALESCE(left_early, 0) AS left_early, sub_share`;
+
+async function selectMatchRows(whereSql: string, args: unknown[]): Promise<DbMatch[]> {
+  try {
+    const rs = await client.execute({
+      sql: `SELECT ${MATCH_SUB_COLS} ${whereSql}`,
+      args,
+    });
+    return rs.rows as unknown as DbMatch[];
+  } catch {
+    const rs = await client.execute({
+      sql: `SELECT ${MATCH_BASE_COLS} ${whereSql}`,
+      args,
+    });
+    return rs.rows as unknown as DbMatch[];
+  }
 }
 
 export async function getMatchesForPlayer(playerName: string, limit = 100): Promise<DbMatch[]> {
@@ -307,17 +334,13 @@ export async function getMatchesForPlayer(playerName: string, limit = 100): Prom
   // covers legacy rows written before the column existed. Mirrors the bot's
   // /matchhistory + /checkperformance filters. Capped: hydrating a whole
   // career of full rows grows unbounded as history accumulates.
-  const rs = await client.execute({
-    sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
-                 hs_percentage, elo_change, result, points, mvps, match_id,
-                 timestamp, executed_by, round_score
-          FROM match_history
+  return selectMatchRows(
+    `FROM match_history
           WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
           ORDER BY id DESC
           LIMIT ?`,
-    args: [playerName, limit]
-  });
-  return rs.rows as unknown as DbMatch[];
+    [playerName, limit]
+  );
 }
 
 /** Placement (pre-rank) games, oldest first — used by the profile placement track. */
@@ -446,9 +469,7 @@ export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
   // means the column may not exist — fall back to a team-less select).
   try {
     const rs = await client.execute({
-      sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
-                   hs_percentage, elo_change, result, points, mvps, match_id,
-                   timestamp, executed_by, round_score, team, mode
+      sql: `SELECT ${MATCH_SUB_COLS}, team, mode
             FROM match_history
             WHERE match_id = ?
             ORDER BY points DESC`,
@@ -456,16 +477,25 @@ export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
     });
     return rs.rows as unknown as DbMatch[];
   } catch {
-    const rs = await client.execute({
-      sql: `SELECT id, player_name, map_name, region, kills, deaths, assists,
-                   hs_percentage, elo_change, result, points, mvps, match_id,
-                   timestamp, executed_by, round_score, NULL AS team, NULL AS mode
-            FROM match_history
-            WHERE match_id = ?
-            ORDER BY points DESC`,
-      args: [matchId]
-    });
-    return rs.rows as unknown as DbMatch[];
+    try {
+      const rs = await client.execute({
+        sql: `SELECT ${MATCH_BASE_COLS}, team, mode
+              FROM match_history
+              WHERE match_id = ?
+              ORDER BY points DESC`,
+        args: [matchId]
+      });
+      return rs.rows as unknown as DbMatch[];
+    } catch {
+      const rs = await client.execute({
+        sql: `SELECT ${MATCH_BASE_COLS}, NULL AS team, NULL AS mode
+              FROM match_history
+              WHERE match_id = ?
+              ORDER BY points DESC`,
+        args: [matchId]
+      });
+      return rs.rows as unknown as DbMatch[];
+    }
   }
 }
 

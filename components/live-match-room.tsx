@@ -9,6 +9,7 @@ import { RankTierLetter } from "@/types";
 import { prettyMap } from "@/lib/format";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 import { ExternalLink, Mic, Crown, Calendar, Send, Gamepad2 } from "lucide-react";
+import { SubRolePill } from "@/components/sub-role-pill";
 
 export interface LiveLobbyMember {
   discordId: string;
@@ -17,6 +18,8 @@ export interface LiveLobbyMember {
   avatar: string | null;
   rank: string;
   elo?: number;
+  left?: boolean;
+  sub?: boolean;
 }
 
 export interface LiveLobby {
@@ -72,7 +75,7 @@ function PlayerRow({
   captain: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-lg bg-[#1c1c1c] border border-white/[0.06] px-2.5 py-2">
+    <div className={`flex items-center gap-2.5 rounded-lg bg-[#1c1c1c] border border-white/[0.06] px-2.5 py-2 ${member.left ? "opacity-50" : ""}`}>
       <Avatar className="w-8 h-8 shrink-0">
         {member.avatar ? <AvatarImage src={member.avatar} /> : null}
         <AvatarFallback className="bg-[#2a2a2a] text-[10px] font-bold text-white">
@@ -80,6 +83,7 @@ function PlayerRow({
         </AvatarFallback>
       </Avatar>
       <span className="text-sm font-semibold text-white truncate flex-1">{member.name}</span>
+      <SubRolePill isSub={member.sub} leftEarly={member.left} compact />
       {captain && <Crown className="w-3.5 h-3.5 text-[#ff5500] shrink-0" />}
       {typeof member.elo === "number" && member.elo > 0 && (
         <span className="text-[12px] tabular-nums text-[#8a8a8a] shrink-0">{member.elo}</span>

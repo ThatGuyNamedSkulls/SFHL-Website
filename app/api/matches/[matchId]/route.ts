@@ -161,6 +161,9 @@ export async function GET(
           clutches: 0,
           plants: 0,
           defuses: 0,
+          isSub: Number(p.is_sub) === 1,
+          leftEarly: Number(p.left_early) === 1,
+          subShare: p.sub_share == null ? null : Number(p.sub_share),
         };
       });
 
