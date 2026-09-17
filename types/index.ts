@@ -151,6 +151,8 @@ export interface Match {
   subShare?: number | null;
   /** Skill rank at the time of this match. */
   rank?: RankTierLetter;
+  /** Elo the player had when this match started. */
+  elo?: number;
 }
 
 /** Tournament status */

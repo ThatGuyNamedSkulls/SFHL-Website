@@ -305,6 +305,8 @@ export interface DbMatch {
   sub_share?: number | null;
   /** Rank at the time of this match (post-result). Null on legacy rows. */
   player_rank?: string | null;
+  /** Elo the player had when this match started. Null on legacy rows. */
+  elo_before?: number | null;
 }
 
 const MATCH_BASE_COLS = `id, player_name, map_name, region, kills, deaths, assists,
@@ -312,29 +314,23 @@ const MATCH_BASE_COLS = `id, player_name, map_name, region, kills, deaths, assis
                  timestamp, executed_by, round_score`;
 const MATCH_SUB_COLS = `${MATCH_BASE_COLS}, COALESCE(is_sub, 0) AS is_sub, COALESCE(left_early, 0) AS left_early, sub_share`;
 const MATCH_RANK_COLS = `${MATCH_SUB_COLS}, player_rank`;
+const MATCH_ELO_COLS = `${MATCH_RANK_COLS}, elo_before`;
 
 async function selectMatchRows(whereSql: string, args: InArgs): Promise<DbMatch[]> {
-  try {
-    const rs = await client.execute({
-      sql: `SELECT ${MATCH_RANK_COLS} ${whereSql}`,
-      args,
-    });
-    return rs.rows as unknown as DbMatch[];
-  } catch {
+  const variants = [MATCH_ELO_COLS, MATCH_RANK_COLS, MATCH_SUB_COLS, MATCH_BASE_COLS];
+  let lastErr: unknown;
+  for (const cols of variants) {
     try {
       const rs = await client.execute({
-        sql: `SELECT ${MATCH_SUB_COLS} ${whereSql}`,
+        sql: `SELECT ${cols} ${whereSql}`,
         args,
       });
       return rs.rows as unknown as DbMatch[];
-    } catch {
-      const rs = await client.execute({
-        sql: `SELECT ${MATCH_BASE_COLS} ${whereSql}`,
-        args,
-      });
-      return rs.rows as unknown as DbMatch[];
+    } catch (e) {
+      lastErr = e;
     }
   }
+  throw lastErr;
 }
 
 export async function getMatchesForPlayer(playerName: string, limit = 100): Promise<DbMatch[]> {
@@ -491,36 +487,28 @@ export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
   // COALESCE(team, ...) keeps this working on DBs from before the bot added
   // the team column (it backfills via ALTER, but a not-yet-restarted bot
   // means the column may not exist — fall back to a team-less select).
-  try {
-    const rs = await client.execute({
-      sql: `SELECT ${MATCH_RANK_COLS}, team, mode
-            FROM match_history
-            WHERE match_id = ?
-            ORDER BY points DESC`,
-      args: [matchId]
-    });
-    return rs.rows as unknown as DbMatch[];
-  } catch {
+  const variants = [
+    `${MATCH_ELO_COLS}, team, mode`,
+    `${MATCH_RANK_COLS}, team, mode`,
+    `${MATCH_SUB_COLS}, team, mode`,
+    `${MATCH_BASE_COLS}, NULL AS team, NULL AS mode`,
+  ];
+  let lastErr: unknown;
+  for (const cols of variants) {
     try {
       const rs = await client.execute({
-        sql: `SELECT ${MATCH_SUB_COLS}, team, mode
+        sql: `SELECT ${cols}
               FROM match_history
               WHERE match_id = ?
               ORDER BY points DESC`,
-        args: [matchId]
+        args: [matchId],
       });
       return rs.rows as unknown as DbMatch[];
-    } catch {
-      const rs = await client.execute({
-        sql: `SELECT ${MATCH_BASE_COLS}, NULL AS team, NULL AS mode
-              FROM match_history
-              WHERE match_id = ?
-              ORDER BY points DESC`,
-        args: [matchId]
-      });
-      return rs.rows as unknown as DbMatch[];
+    } catch (e) {
+      lastErr = e;
     }
   }
+  throw lastErr;
 }
 
 // ---------------------------------------------------------------------------

@@ -199,6 +199,7 @@ export async function GET(
         leftEarly: Number(m.left_early) === 1,
         subShare: m.sub_share == null ? null : Number(m.sub_share),
         rank: mapRank(m.player_rank || player.rank),
+        elo: m.elo_before == null ? undefined : Number(m.elo_before),
       })),
     };
 

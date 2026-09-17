@@ -29,6 +29,7 @@ import {
 import { RANK_TIERS, getNextRank } from "@/data/ranks";
 import { Player, Match, RankTierLetter, ProfileCosmetics, InventoryItem } from "@/types";
 import { SubRolePill } from "@/components/sub-role-pill";
+import { eloChangeColor, formatSigned } from "@/lib/match-stats";
 import {
   UserPlus,
   MapPin,
@@ -139,10 +140,11 @@ function MatchHistoryRow({
   const win = match.result === "W";
   const rank = match.rank || fallbackRank;
   const { day, time } = formatMatchWhen(match.date);
+  const eloDelta = match.eloChange ?? 0;
   return (
     <Link
       href={match.matchId ? `/match/${match.matchId}` : "#"}
-      className={`grid grid-cols-[88px_1fr_72px_90px] md:grid-cols-[100px_1fr_80px_110px] gap-3 items-center px-4 py-3 hover:bg-white/[0.03] border-l-2 ${
+      className={`grid grid-cols-[76px_1fr_52px_56px_84px] md:grid-cols-[100px_1fr_64px_80px_110px] gap-3 items-center px-4 py-3 hover:bg-white/[0.03] border-l-2 ${
         win ? "border-l-[#2ecc71]" : "border-l-[#e74c3c]"
       }`}
     >
@@ -155,6 +157,12 @@ function MatchHistoryRow({
         <RankBadge rank={rank} size="sm" showGlow={false} className="!w-6 !h-6" />
         <span className="text-sm text-[#c8c8c8] truncate">{rank === "UNRANKED" ? "Unranked" : rank}</span>
         <SubRolePill isSub={match.isSub} leftEarly={match.leftEarly} share={match.subShare} />
+      </span>
+      <span
+        className="text-sm font-bold tabular-nums"
+        style={{ color: eloChangeColor(eloDelta) }}
+      >
+        {formatSigned(eloDelta)}
       </span>
       <span className={`text-sm font-bold tabular-nums ${match.kdr >= 1 ? "text-[#2ecc71]" : "text-[#e74c3c]"}`}>
         {match.kdr.toFixed(2)}
@@ -689,9 +697,10 @@ function ProfileContent() {
                       <EmptyState icon={ListChecks} title="No match history" hint="This player hasn't played any recorded matches yet." />
                     ) : (
                       <div>
-                        <div className="hidden md:grid grid-cols-[100px_1fr_80px_110px] gap-3 px-4 py-2.5 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+                        <div className="hidden md:grid grid-cols-[100px_1fr_64px_80px_110px] gap-3 px-4 py-2.5 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
                           <span>Date</span>
                           <span />
+                          <span>Elo</span>
                           <span>Rating</span>
                           <span className="text-right">K/D/A</span>
                         </div>
@@ -716,9 +725,10 @@ function ProfileContent() {
                     <EmptyState icon={ListChecks} title="No matches match your filters" hint="Try widening the map, result, or time-range filters." />
                   ) : (
                     <div>
-                      <div className="hidden md:grid grid-cols-[100px_1fr_80px_110px] gap-3 px-4 py-2.5 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+                      <div className="hidden md:grid grid-cols-[100px_1fr_64px_80px_110px] gap-3 px-4 py-2.5 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
                         <span>Date</span>
                         <span />
+                        <span>Elo</span>
                         <span>Rating</span>
                         <span className="text-right">K/D/A</span>
                       </div>

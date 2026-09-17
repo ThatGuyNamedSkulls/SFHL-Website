@@ -46,7 +46,7 @@ function PlayerCard({
       </Avatar>
       <span className="text-sm font-semibold text-white truncate flex-1">{player.username}</span>
       <SubRolePill isSub={player.isSub} leftEarly={player.leftEarly} share={player.subShare} compact />
-      {typeof player.elo === "number" && player.elo > 0 && (
+      {typeof player.elo === "number" && (
         <span className="text-[12px] tabular-nums text-[#8a8a8a] shrink-0">{player.elo}</span>
       )}
       <span
@@ -237,6 +237,9 @@ function StatsTable({
                     <RankBadge rank={p.rank} size="sm" showGlow={false} className="!w-5 !h-5 mx-auto" />
                   </td>
                   <td className="px-2 py-2 font-bold">
+                    {typeof p.elo === "number" && (
+                      <span className="text-[#8a8a8a] font-normal tabular-nums mr-1">{p.elo}</span>
+                    )}
                     <Num
                       value={formatSigned(p.eloChange ?? 0)}
                       color={eloChangeColor(p.eloChange ?? 0)}
@@ -370,6 +373,9 @@ function Stats({ match }: { match: MatchDetail }) {
                   className="font-bold tabular-nums"
                   style={{ color: eloChangeColor(selected.eloChange ?? 0) }}
                 >
+                  {typeof selected.elo === "number" && (
+                    <span className="text-[#8a8a8a] font-normal mr-1">{selected.elo}</span>
+                  )}
                   {formatSigned(selected.eloChange ?? 0)}
                 </div>
               </div>
