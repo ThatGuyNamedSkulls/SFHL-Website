@@ -149,6 +149,8 @@ export interface Match {
   isSub?: boolean;
   leftEarly?: boolean;
   subShare?: number | null;
+  /** Skill rank at the time of this match. */
+  rank?: RankTierLetter;
 }
 
 /** Tournament status */

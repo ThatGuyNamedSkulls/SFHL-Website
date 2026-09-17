@@ -140,7 +140,7 @@ export async function GET(
           playerId: p.player_name,
           username: p.player_name,
           avatarUrl: info?.avatar ?? "",
-          rank: info?.rank ?? "UNRANKED",
+          rank: p.player_rank ? mapRank(p.player_rank) : info?.rank ?? "UNRANKED",
           elo: info?.elo ?? 0,
           country: info?.country ?? null,
           countryFlag: info?.countryFlag ?? null,

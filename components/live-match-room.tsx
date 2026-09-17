@@ -32,6 +32,8 @@ export interface LiveLobby {
   selectedMap?: string | null;
   status: string;
   side?: { name: string; team: number } | null;
+  sidePick?: { captainId: string; team: number; options: string[] } | null;
+  firstVetoCaptainId?: string | null;
   captains: { team1: string | null; team2: string | null };
   veto: {
     available: boolean;
@@ -123,6 +125,19 @@ export function LiveMatchRoom({
   const veto = lobby.veto;
   const myTurn = !!selfId && veto?.currentTurnCaptainId === selfId && !veto.complete;
   const mapName = lobby.selectedMap || lobby.map;
+  const pickerId =
+    lobby.sidePick?.captainId ||
+    lobby.firstVetoCaptainId ||
+    veto?.history?.[0]?.bannedByCaptainId ||
+    lobby.captains.team1 ||
+    null;
+  const pickingSide =
+    !lobby.side &&
+    lobby.status !== "ready_to_play" &&
+    (lobby.status === "side_selection" || !!veto?.complete);
+  const mySideTurn = !!selfId && pickingSide && pickerId === selfId;
+  const sideOptions = lobby.sidePick?.options?.length ? lobby.sidePick.options : ["CT", "T"];
+  const picker = lobby.members.find((m) => m.discordId === pickerId);
   const name1 = teamHandle(team1, lobby.captains.team1);
   const name2 = teamHandle(team2, lobby.captains.team2);
   const av1 = team1.find((m) => m.discordId === lobby.captains.team1) ?? team1[0];
@@ -206,16 +221,43 @@ export function LiveMatchRoom({
     }
   };
 
+  const pickSide = async (side: string) => {
+    setBusy(side);
+    setError(null);
+    try {
+      const res = await fetch("/api/lobby/side", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ side }),
+      });
+      const data = await res.json();
+      if (!res.ok) setError(data.error || "Side pick failed");
+      else if (data.lobby) onLobby(data.lobby as LiveLobby);
+    } catch {
+      setError("Side pick failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const vetoStatus =
-    mapName && (veto?.complete || !veto)
+    lobby.side && mapName
       ? "Map selected"
-      : veto && !veto.complete && remainingSec <= 0
-        ? "Time's up — random ban incoming…"
-        : myTurn
-          ? "Your turn — ban a map"
-          : veto?.currentTurnCaptainId
-            ? "Your opponent is banning a map"
-            : "Veto in progress";
+      : pickingSide
+        ? mySideTurn
+          ? "Your turn — pick a starting side"
+          : picker
+            ? `${picker.name} is picking a starting side`
+            : "Waiting for side pick"
+        : mapName && (veto?.complete || !veto)
+          ? "Map selected"
+          : veto && !veto.complete && remainingSec <= 0
+            ? "Time's up — random ban incoming…"
+            : myTurn
+              ? "Your turn — ban a map"
+              : veto?.currentTurnCaptainId
+                ? "Your opponent is banning a map"
+                : "Veto in progress";
 
   return (
     <div className="flex h-[calc(100dvh-var(--hl-topbar-h))] overflow-hidden">
@@ -310,7 +352,39 @@ export function LiveMatchRoom({
                 )}
               </div>
 
-              {mapName && (veto?.complete || !veto) ? (
+              {pickingSide ? (
+                <div className="rounded-lg bg-[#1c1c1c] border border-white/[0.06] p-3 text-center">
+                  {mapName && (
+                    <>
+                      <MapThumb map={mapName} className="w-full h-16 mx-auto" />
+                      <div className="text-sm font-bold text-white mt-2">{prettyMap(mapName)}</div>
+                    </>
+                  )}
+                  <div className="text-[11px] text-[#8a8a8a] mt-2 mb-2">
+                    Team {lobby.sidePick?.team || picker?.team || 1} starting side
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {sideOptions.map((side) => {
+                      const isCt = side.toUpperCase() === "CT";
+                      return (
+                        <button
+                          key={side}
+                          type="button"
+                          disabled={!mySideTurn || busy !== null}
+                          onClick={() => pickSide(side)}
+                          className={`h-11 rounded-lg border text-sm font-black tracking-wide transition-colors ${
+                            isCt
+                              ? "bg-[#1e2a3d] border-[#5d79ae]/50 text-[#9eb6d9] hover:border-[#5d79ae] hover:bg-[#24344c]"
+                              : "bg-[#2a1f14] border-[#de9b35]/50 text-[#e8b86a] hover:border-[#de9b35] hover:bg-[#3a2a18]"
+                          } disabled:opacity-50 disabled:cursor-default`}
+                        >
+                          {busy === side ? "…" : side}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : mapName && (veto?.complete || !veto) ? (
                 <div className="rounded-lg bg-[#1c1c1c] border border-white/[0.06] p-3 text-center">
                   <MapThumb map={mapName} className="w-full h-16 mx-auto" />
                   <div className="text-sm font-bold text-white mt-2">{prettyMap(mapName)}</div>

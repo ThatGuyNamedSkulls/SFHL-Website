@@ -303,26 +303,37 @@ export interface DbMatch {
   left_early?: number;
   /** Presence fraction of the match; null on a full-game row. */
   sub_share?: number | null;
+  /** Rank at the time of this match (post-result). Null on legacy rows. */
+  player_rank?: string | null;
 }
 
 const MATCH_BASE_COLS = `id, player_name, map_name, region, kills, deaths, assists,
                  hs_percentage, elo_change, result, points, mvps, match_id,
                  timestamp, executed_by, round_score`;
 const MATCH_SUB_COLS = `${MATCH_BASE_COLS}, COALESCE(is_sub, 0) AS is_sub, COALESCE(left_early, 0) AS left_early, sub_share`;
+const MATCH_RANK_COLS = `${MATCH_SUB_COLS}, player_rank`;
 
 async function selectMatchRows(whereSql: string, args: InArgs): Promise<DbMatch[]> {
   try {
     const rs = await client.execute({
-      sql: `SELECT ${MATCH_SUB_COLS} ${whereSql}`,
+      sql: `SELECT ${MATCH_RANK_COLS} ${whereSql}`,
       args,
     });
     return rs.rows as unknown as DbMatch[];
   } catch {
-    const rs = await client.execute({
-      sql: `SELECT ${MATCH_BASE_COLS} ${whereSql}`,
-      args,
-    });
-    return rs.rows as unknown as DbMatch[];
+    try {
+      const rs = await client.execute({
+        sql: `SELECT ${MATCH_SUB_COLS} ${whereSql}`,
+        args,
+      });
+      return rs.rows as unknown as DbMatch[];
+    } catch {
+      const rs = await client.execute({
+        sql: `SELECT ${MATCH_BASE_COLS} ${whereSql}`,
+        args,
+      });
+      return rs.rows as unknown as DbMatch[];
+    }
   }
 }
 
@@ -332,15 +343,18 @@ export async function getMatchesForPlayer(playerName: string, limit = 100): Prom
   // graph — the graph then starts at the player's post-placement ELO instead of
   // reconstructing the 0 → 0 → 0 → <graduation ELO> placement climb. COALESCE
   // covers legacy rows written before the column existed. Mirrors the bot's
-  // /matchhistory + /checkperformance filters. Capped: hydrating a whole
-  // career of full rows grows unbounded as history accumulates.
-  return selectMatchRows(
-    `FROM match_history
-          WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
-          ORDER BY id DESC
-          LIMIT ?`,
-    [playerName, limit]
-  );
+  // /matchhistory + /checkperformance filters. Dummy /rankdummies rows are
+  // hidden unless staff passed history=True (is_test=0).
+  const where =
+    "FROM match_history WHERE player_name = ? AND COALESCE(is_placement, 0) = 0";
+  try {
+    return await selectMatchRows(
+      `${where} AND COALESCE(is_test, 0) = 0 ORDER BY id DESC LIMIT ?`,
+      [playerName, limit]
+    );
+  } catch {
+    return selectMatchRows(`${where} ORDER BY id DESC LIMIT ?`, [playerName, limit]);
+  }
 }
 
 /** Placement (pre-rank) games, oldest first — used by the profile placement track. */
@@ -369,13 +383,23 @@ export async function getEloChanges(
   playerName: string,
   limit = 250
 ): Promise<{ eloChange: number; timestamp: string }[]> {
-  const rs = await client.execute({
-    sql: `SELECT elo_change, timestamp FROM match_history
+  const sql =
+    `SELECT elo_change, timestamp FROM match_history
           WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
+            AND COALESCE(is_test, 0) = 0
           ORDER BY id DESC
-          LIMIT ?`,
-    args: [playerName, limit],
-  });
+          LIMIT ?`;
+  let rs;
+  try {
+    rs = await client.execute({ sql, args: [playerName, limit] });
+  } catch {
+    rs = await client.execute({
+      sql: `SELECT elo_change, timestamp FROM match_history
+            WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
+            ORDER BY id DESC LIMIT ?`,
+      args: [playerName, limit],
+    });
+  }
   return rs.rows.map((r) => ({
     eloChange: Number(r.elo_change ?? 0),
     timestamp: (r.timestamp as string) ?? "",
@@ -469,7 +493,7 @@ export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
   // means the column may not exist — fall back to a team-less select).
   try {
     const rs = await client.execute({
-      sql: `SELECT ${MATCH_SUB_COLS}, team, mode
+      sql: `SELECT ${MATCH_RANK_COLS}, team, mode
             FROM match_history
             WHERE match_id = ?
             ORDER BY points DESC`,
@@ -479,7 +503,7 @@ export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
   } catch {
     try {
       const rs = await client.execute({
-        sql: `SELECT ${MATCH_BASE_COLS}, team, mode
+        sql: `SELECT ${MATCH_SUB_COLS}, team, mode
               FROM match_history
               WHERE match_id = ?
               ORDER BY points DESC`,
@@ -575,17 +599,30 @@ export async function getPlacementGamesTotal(): Promise<number> {
 }
 
 export async function getAllMatchIds(): Promise<{ match_id: number; timestamp: string; map_name: string; region: string }[]> {
-  const rs = await client.execute(
-    `SELECT DISTINCT match_id,
+  const sql = `SELECT DISTINCT match_id,
             MIN(timestamp) as timestamp,
             map_name,
             region
      FROM match_history
-     WHERE match_id IS NOT NULL
+     WHERE match_id IS NOT NULL AND COALESCE(is_test, 0) = 0
      GROUP BY match_id
-     ORDER BY MIN(timestamp) DESC`
-  );
-  return rs.rows as unknown as { match_id: number; timestamp: string; map_name: string; region: string }[];
+     ORDER BY MIN(timestamp) DESC`;
+  try {
+    const rs = await client.execute(sql);
+    return rs.rows as unknown as { match_id: number; timestamp: string; map_name: string; region: string }[];
+  } catch {
+    const rs = await client.execute(
+      `SELECT DISTINCT match_id,
+              MIN(timestamp) as timestamp,
+              map_name,
+              region
+       FROM match_history
+       WHERE match_id IS NOT NULL
+       GROUP BY match_id
+       ORDER BY MIN(timestamp) DESC`
+    );
+    return rs.rows as unknown as { match_id: number; timestamp: string; map_name: string; region: string }[];
+  }
 }
 
 export async function getMostPlayedWith(

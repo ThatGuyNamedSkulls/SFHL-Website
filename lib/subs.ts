@@ -16,7 +16,7 @@
  * `config/games/counterstrike.toml`.
  */
 
-import { client, getPlayer } from "@/lib/db";
+import { client, getPlayer, mapRank } from "@/lib/db";
 import { getActiveLobbyMemberIds } from "@/lib/lobby";
 import { prettyMap } from "@/lib/format";
 import { SubRequestView } from "@/types";
@@ -190,6 +190,11 @@ interface ViewerContext {
   blocked: string | null;
 }
 
+function isRanked(placementDone: unknown, rank: string | null | undefined): boolean {
+  if (!placementDone) return false;
+  return mapRank(rank || "") !== "UNRANKED";
+}
+
 async function viewerContext(claimer: Claimer | null): Promise<ViewerContext> {
   const ctx: ViewerContext = { claimer, elo: 0, blocked: null };
 
@@ -213,9 +218,9 @@ async function viewerContext(claimer: Claimer | null): Promise<ViewerContext> {
     return ctx;
   }
   ctx.elo = Number(player.elo ?? 0);
-  if (!player.placement_done) {
+  if (!isRanked(player.placement_done, player.rank)) {
     ctx.blocked =
-      "Finish your placement matches first — a partial game can't be graded as a placement.";
+      "Unranked players can't join as a substitute. Finish your placement matches first.";
     return ctx;
   }
 

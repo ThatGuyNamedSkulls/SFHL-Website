@@ -131,12 +131,13 @@ function formatMemberSince(date: string | null): string | null {
 
 function MatchHistoryRow({
   match,
-  rank,
+  fallbackRank,
 }: {
   match: Match;
-  rank: RankTierLetter;
+  fallbackRank: RankTierLetter;
 }) {
   const win = match.result === "W";
+  const rank = match.rank || fallbackRank;
   const { day, time } = formatMatchWhen(match.date);
   return (
     <Link
@@ -695,7 +696,7 @@ function ProfileContent() {
                           <span className="text-right">K/D/A</span>
                         </div>
                         {matches.slice(0, 8).map((m) => (
-                          <MatchHistoryRow key={m.id} match={m} rank={player.rank} />
+                          <MatchHistoryRow key={m.id} match={m} fallbackRank={player.rank} />
                         ))}
                       </div>
                     )}
@@ -722,7 +723,7 @@ function ProfileContent() {
                         <span className="text-right">K/D/A</span>
                       </div>
                       {filteredMatches.map((m) => (
-                        <MatchHistoryRow key={m.id} match={m} rank={player.rank} />
+                        <MatchHistoryRow key={m.id} match={m} fallbackRank={player.rank} />
                       ))}
                     </div>
                   )}
@@ -810,7 +811,13 @@ function ProfileContent() {
                 {/* ELO graph */}
                 <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-5">
                   {player.eloHistory && player.eloHistory.length > 1 ? (
-                    <EloGraphFaceit eloHistory={player.eloHistory} matches={matches} eloResets={player.eloResets} />
+                    <EloGraphFaceit
+                      eloHistory={player.eloHistory}
+                      matches={matches}
+                      lastResetAt={player.lastResetAt}
+                      lastSeason={player.lastSeason}
+                      currentElo={player.elo}
+                    />
                   ) : (
                     <p className="text-sm text-[#8a8a8a] py-8 text-center">Not enough matches to chart yet.</p>
                   )}

@@ -164,7 +164,7 @@ interface GraphPoint {
   match: Match | null;
 }
 
-const GRAPH_MATCHES = 20;
+const GRAPH_MATCHES = 50;
 const Y_PAD = 100;
 const PREV_COLOR = "#e74c3c";
 const CURR_COLOR = "#ff5500";
@@ -309,7 +309,7 @@ export function RecentPerformance({
     };
   }, [statSource]);
 
-  const { prevPoints, currPoints, nowValues } = useMemo(() => {
+  const { prevPoints, currPoints, nowValues, placementRank } = useMemo(() => {
     const lastNull = eloHistory.lastIndexOf(null);
     const prevEloAll =
       lastNull === -1
@@ -324,11 +324,13 @@ export function RecentPerformance({
       prevSeries = [lastSeason.elo];
     }
     const currSeries = tailElo(currEloAll, currMatches.length, currentElo);
+    const placedAt = currEloAll[0] ?? currSeries[0] ?? 0;
 
     return {
       prevPoints: toGraphPoints(prevSeries, prevChrono),
       currPoints: toGraphPoints(currSeries, currChrono),
       nowValues: currSeries,
+      placementRank: getRankForElo(placedAt).letter,
     };
   }, [
     eloHistory,
@@ -467,14 +469,17 @@ export function RecentPerformance({
                 </div>
               )}
               {showCut && (
-                <div className="relative w-11 shrink-0 flex flex-col items-center py-2">
+                <div className="relative w-14 shrink-0 flex flex-col items-center py-2">
                   <span className="flex-1 w-0 border-l border-dashed border-white/30" />
                   <RankBadge
-                    rank={rank && rank !== "UNRANKED" ? rank : lastSeason?.rank || "UNRANKED"}
+                    rank={placementRank}
                     size="sm"
                     showGlow
                     className="!w-9 !h-9 my-1"
                   />
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-[#8a8a8a]">
+                    Placed
+                  </span>
                   <span className="flex-1 w-0 border-l border-dashed border-white/30" />
                 </div>
               )}

@@ -38,6 +38,12 @@ export interface VetoState {
   turnDeadlineAt?: number | null;
 }
 
+export interface SidePickState {
+  captainId: string;
+  team: number;
+  options: string[];
+}
+
 export interface LobbyView {
   channelId: string;
   channelName: string;
@@ -52,6 +58,8 @@ export interface LobbyView {
   selectedMap: string | null;
   status: string;
   side: { name: string; team: number } | null;
+  sidePick: SidePickState | null;
+  firstVetoCaptainId: string | null;
   captains: { team1: string | null; team2: string | null };
   veto: VetoState | null;
   createdAt: number;
@@ -70,7 +78,14 @@ interface RawLobby {
   map?: string | null;
   selectedMap?: string | null;
   status?: string;
-  side?: { name: string; team: number } | null;
+  side?: {
+    name: string;
+    team: number;
+    selectedByCaptainId?: string;
+    actionSource?: string;
+  } | null;
+  sidePick?: Partial<SidePickState> | null;
+  firstVetoCaptainId?: string | null;
   captains?: { team1?: string; team2?: string };
   veto?: Partial<VetoState> | null;
   createdAt: number;
@@ -93,6 +108,40 @@ function normalizeVeto(raw: RawLobby): VetoState | null {
     currentTurnCaptainId: v.currentTurnCaptainId ?? null,
     complete: !!v.complete,
     turnDeadlineAt: typeof v.turnDeadlineAt === "number" ? v.turnDeadlineAt : null,
+  };
+}
+
+const DEFAULT_SIDES = ["CT", "T"];
+
+function normalizeSidePick(raw: RawLobby): SidePickState | null {
+  const s = raw.sidePick;
+  if (!s?.captainId) return null;
+  return {
+    captainId: String(s.captainId),
+    team: Number(s.team) || 1,
+    options: Array.isArray(s.options) && s.options.length ? s.options.map(String) : DEFAULT_SIDES,
+  };
+}
+
+function resolveSidePicker(data: RawLobby): { captainId: string; team: number; options: string[] } | null {
+  const fromState = normalizeSidePick(data);
+  const captainId =
+    fromState?.captainId ||
+    data.firstVetoCaptainId ||
+    data.veto?.history?.[0]?.bannedByCaptainId ||
+    data.captains?.team1 ||
+    null;
+  if (!captainId) return null;
+  let team = fromState?.team || 0;
+  if (!team) {
+    if (data.captains?.team1 === captainId) team = 1;
+    else if (data.captains?.team2 === captainId) team = 2;
+    else team = 1;
+  }
+  return {
+    captainId,
+    team,
+    options: fromState?.options?.length ? fromState.options : DEFAULT_SIDES,
   };
 }
 
@@ -147,6 +196,8 @@ async function enrich(raw: RawLobby): Promise<LobbyView> {
     selectedMap: selected,
     status: raw.status || "veto",
     side: raw.side ?? null,
+    sidePick: normalizeSidePick(raw),
+    firstVetoCaptainId: raw.firstVetoCaptainId ?? null,
     captains: {
       team1: raw.captains?.team1 ?? null,
       team2: raw.captains?.team2 ?? null,
@@ -303,12 +354,22 @@ export async function applyWebsiteMapBan(
   };
 
   const chosen = complete ? remaining[0] : data.selectedMap ?? data.map ?? null;
+  const picker = complete ? resolveSidePicker(data) : null;
   const next: RawLobby = {
     ...data,
     veto: nextVeto,
     selectedMap: chosen,
     map: chosen,
-    status: complete ? "side_selection" : "veto",
+    status: complete ? (picker ? "side_selection" : "ready_to_play") : "veto",
+    ...(complete && picker
+      ? {
+          sidePick: {
+            captainId: picker.captainId,
+            team: picker.team,
+            options: picker.options,
+          },
+        }
+      : {}),
   };
 
   try {
@@ -318,6 +379,80 @@ export async function applyWebsiteMapBan(
     });
   } catch {
     return { ok: false, error: "Failed to save veto.", status: 500 };
+  }
+
+  return { ok: true, lobby: await enrich(next) };
+}
+
+/** Captain picks CT/T from the website. Bot poll applies it to Discord. */
+export async function applyWebsiteSidePick(
+  discordId: string,
+  sideName: string
+): Promise<VetoResult> {
+  const rows = await loadLobbyRows();
+  if (!rows) return { ok: false, error: "No live match.", status: 404 };
+
+  const cutoff = Date.now() - LOBBY_TTL_MS;
+  let rowId: string | null = null;
+  let data: RawLobby | null = null;
+
+  for (const row of rows) {
+    if (Number(row.created_at) < cutoff) continue;
+    try {
+      const parsed = JSON.parse(row.data as string) as RawLobby;
+      if (parsed.members?.some((m) => m.discordId === discordId)) {
+        rowId = row.id as string;
+        data = parsed;
+        break;
+      }
+    } catch {
+      /* skip */
+    }
+  }
+
+  if (!rowId || !data) return { ok: false, error: "You're not in a live match.", status: 404 };
+  if (data.side?.name) {
+    return { ok: false, error: "Starting side is already picked.", status: 409 };
+  }
+
+  const veto = normalizeVeto(data);
+  const mapReady = !!veto?.complete || data.status === "side_selection";
+  if (!mapReady) {
+    return { ok: false, error: "Map veto is still in progress.", status: 409 };
+  }
+
+  const picker = resolveSidePicker(data);
+  if (!picker) {
+    return { ok: false, error: "Side pick is not available.", status: 409 };
+  }
+  if (picker.captainId !== discordId) {
+    return { ok: false, error: "It's not your turn to pick a side.", status: 403 };
+  }
+
+  const name = sideName.trim();
+  if (!picker.options.includes(name)) {
+    return { ok: false, error: "That side is not available.", status: 400 };
+  }
+
+  const next: RawLobby = {
+    ...data,
+    status: "ready_to_play",
+    sidePick: null,
+    side: {
+      name,
+      team: picker.team,
+      selectedByCaptainId: discordId,
+      actionSource: "website",
+    },
+  };
+
+  try {
+    await client.execute({
+      sql: "UPDATE web_lobbies SET data = ? WHERE id = ?",
+      args: [JSON.stringify(next), rowId],
+    });
+  } catch {
+    return { ok: false, error: "Failed to save side pick.", status: 500 };
   }
 
   return { ok: true, lobby: await enrich(next) };
