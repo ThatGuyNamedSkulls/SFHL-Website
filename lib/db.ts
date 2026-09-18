@@ -210,9 +210,10 @@ export async function setPlayerDiscordIdentity(
   }
 }
 
-function readCountry(row: { country?: unknown } | undefined): string | null {
-  const raw = (row?.country as string | null | undefined) || "";
-  const code = raw.toLowerCase();
+function readCountry(row: unknown): string | null {
+  if (!row || typeof row !== "object") return null;
+  const raw = (row as Record<string, unknown>).country;
+  const code = typeof raw === "string" ? raw.toLowerCase() : "";
   return code || null;
 }
 
