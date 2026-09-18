@@ -65,7 +65,7 @@ export function VerifyPrompt() {
   }, [gate, dismissed, load]);
 
   const open = !!gate && dismissed !== gate;
-  const joinUrl = invite || "https://discord.com/app";
+  const joinUrl = invite || "https://discord.gg/4UTrW6xJ39";
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && setDismissed(gate)}>

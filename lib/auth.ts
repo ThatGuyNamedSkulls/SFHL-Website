@@ -70,6 +70,7 @@ export const DISCORD_CONFIG = {
   // guilds.join lets login add the user to the HyperLeague Discord if they
   // aren't already in it (bot needs CREATE_INSTANT_INVITE in the guild).
   scopes: ["identify", "guilds", "guilds.join"],
+  inviteUrl: "https://discord.gg/4UTrW6xJ39",
 };
 
 /** Bloxlink assigns this after a member verifies their Roblox account. */
@@ -79,6 +80,8 @@ export type GuildPresence = {
   inGuild: boolean;
   /** True when the member has the Bloxlink verified role. */
   verified: boolean;
+  /** Guild nickname, else Discord display name. */
+  displayName?: string | null;
 };
 
 /**
@@ -93,13 +96,20 @@ export async function getGuildPresence(userId: string): Promise<GuildPresence | 
       `https://discord.com/api/v10/guilds/${DISCORD_CONFIG.guildId}/members/${userId}`,
       { headers: { Authorization: `Bot ${token}` }, cache: "no-store" }
     );
-    if (res.status === 404) return { inGuild: false, verified: false };
+    if (res.status === 404) return { inGuild: false, verified: false, displayName: null };
     if (!res.ok) return null;
-    const member = (await res.json()) as { roles?: string[] };
+    const member = (await res.json()) as {
+      roles?: string[];
+      nick?: string | null;
+      user?: { username?: string; global_name?: string | null };
+    };
     const roles = member.roles ?? [];
+    const displayName =
+      (member.nick || member.user?.global_name || member.user?.username || "").trim() || null;
     return {
       inGuild: true,
       verified: roles.includes(BLOXLINK_VERIFIED_ROLE_ID),
+      displayName,
     };
   } catch {
     return null;
@@ -172,61 +182,16 @@ export async function addUserToGuild(userId: string, accessToken: string): Promi
   }
 }
 
-let inviteCache: { url: string; at: number } | null = null;
-const INVITE_TTL_MS = 12 * 60 * 60 * 1000;
-
 /** Permanent Discord invite for users the website couldn't auto-add. */
+export const DISCORD_INVITE_URL = "https://discord.gg/4UTrW6xJ39";
+
 export async function getDiscordInviteUrl(): Promise<string | null> {
-  const fromEnv =
-    process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || process.env.DISCORD_INVITE_URL || "";
-  if (fromEnv) return fromEnv;
-  if (inviteCache && Date.now() - inviteCache.at < INVITE_TTL_MS) return inviteCache.url;
-  const token = process.env.DISCORD_BOT_TOKEN;
-  if (!token) return null;
-  try {
-    const guildRes = await fetch(
-      `https://discord.com/api/v10/guilds/${DISCORD_CONFIG.guildId}?with_counts=false`,
-      { headers: { Authorization: `Bot ${token}` } }
-    );
-    if (!guildRes.ok) return null;
-    const guild = (await guildRes.json()) as {
-      system_channel_id?: string | null;
-      vanity_url_code?: string | null;
-    };
-    if (guild.vanity_url_code) {
-      const url = `https://discord.gg/${guild.vanity_url_code}`;
-      inviteCache = { url, at: Date.now() };
-      return url;
-    }
-    let channelId = guild.system_channel_id || null;
-    if (!channelId) {
-      const chRes = await fetch(
-        `https://discord.com/api/v10/guilds/${DISCORD_CONFIG.guildId}/channels`,
-        { headers: { Authorization: `Bot ${token}` } }
-      );
-      if (chRes.ok) {
-        const channels = (await chRes.json()) as { id: string; type: number }[];
-        channelId = channels.find((c) => c.type === 0)?.id ?? null;
-      }
-    }
-    if (!channelId) return null;
-    const invRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/invites`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bot ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ max_age: 0, max_uses: 0, unique: false }),
-    });
-    if (!invRes.ok) return null;
-    const inv = (await invRes.json()) as { code?: string };
-    if (!inv.code) return null;
-    const url = `https://discord.gg/${inv.code}`;
-    inviteCache = { url, at: Date.now() };
-    return url;
-  } catch {
-    return null;
-  }
+  return (
+    process.env.NEXT_PUBLIC_DISCORD_INVITE_URL ||
+    process.env.DISCORD_INVITE_URL ||
+    DISCORD_CONFIG.inviteUrl ||
+    DISCORD_INVITE_URL
+  );
 }
 
 /** Re-check Discord membership + Bloxlink role and return an updated session. */

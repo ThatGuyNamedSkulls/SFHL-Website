@@ -76,7 +76,7 @@ export async function GET(request: Request) {
       const listed =
         Array.isArray(guildsData) &&
         guildsData.some((g: { id: string }) => g.id === DISCORD_CONFIG.guildId);
-      presence = { inGuild: listed, verified: false };
+      presence = { inGuild: listed, verified: false, displayName: null };
     }
     if (!presence.inGuild) {
       const joined = await addUserToGuild(userData.id, accessToken);
@@ -84,6 +84,7 @@ export async function GET(request: Request) {
         presence = (await getGuildPresence(userData.id)) ?? {
           inGuild: true,
           verified: false,
+          displayName: null,
         };
       }
     }
@@ -99,11 +100,16 @@ export async function GET(request: Request) {
 
     const playerData = await getPlayerByDiscordId(userData.id);
     const playerName = playerData ? playerData.name : null;
+    const displayName =
+      playerName ||
+      presence.displayName ||
+      userData.global_name ||
+      userData.username;
 
     // Create session
     const session = {
       discordId: userData.id,
-      username: userData.global_name || userData.username,
+      username: displayName,
       discordUsername: userData.username ?? null,
       avatar: avatar,
       discriminator: userData.discriminator || "0",
