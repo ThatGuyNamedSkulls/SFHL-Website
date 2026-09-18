@@ -6,7 +6,7 @@ import { ChevronDown, Swords } from "lucide-react";
 import { useState } from "react";
 import { ProfileMenu } from "@/components/profile-menu";
 import { usePlayRegion } from "@/components/use-play-region";
-import { PLAY_REGIONS } from "@/lib/regions";
+import { PLAY_REGIONS, QUEUE_REGIONS, isQueueRegion } from "@/lib/regions";
 
 const CENTER_TABS = [
   { id: "matchmaking", label: "Matchmaking", href: "/queue" as const },
@@ -47,7 +47,7 @@ export function TopBar() {
                 : "text-hl-muted hover:text-white"
             }`}
           >
-            {meta.short}
+            {isQueueRegion(region) ? meta.short : "Server"}
             <ChevronDown className="w-3 h-3" />
           </button>
           {regionOpen && !queueLocked && (
@@ -59,7 +59,7 @@ export function TopBar() {
                 onClick={() => setRegionOpen(false)}
               />
               <div className="absolute left-0 top-full mt-1 z-50 w-48 rounded-lg border border-hl-border bg-hl-panel shadow-xl py-1">
-                {PLAY_REGIONS.map((r) => (
+                {QUEUE_REGIONS.map((r) => (
                   <button
                     key={r.id}
                     type="button"

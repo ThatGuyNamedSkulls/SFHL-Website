@@ -8,6 +8,8 @@ import {
   QUEUE_LOCK_KEY,
   REGION_CHANGE_EVENT,
   REGION_STORAGE_KEY,
+  LEADERBOARD_REGION_KEY,
+  LEADERBOARD_REGION_CHANGE_EVENT,
   isPlayRegion,
   type PlayRegionId,
 } from "@/lib/regions";
@@ -81,4 +83,44 @@ export function usePlayRegion() {
 
   const meta = PLAY_REGIONS.find((r) => r.id === region) ?? PLAY_REGIONS[0];
   return { region, setRegion, meta, queueLocked };
+}
+
+function readLeaderboardRegion(): PlayRegionId {
+  if (typeof window === "undefined") return "GLOBAL";
+  try {
+    const raw = window.localStorage.getItem(LEADERBOARD_REGION_KEY);
+    if (raw && isPlayRegion(raw)) return raw;
+  } catch {
+    /* ignore */
+  }
+  return "GLOBAL";
+}
+
+/** Rank page filter only. Does not follow the top-bar server/queue region. */
+export function useLeaderboardRegion() {
+  const [region, setRegionState] = useState<PlayRegionId>("GLOBAL");
+
+  useEffect(() => {
+    setRegionState(readLeaderboardRegion());
+    const onChange = () => setRegionState(readLeaderboardRegion());
+    window.addEventListener(LEADERBOARD_REGION_CHANGE_EVENT, onChange);
+    window.addEventListener("storage", onChange);
+    return () => {
+      window.removeEventListener(LEADERBOARD_REGION_CHANGE_EVENT, onChange);
+      window.removeEventListener("storage", onChange);
+    };
+  }, []);
+
+  const setRegion = useCallback((next: PlayRegionId) => {
+    setRegionState(next);
+    try {
+      window.localStorage.setItem(LEADERBOARD_REGION_KEY, next);
+    } catch {
+      /* ignore */
+    }
+    window.dispatchEvent(new Event(LEADERBOARD_REGION_CHANGE_EVENT));
+  }, []);
+
+  const meta = PLAY_REGIONS.find((r) => r.id === region) ?? PLAY_REGIONS[0];
+  return { region, setRegion, meta };
 }

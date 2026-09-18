@@ -8,10 +8,11 @@ import { Search } from "lucide-react";
 interface CountrySelectProps {
   value: string | null;
   onChange: (code: string) => void;
+  disabled?: boolean;
 }
 
 /** Searchable country picker with flag thumbnails. */
-export function CountrySelect({ value, onChange }: CountrySelectProps) {
+export function CountrySelect({ value, onChange, disabled }: CountrySelectProps) {
   const [query, setQuery] = useState("");
   const options = useMemo(() => countryOptions(), []);
   const filtered = useMemo(() => {
@@ -35,8 +36,10 @@ export function CountrySelect({ value, onChange }: CountrySelectProps) {
         {filtered.map((o) => (
           <button
             key={o.code}
+            type="button"
+            disabled={disabled}
             onClick={() => onChange(o.code)}
-            className={`flex items-center gap-3 w-full px-3 py-2 text-left text-sm transition-colors ${
+            className={`flex items-center gap-3 w-full px-3 py-2 text-left text-sm transition-colors disabled:opacity-60 ${
               value === o.code ? "bg-hl-gold/15 text-hl-gold" : "text-white hover:bg-hl-panel-light/50"
             }`}
           >

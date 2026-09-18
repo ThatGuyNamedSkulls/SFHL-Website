@@ -259,9 +259,7 @@ export function MyPartyRail() {
         {party?.voiceChannelUrl ? (
           <a
             href={party.voiceChannelUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Join party voice"
+            title="Join party voice in the Discord app"
             className={`${iconBtn} border-t border-white/10 text-[#8a8a8a] hover:text-[#57F287]`}
           >
             <Headphones className="w-4 h-4" strokeWidth={1.75} />
@@ -394,8 +392,7 @@ export function MyPartyRail() {
                 {party.voiceChannelUrl && (
                   <a
                     href={party.voiceChannelUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    title="Opens the Discord app"
                     className="mt-1 w-full flex items-center gap-2 rounded-lg px-2 py-2 text-[#57F287] hover:bg-white/[0.04]"
                   >
                     <Headphones className="w-4 h-4" />

@@ -23,6 +23,7 @@ import {
   deletePartyVoiceChannel,
   promptJoinPartyVoice,
   syncPartyVoiceMembers,
+  partyVoiceAppUrl,
 } from "@/lib/discord-party-voice";
 
 /** 30 minutes without any party operation (create/join/leave) before a party
@@ -115,7 +116,8 @@ export async function getParties(): Promise<Party[]> {
       continue;
     }
     if (party.members.length > 0 && party.updatedAt >= cutoff) {
-      live.push(party);
+      const appUrl = partyVoiceAppUrl(party.voiceChannelId, party.guildId);
+      live.push(appUrl ? { ...party, voiceChannelUrl: appUrl } : party);
     } else {
       expiredIds.push(row.id as string);
       expiredMembers.push(...party.members);
@@ -279,7 +281,7 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
     if (voice) {
       party = { ...party, ...voice, updatedAt: Date.now() };
       await upsert(party);
-      await promptJoinPartyVoice(input.leader.playerName, voice.voiceChannelUrl);
+      await promptJoinPartyVoice(input.leader.playerName, voice);
     }
   } catch (err) {
     console.error("Failed to create party voice channel", err);
@@ -380,7 +382,7 @@ export async function joinParty(
             party = { ...party, ...voice };
             await upsert(party);
             for (const m of party.members) {
-              await promptJoinPartyVoice(m.playerName, voice.voiceChannelUrl);
+              await promptJoinPartyVoice(m.playerName, voice);
             }
           }
         } else {
@@ -389,8 +391,11 @@ export async function joinParty(
             party.members.map((m) => m.discordId),
             previousIds
           );
-          if (party.voiceChannelUrl) {
-            await promptJoinPartyVoice(member.playerName, party.voiceChannelUrl);
+          if (party.voiceChannelUrl && party.voiceChannelId) {
+            await promptJoinPartyVoice(member.playerName, {
+              voiceChannelId: party.voiceChannelId,
+              voiceChannelUrl: party.voiceChannelUrl,
+            });
           }
         }
       } catch (err) {

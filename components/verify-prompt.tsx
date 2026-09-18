@@ -100,12 +100,12 @@ export function VerifyPrompt() {
             <DialogHeader>
               <DialogTitle className="text-lg font-black text-white header-caps flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-hl-gold" />
-                Verify with Bloxlink
+                Unlock matchmaking
               </DialogTitle>
               <DialogDescription className="text-hl-muted">
-                You have to verify with Bloxlink in the HyperLeague Discord before
-                you can queue or appear on the league. Use the Bloxlink verify
-                command in the server, then refresh this page.
+                Press <strong>Get Matchmaking Access</strong> in the HyperLeague
+                Discord to unlock ranked queue and your website profile, then
+                refresh this page.
               </DialogDescription>
             </DialogHeader>
             {invite ? (

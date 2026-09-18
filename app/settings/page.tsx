@@ -11,7 +11,7 @@ import { CountrySelect } from "@/components/country-select";
 import { LogoutButton } from "@/components/logout-button";
 import { InventoryPanel } from "@/components/inventory-panel";
 import { Flag } from "@/components/flag";
-import { countryName, flagPath } from "@/lib/countries";
+import { countryName, flagPath, notifyCountryChanged, COUNTRY_CHANGE_EVENT } from "@/lib/countries";
 import {
   User,
   Link2,
@@ -49,6 +49,18 @@ export default function SettingsPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const onCountry = (event: Event) => {
+      const code = (event as CustomEvent<{ code?: string }>).detail?.code;
+      if (!code) return;
+      setCountry(code);
+      setCountryDraft(code);
+      setEditingCountry(false);
+    };
+    window.addEventListener(COUNTRY_CHANGE_EVENT, onCountry);
+    return () => window.removeEventListener(COUNTRY_CHANGE_EVENT, onCountry);
+  }, []);
+
   const saveCountry = async () => {
     if (!countryDraft) return;
     setSavingCountry(true);
@@ -61,6 +73,7 @@ export default function SettingsPage() {
       if (res.ok) {
         setCountry(countryDraft);
         setEditingCountry(false);
+        notifyCountryChanged(countryDraft);
       }
     } finally {
       setSavingCountry(false);

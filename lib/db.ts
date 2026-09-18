@@ -133,6 +133,7 @@ export function ensurePlayerDiscordColumns(): Promise<void> {
       await client.execute("ALTER TABLE players ADD COLUMN discord_id INTEGER DEFAULT NULL").catch(() => {});
       await client.execute("ALTER TABLE players ADD COLUMN discord_username TEXT DEFAULT NULL").catch(() => {});
       await client.execute("ALTER TABLE players ADD COLUMN discord_avatar TEXT DEFAULT NULL").catch(() => {});
+      await client.execute("ALTER TABLE players ADD COLUMN country TEXT DEFAULT NULL").catch(() => {});
     })();
   }
   return discordColsReady;
@@ -209,15 +210,56 @@ export async function setPlayerDiscordIdentity(
   }
 }
 
-export async function getPlayerCountry(name: string): Promise<string | null> {
-  const rs = await client.execute({ sql: "SELECT country FROM players WHERE name = ?", args: [name] });
-  if (rs.rows.length === 0) return null;
-  return (rs.rows[0].country as string) || null;
+function readCountry(row: { country?: unknown } | undefined): string | null {
+  const raw = (row?.country as string | null | undefined) || "";
+  const code = raw.toLowerCase();
+  return code || null;
 }
 
-export async function setPlayerCountry(name: string, code: string): Promise<boolean> {
-  const rs = await client.execute({ sql: "UPDATE players SET country = ? WHERE name = ?", args: [code.toLowerCase(), name] });
-  return rs.rowsAffected > 0;
+export async function getPlayerCountry(
+  name: string,
+  discordId?: string | null
+): Promise<string | null> {
+  await ensurePlayerDiscordColumns();
+  if (discordId) {
+    const byDiscord = await client.execute({
+      sql: "SELECT country FROM players WHERE CAST(discord_id AS TEXT) = ?",
+      args: [String(discordId)],
+    });
+    if (byDiscord.rows.length > 0) return readCountry(byDiscord.rows[0]);
+  }
+  const rs = await client.execute({
+    sql: "SELECT country FROM players WHERE name = ?",
+    args: [name],
+  });
+  if (rs.rows.length === 0) return null;
+  return readCountry(rs.rows[0]);
+}
+
+export async function setPlayerCountry(
+  name: string,
+  code: string,
+  discordId?: string | null
+): Promise<boolean> {
+  await ensurePlayerDiscordColumns();
+  const normalized = code.toLowerCase();
+  if (discordId) {
+    const existing = await getPlayerByDiscordId(String(discordId));
+    if (existing) {
+      await client.execute({
+        sql: "UPDATE players SET country = ? WHERE CAST(discord_id AS TEXT) = ?",
+        args: [normalized, String(discordId)],
+      });
+      return true;
+    }
+  }
+  const existing = await getPlayer(name);
+  if (!existing) return false;
+  await client.execute({
+    sql: "UPDATE players SET country = ? WHERE name = ?",
+    args: [normalized, name],
+  });
+  return true;
 }
 
 /** Lazily add the shop-currency column if the bot hasn't migrated it yet

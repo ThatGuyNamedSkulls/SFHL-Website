@@ -75,10 +75,13 @@ export const DISCORD_CONFIG = {
 
 /** Bloxlink assigns this after a member verifies their Roblox account. */
 export const BLOXLINK_VERIFIED_ROLE_ID = "1550436622544150548";
+/** Self-serve matchmaking access from the Discord /verifymessage button. */
+export const MM_ACCESS_ROLE_ID = "1523016656161603584";
+const LEAGUE_ACCESS_ROLE_IDS = [BLOXLINK_VERIFIED_ROLE_ID, MM_ACCESS_ROLE_ID];
 
 export type GuildPresence = {
   inGuild: boolean;
-  /** True when the member has the Bloxlink verified role. */
+  /** True when the member has MM access or the Bloxlink verified role. */
   verified: boolean;
   /** Guild nickname, else Discord display name. */
   displayName?: string | null;
@@ -108,7 +111,7 @@ export async function getGuildPresence(userId: string): Promise<GuildPresence | 
       (member.nick || member.user?.global_name || member.user?.username || "").trim() || null;
     return {
       inGuild: true,
-      verified: roles.includes(BLOXLINK_VERIFIED_ROLE_ID),
+      verified: LEAGUE_ACCESS_ROLE_IDS.some((id) => roles.includes(id)),
       displayName,
     };
   } catch {

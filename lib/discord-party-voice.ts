@@ -56,7 +56,15 @@ async function matchStaffRoleId(): Promise<string | null> {
 }
 
 function channelUrl(channelId: string) {
-  return `https://discord.com/channels/${DISCORD_CONFIG.guildId}/${channelId}`;
+  return `discord://-/channels/${DISCORD_CONFIG.guildId}/${channelId}`;
+}
+
+export function partyVoiceAppUrl(
+  channelId: string | null | undefined,
+  guildId?: string | null
+): string | null {
+  if (!channelId) return null;
+  return `discord://-/channels/${guildId || DISCORD_CONFIG.guildId}/${channelId}`;
 }
 
 function slug(name: string) {
@@ -131,13 +139,17 @@ export async function deletePartyVoiceChannel(voiceChannelId: string | null | un
 /** Website notification + Discord DM asking the player to join party voice. */
 export async function promptJoinPartyVoice(
   playerName: string | null,
-  voiceChannelUrl: string
+  voice: { voiceChannelId: string; voiceChannelUrl: string }
 ): Promise<void> {
   if (!playerName) return;
-  const msg = `Join your party voice on Discord: ${voiceChannelUrl}`;
+  const mention = `<#${voice.voiceChannelId}>`;
+  const msg = `Join your party voice on Discord: ${mention}`;
   try {
-    await addNotification(playerName, "party_voice", msg, null, voiceChannelUrl);
-    await enqueueDM(playerName, `🔊 **Party voice is ready.** Click to join:\n${voiceChannelUrl}`);
+    await addNotification(playerName, "party_voice", msg, null, voice.voiceChannelUrl);
+    await enqueueDM(
+      playerName,
+      `🔊 **Party voice is ready.** Click to join:\n${mention}`
+    );
   } catch {
     /* social schema / DM outbox not ready */
   }

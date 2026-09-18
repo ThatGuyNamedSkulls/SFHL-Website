@@ -21,6 +21,9 @@ export type PlayRegionId = (typeof PLAY_REGIONS)[number]["id"];
 export const DEFAULT_PLAY_REGION: PlayRegionId = "GLOBAL";
 export const REGION_STORAGE_KEY = "hl_view_region";
 export const REGION_CHANGE_EVENT = "hl-region-change";
+/** Rank page board filter — independent of the top-bar queue/server region. */
+export const LEADERBOARD_REGION_KEY = "hl_leaderboard_region";
+export const LEADERBOARD_REGION_CHANGE_EVENT = "hl-leaderboard-region";
 export const QUEUE_LOCK_KEY = "hl_queue_lock";
 export const QUEUE_LOCK_EVENT = "hl-queue-lock";
 

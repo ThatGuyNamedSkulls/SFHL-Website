@@ -99,6 +99,11 @@ function discordUrl(guildId: string, channelId: string) {
   return `https://discord.com/channels/${guildId}/${channelId}`;
 }
 
+/** Opens a guild channel in the Discord desktop/mobile app, not discord.com. */
+function discordAppUrl(guildId: string, channelId: string) {
+  return `discord://-/channels/${guildId}/${channelId}`;
+}
+
 function normalizeVeto(raw: RawLobby): VetoState | null {
   const v = raw.veto;
   if (!v) return null;
@@ -193,7 +198,7 @@ async function enrich(raw: RawLobby): Promise<LobbyView> {
     guildId: raw.guildId,
     channelUrl: discordUrl(raw.guildId, raw.channelId),
     voiceChannelId,
-    voiceChannelUrl: voiceChannelId ? discordUrl(raw.guildId, voiceChannelId) : null,
+    voiceChannelUrl: voiceChannelId ? discordAppUrl(raw.guildId, voiceChannelId) : null,
     map: selected,
     selectedMap: selected,
     status: raw.status || "veto",

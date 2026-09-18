@@ -18,7 +18,7 @@ import { MetricChart } from "@/components/metric-chart";
 import { ProfileInventory } from "@/components/profile-inventory";
 import { EmptyState } from "@/components/empty-state";
 import { Flag } from "@/components/flag";
-import { flagPath, countryName as countryLabel } from "@/lib/countries";
+import { flagPath, countryName as countryLabel, COUNTRY_CHANGE_EVENT } from "@/lib/countries";
 import { formatUsername } from "@/lib/format";
 import {
   StatsFilters,
@@ -320,6 +320,28 @@ function ProfileContent() {
     };
     run();
   }, [playerNameParam]);
+
+  useEffect(() => {
+    const onCountry = (event: Event) => {
+      const code = (event as CustomEvent<{ code?: string }>).detail?.code;
+      if (!code) return;
+      setPlayer((prev) => {
+        if (!prev) return prev;
+        const own =
+          !playerNameParam ||
+          (myName != null && (playerNameParam === myName || prev.username === myName));
+        if (!own) return prev;
+        return {
+          ...prev,
+          country: code,
+          countryName: countryLabel(code),
+          countryFlag: flagPath(code),
+        };
+      });
+    };
+    window.addEventListener(COUNTRY_CHANGE_EVENT, onCountry);
+    return () => window.removeEventListener(COUNTRY_CHANGE_EVENT, onCountry);
+  }, [playerNameParam, myName]);
 
   const mapsList = useMemo(() => Array.from(new Set(matches.map((m) => m.map))).sort(), [matches]);
   const filteredMatches = useMemo(() => applyMatchFilters(matches, filters), [matches, filters]);

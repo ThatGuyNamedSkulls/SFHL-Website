@@ -7,8 +7,10 @@ import { EmptyState } from "@/components/empty-state";
 import { Flag } from "@/components/flag";
 import { RankTierLetter } from "@/types";
 import { Users, Globe, ChevronDown } from "lucide-react";
-import { usePlayRegion } from "@/components/use-play-region";
-import { PLAY_REGIONS, isGlobalRegion, type PlayRegionId } from "@/lib/regions";
+import { useLeaderboardRegion } from "@/components/use-play-region";
+import { PLAY_REGIONS, isGlobalRegion, regionMeta, type PlayRegionId } from "@/lib/regions";
+import { countryName, flagPath, COUNTRY_CHANGE_EVENT } from "@/lib/countries";
+import { countryToPlayRegion } from "@/lib/country-regions";
 
 interface ApiPlayer {
   id: string;
@@ -75,7 +77,7 @@ export default function LeaderboardsPage() {
   const [myPlayer, setMyPlayer] = useState<string | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
   const [countryFilter, setCountryFilter] = useState("All");
-  const { region, setRegion, meta } = usePlayRegion();
+  const { region, setRegion, meta } = useLeaderboardRegion();
 
   useEffect(() => {
     fetch("/api/players")
@@ -96,6 +98,30 @@ export default function LeaderboardsPage() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const onCountry = (event: Event) => {
+      const code = (event as CustomEvent<{ code?: string }>).detail?.code;
+      if (!code || !myPlayer) return;
+      const playRegion = countryToPlayRegion(code);
+      setPlayers((prev) =>
+        prev.map((p) =>
+          p.username === myPlayer
+            ? {
+                ...p,
+                country: code,
+                countryName: countryName(code),
+                countryFlag: flagPath(code),
+                region: playRegion ?? p.region,
+                regionFlag: playRegion ? regionMeta(playRegion).short : p.regionFlag,
+              }
+            : p
+        )
+      );
+    };
+    window.addEventListener(COUNTRY_CHANGE_EVENT, onCountry);
+    return () => window.removeEventListener(COUNTRY_CHANGE_EVENT, onCountry);
+  }, [myPlayer]);
 
   useEffect(() => {
     setCountryFilter("All");
@@ -121,6 +147,11 @@ export default function LeaderboardsPage() {
       return true;
     });
   }, [players, countryFilter, region]);
+
+  const unsetCountryCount = useMemo(
+    () => players.filter((p) => !p.country).length,
+    [players]
+  );
 
   const me = useMemo(
     () => (myPlayer ? players.find((p) => p.username === myPlayer) : undefined),
@@ -183,6 +214,16 @@ export default function LeaderboardsPage() {
 
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <h2 className="text-sm font-bold text-white">{meta.short} Rankings</h2>
+        {!isGlobalRegion(region) && unsetCountryCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => setRegion("GLOBAL")}
+            className="text-[12px] text-[#8a8a8a] hover:text-white"
+          >
+            {unsetCountryCount} new {unsetCountryCount === 1 ? "player hasn’t" : "players haven’t"} set a
+            country — view Global
+          </button>
+        ) : null}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <FilterSelect value="s1" onChange={() => {}}>
             <option value="s1">Season 1 (current)</option>

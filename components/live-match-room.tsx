@@ -299,8 +299,7 @@ export function LiveMatchRoom({
             {lobby.voiceChannelUrl && (
               <a
                 href={lobby.voiceChannelUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                title="Opens the Discord app"
                 className="xl:hidden inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-[#57F287] text-hl-base text-[11px] font-black"
               >
                 <Mic className="w-3.5 h-3.5" /> Voice
@@ -507,8 +506,7 @@ export function LiveMatchRoom({
           {lobby.voiceChannelUrl ? (
             <a
               href={lobby.voiceChannelUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              title="Opens the Discord app"
               className="inline-flex items-center gap-2 w-full justify-center h-9 rounded-md bg-[#57F287] text-hl-base text-xs font-black"
             >
               <Mic className="w-3.5 h-3.5" /> Join Voice

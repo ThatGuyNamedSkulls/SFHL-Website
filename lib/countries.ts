@@ -42,3 +42,13 @@ export function countryOptions(): CountryOption[] {
     a.name.localeCompare(b.name)
   );
 }
+
+export const COUNTRY_CHANGE_EVENT = "hl-country-changed";
+
+/** Tell profile / settings / leaderboard the logged-in player's country changed. */
+export function notifyCountryChanged(code: string) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(COUNTRY_CHANGE_EVENT, { detail: { code: code.toLowerCase() } })
+  );
+}

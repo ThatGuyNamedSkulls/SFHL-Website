@@ -222,8 +222,7 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
                     <div className="flex gap-2 pl-6">
                       <a
                         href={n.refId}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        title="Opens the Discord app"
                         className="text-xs font-bold px-4 py-1.5 rounded-md bg-[#57F287] text-hl-base hover:opacity-90"
                       >
                         Join voice
