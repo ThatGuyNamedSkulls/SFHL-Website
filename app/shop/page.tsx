@@ -3,12 +3,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ShopItem, CosmeticType } from "@/types";
-import { WEAPON_CASES } from "@/data/weapon-cases";
-import { Coins, Check, Award, UserRound, ShoppingBag, Lock, Package } from "lucide-react";
+import { Coins, Check, Award, UserRound, ShoppingBag, Lock } from "lucide-react";
 
-const FILTERS: { id: CosmeticType | "all" | "cases"; label: string }[] = [
+const FILTERS: { id: CosmeticType | "all"; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "cases", label: "Cases" },
   { id: "card", label: "Profile cards" },
   { id: "frame", label: "Avatar frames" },
   { id: "title", label: "Titles" },
@@ -82,7 +80,7 @@ export default function ShopPage() {
   const [coins, setCoins] = useState(0);
   const [linked, setLinked] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<CosmeticType | "all" | "cases">("all");
+  const [filter, setFilter] = useState<CosmeticType | "all">("all");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -124,9 +122,7 @@ export default function ShopPage() {
     }
   };
 
-  const visible = filter === "all" || filter === "cases" ? items : items.filter((i) => i.type === filter);
-  const showCases = filter === "all" || filter === "cases";
-  const showCatalog = filter !== "cases";
+  const visible = filter === "all" ? items : items.filter((i) => i.type === filter);
 
   return (
     <div className="hl-page">
@@ -138,7 +134,7 @@ export default function ShopPage() {
             <span className="text-lg font-black text-white header-caps">Shop</span>
           </div>
           <p className="text-xs text-hl-muted mt-1">
-            Profile cosmetics plus Alpha &amp; Tempered weapon cases (Coming soon).
+            Profile cards, avatar frames, titles, and badges.
           </p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full bg-hl-panel border border-hl-gold/40 px-4 py-1.5">
@@ -168,11 +164,7 @@ export default function ShopPage() {
               >
                 {f.label}
                 <span className="opacity-60 ml-1">
-                  ({f.id === "all"
-                    ? items.length + WEAPON_CASES.length
-                    : f.id === "cases"
-                      ? WEAPON_CASES.length
-                      : items.filter((i) => i.type === f.id).length})
+                  ({f.id === "all" ? items.length : items.filter((i) => i.type === f.id).length})
                 </span>
               </button>
             ))}
@@ -192,52 +184,11 @@ export default function ShopPage() {
 
           {loading ? (
             <div className="py-16 text-center text-sm text-hl-muted">Loading shop…</div>
+          ) : visible.length === 0 ? (
+            <div className="py-16 text-center text-sm text-hl-muted">
+              Nothing for sale here yet — items appear once an admin sets a price.
+            </div>
           ) : (
-            <>
-              {showCases && (
-                <div className="mb-8">
-                  <h2 className="text-sm font-black text-white header-caps mb-3 flex items-center gap-2">
-                    <Package className="w-4 h-4 text-hl-gold" /> Cases
-                  </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {WEAPON_CASES.map((c) => (
-                      <div
-                        key={c.id}
-                        className="rounded-xl border border-hl-border overflow-hidden bg-hl-panel opacity-90"
-                      >
-                        <div className="relative aspect-[3/4] bg-gradient-to-b from-hl-gold/20 via-hl-panel-light to-hl-base flex flex-col items-center justify-center gap-3 px-4">
-                          <Package className="w-14 h-14 text-hl-gold" />
-                          <span className="absolute top-2 right-2 rounded-full bg-hl-base/80 border border-hl-gold/40 text-hl-gold text-[10px] font-black px-2 py-0.5 header-caps">
-                            Coming soon
-                          </span>
-                        </div>
-                        <div className="p-3 border-t border-hl-border">
-                          <div className="text-[9px] header-caps text-hl-gold">Weapon case</div>
-                          <div className="text-sm font-bold text-white truncate mt-0.5">{c.name}</div>
-                          <div className="flex items-center gap-1.5 mt-1 text-hl-gold">
-                            <Coins className="w-3.5 h-3.5" />
-                            <span className="stat-number text-sm">{c.price.toLocaleString()}</span>
-                          </div>
-                          <button
-                            type="button"
-                            disabled
-                            className="mt-2 w-full inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold border border-hl-border text-hl-muted cursor-not-allowed"
-                          >
-                            <Lock className="w-3 h-3" /> Coming soon
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {showCatalog && (
-                visible.length === 0 && !showCases ? (
-                  <div className="py-16 text-center text-sm text-hl-muted">
-                    Nothing for sale here yet — items appear once an admin sets a price.
-                  </div>
-                ) : visible.length === 0 ? null : (
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
               {visible.map((item) => {
                 const affordable = coins >= item.price;
@@ -298,9 +249,6 @@ export default function ShopPage() {
                 );
               })}
             </div>
-                )
-              )}
-              </>
           )}
 
           <p className="mt-8 text-center text-xs text-hl-muted">
