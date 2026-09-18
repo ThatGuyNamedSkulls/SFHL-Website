@@ -88,7 +88,7 @@ function LoginContent() {
                 .
               </p>
               <p className="mt-2">
-                You must be a member of the HyperLeague Discord server to log in.
+                You must be a member of the HyperLeague Discord and verify with Bloxlink to play. We&apos;ll invite you to the server if you aren&apos;t in it yet.
               </p>
             </div>
           </div>

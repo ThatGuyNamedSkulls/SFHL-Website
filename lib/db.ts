@@ -169,6 +169,24 @@ export async function getPlayer(name: string): Promise<DbPlayer | undefined> {
   return (rs.rows[0] as unknown as DbPlayer) || undefined;
 }
 
+/** Look up a player by Discord snowflake. New accounts are created by the bot
+ *  only after Bloxlink verification — the website never inserts players. */
+export async function getPlayerByDiscordId(discordId: string): Promise<DbPlayer | undefined> {
+  await ensurePlayerDiscordColumns();
+  const rs = await client.execute({
+    sql: `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
+                 kd_ratio, total_mvps, total_score, total_headshot_percentage,
+                 avg_hs_percent, matches_played, matches_won, peak_elo,
+                 total_play_time, roblox_avatar_image, placement_done,
+                 placement_games_played, CAST(discord_id AS TEXT) AS discord_id,
+                 discord_username, discord_avatar
+          FROM players
+          WHERE CAST(discord_id AS TEXT) = ?`,
+    args: [String(discordId)]
+  });
+  return (rs.rows[0] as unknown as DbPlayer) || undefined;
+}
+
 /** Record a player's Discord identity (called on login for the user's own row;
  *  the bot's hourly sync keeps everyone else fresh). */
 export async function setPlayerDiscordIdentity(
@@ -252,22 +270,9 @@ export async function getPlayerRankings(
   return { overall, country, region };
 }
 
-/** The DB rank string for a brand-new (Elo 0) player — mirrors the bot's
- *  get_rank(0). Reverse of RANK_DB_MAP["[?] Unranked"]. */
-const UNRANKED_DB_RANK = "[?] Unranked";
-
-/**
- * Ensure a player row exists for this name, creating a fresh unranked one if
- * not (same shape the bot's /addplayer produces: Elo 0, everything else
- * defaulted). Returns the player row. Safe to call on every login.
- */
+/** Look up a player by name. New rows are created by the Discord bot after
+ *  Bloxlink verification, not here. */
 export async function ensurePlayer(name: string): Promise<DbPlayer | undefined> {
-  const existing = await getPlayer(name);
-  if (existing) return existing;
-  await client.execute({
-    sql: "INSERT OR IGNORE INTO players (name, elo, rank) VALUES (?, 0, ?)",
-    args: [name, UNRANKED_DB_RANK],
-  });
   return getPlayer(name);
 }
 

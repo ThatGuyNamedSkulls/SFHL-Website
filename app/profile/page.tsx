@@ -287,7 +287,7 @@ function ProfileContent() {
             target = me.user.playerName;
           } else if (me?.user) {
             // Logged in but Discord account isn't linked to an SFHL player yet.
-            setError("Your Discord account isn't linked to a HyperLeague player yet. Ask an admin to add you.");
+            setError("Your Discord account isn't linked to a HyperLeague player yet. Join the Discord server and verify with Bloxlink first.");
             setLoading(false);
             return;
           } else {

@@ -67,18 +67,25 @@ export const DISCORD_CONFIG = {
   clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
   redirectUri: `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/auth/callback`,
   guildId: process.env.SFHL_GUILD_ID || "973987866336190484",
-  scopes: ["identify", "guilds"],
+  // guilds.join lets login add the user to the HyperLeague Discord if they
+  // aren't already in it (bot needs CREATE_INSTANT_INVITE in the guild).
+  scopes: ["identify", "guilds", "guilds.join"],
+};
+
+/** Bloxlink assigns this after a member verifies their Roblox account. */
+export const BLOXLINK_VERIFIED_ROLE_ID = "1550436622544150548";
+
+export type GuildPresence = {
+  inGuild: boolean;
+  /** True when the member has the Bloxlink verified role. */
+  verified: boolean;
 };
 
 /**
- * Check guild membership by Discord user ID using the bot token.
- *
- * This is authoritative — it asks the guild directly whether that user ID is a
- * member — instead of matching a display name or trusting the user's OAuth
- * `guilds` scope. Returns `null` when it can't tell (no bot token configured or
- * the API errored) so callers can fall back.
+ * Live guild membership + Bloxlink verified-role check via the bot token.
+ * Returns `null` when it can't tell (no bot token / API error).
  */
-export async function isUserInGuildById(userId: string): Promise<boolean | null> {
+export async function getGuildPresence(userId: string): Promise<GuildPresence | null> {
   const token = process.env.DISCORD_BOT_TOKEN;
   if (!token) return null;
   try {
@@ -86,41 +93,150 @@ export async function isUserInGuildById(userId: string): Promise<boolean | null>
       `https://discord.com/api/v10/guilds/${DISCORD_CONFIG.guildId}/members/${userId}`,
       { headers: { Authorization: `Bot ${token}` }, cache: "no-store" }
     );
-    if (res.status === 404) return false; // definitively not a member
-    if (!res.ok) return null; // rate-limited / permission issue -> unknown
-    return true;
+    if (res.status === 404) return { inGuild: false, verified: false };
+    if (!res.ok) return null;
+    const member = (await res.json()) as { roles?: string[] };
+    const roles = member.roles ?? [];
+    return {
+      inGuild: true,
+      verified: roles.includes(BLOXLINK_VERIFIED_ROLE_ID),
+    };
   } catch {
     return null;
   }
 }
 
-/** Per-instance cache of guild-membership checks. The parties/queue endpoints
- *  are polled every few seconds, so raw per-member Discord API calls would
- *  burn rate limit. "Is a member" can stay cached longer; "not a member"
- *  must expire quickly so joining Discord after a failed check starts working. */
-const guildCache = new Map<string, { val: boolean; at: number }>();
-const GUILD_CACHE_TTL_TRUE_MS = 5 * 60 * 1000;
-const GUILD_CACHE_TTL_FALSE_MS = 20 * 1000;
+export async function isUserInGuildById(userId: string): Promise<boolean | null> {
+  const p = await getGuildPresence(userId);
+  if (p === null) return null;
+  return p.inGuild;
+}
 
-/** isUserInGuildById with a short-lived cache. Unknown (null) is not cached. */
-export async function isUserInGuildCached(userId: string): Promise<boolean | null> {
-  const hit = guildCache.get(userId);
+/** Per-instance cache of guild presence. Fully verified members stay cached
+ *  longer; missing-server / missing-role must expire quickly so the invite
+ *  and Bloxlink popups close soon after they join or verify. */
+const presenceCache = new Map<string, { val: GuildPresence; at: number }>();
+const PRESENCE_TTL_READY_MS = 5 * 60 * 1000;
+const PRESENCE_TTL_PENDING_MS = 15 * 1000;
+
+export function clearGuildPresenceCache(userId?: string) {
+  if (userId) presenceCache.delete(userId);
+  else presenceCache.clear();
+}
+
+export async function getGuildPresenceCached(userId: string): Promise<GuildPresence | null> {
+  const hit = presenceCache.get(userId);
   if (hit) {
-    const ttl = hit.val ? GUILD_CACHE_TTL_TRUE_MS : GUILD_CACHE_TTL_FALSE_MS;
+    const ready = hit.val.inGuild && hit.val.verified;
+    const ttl = ready ? PRESENCE_TTL_READY_MS : PRESENCE_TTL_PENDING_MS;
     if (Date.now() - hit.at < ttl) return hit.val;
   }
-  const val = await isUserInGuildById(userId);
-  if (val !== null) guildCache.set(userId, { val, at: Date.now() });
+  const val = await getGuildPresence(userId);
+  if (val !== null) presenceCache.set(userId, { val, at: Date.now() });
   return val;
 }
 
-/** Re-check Discord membership and return an updated session when it changed.
- *  Login freezes `inGuild` in the cookie; without this, joining the server
- *  after signing in still looks like "not a member" until they log in again. */
+/** isUserInGuildById with a short-lived cache. Unknown (null) is not cached. */
+export async function isUserInGuildCached(userId: string): Promise<boolean | null> {
+  const p = await getGuildPresenceCached(userId);
+  if (p === null) return null;
+  return p.inGuild;
+}
+
+/** Add the OAuth user to the HyperLeague guild. Requires the `guilds.join`
+ *  scope on their access token and CREATE_INSTANT_INVITE on the bot. */
+export async function addUserToGuild(userId: string, accessToken: string): Promise<boolean> {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) return false;
+  try {
+    const res = await fetch(
+      `https://discord.com/api/v10/guilds/${DISCORD_CONFIG.guildId}/members/${userId}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bot ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ access_token: accessToken }),
+      }
+    );
+    // 201 = added, 204 = already a member.
+    if (res.status === 201 || res.status === 204 || res.ok) {
+      clearGuildPresenceCache(userId);
+      return true;
+    }
+    console.error("guilds.join failed:", res.status, await res.text().catch(() => ""));
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+let inviteCache: { url: string; at: number } | null = null;
+const INVITE_TTL_MS = 12 * 60 * 60 * 1000;
+
+/** Permanent Discord invite for users the website couldn't auto-add. */
+export async function getDiscordInviteUrl(): Promise<string | null> {
+  const fromEnv =
+    process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || process.env.DISCORD_INVITE_URL || "";
+  if (fromEnv) return fromEnv;
+  if (inviteCache && Date.now() - inviteCache.at < INVITE_TTL_MS) return inviteCache.url;
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) return null;
+  try {
+    const guildRes = await fetch(
+      `https://discord.com/api/v10/guilds/${DISCORD_CONFIG.guildId}?with_counts=false`,
+      { headers: { Authorization: `Bot ${token}` } }
+    );
+    if (!guildRes.ok) return null;
+    const guild = (await guildRes.json()) as {
+      system_channel_id?: string | null;
+      vanity_url_code?: string | null;
+    };
+    if (guild.vanity_url_code) {
+      const url = `https://discord.gg/${guild.vanity_url_code}`;
+      inviteCache = { url, at: Date.now() };
+      return url;
+    }
+    let channelId = guild.system_channel_id || null;
+    if (!channelId) {
+      const chRes = await fetch(
+        `https://discord.com/api/v10/guilds/${DISCORD_CONFIG.guildId}/channels`,
+        { headers: { Authorization: `Bot ${token}` } }
+      );
+      if (chRes.ok) {
+        const channels = (await chRes.json()) as { id: string; type: number }[];
+        channelId = channels.find((c) => c.type === 0)?.id ?? null;
+      }
+    }
+    if (!channelId) return null;
+    const invRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/invites`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bot ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ max_age: 0, max_uses: 0, unique: false }),
+    });
+    if (!invRes.ok) return null;
+    const inv = (await invRes.json()) as { code?: string };
+    if (!inv.code) return null;
+    const url = `https://discord.gg/${inv.code}`;
+    inviteCache = { url, at: Date.now() };
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+/** Re-check Discord membership + Bloxlink role and return an updated session. */
 export async function withLiveGuildFlag(session: UserSession): Promise<UserSession> {
-  const live = await isUserInGuildCached(session.discordId);
-  if (live === null || live === session.inGuild) return session;
-  return { ...session, inGuild: live };
+  const live = await getGuildPresenceCached(session.discordId);
+  if (live === null) return session;
+  if (live.inGuild === session.inGuild && session.verified === live.verified) {
+    return session;
+  }
+  return { ...session, inGuild: live.inGuild, verified: live.verified };
 }
 
 /** Per-instance cache of Discord avatar URLs (the queue page polls every 5s;

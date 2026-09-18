@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession, isUserInGuildCached } from "@/lib/auth";
+import { getSession, isUserInGuildCached, getGuildPresenceCached } from "@/lib/auth";
 import {
   getWebQueue,
   joinWebQueue,
@@ -106,20 +106,27 @@ export async function POST(request: Request) {
     );
   }
 
-  // Verified = currently in the guild. Re-check live (cached) rather than
-  // trusting the login-time session flag — someone who left the server since
-  // logging in must not be able to queue.
-  const liveInGuild = await isUserInGuildCached(session.discordId);
+  // Live guild + Bloxlink check — login-time flags go stale if they leave
+  // Discord or haven't verified yet.
+  const presence = await getGuildPresenceCached(session.discordId);
+  const liveInGuild =
+    presence !== null ? presence.inGuild : await isUserInGuildCached(session.discordId);
   if (liveInGuild === false || (!session.inGuild && liveInGuild !== true)) {
     return NextResponse.json(
       { error: "You must be a member of the HyperLeague Discord server to join the queue" },
       { status: 403 }
     );
   }
+  if (presence && !presence.verified) {
+    return NextResponse.json(
+      { error: "You have to verify with Bloxlink in the HyperLeague Discord before you can queue." },
+      { status: 403 }
+    );
+  }
 
   if (!session.playerName) {
     return NextResponse.json(
-      { error: "Your Discord account is not linked to a HyperLeague player. Contact an admin." },
+      { error: "Your Discord account is not linked to a HyperLeague player. Join the Discord server and verify with Bloxlink first." },
       { status: 403 }
     );
   }

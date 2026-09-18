@@ -395,4 +395,6 @@ export interface UserSession {
   playerName: string | null;
   /** Whether the user is a member of the SFHL guild */
   inGuild: boolean;
+  /** Whether they have the Bloxlink verified role in the guild. */
+  verified?: boolean;
 }

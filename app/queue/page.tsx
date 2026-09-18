@@ -117,6 +117,7 @@ const PLACEMENT_GAMES = 3;
 
 export default function QueuePage() {
   const [session, setSession] = useState<UserSession | null>(null);
+  const [discordInvite, setDiscordInvite] = useState<string | null>(null);
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
   const [party, setParty] = useState<PartyLite | null>(null);
   const [queue, setQueue] = useState<WebQueueEntry[]>([]);
@@ -169,6 +170,9 @@ export default function QueuePage() {
         const sData = await sRes.json();
         const me = sData.user as UserSession | undefined;
         if (me) setSession(me);
+        if (typeof sData.discordInvite === "string" && sData.discordInvite) {
+          setDiscordInvite(sData.discordInvite);
+        }
         // Find the party this user belongs to, so we can show teammates in the lobby.
         const pData = await pRes.json();
         const mine = me
@@ -216,7 +220,8 @@ export default function QueuePage() {
     !!(session && queue.some((q) => q.discord_user_id === session.discordId));
   const selectionLocked = inQueue || actionLoading;
   const visibleQueue = queue.filter((e) => parseQueueMode(e.queue_mode) === matchType);
-  const canQueue = !!session?.inGuild && !!session?.playerName;
+  const canQueue =
+    !!session?.inGuild && session?.verified !== false && !!session?.playerName;
 
   useEffect(() => {
     setQueueLocked(inQueue);
@@ -287,7 +292,7 @@ export default function QueuePage() {
       card: player?.card ?? null,
       frame: player?.frame ?? null,
       self: true,
-      verified: session.inGuild,
+      verified: session.verified !== false && session.inGuild,
       canQueue,
     }
     : null;
@@ -308,7 +313,7 @@ export default function QueuePage() {
         card: (isMe ? player?.card ?? m.card : m.card) ?? null,
         frame: (isMe ? player?.frame ?? m.frame : m.frame) ?? null,
         self: isMe,
-        verified: isMe ? session.inGuild : m.verified ?? null,
+        verified: isMe ? session.verified !== false && session.inGuild : m.verified ?? null,
         canQueue: isMe ? canQueue : m.canQueue,
       };
     });
@@ -443,9 +448,27 @@ export default function QueuePage() {
         {session && !canQueue && (
           <div className="mt-5 p-4 rounded-xl bg-hl-gold/10 border border-hl-gold/30 text-hl-gold flex items-center gap-2 text-sm">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            {!session.inGuild
-              ? "You must be a member of the HyperLeague Discord server to queue."
-              : "Your Discord account is not linked to a HyperLeague player. Contact an admin."}
+            <span>
+              {!session.inGuild ? (
+                <>
+                  You must be in the HyperLeague Discord server to queue.{" "}
+                  {discordInvite ? (
+                    <a
+                      href={discordInvite}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline font-bold hover:text-white"
+                    >
+                      Join the server
+                    </a>
+                  ) : null}
+                </>
+              ) : session.verified === false ? (
+                "You have to verify with Bloxlink in the HyperLeague Discord before you can queue."
+              ) : (
+                "Your Discord account is not linked to a HyperLeague player. Join the Discord server and verify with Bloxlink first."
+              )}
+            </span>
           </div>
         )}
         {session && canQueue && partyBlocked && (

@@ -3,11 +3,12 @@ import { cookies } from "next/headers";
 import {
   DISCORD_CONFIG,
   encodeSession,
-  isUserInGuildById,
+  getGuildPresence,
+  addUserToGuild,
   SESSION_COOKIE,
   OAUTH_STATE_COOKIE,
 } from "@/lib/auth";
-import { getPlayer, ensurePlayer, setPlayerDiscordIdentity } from "@/lib/db";
+import { getPlayerByDiscordId, setPlayerDiscordIdentity } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
 
 export async function GET(request: Request) {
@@ -64,44 +65,40 @@ export async function GET(request: Request) {
     });
     const userData = await userRes.json();
 
-    // Determine SFHL membership by Discord user ID via the bot token — the
-    // guild tells us directly whether this account is a member, regardless of
-    // display name. Fall back to the user's OAuth guilds list only if the
-    // bot-token lookup is unavailable (e.g. DISCORD_BOT_TOKEN not set).
-    let inGuild = await isUserInGuildById(userData.id);
-    if (inGuild === null) {
+    // Determine SFHL membership by Discord user ID via the bot token. If they
+    // aren't in the guild yet, add them with the guilds.join OAuth grant.
+    let presence = await getGuildPresence(userData.id);
+    if (presence === null) {
       const guildsRes = await fetch("https://discord.com/api/users/@me/guilds", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const guildsData = await guildsRes.json();
-      inGuild =
+      const listed =
         Array.isArray(guildsData) &&
         guildsData.some((g: { id: string }) => g.id === DISCORD_CONFIG.guildId);
+      presence = { inGuild: listed, verified: false };
     }
+    if (!presence.inGuild) {
+      const joined = await addUserToGuild(userData.id, accessToken);
+      if (joined) {
+        presence = (await getGuildPresence(userData.id)) ?? {
+          inGuild: true,
+          verified: false,
+        };
+      }
+    }
+    const inGuild = presence.inGuild;
+    const verified = presence.verified;
 
-    // Match the Discord display name to a player, creating a fresh unranked
-    // player on first login if none exists — so signing in auto-registers them
-    // in the SFHL database (matching how the bot keys players by display name).
-    const displayName = userData.global_name || userData.username;
+    // Match the Discord account to a player the bot enrolled after Bloxlink
+    // verification. Login never creates a players row.
     const discordAvatar = userData.avatar
       ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png?size=256`
       : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(userData.id) >> BigInt(22)) % BigInt(6))}.png`;
-    let avatar: string | null = discordAvatar;
-    let rank = "UNRANKED";
+    const avatar: string | null = discordAvatar;
 
-    let playerData = await getPlayer(displayName);
-    if (!playerData) {
-      try {
-        playerData = await ensurePlayer(displayName);
-      } catch (e) {
-        console.error("Failed to auto-create player on login:", e);
-      }
-    }
+    const playerData = await getPlayerByDiscordId(userData.id);
     const playerName = playerData ? playerData.name : null;
-
-    if (playerData) {
-      rank = playerData.rank || "UNRANKED";
-    }
 
     // Create session
     const session = {
@@ -112,6 +109,7 @@ export async function GET(request: Request) {
       discriminator: userData.discriminator || "0",
       playerName,
       inGuild,
+      verified,
     };
 
     // Remember this player's Discord id so the bot can DM them by id later.

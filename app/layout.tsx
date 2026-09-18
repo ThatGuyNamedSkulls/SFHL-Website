@@ -7,6 +7,7 @@ import { RightSidebar } from "@/components/right-sidebar";
 import { TopBar } from "@/components/top-bar";
 import { CountryPrompt } from "@/components/country-prompt";
 import { MatchReadyModal } from "@/components/match-ready-modal";
+import { VerifyPrompt } from "@/components/verify-prompt";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -46,6 +47,7 @@ export default function RootLayout({
             <RightSidebar />
           </div>
           <CountryPrompt />
+          <VerifyPrompt />
           <MatchReadyModal />
         </TooltipProvider>
         <SpeedInsights />
