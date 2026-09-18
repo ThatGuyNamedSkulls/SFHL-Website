@@ -50,9 +50,9 @@ export interface LobbyView {
   guildId: string;
   /** Discord deep link to the match text channel. */
   channelUrl: string;
-  /** Private match voice channel id (players + Match Staff), if created. */
+  /** Private team voice channel id for this viewer (players + Match Staff). */
   voiceChannelId: string | null;
-  /** Discord deep link to the private match voice channel. */
+  /** Discord deep link to this viewer's team voice channel. */
   voiceChannelUrl: string | null;
   map: string | null;
   selectedMap: string | null;
@@ -76,6 +76,7 @@ interface RawLobby {
   guildId: string;
   voiceChannelId?: string | null;
   voiceChannelName?: string | null;
+  voiceChannels?: Record<string, { id?: string; name?: string } | string>;
   map?: string | null;
   selectedMap?: string | null;
   status?: string;
@@ -102,6 +103,21 @@ function discordUrl(guildId: string, channelId: string) {
 /** Opens a guild channel in the Discord desktop/mobile app, not discord.com. */
 function discordAppUrl(guildId: string, channelId: string) {
   return `discord://-/channels/${guildId}/${channelId}`;
+}
+
+function voiceIdForViewer(raw: RawLobby, viewerDiscordId?: string | null): string | null {
+  const channels = raw.voiceChannels;
+  const hasTeams = !!channels && Object.keys(channels).length > 0;
+  if (hasTeams) {
+    if (!viewerDiscordId) return null;
+    const team = raw.members?.find((m) => m.discordId === viewerDiscordId)?.team;
+    if (!team) return null;
+    const entry = channels[String(team)] ?? channels[team as unknown as string];
+    if (entry && typeof entry === "object" && entry.id) return String(entry.id);
+    if (typeof entry === "string" && entry) return entry;
+    return null;
+  }
+  return raw.voiceChannelId ?? null;
 }
 
 function normalizeVeto(raw: RawLobby): VetoState | null {
@@ -153,7 +169,7 @@ function resolveSidePicker(data: RawLobby): { captainId: string; team: number; o
 }
 
 /** Enrich the raw members with avatar, rank, and elo from the players table (one query). */
-async function enrich(raw: RawLobby): Promise<LobbyView> {
+async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<LobbyView> {
   const names = raw.members.map((m) => m.name);
   const byName = new Map<string, { avatar: string | null; rank: string; elo: number }>();
   if (names.length > 0) {
@@ -183,7 +199,7 @@ async function enrich(raw: RawLobby): Promise<LobbyView> {
     }
   }
   const byDiscordId = await resolveAvatarsByDiscordId(raw.members.map((m) => m.discordId));
-  const voiceChannelId = raw.voiceChannelId ?? null;
+  const voiceChannelId = voiceIdForViewer(raw, viewerDiscordId);
   const selected = raw.selectedMap ?? raw.map ?? null;
   const serverUrl = raw.server?.url?.trim() || null;
   let messages: ChatMessage[] = [];
@@ -305,7 +321,7 @@ export async function getLobbyForUser(discordId: string): Promise<LobbyView | nu
   }
 
   await pruneExpired(expired);
-  return mine ? enrich(mine) : null;
+  return mine ? enrich(mine, discordId) : null;
 }
 
 export type VetoResult =
@@ -395,7 +411,7 @@ export async function applyWebsiteMapBan(
     return { ok: false, error: "Failed to save veto.", status: 500 };
   }
 
-  return { ok: true, lobby: await enrich(next) };
+  return { ok: true, lobby: await enrich(next, discordId) };
 }
 
 /** Captain picks CT/T from the website. Bot poll applies it to Discord. */
@@ -469,5 +485,5 @@ export async function applyWebsiteSidePick(
     return { ok: false, error: "Failed to save side pick.", status: 500 };
   }
 
-  return { ok: true, lobby: await enrich(next) };
+  return { ok: true, lobby: await enrich(next, discordId) };
 }

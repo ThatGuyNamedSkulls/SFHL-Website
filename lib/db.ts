@@ -834,7 +834,10 @@ export async function joinWebQueue(
 
 export async function leaveWebQueue(discordUserId: string): Promise<void> {
   try {
-    await client.execute({ sql: "DELETE FROM web_queue WHERE discord_user_id = ?", args: [discordUserId] });
+    await client.execute({
+      sql: "DELETE FROM web_queue WHERE CAST(discord_user_id AS TEXT) = CAST(? AS TEXT)",
+      args: [String(discordUserId)],
+    });
   } catch {}
 }
 
@@ -845,7 +848,10 @@ export async function getQueueTeamSize(): Promise<number> {
 
 export async function isInWebQueue(discordUserId: string): Promise<boolean> {
   try {
-    const rs = await client.execute({ sql: "SELECT 1 FROM web_queue WHERE discord_user_id = ?", args: [discordUserId] });
+    const rs = await client.execute({
+      sql: "SELECT 1 FROM web_queue WHERE CAST(discord_user_id AS TEXT) = CAST(? AS TEXT)",
+      args: [String(discordUserId)],
+    });
     return rs.rows.length > 0;
   } catch {
     return false;
@@ -864,8 +870,8 @@ export async function getWebQueueSpot(
   try {
     await ensureWebQueueModeColumn();
     const rs = await client.execute({
-      sql: "SELECT region, queue_mode FROM web_queue WHERE discord_user_id = ?",
-      args: [discordUserId],
+      sql: "SELECT region, queue_mode FROM web_queue WHERE CAST(discord_user_id AS TEXT) = CAST(? AS TEXT)",
+      args: [String(discordUserId)],
     });
     if (!rs.rows.length) return null;
     const raw = String(rs.rows[0].region ?? "").toUpperCase();
