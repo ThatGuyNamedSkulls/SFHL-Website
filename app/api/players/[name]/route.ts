@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getPlayer, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, mapRank } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, mapRank } from "@/lib/db";
 import { buildEloTimeline } from "@/lib/elo-timeline";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
@@ -16,7 +17,29 @@ export async function GET(
   try {
     const { name } = await params;
     const decodedName = decodeURIComponent(name);
-    const player = await getPlayer(decodedName);
+    let player = await getPlayer(decodedName);
+    if (!player) {
+      // Stale session links use the Discord login name after the website
+      // username was switched to the server display name.
+      const session = await getSession();
+      if (session) {
+        const mine = await getPlayerByDiscordId(session.discordId);
+        if (mine) {
+          const aliases = [
+            mine.name,
+            mine.discord_username,
+            session.playerName,
+            session.username,
+            session.discordUsername,
+          ]
+            .filter((v): v is string => !!v)
+            .map((v) => v.toLowerCase());
+          if (aliases.includes(decodedName.toLowerCase())) {
+            player = mine;
+          }
+        }
+      }
+    }
 
     if (!player) {
       return NextResponse.json(
@@ -25,30 +48,32 @@ export async function GET(
       );
     }
 
+    const playerName = player.name;
+
     // These are all independent of one another — fetch them concurrently
     // instead of one sequential await per data source.
     const [matches, placementRows, eloChanges, avatar, playedWithRaw, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings, seasonResets, seasonFinalElos, careerMatchesPlayed, lastSeasonArchive] =
       await Promise.all([
-        getMatchesForPlayer(decodedName),
-        getPlacementMatchesForPlayer(decodedName),
-        getEloChanges(decodedName),
-        resolvePlayerAvatar(decodedName, player.roblox_avatar_image, player.discord_avatar, player.discord_id),
-        getMostPlayedWith(decodedName, 10),
-        getPlayerRankings(decodedName).catch(() => ({ overall: null, country: null, region: null })),
-        getEquippedCosmetics(decodedName).catch(() => ({
+        getMatchesForPlayer(playerName),
+        getPlacementMatchesForPlayer(playerName),
+        getEloChanges(playerName),
+        resolvePlayerAvatar(playerName, player.roblox_avatar_image, player.discord_avatar, player.discord_id),
+        getMostPlayedWith(playerName, 10),
+        getPlayerRankings(playerName).catch(() => ({ overall: null, country: null, region: null })),
+        getEquippedCosmetics(playerName).catch(() => ({
           card: null,
           frame: null,
           title: null,
           badges: [],
         })),
-        getFriends(decodedName).catch(() => []),
-        getInventory(decodedName).catch(() => []),
+        getFriends(playerName).catch(() => []),
+        getInventory(playerName).catch(() => []),
         getPlacementGamesTotal(),
-        getModeRatings(decodedName),
+        getModeRatings(playerName),
         getSeasonResets(),
-        getSeasonFinalElos(decodedName),
-        getCareerMatchCount(decodedName),
-        getLastSeasonArchive(decodedName),
+        getSeasonFinalElos(playerName),
+        getCareerMatchCount(playerName),
+        getLastSeasonArchive(playerName),
       ]);
 
     const playedAvatars = await resolveAvatarMap(playedWithRaw);

@@ -6,6 +6,39 @@ import {
   withLiveGuildFlag,
   getDiscordInviteUrl,
 } from "@/lib/auth";
+import { getPlayerByDiscordId } from "@/lib/db";
+import { UserSession } from "@/types";
+
+/** Session cookies can outlive a Discord nick change. Re-read the linked
+ *  players row by discord_id so "My profile" uses the current website name. */
+async function withLivePlayerIdentity(session: UserSession): Promise<UserSession> {
+  try {
+    const player = await getPlayerByDiscordId(session.discordId);
+    if (!player) return session;
+    const dbHandle = (player.discord_username || "").trim() || null;
+    const priorName = (session.username || "").trim() || null;
+    const handle =
+      dbHandle && dbHandle.toLowerCase() !== player.name.toLowerCase()
+        ? dbHandle
+        : session.discordUsername ||
+          (priorName && priorName.toLowerCase() !== player.name.toLowerCase() ? priorName : dbHandle);
+    if (
+      session.playerName === player.name &&
+      session.username === player.name &&
+      (session.discordUsername ?? null) === handle
+    ) {
+      return session;
+    }
+    return {
+      ...session,
+      playerName: player.name,
+      username: player.name,
+      discordUsername: handle,
+    };
+  } catch {
+    return session;
+  }
+}
 
 // Never cache this: it's per-user and read on every navigation. A cached
 // `{ user: null }` (e.g. from before login, or from another visitor via a CDN)
@@ -23,7 +56,7 @@ export async function GET() {
     return NextResponse.json({ user: null, discordInvite }, { headers: noStore });
   }
 
-  const fresh = await withLiveGuildFlag(session);
+  const fresh = await withLivePlayerIdentity(await withLiveGuildFlag(session));
   const res = NextResponse.json({ user: fresh, discordInvite }, { headers: noStore });
 
   // Sliding session: re-issue the cookie on each check so an actively-browsing

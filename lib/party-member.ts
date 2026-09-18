@@ -1,5 +1,5 @@
 import { Party, PartyMember } from "@/lib/parties";
-import { getPlayer, mapRank } from "@/lib/db";
+import { getPlayer, getPlayerByDiscordId, mapRank } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
 import { getEquippedCosmetics, getEquippedVisualsMap, EquippedVisuals } from "@/lib/cosmetics";
 import { getGuildPresenceCached } from "@/lib/auth";
@@ -17,26 +17,28 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
   let frame: string | null = null;
   let discordUsername: string | null = session.discordUsername ?? null;
 
-  // Remember this player's Discord id so the bot can DM them by id.
-  upsertWebUser(session.discordId, session.playerName, session.username).catch(() => {});
+  const player =
+    (await getPlayerByDiscordId(session.discordId)) ||
+    (session.playerName ? await getPlayer(session.playerName) : undefined);
+  const playerName = player?.name ?? session.playerName;
 
-  if (session.playerName) {
-    const player = await getPlayer(session.playerName);
-    if (player) {
-      rank = mapRank(player.rank);
-      elo = player.elo;
-      country = isValidCountry(player.country) ? player.country!.toLowerCase() : null;
-      discordUsername = player.discord_username ?? discordUsername;
-      const dbAvatar = await resolvePlayerAvatar(
-        session.playerName,
-        player.roblox_avatar_image,
-        player.discord_avatar,
-        player.discord_id
-      );
-      if (dbAvatar) avatar = dbAvatar;
-    }
+  // Remember this player's Discord id so the bot can DM them by id.
+  upsertWebUser(session.discordId, playerName, playerName || session.username).catch(() => {});
+
+  if (player) {
+    rank = mapRank(player.rank);
+    elo = player.elo;
+    country = isValidCountry(player.country) ? player.country!.toLowerCase() : null;
+    discordUsername = player.discord_username ?? discordUsername;
+    const dbAvatar = await resolvePlayerAvatar(
+      player.name,
+      player.roblox_avatar_image,
+      player.discord_avatar,
+      player.discord_id
+    );
+    if (dbAvatar) avatar = dbAvatar;
     try {
-      const cosmetics = await getEquippedCosmetics(session.playerName);
+      const cosmetics = await getEquippedCosmetics(player.name);
       card = cosmetics.card?.asset ?? null;
       frame = cosmetics.frame?.asset ?? null;
     } catch {
@@ -46,8 +48,8 @@ export async function memberFromSession(session: UserSession): Promise<PartyMemb
 
   return {
     discordId: session.discordId,
-    username: session.username,
-    playerName: session.playerName,
+    username: playerName || session.username,
+    playerName,
     discordUsername,
     avatar,
     rank,

@@ -139,35 +139,42 @@ export function ensurePlayerDiscordColumns(): Promise<void> {
   return discordColsReady;
 }
 
-export async function getAllPlayers(): Promise<DbPlayer[]> {
-  await ensurePlayerDiscordColumns();
-  const rs = await client.execute(
-    `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
+const PLAYER_SELECT = `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
             kd_ratio, total_mvps, total_score, total_headshot_percentage,
             avg_hs_percent, matches_played, matches_won, peak_elo,
             total_play_time, roblox_avatar_image, placement_done,
             placement_games_played, CAST(discord_id AS TEXT) AS discord_id,
             discord_username, discord_avatar
-     FROM players
-     ORDER BY elo DESC`
-  );
+     FROM players`;
+
+function playerFromRows(rs: ResultSet): DbPlayer | undefined {
+  return (rs.rows[0] as unknown as DbPlayer) || undefined;
+}
+
+export async function getAllPlayers(): Promise<DbPlayer[]> {
+  await ensurePlayerDiscordColumns();
+  const rs = await client.execute(`${PLAYER_SELECT} ORDER BY elo DESC`);
   return rs.rows as unknown as DbPlayer[];
 }
 
+/** Resolve a player by website username or Discord @handle (case-insensitive). */
 export async function getPlayer(name: string): Promise<DbPlayer | undefined> {
   await ensurePlayerDiscordColumns();
+  const key = name.trim();
+  if (!key) return undefined;
   const rs = await client.execute({
-    sql: `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
-                 kd_ratio, total_mvps, total_score, total_headshot_percentage,
-                 avg_hs_percent, matches_played, matches_won, peak_elo,
-                 total_play_time, roblox_avatar_image, placement_done,
-                 placement_games_played, CAST(discord_id AS TEXT) AS discord_id,
-                 discord_username, discord_avatar
-          FROM players
-          WHERE name = ?`,
-    args: [name]
+    sql: `${PLAYER_SELECT}
+          WHERE lower(name) = lower(?)
+             OR lower(COALESCE(discord_username, '')) = lower(?)
+          ORDER BY CASE
+            WHEN name = ? THEN 0
+            WHEN lower(name) = lower(?) THEN 1
+            ELSE 2
+          END
+          LIMIT 1`,
+    args: [key, key, key, key],
   });
-  return (rs.rows[0] as unknown as DbPlayer) || undefined;
+  return playerFromRows(rs);
 }
 
 /** Look up a player by Discord snowflake. New accounts are created by the bot
@@ -175,17 +182,10 @@ export async function getPlayer(name: string): Promise<DbPlayer | undefined> {
 export async function getPlayerByDiscordId(discordId: string): Promise<DbPlayer | undefined> {
   await ensurePlayerDiscordColumns();
   const rs = await client.execute({
-    sql: `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
-                 kd_ratio, total_mvps, total_score, total_headshot_percentage,
-                 avg_hs_percent, matches_played, matches_won, peak_elo,
-                 total_play_time, roblox_avatar_image, placement_done,
-                 placement_games_played, CAST(discord_id AS TEXT) AS discord_id,
-                 discord_username, discord_avatar
-          FROM players
-          WHERE CAST(discord_id AS TEXT) = ?`,
-    args: [String(discordId)]
+    sql: `${PLAYER_SELECT} WHERE CAST(discord_id AS TEXT) = ? LIMIT 1`,
+    args: [String(discordId)],
   });
-  return (rs.rows[0] as unknown as DbPlayer) || undefined;
+  return playerFromRows(rs);
 }
 
 /** Record a player's Discord identity (called on login for the user's own row;
@@ -199,13 +199,15 @@ export async function setPlayerDiscordIdentity(
   await ensurePlayerDiscordColumns();
   if (avatar) {
     await client.execute({
-      sql: "UPDATE players SET discord_id = ?, discord_username = ?, discord_avatar = ? WHERE name = ?",
-      args: [discordId, username, avatar, name],
+      sql: `UPDATE players SET discord_id = ?, discord_username = ?, discord_avatar = ?
+            WHERE CAST(discord_id AS TEXT) = ? OR name = ?`,
+      args: [discordId, username, avatar, String(discordId), name],
     });
   } else {
     await client.execute({
-      sql: "UPDATE players SET discord_id = ?, discord_username = ? WHERE name = ?",
-      args: [discordId, username, name],
+      sql: `UPDATE players SET discord_id = ?, discord_username = ?
+            WHERE CAST(discord_id AS TEXT) = ? OR name = ?`,
+      args: [discordId, username, String(discordId), name],
     });
   }
 }

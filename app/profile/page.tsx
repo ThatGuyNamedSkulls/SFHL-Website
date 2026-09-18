@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -205,6 +205,7 @@ function ProfileSkeleton() {
 
 function ProfileContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const playerNameParam = searchParams.get("player");
 
   const [player, setPlayer] = useState<ProfilePlayer | null>(null);
@@ -278,13 +279,17 @@ function ProfileContent() {
       setMainTab("games");
       setTab("summary");
       try {
+        const meRes = await fetch("/api/auth/me", { cache: "no-store" });
+        const me = await meRes.json();
+        const liveName: string | null = me?.user?.playerName ?? null;
+        const aliases = [me?.user?.playerName, me?.user?.username, me?.user?.discordUsername]
+          .filter((v: unknown): v is string => typeof v === "string" && v.length > 0)
+          .map((v: string) => v.toLowerCase());
+
         let target = playerNameParam;
         if (!target) {
-          // No ?player= → show the logged-in user's own tracker, not the #1 player.
-          const meRes = await fetch("/api/auth/me");
-          const me = await meRes.json();
-          if (me?.user?.playerName) {
-            target = me.user.playerName;
+          if (liveName) {
+            target = liveName;
           } else if (me?.user) {
             // Logged in but Discord account isn't linked to an SFHL player yet.
             setError("Your Discord account isn't linked to a HyperLeague player yet. Join the Discord server and verify with Bloxlink first.");
@@ -302,7 +307,12 @@ function ProfileContent() {
             }
           }
         }
-        const res = await fetch(`/api/players/${encodeURIComponent(target!)}`);
+
+        let res = await fetch(`/api/players/${encodeURIComponent(target!)}`);
+        if (!res.ok && res.status === 404 && liveName && target!.toLowerCase() !== liveName.toLowerCase() && aliases.includes(target!.toLowerCase())) {
+          target = liveName;
+          res = await fetch(`/api/players/${encodeURIComponent(target)}`);
+        }
         if (!res.ok) {
           setError(res.status === 404 ? "Player not found" : "Failed to fetch profile");
           setLoading(false);
@@ -311,6 +321,9 @@ function ProfileContent() {
         const data = await res.json();
         setPlayer(data);
         setMatches(data.matchHistory || []);
+        if (typeof data.username === "string" && data.username !== playerNameParam) {
+          router.replace(`/profile?player=${encodeURIComponent(data.username)}`, { scroll: false });
+        }
       } catch (err) {
         console.error(err);
         setError("An error occurred");
@@ -319,7 +332,7 @@ function ProfileContent() {
       }
     };
     run();
-  }, [playerNameParam]);
+  }, [playerNameParam, router]);
 
   useEffect(() => {
     const onCountry = (event: Event) => {
