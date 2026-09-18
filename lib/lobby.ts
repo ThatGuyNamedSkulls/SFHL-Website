@@ -65,6 +65,7 @@ export interface LobbyView {
   createdAt: number;
   members: LobbyMemberView[];
   server: { url: string } | null;
+  matchNumber: number | null;
   messages: ChatMessage[];
 }
 
@@ -91,6 +92,7 @@ interface RawLobby {
   createdAt: number;
   members: { discordId: string; name: string; team: number; left?: boolean; sub?: boolean }[];
   server?: { url?: string } | null;
+  matchNumber?: number | null;
 }
 
 function discordUrl(guildId: string, channelId: string) {
@@ -215,6 +217,13 @@ async function enrich(raw: RawLobby): Promise<LobbyView> {
       sub: !!m.sub,
     })),
     server: serverUrl ? { url: serverUrl } : null,
+    matchNumber:
+      typeof raw.matchNumber === "number" && raw.matchNumber > 0
+        ? raw.matchNumber
+        : Number.parseInt(
+            String(raw.channelName || "").match(/^queue-game-(\d+)$/i)?.[1] || "",
+            10
+          ) || null,
     messages,
   };
 }

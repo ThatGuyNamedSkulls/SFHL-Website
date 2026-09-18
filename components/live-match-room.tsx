@@ -46,6 +46,7 @@ export interface LiveLobby {
   members: LiveLobbyMember[];
   createdAt?: number;
   server?: { url: string } | null;
+  matchNumber?: number | null;
   messages?: ChatLine[];
 }
 
@@ -263,7 +264,9 @@ export function LiveMatchRoom({
     <div className="flex h-[calc(100dvh-var(--hl-topbar-h))] overflow-hidden">
       <div className="flex-1 min-w-0 overflow-y-auto px-6 py-5">
         <div className="flex items-center justify-between gap-3 mb-4">
-          <h1 className="text-2xl font-bold text-white">Matchroom</h1>
+          <h1 className="text-2xl font-bold text-white">
+            Matchroom{lobby.matchNumber ? ` · #{lobby.matchNumber}` : ""}
+          </h1>
           <div className="flex items-center gap-5">
             {(["overview", "stats"] as const).map((t) => (
               <button
