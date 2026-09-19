@@ -64,7 +64,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="appearance-none bg-[#1a1a1a] border border-[#2a2a2a] rounded-md h-9 pl-3 pr-8 text-[13px] text-white focus:outline-none focus:border-white/30 min-w-[140px]"
+        className="appearance-none bg-[#1a1a1a] border border-[#2a2a2a] rounded-md h-9 pl-3 pr-8 text-[13px] text-white focus:outline-none focus:border-white/30 w-full min-w-0 sm:w-auto sm:min-w-[140px]"
       >
         {children}
       </select>
@@ -216,7 +216,7 @@ export default function LeaderboardsPage() {
             country — view Global
           </button>
         ) : null}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <FilterSelect value="s1" onChange={() => {}}>
             <option value="s1">Season 1 (current)</option>
           </FilterSelect>
@@ -239,7 +239,7 @@ export default function LeaderboardsPage() {
       </div>
 
       <div className="w-full">
-        <div className="grid grid-cols-[56px_1fr_90px_140px_88px] gap-2 px-1 pb-2 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+        <div className="hidden md:grid grid-cols-[56px_1fr_90px_140px_88px] gap-2 px-1 pb-2 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
           <span>Rank</span>
           <span>Player</span>
           <span className="text-center">Country</span>
@@ -267,7 +267,7 @@ export default function LeaderboardsPage() {
               <Link
                 key={player.id}
                 href={`/profile?player=${encodeURIComponent(player.username)}`}
-                className={`grid grid-cols-[56px_1fr_90px_140px_88px] gap-2 items-center px-1 h-16 border-b border-white/[0.04] ${
+                className={`grid grid-cols-[32px_1fr_auto] md:grid-cols-[56px_1fr_90px_140px_88px] gap-2 items-center px-1 min-h-14 py-2 md:h-16 md:py-0 border-b border-white/[0.04] ${
                   isMe ? "bg-[#ff5500]/10" : "hover:bg-white/[0.03]"
                 }`}
               >
@@ -287,15 +287,18 @@ export default function LeaderboardsPage() {
                     </span>
                   )}
                   <span className="text-[15px] font-medium text-white truncate">{player.username}</span>
+                  <span className="md:hidden shrink-0">
+                    <RankBadge rank={player.rank as RankTierLetter} size="sm" showGlow={false} className="!w-5 !h-5" />
+                  </span>
                 </span>
-                <span className="flex items-center justify-center">
+                <span className="hidden md:flex items-center justify-center">
                   {player.countryFlag ? (
                     <Flag src={player.countryFlag} name={player.countryName} className="w-6 h-4" />
                   ) : (
                     <span className="w-6" />
                   )}
                 </span>
-                <span className="flex items-center justify-center">
+                <span className="hidden md:flex items-center justify-center">
                   {boardRank <= 10 ? (
                     <SkillPill position={boardRank} rank={player.rank as RankTierLetter} />
                   ) : (

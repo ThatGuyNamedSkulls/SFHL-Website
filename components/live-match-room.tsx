@@ -120,6 +120,7 @@ export function LiveMatchRoom({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const chatListRef = useRef<HTMLDivElement>(null);
+  const chatListMobileRef = useRef<HTMLDivElement>(null);
 
   const team1 = lobby.members.filter((m) => m.team === 1);
   const team2 = lobby.members.filter((m) => m.team === 2);
@@ -177,8 +178,9 @@ export function LiveMatchRoom({
   }, [lobby.channelId]);
 
   useEffect(() => {
-    const el = chatListRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    for (const el of [chatListRef.current, chatListMobileRef.current]) {
+      if (el) el.scrollTop = el.scrollHeight;
+    }
   }, [messages.length]);
 
   const remainingSec = (turnEndsAt - now) / 1000;
@@ -261,10 +263,10 @@ export function LiveMatchRoom({
                 : "Veto in progress";
 
   return (
-    <div className="flex h-[calc(100dvh-var(--hl-topbar-h))] overflow-hidden">
-      <div className="flex-1 min-w-0 overflow-y-auto px-6 py-5">
+    <div className="flex h-full min-h-0 overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
         <div className="flex items-center justify-between gap-3 mb-4">
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-xl md:text-2xl font-bold text-white">
             Matchroom{lobby.matchNumber ? ` · #{lobby.matchNumber}` : ""}
           </h1>
           <div className="flex items-center gap-5">
@@ -313,8 +315,8 @@ export function LiveMatchRoom({
           </div>
         </div>
 
-        <div className="rounded-xl bg-[#1a1a1a] border border-white/[0.06] px-5 py-4 mb-4 flex items-center justify-center gap-4">
-          <span className="text-lg font-bold text-white truncate max-w-[36%] text-right">{name1}</span>
+        <div className="rounded-xl bg-[#1a1a1a] border border-white/[0.06] px-3 py-3 md:px-5 md:py-4 mb-4 flex items-center justify-center gap-2 md:gap-4">
+          <span className="text-sm md:text-lg font-bold text-white truncate max-w-[28%] md:max-w-[36%] text-right">{name1}</span>
           <Avatar className="w-12 h-12 shrink-0">
             {av1?.avatar ? <AvatarImage src={av1.avatar} /> : null}
             <AvatarFallback className="bg-[#2a2a2a] text-sm font-bold text-white">
@@ -328,7 +330,7 @@ export function LiveMatchRoom({
               {(av2?.name || "T2").slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <span className="text-lg font-bold text-white truncate max-w-[36%]">{name2}</span>
+          <span className="text-sm md:text-lg font-bold text-white truncate max-w-[28%] md:max-w-[36%]">{name2}</span>
         </div>
 
         {tab === "stats" ? (
@@ -434,6 +436,59 @@ export function LiveMatchRoom({
             </div>
           </div>
         )}
+
+        <div className="xl:hidden mt-6 rounded-xl border border-white/[0.06] bg-[#141414] overflow-hidden">
+          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+            <span className="text-[12px] font-bold uppercase tracking-wide text-[#8a8a8a]">Room chat</span>
+            <a
+              href={lobby.channelUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open Discord channel"
+              className="text-[#8a8a8a] hover:text-white"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+          <div ref={chatListMobileRef} className="max-h-48 overflow-y-auto overscroll-contain px-3 py-3 space-y-2">
+            {messages.length === 0 ? (
+              <p className="text-[12px] text-[#8a8a8a]">No messages yet. Chat here or in Discord.</p>
+            ) : (
+              messages.map((m) => (
+                <div key={m.id} className="text-[12px] leading-snug">
+                  <span className="font-semibold text-white">{m.authorName}</span>
+                  <span className="ml-1 text-[10px] uppercase tracking-wide text-[#6a6a6a]">
+                    {m.source === "website" ? "web" : "dc"}
+                  </span>
+                  <p className="text-[#d0d0d0] whitespace-pre-wrap break-words">{m.content}</p>
+                </div>
+              ))
+            )}
+          </div>
+          <form
+            className="flex items-center gap-1.5 px-3 py-2 border-t border-white/[0.06]"
+            onSubmit={(e) => {
+              e.preventDefault();
+              sendChat();
+            }}
+          >
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              maxLength={400}
+              placeholder="Message match chat…"
+              className="flex-1 min-w-0 h-8 rounded-md bg-[#1c1c1c] border border-white/10 px-2 text-[12px] text-white placeholder:text-[#6a6a6a] focus:outline-none focus:border-[#ff5500]/50"
+            />
+            <button
+              type="submit"
+              disabled={sending || !draft.trim()}
+              className="h-8 w-8 rounded-md bg-gold-gradient text-hl-base flex items-center justify-center disabled:opacity-40"
+              aria-label="Send"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          </form>
+        </div>
       </div>
 
       <aside className="hidden xl:flex w-[300px] shrink-0 flex-col min-h-0 h-full border-l border-white/[0.06] bg-[#141414]">

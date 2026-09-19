@@ -6,13 +6,28 @@ import { ChevronDown, Swords } from "lucide-react";
 import { useState } from "react";
 import { ProfileMenu } from "@/components/profile-menu";
 import { usePlayRegion } from "@/components/use-play-region";
-import { PLAY_REGIONS, QUEUE_REGIONS, isQueueRegion } from "@/lib/regions";
+import { QUEUE_REGIONS, isQueueRegion } from "@/lib/regions";
 
 const CENTER_TABS = [
   { id: "matchmaking", label: "Matchmaking", href: "/queue" as const },
   { id: "league", label: "League", soon: true },
   { id: "tournaments", label: "Tournaments", soon: true },
 ] as const;
+
+const PAGE_TITLE: { test: (path: string) => boolean; label: string }[] = [
+  { test: (p) => p === "/" , label: "Home" },
+  { test: (p) => p === "/queue" || p === "/subs", label: "Play" },
+  { test: (p) => p.startsWith("/match"), label: "Match" },
+  { test: (p) => p === "/leaderboards", label: "Rank" },
+  { test: (p) => p === "/party-finder", label: "Social" },
+  { test: (p) => p === "/friends", label: "Friends" },
+  { test: (p) => p === "/shop", label: "Shop" },
+  { test: (p) => p === "/profile", label: "Profile" },
+  { test: (p) => p === "/track", label: "Track" },
+  { test: (p) => p === "/feed", label: "Feed" },
+  { test: (p) => p === "/settings", label: "Settings" },
+  { test: (p) => p === "/alerts", label: "Alerts" },
+];
 
 /** Game + region on the left, MATCHMAKING / LEAGUE / TOURNAMENTS center, avatar right. */
 export function TopBar() {
@@ -25,9 +40,10 @@ export function TopBar() {
     pathname === "/leaderboards" ||
     pathname.startsWith("/match");
   const onRank = pathname === "/leaderboards";
+  const mobileTitle = PAGE_TITLE.find((t) => t.test(pathname))?.label ?? "HyperLeague";
 
   return (
-    <header className="h-[var(--hl-topbar-h)] shrink-0 flex items-stretch px-5 gap-3 relative z-30 bg-[#111] border-b border-white/[0.06]">
+    <header className="h-[var(--hl-topbar-h)] shrink-0 flex items-stretch px-3 sm:px-5 gap-2 sm:gap-3 relative z-30 bg-[#111] border-b border-white/[0.06]">
       <div className="flex items-center gap-2 min-w-0">
         <div className="flex items-center gap-1.5 rounded-md bg-[#1a1a1a] border border-white/10 px-2 py-1.5">
           <Swords className="w-4 h-4 text-[#ff5500]" />
@@ -78,9 +94,12 @@ export function TopBar() {
             </>
           )}
         </div>
+        <span className="md:hidden text-[13px] font-black text-white header-caps truncate">
+          {mobileTitle}
+        </span>
       </div>
 
-      <nav className="absolute inset-x-0 top-0 h-full flex items-end justify-center gap-8 pointer-events-none">
+      <nav className="hidden md:flex absolute inset-x-0 top-0 h-full items-end justify-center gap-8 pointer-events-none">
         {(onRank
           ? ([{ id: "matchmaking", label: "Matchmaking", href: "/leaderboards" as const }] as const)
           : CENTER_TABS

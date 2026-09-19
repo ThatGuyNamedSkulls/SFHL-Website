@@ -374,7 +374,7 @@ export default function QueuePage() {
       </div>
 
       {/* Season / skill-level banner (FACEIT-style) */}
-      <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+      <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
         <div className="flex flex-wrap items-center gap-5">
           <RankBadge rank={player?.rank ?? "UNRANKED"} size="lg" />
           <div className="min-w-0">
@@ -442,7 +442,7 @@ export default function QueuePage() {
       </Card>
 
       {/* Lobby slots */}
-      <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+      <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
         {inQueue && (
           <div className="flex justify-end mb-3">
             <Badge className="bg-hl-green/15 text-hl-green border-hl-green/30 animate-pulse-glow">
@@ -505,7 +505,7 @@ export default function QueuePage() {
           {!session ? (
             <Link
               href="/login"
-              className="find-match-btn inline-flex items-center gap-2 px-12 py-4 rounded-xl text-hl-base font-black text-lg header-caps"
+              className="find-match-btn inline-flex items-center justify-center gap-2 w-full sm:w-auto px-8 sm:px-12 py-4 rounded-xl text-hl-base font-black text-lg header-caps"
             >
               Log in to Play
             </Link>
@@ -513,7 +513,7 @@ export default function QueuePage() {
             <button
               onClick={inQueue ? handleLeave : handleJoin}
               disabled={findDisabled}
-              className={`inline-flex items-center gap-2 px-12 py-4 rounded-xl font-black text-lg header-caps transition-all ${inQueue
+              className={`inline-flex items-center justify-center gap-2 w-full sm:w-auto px-8 sm:px-12 py-4 rounded-xl font-black text-lg header-caps transition-all ${inQueue
                   ? "bg-hl-red/10 text-hl-red border border-hl-red/30 hover:bg-hl-red/20"
                   : "find-match-btn text-hl-base"
                 } ${findDisabled && "opacity-50 cursor-not-allowed"}`}
@@ -548,7 +548,7 @@ export default function QueuePage() {
             </div>
             <Link
               href="/subs"
-              className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm header-caps ${
+              className={`inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 rounded-xl font-black text-sm header-caps ${
                 subCount > 0
                   ? "find-match-btn text-hl-base"
                   : "bg-hl-panel-light text-white border border-hl-border hover:border-hl-gold/40 transition-colors"
@@ -562,8 +562,8 @@ export default function QueuePage() {
 
       {/* Match type / Servers (FACEIT-style). Maps stay post-match veto. */}
       <div className="mb-6">
-        <div className="border-b border-hl-border mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-6">
+        <div className="border-b border-hl-border mb-4 flex items-center justify-between overflow-x-auto">
+          <div className="flex items-center gap-6 shrink-0">
             <button
               type="button"
               onClick={() => setPlayTab("type")}

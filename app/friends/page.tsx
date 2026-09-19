@@ -40,7 +40,7 @@ function FriendRow({ friend, actions }: { friend: Friend; actions: React.ReactNo
         </Link>
       </div>
       <RankBadge rank={(friend.rank || "UNRANKED") as RankTierLetter} size="sm" />
-      <div className="flex items-center gap-2 shrink-0">{actions}</div>
+      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">{actions}</div>
     </div>
   );
 }

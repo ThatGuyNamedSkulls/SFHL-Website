@@ -178,7 +178,7 @@ export function Dashboard({ session }: DashboardProps) {
           </div>
           <Link
             href="/queue"
-            className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-[#ccff00] text-hl-base font-black text-sm header-caps hover:opacity-90 transition-opacity shadow-[0_0_24px_rgba(204,255,0,0.25)]"
+            className="inline-flex items-center justify-center w-full sm:w-auto px-6 py-3 rounded-lg bg-[#ccff00] text-hl-base font-black text-sm header-caps hover:opacity-90 transition-opacity shadow-[0_0_24px_rgba(204,255,0,0.25)]"
           >
             Find Match
           </Link>

@@ -85,13 +85,13 @@ export function LandingPage() {
           }}
         />
 
-        <div className="relative z-10 hl-page-wide py-24 md:py-32">
+        <div className="relative z-10 hl-page-wide py-12 md:py-32">
           <div className="max-w-3xl">
             <Badge className="mb-6 bg-hl-gold/10 text-hl-gold border-hl-gold/30 px-3 py-1 text-xs header-caps">
               <Zap className="w-3 h-3 mr-1.5" />
               Season 1 — Now Live
             </Badge>
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight mb-6">
               <span className="text-white">Compete.</span>
               <br />
               <span className="text-gradient-hero">Dominate.</span>

@@ -142,7 +142,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={LABEL_CLS}>Party name</label>
                 <input
@@ -161,7 +161,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={LABEL_CLS}>Game mode</label>
                 <select className={SELECT_CLS} value={gameMode} disabled>

@@ -66,7 +66,7 @@ export default function FeedPage() {
                       key={url}
                       src={url}
                       alt=""
-                      className="mt-3 rounded-lg max-h-80 border border-hl-border"
+                      className="mt-3 rounded-lg max-h-80 max-w-full h-auto border border-hl-border"
                     />
                   ))}
                 </div>

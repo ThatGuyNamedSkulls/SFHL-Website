@@ -112,7 +112,7 @@ export default function SettingsPage() {
       />
 
       {/* Account card */}
-      <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+      <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
         <h2 className="text-sm font-bold text-white header-caps mb-4">
           Discord Account
         </h2>
@@ -127,13 +127,13 @@ export default function SettingsPage() {
             <div className="text-lg font-bold text-white truncate">
               {session.username}
             </div>
-            <div className="text-xs text-hl-muted">Discord ID: {session.discordId}</div>
+            <div className="text-xs text-hl-muted break-all">Discord ID: {session.discordId}</div>
           </div>
         </div>
       </Card>
 
       {/* Connection card */}
-      <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+      <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
         <h2 className="text-sm font-bold text-white header-caps mb-4">
           HyperLeague Connection
         </h2>
@@ -179,7 +179,7 @@ export default function SettingsPage() {
 
       {/* Country card (only when linked to a player) */}
       {session.playerName && (
-        <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+        <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
           <h2 className="text-sm font-bold text-white header-caps mb-4 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-hl-gold" /> Country
           </h2>
@@ -233,7 +233,7 @@ export default function SettingsPage() {
 
       {/* Inventory & profile customization (only when linked to a player) */}
       {session.playerName && (
-        <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+        <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
           <h2 className="text-sm font-bold text-white header-caps mb-1 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-hl-gold" /> Inventory &amp; Customization
           </h2>
@@ -245,7 +245,7 @@ export default function SettingsPage() {
       )}
 
       {/* Info about where stats live */}
-      <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+      <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
         <div className="flex items-start gap-3">
           <Info className="w-5 h-5 text-hl-gold shrink-0 mt-0.5" />
           <p className="text-sm text-hl-muted">
@@ -256,7 +256,7 @@ export default function SettingsPage() {
         </div>
       </Card>
 
-      <Card className="bg-hl-panel border-hl-border p-6 mb-6">
+      <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
         <h2 className="text-sm font-bold text-white header-caps mb-2 flex items-center gap-2">
           <Gamepad2 className="w-4 h-4 text-hl-gold" /> Roblox login
         </h2>

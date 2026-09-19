@@ -101,19 +101,19 @@ export function MatchReadyModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[12vh] bg-black/70">
-      <div className="w-[min(420px,calc(100%-2rem))] rounded-xl bg-[#1a1a1a] border border-white/10 shadow-2xl px-8 py-7 text-center">
+    <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[max(12vh,env(safe-area-inset-top)+1.5rem)] bg-black/70">
+      <div className="w-[min(420px,calc(100%-2rem))] rounded-xl bg-[#1a1a1a] border border-white/10 shadow-2xl px-5 py-6 sm:px-8 sm:py-7 text-center">
         <div className="text-xl font-bold text-white">Match ready</div>
         <div className="text-[13px] text-[#8a8a8a] mt-1">{regionLabel}</div>
         <div className="text-[12px] text-[#8a8a8a] mt-6">Time left to accept</div>
         <div className="text-[42px] leading-none font-black tabular-nums text-[#ff5500] mt-2">
           {formatClock(remaining)}
         </div>
-        <button
-          type="button"
-          onClick={accept}
-          className="mt-6 inline-flex items-center justify-center min-w-[140px] h-11 rounded-md bg-[#ff5500] text-white text-sm font-black uppercase tracking-wide hover:opacity-90"
-        >
+          <button
+            type="button"
+            onClick={accept}
+            className="mt-6 inline-flex items-center justify-center w-full sm:w-auto min-w-[140px] h-11 rounded-md bg-[#ff5500] text-white text-sm font-black uppercase tracking-wide hover:opacity-90"
+          >
           Accept
         </button>
       </div>

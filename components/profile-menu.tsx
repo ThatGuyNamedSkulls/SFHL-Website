@@ -55,7 +55,7 @@ export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
 
       {open && (
         <div
-          className={`absolute w-[280px] rounded-xl border border-hl-border bg-[#1c1c1c] shadow-2xl z-[80] overflow-hidden ${
+          className={`absolute w-[min(280px,calc(100vw-1.5rem))] rounded-xl border border-hl-border bg-[#1c1c1c] shadow-2xl z-[80] overflow-hidden ${
             variant === "rail"
               ? "right-[calc(100%+8px)] top-0"
               : "right-0 top-[calc(100%+10px)]"

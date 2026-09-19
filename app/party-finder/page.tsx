@@ -366,7 +366,7 @@ function PartyFinderContent() {
 
         <button
           onClick={() => setCreateOpen(true)}
-          className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-lg text-hl-gold font-bold text-sm header-caps hover:bg-hl-gold/10 transition-colors"
+          className="w-full sm:w-auto sm:ml-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-hl-gold font-bold text-sm header-caps hover:bg-hl-gold/10 transition-colors"
         >
           <Plus className="w-4 h-4" /> Create
         </button>

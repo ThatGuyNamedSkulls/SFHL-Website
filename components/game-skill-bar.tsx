@@ -19,14 +19,14 @@ function SkillLevelBox({
   const hasSkill = !!rank && rank !== "UNRANKED" && elo != null && elo > 0;
 
   return (
-    <div className="relative inline-flex items-center gap-4 rounded-xl border border-white/[0.1] bg-[#121212] pl-5 pr-6 py-3.5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+    <div className="relative inline-flex items-center gap-3 md:gap-4 rounded-xl border border-white/[0.1] bg-[#121212] pl-4 pr-4 md:pl-5 md:pr-6 py-3 md:py-3.5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
       {hasSkill && (
         <span
           className="absolute inset-0 rounded-xl pointer-events-none"
           style={{ boxShadow: `inset 0 0 28px ${color}32` }}
         />
       )}
-      <span className="relative text-[12px] font-bold tracking-[0.18em] text-[#9a9a9a] uppercase whitespace-nowrap">
+      <span className="relative hidden sm:inline text-[12px] font-bold tracking-[0.18em] text-[#9a9a9a] uppercase whitespace-nowrap">
         Skill level
       </span>
       {hasSkill ? (
@@ -38,7 +38,7 @@ function SkillLevelBox({
             />
             <RankBadge rank={letter} size="md" showGlow={false} className="relative !w-12 !h-12" />
           </span>
-          <span className="relative text-[42px] leading-none font-black tabular-nums text-[#ff5500]">
+          <span className="relative text-[28px] md:text-[42px] leading-none font-black tabular-nums text-[#ff5500]">
             {elo}
           </span>
         </>
@@ -101,19 +101,21 @@ export function GameSkillBar({
       )}
 
       {header && (
-        <div className="relative flex items-start justify-between gap-3 px-6 pt-5">{header}</div>
+        <div className="relative flex items-start justify-between gap-3 px-4 md:px-6 pt-5">{header}</div>
       )}
 
-      <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 min-h-[168px] py-6">
-        <div />
-        <SkillLevelBox rank={rank} elo={elo} />
-        <div className="flex justify-end">
+      <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 md:px-6 min-h-0 md:min-h-[168px] py-5 md:py-6">
+        <div className="hidden md:block" />
+        <div className="flex justify-center">
+          <SkillLevelBox rank={rank} elo={elo} />
+        </div>
+        <div className="flex justify-center md:justify-end">
           <GameChip />
         </div>
       </div>
 
       {footer && (
-        <div className="relative flex flex-wrap items-center justify-end gap-4 px-6 pb-5 pt-1 border-t border-white/[0.06]">
+        <div className="relative flex flex-wrap items-center justify-end gap-4 px-4 md:px-6 pb-5 pt-1 border-t border-white/[0.06]">
           {footer}
         </div>
       )}

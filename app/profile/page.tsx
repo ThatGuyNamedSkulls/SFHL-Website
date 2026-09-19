@@ -147,30 +147,30 @@ function MatchHistoryRow({
   return (
     <Link
       href={match.matchId ? `/match/${match.matchId}` : "#"}
-      className={`grid grid-cols-[76px_1fr_52px_56px_84px] md:grid-cols-[100px_1fr_64px_80px_110px] gap-3 items-center px-4 py-3 hover:bg-white/[0.03] border-l-2 ${
+      className={`grid grid-cols-[64px_1fr_auto] md:grid-cols-[100px_1fr_64px_80px_110px] gap-2 md:gap-3 items-center px-3 md:px-4 py-3 hover:bg-white/[0.03] border-l-2 ${
         win ? "border-l-[#2ecc71]" : "border-l-[#e74c3c]"
       }`}
     >
-      <span className="leading-tight">
-        <span className="block text-[13px] text-white">{day}</span>
+      <span className="leading-tight min-w-0">
+        <span className="block text-[13px] text-white truncate">{day}</span>
         {time ? <span className="block text-[11px] text-[#8a8a8a]">{time}</span> : null}
       </span>
       <span className="flex items-center gap-2 min-w-0">
         <Swords className="w-3.5 h-3.5 text-[#8a8a8a] shrink-0" />
-        <RankBadge rank={rank} size="sm" showGlow={false} className="!w-6 !h-6" />
-        <span className="text-sm text-[#c8c8c8] truncate">{rank === "UNRANKED" ? "Unranked" : rank}</span>
+        <RankBadge rank={rank} size="sm" showGlow={false} className="!w-6 !h-6 shrink-0" />
+        <span className="hidden sm:inline text-sm text-[#c8c8c8] truncate">{rank === "UNRANKED" ? "Unranked" : rank}</span>
         <SubRolePill isSub={match.isSub} leftEarly={match.leftEarly} share={match.subShare} />
       </span>
       <span
-        className="text-sm font-bold tabular-nums"
+        className="text-sm font-bold tabular-nums text-right"
         style={{ color: eloChangeColor(eloDelta) }}
       >
         {formatSigned(eloDelta)}
       </span>
-      <span className={`text-sm font-bold tabular-nums ${match.kdr >= 1 ? "text-[#2ecc71]" : "text-[#e74c3c]"}`}>
+      <span className={`hidden md:block text-sm font-bold tabular-nums ${match.kdr >= 1 ? "text-[#2ecc71]" : "text-[#e74c3c]"}`}>
         {match.kdr.toFixed(2)}
       </span>
-      <span className="text-sm tabular-nums text-[#c8c8c8] text-right">
+      <span className="hidden md:block text-sm tabular-nums text-[#c8c8c8] text-right">
         {match.kills} / {match.deaths} / {match.assists}
       </span>
     </Link>
@@ -460,7 +460,7 @@ function ProfileContent() {
       {/* ================= LEFT SIDEBAR ================= */}
       <div className="space-y-5">
         <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] overflow-hidden">
-          <div className="relative aspect-[4/5]">
+          <div className="relative aspect-[4/5] max-h-[380px] lg:max-h-none">
             {cardArt ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -604,7 +604,7 @@ function ProfileContent() {
       {/* ================= RIGHT CONTENT ================= */}
       <div className="space-y-6 min-w-0">
         {/* Top-level tabs (FACEIT: GAMES / FRIENDS / INVENTORY) */}
-        <div className="flex items-center gap-5 border-b border-white/[0.08]">
+        <div className="flex items-center gap-5 border-b border-white/[0.08] overflow-x-auto">
           {(
             [
               { id: "games", label: "Games" },
@@ -618,7 +618,7 @@ function ProfileContent() {
             <button
               key={t.id}
               onClick={() => setMainTab(t.id)}
-              className={`pb-3 text-[13px] font-bold uppercase tracking-wide border-b-2 transition-colors ${
+              className={`shrink-0 pb-3 text-[13px] font-bold uppercase tracking-wide border-b-2 transition-colors ${
                 mainTab === t.id ? "text-[#ff5500] border-[#ff5500]" : "text-[#8a8a8a] border-transparent hover:text-white"
               }`}
             >
@@ -805,7 +805,7 @@ function ProfileContent() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-end justify-between gap-1.5">
+                  <div className="flex items-end justify-between gap-1.5 overflow-x-auto pb-1">
                     {LADDER.map((tier, i) => {
                       const achieved = i < currentTierIdx;
                       const isCurrent = i === currentTierIdx;

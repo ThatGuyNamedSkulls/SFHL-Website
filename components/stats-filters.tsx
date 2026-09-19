@@ -37,7 +37,7 @@ export function StatsFilters({ maps, value, onChange, count }: StatsFiltersProps
       <Filter className="w-4 h-4 text-hl-muted" />
 
       <Select value={value.map} onValueChange={(v) => set({ map: v ?? "ALL" })}>
-        <SelectTrigger className="w-[150px] bg-hl-panel border-hl-border text-white text-sm">
+        <SelectTrigger className="w-full min-w-[140px] sm:w-[150px] bg-hl-panel border-hl-border text-white text-sm">
           <SelectValue placeholder="Map" />
         </SelectTrigger>
         <SelectContent className="bg-hl-panel border-hl-border text-white">
@@ -54,7 +54,7 @@ export function StatsFilters({ maps, value, onChange, count }: StatsFiltersProps
         value={value.result}
         onValueChange={(v) => set({ result: v as MatchFilters["result"] })}
       >
-        <SelectTrigger className="w-[130px] bg-hl-panel border-hl-border text-white text-sm">
+        <SelectTrigger className="w-full min-w-[120px] sm:w-[130px] bg-hl-panel border-hl-border text-white text-sm">
           <SelectValue placeholder="Result" />
         </SelectTrigger>
         <SelectContent className="bg-hl-panel border-hl-border text-white">
@@ -68,7 +68,7 @@ export function StatsFilters({ maps, value, onChange, count }: StatsFiltersProps
         value={value.range}
         onValueChange={(v) => set({ range: v as MatchFilters["range"] })}
       >
-        <SelectTrigger className="w-[140px] bg-hl-panel border-hl-border text-white text-sm">
+        <SelectTrigger className="w-full min-w-[140px] sm:w-[140px] bg-hl-panel border-hl-border text-white text-sm">
           <SelectValue placeholder="Time range" />
         </SelectTrigger>
         <SelectContent className="bg-hl-panel border-hl-border text-white">

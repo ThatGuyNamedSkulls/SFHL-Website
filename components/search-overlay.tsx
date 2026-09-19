@@ -24,7 +24,7 @@ export function SearchOverlay({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center pt-[12vh] px-4">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center pt-[max(12vh,env(safe-area-inset-top))] px-3 sm:px-4">
       <button
         type="button"
         className="absolute inset-0 bg-black/70"

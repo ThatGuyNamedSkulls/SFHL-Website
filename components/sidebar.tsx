@@ -130,7 +130,7 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="hl-sidebar shrink-0 h-screen flex flex-col overflow-hidden z-40">
+      <aside className="hl-sidebar hidden md:flex shrink-0 h-dvh flex-col overflow-hidden z-40">
         <Link href="/" className="flex items-center justify-center h-[var(--hl-topbar-h)] shrink-0" title="HyperLeague">
           <Play className="w-5 h-5 text-[#ff5500] fill-[#ff5500] -rotate-[20deg]" />
         </Link>

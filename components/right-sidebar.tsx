@@ -49,7 +49,7 @@ function FriendsRailLink() {
 /** Narrow right-edge icon rail (FACEIT: avatar, VS, bell, friends, My Party). */
 export function RightSidebar() {
   return (
-    <aside className="hidden md:flex flex-col items-center gap-1 w-[var(--hl-sidebar-w)] shrink-0 border-l border-white/[0.04] bg-[#181818] sticky top-0 h-screen z-40">
+    <aside className="hidden md:flex flex-col items-center gap-1 w-[var(--hl-sidebar-w)] shrink-0 border-l border-white/[0.04] bg-[#181818] sticky top-0 h-dvh z-40">
       <div className="h-[var(--hl-topbar-h)] flex items-center justify-center shrink-0">
         <ProfileMenu variant="rail" />
       </div>

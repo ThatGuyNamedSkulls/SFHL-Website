@@ -71,7 +71,7 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
       className={
         size === 1
           ? "flex justify-center gap-3 items-center"
-          : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-center"
+          : "flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory lg:grid lg:grid-cols-5 lg:overflow-visible lg:mx-0 lg:px-0 lg:snap-none"
       }
     >
       {positions.map((member, i) => {
@@ -82,8 +82,8 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
           return (
             <div
               key={i}
-              className={`lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center px-3 gap-3 rounded-xl ${slotW} ${isCenter
-                  ? `py-10 border-hl-gold/60 shadow-[0_0_24px_rgba(255,85,0,0.12)] z-10 ${size > 1 ? "lg:-my-3" : ""}`
+              className={`lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center px-3 gap-3 rounded-xl w-[150px] shrink-0 snap-center lg:w-auto ${slotW} ${isCenter
+                  ? `py-8 lg:py-10 border-hl-gold/60 shadow-[0_0_24px_rgba(255,85,0,0.12)] z-10 ${size > 1 ? "lg:-my-3" : ""}`
                   : "py-8"
                 }`}
             >
@@ -113,7 +113,7 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
               )}
               <div className="relative z-10">
                 <AvatarFrame frame={member.frame}>
-                  <Avatar className={`border-2 border-hl-border shadow-xl ${isCenter ? "w-24 h-24" : "w-16 h-16"}`}>
+                  <Avatar className={`border-2 border-hl-border shadow-xl ${isCenter ? "w-20 h-20 lg:w-24 lg:h-24" : "w-16 h-16"}`}>
                     {member.avatar ? <AvatarImage src={member.avatar} /> : null}
                     <AvatarFallback className="bg-hl-panel-light text-hl-gold font-bold">
                       {member.username.slice(0, 2).toUpperCase()}
@@ -149,7 +149,7 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
             <Link
               key={i}
               href={findPartiesHref}
-              className={`lobby-slot empty flex flex-col items-center justify-center py-8 px-3 gap-3 rounded-xl hover:border-hl-gold/40 transition-colors ${slotW}`}
+              className={`lobby-slot empty flex flex-col items-center justify-center py-8 px-3 gap-3 rounded-xl hover:border-hl-gold/40 transition-colors w-[150px] shrink-0 snap-center lg:w-auto ${slotW}`}
             >
               <div className="w-16 h-16 rounded-full bg-hl-panel-light flex items-center justify-center">
                 <Search className="w-6 h-6 text-hl-muted" />
@@ -160,7 +160,7 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
         }
 
         return (
-          <div key={i} className={`lobby-slot empty flex flex-col items-center justify-center py-8 px-3 gap-3 rounded-xl ${slotW}`}>
+          <div key={i} className={`lobby-slot empty flex flex-col items-center justify-center py-8 px-3 gap-3 rounded-xl w-[150px] shrink-0 snap-center lg:w-auto ${slotW}`}>
             <div className="w-16 h-16 rounded-full flex items-center justify-center">
               <Plus className="w-8 h-8 text-hl-muted/60" />
             </div>

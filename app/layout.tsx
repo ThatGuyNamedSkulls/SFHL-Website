@@ -6,6 +6,7 @@ import { SessionProvider } from "@/components/session-provider";
 import { Sidebar } from "@/components/sidebar";
 import { RightSidebar } from "@/components/right-sidebar";
 import { TopBar } from "@/components/top-bar";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { CountryPrompt } from "@/components/country-prompt";
 import { MatchReadyModal } from "@/components/match-ready-modal";
 import { VerifyPrompt } from "@/components/verify-prompt";
@@ -27,6 +28,12 @@ export const metadata: Metadata = {
     "HyperLeague competitive Strike Force league. Ranked 5v5 matchmaking, ELO tracking, leaderboards, match history, and stats — synced live with the HyperLeague Discord.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" as const,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -40,13 +47,16 @@ export default function RootLayout({
       <body className="h-full bg-hl-base text-white">
         <TooltipProvider>
           <SessionProvider>
-            <div className="flex h-screen overflow-hidden bg-[#111]">
+            <div className="flex h-dvh overflow-hidden bg-[#111]">
               <Sidebar />
               <div className="flex-1 min-w-0 flex flex-col">
                 <TopBar />
-                <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
+                <main className="hl-main flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                  {children}
+                </main>
               </div>
               <RightSidebar />
+              <MobileTabBar />
             </div>
             <CountryPrompt />
             <VerifyPrompt />

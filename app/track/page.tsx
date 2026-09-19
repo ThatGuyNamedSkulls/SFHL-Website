@@ -98,7 +98,7 @@ export default function TrackPage() {
         {player && <RankBadge rank={player.rank} size="lg" />}
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {tiles.map((t) => (
           <Card key={t.label} className="bg-hl-panel border-hl-border p-4">
             <div className="text-[11px] header-caps text-hl-muted">{t.label}</div>
