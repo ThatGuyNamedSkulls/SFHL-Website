@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { GameSkillBar } from "@/components/game-skill-bar";
-import { UserSession, RankTierLetter } from "@/types";
+import { RankTierLetter, UserSession } from "@/types";
 import {
   Swords,
   Trophy,
@@ -16,6 +16,7 @@ import {
   Zap,
   UserPlus,
 } from "lucide-react";
+import { apiGetJson } from "@/lib/client-api";
 
 interface DashboardProps {
   session: UserSession;
@@ -73,29 +74,28 @@ export function Dashboard({ session }: DashboardProps) {
         .then((d) => d && setPlayer({ rank: d.rank, elo: d.elo, stats: d.stats }))
         .catch(() => {});
     }
-    fetch("/api/parties")
-      .then((r) => r.json())
-      .then((d) => {
+    apiGetJson<{
+      count?: number;
+      parties?: { members: PartyAvatar[] }[];
+    }>("/api/parties")
+      .then(({ json: d }) => {
         setPartyCount(d.count ?? 0);
         const parties = d.parties ?? [];
         const members = parties.flatMap(
-          (p: { members: PartyAvatar[] }) => p.members
+          (p) => p.members
         );
         setPartyAvatars(members.slice(0, 5));
         setPartyLooking(members.length);
       })
       .catch(() => {});
-    fetch("/api/discord/announcements")
-      .then((r) => r.json())
-      .then((d) => setAnnouncement(d.announcements?.[0] ?? null))
+    apiGetJson<{ announcements?: Announcement[] }>("/api/discord/announcements")
+      .then(({ json: d }) => setAnnouncement(d.announcements?.[0] ?? null))
       .catch(() => {});
-    fetch("/api/matches")
-      .then((r) => r.json())
-      .then((d) => setMatches(Array.isArray(d) ? d.slice(0, 4) : []))
+    apiGetJson<RecentMatch[]>("/api/matches")
+      .then(({ json: d }) => setMatches(Array.isArray(d) ? d.slice(0, 4) : []))
       .catch(() => {});
-    fetch("/api/lobby")
-      .then((r) => r.json())
-      .then((d) => {
+    apiGetJson<{ lobby?: { channelName: string; voiceChannelUrl?: string | null } | null }>("/api/lobby")
+      .then(({ json: d }) => {
         const lobby = d?.lobby;
         setLiveLobby(
           lobby

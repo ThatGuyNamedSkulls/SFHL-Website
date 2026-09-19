@@ -8,6 +8,7 @@ import { ProfileMenu } from "@/components/profile-menu";
 import { MyPartyRail } from "@/components/my-party-rail";
 import { VsMatchesPanel } from "@/components/vs-matches-panel";
 import { RailBadge } from "@/components/rail-badge";
+import { apiGetJson } from "@/lib/client-api";
 
 function FriendsRailLink() {
   const [incoming, setIncoming] = useState(0);
@@ -15,10 +16,17 @@ function FriendsRailLink() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch("/api/friends");
-        if (!res.ok) return;
-        const data = await res.json();
-        setIncoming(Array.isArray(data.incoming) ? data.incoming.length : 0);
+        const { ok, json } = await apiGetJson<{ incomingCount?: number; incoming?: unknown[] }>(
+          "/api/friends?counts=1"
+        );
+        if (!ok) return;
+        setIncoming(
+          typeof json.incomingCount === "number"
+            ? json.incomingCount
+            : Array.isArray(json.incoming)
+              ? json.incoming.length
+              : 0
+        );
       } catch {
         /* not signed in / social not ready */
       }

@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { RankBadge } from "@/components/rank-badge";
-import { UserSession, RankTierLetter } from "@/types";
+import { RankTierLetter } from "@/types";
 import { TrendingUp } from "lucide-react";
+import { useSession } from "@/components/session-provider";
 
 interface TrackStats {
   rank: RankTierLetter;
@@ -20,15 +21,8 @@ interface TrackStats {
 }
 
 export default function TrackPage() {
-  const [session, setSession] = useState<UserSession | null | undefined>(undefined);
+  const { session, loaded } = useSession();
   const [player, setPlayer] = useState<TrackStats | null>(null);
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => setSession(d.user ?? null))
-      .catch(() => setSession(null));
-  }, []);
 
   useEffect(() => {
     if (!session?.playerName) return;
@@ -51,7 +45,7 @@ export default function TrackPage() {
       .catch(() => {});
   }, [session?.playerName]);
 
-  if (session === undefined) {
+  if (!loaded) {
     return (
       <div className="flex items-center justify-center h-full py-24">
         <div className="w-10 h-10 rounded-full border-2 border-hl-border border-t-hl-gold animate-spin" />

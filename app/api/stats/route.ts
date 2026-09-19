@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAggregateStats } from "@/lib/db";
+import { remember } from "@/lib/server-cache";
 
 export async function GET() {
   try {
-    const stats = await getAggregateStats();
+    const stats = await remember("aggregate-stats", 15000, getAggregateStats);
 
     return NextResponse.json({
       activePlayers: stats.totalPlayers,

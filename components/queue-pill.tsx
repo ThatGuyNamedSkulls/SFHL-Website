@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Gamepad2 } from "lucide-react";
+import { apiGetJson } from "@/lib/client-api";
 
 interface QueueEntry {
   discord_user_id: string;
@@ -20,9 +21,8 @@ export function QueuePill({ discordId }: { discordId?: string | null }) {
   useEffect(() => {
     let active = true;
     const load = () =>
-      fetch("/api/queue")
-        .then((r) => r.json())
-        .then((d) => {
+      apiGetJson<{ queue?: QueueEntry[] }>("/api/queue")
+        .then(({ json: d }) => {
           if (!active) return;
           const q: QueueEntry[] = d.queue || [];
           setCount(q.length);

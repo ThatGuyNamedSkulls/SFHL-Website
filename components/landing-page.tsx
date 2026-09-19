@@ -18,6 +18,7 @@ import {
   MapPin,
   Swords,
 } from "lucide-react";
+import { apiGetJson } from "@/lib/client-api";
 
 interface ApiPlayer {
   id: string;
@@ -49,14 +50,16 @@ export function LandingPage() {
   const [stats, setStats] = useState<ApiStats>({ activePlayers: 0, totalMatches: 0, totalKills: 0 });
 
   useEffect(() => {
-    fetch("/api/players")
-      .then((r) => r.json())
-      .then((data) => setTopPlayers(data.slice(0, 6)))
+    apiGetJson<ApiPlayer[]>("/api/players")
+      .then(({ json: data }) => setTopPlayers(Array.isArray(data) ? data.slice(0, 6) : []))
       .catch(console.error);
-    fetch("/api/stats").then((r) => r.json()).then(setStats).catch(console.error);
-    fetch("/api/matches")
-      .then((r) => r.json())
-      .then((data) => setRecentMatches(Array.isArray(data) ? data.slice(0, 6) : []))
+    apiGetJson<ApiStats>("/api/stats")
+      .then(({ ok, json }) => {
+        if (ok && json && typeof json.activePlayers === "number") setStats(json);
+      })
+      .catch(console.error);
+    apiGetJson<ApiMatch[]>("/api/matches")
+      .then(({ json: data }) => setRecentMatches(Array.isArray(data) ? data.slice(0, 6) : []))
       .catch(console.error);
   }, []);
 

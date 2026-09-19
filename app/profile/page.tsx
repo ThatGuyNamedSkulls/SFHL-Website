@@ -31,6 +31,7 @@ import { RANK_TIERS, getNextRank } from "@/data/ranks";
 import { Player, Match, RankTierLetter, ProfileCosmetics, InventoryItem } from "@/types";
 import { SubRolePill } from "@/components/sub-role-pill";
 import { eloChangeColor, formatSigned } from "@/lib/match-stats";
+import { useSession } from "@/components/session-provider";
 import {
   UserPlus,
   MapPin,
@@ -208,6 +209,7 @@ function ProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const playerNameParam = searchParams.get("player");
+  const { session, loaded: sessionLoaded } = useSession();
 
   const [player, setPlayer] = useState<ProfilePlayer | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -216,19 +218,17 @@ function ProfileContent() {
   const [mainTab, setMainTab] = useState<MainTab>("games");
   const [tab, setTab] = useState<SubTab>("summary");
   const [filters, setFilters] = useState<MatchFilters>(DEFAULT_FILTERS);
-  const [myName, setMyName] = useState<string | null>(null);
   const [friendState, setFriendState] = useState<"none" | "pending" | "friends">("none");
   const [friendMsg, setFriendMsg] = useState<string | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
-  // Who am I, and is the profile I'm viewing already a friend / pending?
+  const myName = session?.playerName ?? null;
+
+  // Is the profile I'm viewing already a friend / pending?
   useEffect(() => {
     const run = async () => {
       try {
-        const meRes = await fetch("/api/auth/me");
-        const me = (await meRes.json())?.user;
-        const name = me?.playerName ?? null;
-        setMyName(name);
+        const name = myName;
         if (!name || !playerNameParam || playerNameParam === name) return;
         const fRes = await fetch("/api/friends");
         if (!fRes.ok) return;
@@ -245,7 +245,7 @@ function ProfileContent() {
       }
     };
     run();
-  }, [playerNameParam]);
+  }, [playerNameParam, myName]);
 
   const addFriendByName = async (toName: string, updateHeader: boolean) => {
     try {
@@ -275,16 +275,15 @@ function ProfileContent() {
 
   useEffect(() => {
     const run = async () => {
+      if (!sessionLoaded) return;
       setLoading(true);
       setError(null);
       setFilters(DEFAULT_FILTERS);
       setMainTab("games");
       setTab("summary");
       try {
-        const meRes = await fetch("/api/auth/me", { cache: "no-store" });
-        const me = await meRes.json();
-        const liveName: string | null = me?.user?.playerName ?? null;
-        const aliases = [me?.user?.playerName, me?.user?.username, me?.user?.discordUsername]
+        const liveName: string | null = session?.playerName ?? null;
+        const aliases = [session?.playerName, session?.username, session?.discordUsername]
           .filter((v: unknown): v is string => typeof v === "string" && v.length > 0)
           .map((v: string) => v.toLowerCase());
 
@@ -292,7 +291,7 @@ function ProfileContent() {
         if (!target) {
           if (liveName) {
             target = liveName;
-          } else if (me?.user) {
+          } else if (session) {
             // Logged in but Discord account isn't linked to an SFHL player yet.
             setError("Your Discord account isn't linked to a HyperLeague player yet. Join the Discord server and verify with Bloxlink first.");
             setLoading(false);
@@ -335,7 +334,7 @@ function ProfileContent() {
       }
     };
     run();
-  }, [playerNameParam, router]);
+  }, [playerNameParam, router, sessionLoaded, session?.playerName, session?.username, session?.discordUsername]);
 
   useEffect(() => {
     const onCountry = (event: Event) => {

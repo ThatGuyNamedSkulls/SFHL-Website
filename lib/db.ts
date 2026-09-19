@@ -151,8 +151,16 @@ function playerFromRows(rs: ResultSet): DbPlayer | undefined {
   return (rs.rows[0] as unknown as DbPlayer) || undefined;
 }
 
-export async function getAllPlayers(): Promise<DbPlayer[]> {
+export async function getAllPlayers(limit?: number): Promise<DbPlayer[]> {
   await ensurePlayerDiscordColumns();
+  const cap = limit != null && Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 0;
+  if (cap > 0) {
+    const rs = await client.execute({
+      sql: `${PLAYER_SELECT} ORDER BY elo DESC LIMIT ?`,
+      args: [cap],
+    });
+    return rs.rows as unknown as DbPlayer[];
+  }
   const rs = await client.execute(`${PLAYER_SELECT} ORDER BY elo DESC`);
   return rs.rows as unknown as DbPlayer[];
 }
@@ -299,18 +307,28 @@ export async function getPlayerRankings(
   const ctry = ((rs.rows[0].country as string) || "").toLowerCase() || null;
   const playRegion = countryToPlayRegion(ctry);
 
-  const all = await client.execute("SELECT elo, country FROM players");
-  let overall = 1;
-  let country: number | null = ctry ? 1 : null;
-  let region: number | null = playRegion ? 1 : null;
-  for (const row of all.rows) {
-    if (Number(row.elo) <= elo) continue;
-    overall += 1;
-    const rowCountry = ((row.country as string) || "").toLowerCase() || null;
-    if (ctry && country !== null && rowCountry === ctry) country += 1;
-    if (playRegion && region !== null && countryToPlayRegion(rowCountry) === playRegion) {
-      region += 1;
+  const [higherRs, countryRs] = await Promise.all([
+    client.execute({
+      sql: "SELECT country FROM players WHERE elo > ?",
+      args: [elo],
+    }),
+    ctry
+      ? client.execute({
+          sql: "SELECT COUNT(*) AS c FROM players WHERE lower(country) = ? AND elo > ?",
+          args: [ctry, elo],
+        })
+      : Promise.resolve(null),
+  ]);
+  const overall = higherRs.rows.length + 1;
+  const country = ctry ? Number(countryRs?.rows[0]?.c ?? 0) + 1 : null;
+  let region: number | null = null;
+  if (playRegion) {
+    let n = 1;
+    for (const row of higherRs.rows) {
+      const rowCountry = ((row.country as string) || "").toLowerCase() || null;
+      if (countryToPlayRegion(rowCountry) === playRegion) n += 1;
     }
+    region = n;
   }
   return { overall, country, region };
 }

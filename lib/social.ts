@@ -277,6 +277,15 @@ export async function removeFriend(meName: string, otherName: string): Promise<v
   });
 }
 
+export async function getIncomingRequestCount(meName: string): Promise<number> {
+  await ensureSocialSchema();
+  const rs = await client.execute({
+    sql: "SELECT COUNT(*) AS c FROM friend_requests WHERE to_id = ?",
+    args: [meName],
+  });
+  return Number(rs.rows[0]?.c ?? 0);
+}
+
 export async function getIncomingRequests(meName: string): Promise<FriendRequestView[]> {
   await ensureSocialSchema();
   const rs = await client.execute({

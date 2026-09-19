@@ -16,6 +16,7 @@ import {
   notifyCountryChanged,
 } from "@/lib/countries";
 import { MapPin } from "lucide-react";
+import { useSession } from "@/components/session-provider";
 
 /**
  * One-time prompt asking a newly-linked player to pick their country.
@@ -23,6 +24,7 @@ import { MapPin } from "lucide-react";
  * that has no country set yet. Picking a country saves immediately and closes.
  */
 export function CountryPrompt() {
+  const { session, loaded } = useSession();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -30,11 +32,23 @@ export function CountryPrompt() {
   const savedRef = useRef(false);
 
   useEffect(() => {
+    if (!loaded || !session?.playerName || savedRef.current) return;
+    if (typeof window !== "undefined") {
+      if (sessionStorage.getItem("hl_country_skipped")) return;
+      if (sessionStorage.getItem("hl_country_saved")) return;
+    }
     let cancelled = false;
+    let id: ReturnType<typeof setInterval> | null = null;
     const check = async () => {
       if (typeof window !== "undefined") {
-        if (sessionStorage.getItem("hl_country_skipped")) return;
-        if (sessionStorage.getItem("hl_country_saved")) return;
+        if (sessionStorage.getItem("hl_country_skipped")) {
+          if (id) clearInterval(id);
+          return;
+        }
+        if (sessionStorage.getItem("hl_country_saved")) {
+          if (id) clearInterval(id);
+          return;
+        }
       }
       try {
         const r = await fetch("/api/players/country", { cache: "no-store" });
@@ -43,6 +57,7 @@ export function CountryPrompt() {
         if (d.country) {
           savedRef.current = true;
           setOpen(false);
+          if (id) clearInterval(id);
           return;
         }
         if (d.linked && !d.country) setOpen(true);
@@ -50,13 +65,21 @@ export function CountryPrompt() {
         /* ignore */
       }
     };
-    check();
-    const id = setInterval(check, 8000);
+    const start = async () => {
+      await check();
+      if (cancelled || savedRef.current) return;
+      if (typeof window !== "undefined") {
+        if (sessionStorage.getItem("hl_country_skipped")) return;
+        if (sessionStorage.getItem("hl_country_saved")) return;
+      }
+      id = setInterval(check, 8000);
+    };
+    void start();
     return () => {
       cancelled = true;
-      clearInterval(id);
+      if (id) clearInterval(id);
     };
-  }, []);
+  }, [loaded, session?.playerName]);
 
   const close = (skipped: boolean) => {
     setOpen(false);

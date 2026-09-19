@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { UserSession } from "@/types";
 import { Bell, UserPlus, Users, Check, X, Swords } from "lucide-react";
+import { useSession } from "@/components/session-provider";
 
 interface NotificationView {
   id: number;
@@ -30,7 +30,7 @@ function timeAgo(ts: number): string {
 
 export default function AlertsPage() {
   const router = useRouter();
-  const [session, setSession] = useState<UserSession | null | undefined>(undefined);
+  const { session, loaded: sessionLoaded } = useSession();
   const [items, setItems] = useState<NotificationView[]>([]);
   const [busy, setBusy] = useState<number | null>(null);
 
@@ -46,12 +46,7 @@ export default function AlertsPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => setSession(d.user ?? null))
-      .catch(() => setSession(null));
     load();
-    // Mark everything read when the page opens.
     fetch("/api/notifications", { method: "POST" }).catch(() => {});
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
@@ -91,6 +86,14 @@ export default function AlertsPage() {
       setBusy(null);
     }
   };
+
+  if (!sessionLoaded) {
+    return (
+      <div className="flex items-center justify-center h-full py-24">
+        <div className="w-10 h-10 rounded-full border-2 border-hl-border border-t-hl-gold animate-spin" />
+      </div>
+    );
+  }
 
   if (session === null) {
     return (

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { LobbySlots, LobbyMember } from "@/components/lobby-slots";
-import { UserSession, RankTierLetter } from "@/types";
+import { RankTierLetter } from "@/types";
 import {
   AlertCircle,
   Users,
@@ -26,6 +26,8 @@ import { usePlayRegion, setQueueLocked } from "@/components/use-play-region";
 import { QUEUE_REGIONS, regionQueueLabel, isQueueRegion } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 import { QUEUE_MODE_SUPER, SUPER_PARTY_MAX, SUPER_ELO_RANGE, parseQueueMode } from "@/lib/queue-modes";
+import { useSession } from "@/components/session-provider";
+import { apiGetJson } from "@/lib/client-api";
 
 interface WebQueueEntry {
   id: number;
@@ -116,7 +118,7 @@ const TIER_LADDER: RankTierLetter[] = ["D", "C", "B", "A1", "A2", "A3", "S1", "S
 const PLACEMENT_GAMES = 3;
 
 export default function QueuePage() {
-  const [session, setSession] = useState<UserSession | null>(null);
+  const { session, discordInvite: sessionInvite } = useSession();
   const [discordInvite, setDiscordInvite] = useState<string | null>(null);
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
   const [party, setParty] = useState<PartyLite | null>(null);
@@ -141,15 +143,25 @@ export default function QueuePage() {
   const actionInFlight = useRef(false);
 
   useEffect(() => {
+    if (sessionInvite) setDiscordInvite(sessionInvite);
+  }, [sessionInvite]);
+
+  useEffect(() => {
     const fetchQueue = async () => {
       try {
-        const [qRes, sRes, pRes, subRes] = await Promise.all([
-          fetch(`/api/queue?region=${encodeURIComponent(region)}`),
-          fetch("/api/auth/me"),
-          fetch("/api/parties"),
-          fetch("/api/subs"),
+        const [q, p, sub] = await Promise.all([
+          apiGetJson<{
+            queue?: WebQueueEntry[];
+            teamSize?: number;
+            openRegions?: string[];
+            region?: string;
+            openModes?: Record<string, string[]>;
+            me?: { region?: string; mode?: string } | null;
+          }>(`/api/queue?region=${encodeURIComponent(region)}`),
+          apiGetJson<{ parties?: PartyLite[] }>("/api/parties?mine=1"),
+          apiGetJson<{ count?: number }>("/api/subs"),
         ]);
-        const qData = await qRes.json();
+        const qData = q.json;
         if (!actionInFlight.current) setQueue(qData.queue || []);
         setTeamSize(qData.teamSize || MATCH_TEAM_SIZE);
         const regions = Array.isArray(qData.openRegions)
@@ -167,22 +179,14 @@ export default function QueuePage() {
             ? { region: qData.me.region, mode: parseQueueMode(qData.me.mode) }
             : null
         );
-        const sData = await sRes.json();
-        const me = sData.user as UserSession | undefined;
-        if (me) setSession(me);
-        if (typeof sData.discordInvite === "string" && sData.discordInvite) {
-          setDiscordInvite(sData.discordInvite);
-        }
-        // Find the party this user belongs to, so we can show teammates in the lobby.
-        const pData = await pRes.json();
+        const me = session;
         const mine = me
-          ? (pData.parties as PartyLite[] | undefined)?.find((p) =>
-              p.members.some((m) => m.discordId === me.discordId)
+          ? (p.json.parties as PartyLite[] | undefined)?.find((party) =>
+              party.members.some((m) => m.discordId === me.discordId)
             )
           : null;
         setParty(mine ?? null);
-        const subData = await subRes.json();
-        setSubCount(Number(subData?.count ?? 0));
+        setSubCount(Number(sub.json?.count ?? 0));
         setLoading(false);
       } catch (err) {
         console.error("Queue poll error:", err);
@@ -192,7 +196,7 @@ export default function QueuePage() {
     fetchQueue();
     const interval = setInterval(fetchQueue, 5000);
     return () => clearInterval(interval);
-  }, [region]);
+  }, [region, session?.discordId]);
 
   // Fetch the linked player's rank/elo for the lobby slot + season display.
   useEffect(() => {

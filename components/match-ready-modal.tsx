@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LiveLobby } from "@/components/live-match-room";
 import { regionMeta } from "@/lib/regions";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
+import { apiGetJson } from "@/lib/client-api";
 
 const ACCEPT_WINDOW_MS = 20_000;
 const STORAGE_PREFIX = "hl-match-accepted:";
@@ -41,16 +42,17 @@ export function MatchReadyModal() {
 
   const load = useCallback(async () => {
     try {
-      const [lRes, qRes] = await Promise.all([fetch("/api/lobby"), fetch("/api/queue")]);
-      const lData = lRes.ok ? await lRes.json() : null;
-      const qData = qRes.ok ? await qRes.json() : null;
-      const next = (lData?.lobby as LiveLobby | null) ?? null;
+      const [l, q] = await Promise.all([
+        apiGetJson<{ lobby?: LiveLobby | null }>("/api/lobby"),
+        apiGetJson<{ region?: string; openRegions?: string[] }>("/api/queue"),
+      ]);
+      const next = (l.json?.lobby as LiveLobby | null) ?? null;
       setLobby(next);
-      if (typeof qData?.region === "string") {
-        setRegionLabel(`${regionMeta(qData.region).label} ${MATCH_MODE_LABEL} Queue`);
+      if (typeof q.json?.region === "string") {
+        setRegionLabel(`${regionMeta(q.json.region).label} ${MATCH_MODE_LABEL} Queue`);
       }
-      if (Array.isArray(qData?.openRegions) && qData.openRegions.length === 1) {
-        setRegionLabel(`${regionMeta(qData.openRegions[0]).label} ${MATCH_MODE_LABEL} Queue`);
+      if (Array.isArray(q.json?.openRegions) && q.json.openRegions.length === 1) {
+        setRegionLabel(`${regionMeta(q.json.openRegions[0]).label} ${MATCH_MODE_LABEL} Queue`);
       }
     } catch {
       /* ignore */

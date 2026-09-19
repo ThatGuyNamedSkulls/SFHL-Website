@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, User, LogOut, Trophy, Swords, Gamepad2, Settings, Shield, Award } from "lucide-react";
-import { UserSession } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlayerSearch } from "@/components/player-search";
 import { QueuePill } from "@/components/queue-pill";
 import { LogoutButton } from "@/components/logout-button";
+import { useSession } from "@/components/session-provider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,28 +20,8 @@ import {
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [session, setSession] = useState<UserSession | null>(null);
+  const { session } = useSession();
   const pathname = usePathname();
-
-  // Fetch session. Only change the UI on a definitive answer (a 200 telling us
-  // who the user is, or that they're logged out). On a transient error/non-OK
-  // response we keep the current state instead of flipping to "logged out" —
-  // that flip was what made login appear to drop at random.
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/auth/me", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled || data === null) return;
-        setSession(data.user ?? null);
-      })
-      .catch(() => {
-        /* transient — keep the last known session */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname]);
 
   const navLinks = [
     { href: "/leaderboards", label: "Leaderboards", icon: Trophy },

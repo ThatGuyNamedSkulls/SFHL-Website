@@ -61,6 +61,27 @@ export async function getSession(): Promise<UserSession | null> {
   return decodeSession(token);
 }
 
+/** Session plus JWT expiry (unix seconds). Used so /api/auth/me can skip
+ *  re-signing the cookie when identity hasn't changed and the token is still
+ *  well inside its 7-day window. */
+export async function getSessionWithExpiry(): Promise<{
+  session: UserSession | null;
+  exp: number | null;
+}> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!token) return { session: null, exp: null };
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    return {
+      session: payload as unknown as UserSession,
+      exp: typeof payload.exp === "number" ? payload.exp : null,
+    };
+  } catch {
+    return { session: null, exp: null };
+  }
+}
+
 /** Discord OAuth2 URLs and config */
 export const DISCORD_CONFIG = {
   clientId: process.env.DISCORD_CLIENT_ID || "",
@@ -129,6 +150,7 @@ export async function isUserInGuildById(userId: string): Promise<boolean | null>
  *  longer; missing-server / missing-role must expire quickly so the invite
  *  and Bloxlink popups close soon after they join or verify. */
 const presenceCache = new Map<string, { val: GuildPresence; at: number }>();
+const presenceInflight = new Map<string, Promise<GuildPresence | null>>();
 const PRESENCE_TTL_READY_MS = 5 * 60 * 1000;
 const PRESENCE_TTL_PENDING_MS = 15 * 1000;
 
@@ -144,9 +166,18 @@ export async function getGuildPresenceCached(userId: string): Promise<GuildPrese
     const ttl = ready ? PRESENCE_TTL_READY_MS : PRESENCE_TTL_PENDING_MS;
     if (Date.now() - hit.at < ttl) return hit.val;
   }
-  const val = await getGuildPresence(userId);
-  if (val !== null) presenceCache.set(userId, { val, at: Date.now() });
-  return val;
+  const pending = presenceInflight.get(userId);
+  if (pending) return pending;
+  const request = getGuildPresence(userId)
+    .then((val) => {
+      if (val !== null) presenceCache.set(userId, { val, at: Date.now() });
+      return val;
+    })
+    .finally(() => {
+      presenceInflight.delete(userId);
+    });
+  presenceInflight.set(userId, request);
+  return request;
 }
 
 /** isUserInGuildById with a short-lived cache. Unknown (null) is not cached. */

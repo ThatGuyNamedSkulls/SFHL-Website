@@ -10,6 +10,8 @@ import { markMatchAccepted } from "@/components/match-ready-modal";
 import { formatScoreDisplay } from "@/lib/format";
 import { SWING_GREAT } from "@/lib/match-stats";
 import { SubRolePill } from "@/components/sub-role-pill";
+import { useSession } from "@/components/session-provider";
+import { apiGetJson } from "@/lib/client-api";
 
 interface RecentMatch {
   id: number;
@@ -116,6 +118,7 @@ function PastMatchCard({ match }: { match: RecentMatch }) {
 /** FACEIT-style VS Matches drawer. */
 export function VsMatchesPanel() {
   const router = useRouter();
+  const { session } = useSession();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [lobby, setLobby] = useState<LiveLobby | null>(null);
@@ -130,30 +133,25 @@ export function VsMatchesPanel() {
 
   const load = useCallback(async () => {
     try {
-      const [lRes, sRes, mRes, qRes] = await Promise.all([
-        fetch("/api/lobby"),
-        fetch("/api/auth/me"),
-        fetch("/api/matches/recent"),
-        fetch("/api/queue"),
+      const [l, m, q] = await Promise.all([
+        apiGetJson<{ lobby?: LiveLobby | null }>("/api/lobby"),
+        apiGetJson<{ matches?: RecentMatch[] }>("/api/matches/recent"),
+        apiGetJson<{ queue?: { discord_user_id: string; joined_at: string }[] }>("/api/queue"),
       ]);
-      const lData = lRes.ok ? await lRes.json() : null;
-      const sData = sRes.ok ? await sRes.json() : null;
-      const mData = mRes.ok ? await mRes.json() : null;
-      const qData = qRes.ok ? await qRes.json() : null;
-      const user = sData?.user;
-      setLobby((lData?.lobby as LiveLobby | null) ?? null);
+      const user = session;
+      setLobby((l.json?.lobby as LiveLobby | null) ?? null);
       setLoggedIn(!!user);
-      setMatches(Array.isArray(mData?.matches) ? mData.matches : []);
+      setMatches(Array.isArray(m.json?.matches) ? m.json.matches : []);
       const mine = user
-        ? (qData?.queue as { discord_user_id: string; joined_at: string }[] | undefined)?.find(
-            (q) => q.discord_user_id === user.discordId
+        ? (q.json?.queue as { discord_user_id: string; joined_at: string }[] | undefined)?.find(
+            (entry) => entry.discord_user_id === user.discordId
           )
         : null;
       setQueuedAt(mine?.joined_at ? parseJoinedAt(mine.joined_at) : null);
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [session?.discordId]);
 
   useEffect(() => {
     load();

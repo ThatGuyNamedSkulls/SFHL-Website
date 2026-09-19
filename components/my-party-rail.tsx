@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Crown, Headphones, Plus, Search, UsersRound, X } from "lucide-react";
-import { UserSession, RankTierLetter } from "@/types";
+import { RankTierLetter } from "@/types";
 import { RankBadge } from "@/components/rank-badge";
 import { MATCH_MODE_LABEL, PARTY_MAX_SIZE } from "@/lib/match-mode";
 import { RailBadge } from "@/components/rail-badge";
+import { useSession } from "@/components/session-provider";
+import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
 
 interface PartyMember {
   discordId: string;
@@ -34,10 +36,10 @@ interface SearchHit {
 
 /** Right-rail My Party flyout + instant invite search. */
 export function MyPartyRail() {
+  const { session } = useSession();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [inviteMode, setInviteMode] = useState(false);
-  const [session, setSession] = useState<UserSession | null>(null);
   const [party, setParty] = useState<PartyLite | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -52,21 +54,18 @@ export function MyPartyRail() {
 
   const load = useCallback(async () => {
     try {
-      const [meRes, pRes] = await Promise.all([fetch("/api/auth/me"), fetch("/api/parties")]);
-      const me = meRes.ok ? await meRes.json() : null;
-      const user = (me?.user as UserSession | undefined) ?? null;
-      setSession(user);
-      const data = pRes.ok ? await pRes.json() : { parties: [] };
+      const { ok, json } = await apiGetJson<{ parties?: PartyLite[] }>("/api/parties?mine=1");
+      const data = ok ? json : { parties: [] };
       const mine =
-        user &&
+        session &&
         (data.parties as PartyLite[] | undefined)?.find((p) =>
-          p.members.some((m) => m.discordId === user.discordId)
+          p.members.some((m) => m.discordId === session.discordId)
         );
       setParty(mine ?? null);
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [session?.discordId]);
 
   useEffect(() => {
     load();
@@ -142,6 +141,8 @@ export function MyPartyRail() {
       const data = await res.json();
       if (!res.ok) flash(data.error || "Failed to create party");
       else {
+        invalidateClientApi("/api/parties?mine=1");
+        invalidateClientApi("/api/parties");
         await load();
         if (data.party?.voiceChannelUrl) {
           flash("Party voice is ready — click the headphones to join Discord.");
@@ -161,6 +162,8 @@ export function MyPartyRail() {
     setBusy(true);
     try {
       await fetch(`/api/parties/${party.id}/leave`, { method: "DELETE" });
+      invalidateClientApi("/api/parties?mine=1");
+      invalidateClientApi("/api/parties");
       await load();
     } finally {
       setBusy(false);
@@ -178,6 +181,8 @@ export function MyPartyRail() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) flash(data.error || "Failed to kick");
+      invalidateClientApi("/api/parties?mine=1");
+      invalidateClientApi("/api/parties");
       await load();
     } finally {
       setBusy(false);
@@ -200,6 +205,7 @@ export function MyPartyRail() {
       if (!res.ok) flash(data.error || "Failed to invite");
       else if (data.status === "pending") flash("Invite already sent.");
       else flash(`Invited ${toName}.`);
+      invalidateClientApi("/api/parties?mine=1");
       setQuery("");
       setHits([]);
     } catch {

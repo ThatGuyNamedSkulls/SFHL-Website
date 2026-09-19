@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Bell, UserPlus, Users, Check, X, Swords, Headphones } from "lucide-react";
+import { apiGetJson } from "@/lib/client-api";
 
 interface NotificationView {
   id: number;
@@ -37,11 +38,13 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/notifications");
-      if (!res.ok) return;
-      const data = await res.json();
-      setItems(data.notifications ?? []);
-      setUnread(data.unread ?? 0);
+      const { ok, json } = await apiGetJson<{
+        notifications?: NotificationView[];
+        unread?: number;
+      }>("/api/notifications");
+      if (!ok) return;
+      setItems(json.notifications ?? []);
+      setUnread(json.unread ?? 0);
     } catch {
       /* ignore */
     }

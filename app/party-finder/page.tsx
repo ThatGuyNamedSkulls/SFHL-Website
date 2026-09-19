@@ -11,9 +11,10 @@ import {
 import { PartyCard, FriendOption } from "@/components/party-card";
 import { CreatePartyModal, PARTY_VIBES } from "@/components/create-party-modal";
 import { EmptyState } from "@/components/empty-state";
-import { UserSession, PartyView } from "@/types";
+import { PartyView } from "@/types";
 import { RANK_TIERS } from "@/data/ranks";
 import { Users, Plus, Filter, ShieldCheck, Mic } from "lucide-react";
+import { useSession } from "@/components/session-provider";
 
 const SKILL_TIERS = RANK_TIERS.filter((t) => t.letter !== "UNRANKED");
 const tierIdx = (letter: string) => SKILL_TIERS.findIndex((t) => t.letter === letter);
@@ -184,8 +185,8 @@ function FiltersModal({
 
 function PartyFinderContent() {
   const searchParams = useSearchParams();
+  const { session } = useSession();
   const [parties, setParties] = useState<PartyView[]>([]);
-  const [session, setSession] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -227,10 +228,6 @@ function PartyFinderContent() {
   useEffect(() => {
     load();
     loadFriends();
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => setSession(d.user ?? null))
-      .catch(() => { });
     const interval = setInterval(load, 8000);
     return () => clearInterval(interval);
   }, []);

@@ -1,21 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { UserSession } from "@/types";
 import { LandingPage } from "@/components/landing-page";
 import { Dashboard } from "@/components/dashboard";
+import { useSession } from "@/components/session-provider";
 
 export default function HomePage() {
-  const [session, setSession] = useState<UserSession | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => setSession(d.user ?? null))
-      .catch(() => setSession(null))
-      .finally(() => setLoaded(true));
-  }, []);
+  const { session, loaded } = useSession();
 
   // Avoid a flash of the wrong view before we know the auth state.
   if (!loaded) {

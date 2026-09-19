@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useSession } from "@/components/session-provider";
+import { invalidateClientApi } from "@/lib/client-api";
 
 /**
  * Logs the user out via a POST (never a GET). Logout clears the session cookie,
@@ -21,6 +23,7 @@ export function LogoutButton({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const { clear } = useSession();
 
   const onClick = async () => {
     if (busy) return;
@@ -31,6 +34,8 @@ export function LogoutButton({
     } catch {
       /* even if the request fails, fall through and send them home */
     }
+    invalidateClientApi();
+    clear();
     router.push("/");
     router.refresh();
   };

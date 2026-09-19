@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import {
   getFriends,
   getIncomingRequests,
+  getIncomingRequestCount,
   getOutgoingRequests,
   sendFriendRequest,
   removeFriend,
@@ -20,11 +21,15 @@ function requireLinked(session: Awaited<ReturnType<typeof getSession>>) {
 }
 
 /** GET — the current user's friends + incoming/outgoing requests. */
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession();
   const gate = requireLinked(session);
   if (gate) return NextResponse.json({ error: gate.error }, { status: gate.status });
   const me = session!.playerName!;
+  if (new URL(request.url).searchParams.get("counts") === "1") {
+    const incomingCount = await getIncomingRequestCount(me);
+    return NextResponse.json({ incomingCount });
+  }
   const [friends, incoming, outgoing] = await Promise.all([
     getFriends(me),
     getIncomingRequests(me),

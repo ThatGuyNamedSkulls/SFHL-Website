@@ -6,22 +6,18 @@ import { useEffect, Suspense } from "react";
 import { Card } from "@/components/ui/card";
 import { Gamepad2, ArrowLeft } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
+import { useSession } from "@/components/session-provider";
 
 function LoginContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
   const router = useRouter();
+  const { session, loaded } = useSession();
 
   // Redirect if already logged in
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) {
-          router.push("/profile");
-        }
-      });
-  }, [router]);
+    if (loaded && session) router.push("/profile");
+  }, [loaded, session, router]);
 
   let errorMessage = "";
   if (error === "no_code") errorMessage = "Authentication failed: No code provided.";

@@ -5,42 +5,14 @@ import Link from "next/link";
 import { Coins, Settings, UserRound, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogoutButton } from "@/components/logout-button";
-import { UserSession } from "@/types";
+import { useSession } from "@/components/session-provider";
 import { formatUsername } from "@/lib/format";
 
 /** FACEIT-style avatar popover: online, HL Coins, View Profile, Settings. */
 export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
-  const [session, setSession] = useState<UserSession | null>(null);
-  const [coins, setCoins] = useState(0);
+  const { session, coins } = useSession();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const meRes = await fetch("/api/auth/me", { cache: "no-store" });
-        const me = meRes.ok ? await meRes.json() : null;
-        if (cancelled) return;
-        const user = (me?.user as UserSession | undefined) ?? null;
-        setSession(user);
-        if (!user?.playerName) {
-          setCoins(0);
-          return;
-        }
-        const shopRes = await fetch("/api/shop", { cache: "no-store" });
-        const shop = shopRes.ok ? await shopRes.json() : null;
-        if (!cancelled) setCoins(typeof shop?.coins === "number" ? shop.coins : 0);
-      } catch {
-        /* ignore */
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {

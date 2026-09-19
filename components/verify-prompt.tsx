@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   Dialog,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { SiDiscord } from "react-icons/si";
 import { ShieldAlert } from "lucide-react";
-import { UserSession } from "@/types";
+import { useSession } from "@/components/session-provider";
 
 type Gate = "join" | "verify" | null;
 
@@ -21,51 +21,31 @@ type Gate = "join" | "verify" | null;
  */
 export function VerifyPrompt() {
   const pathname = usePathname();
+  const { session, discordInvite, loaded } = useSession();
   const [gate, setGate] = useState<Gate>(null);
-  const [invite, setInvite] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Gate>(null);
 
-  const load = useCallback(async () => {
-    if (pathname === "/login") {
+  useEffect(() => {
+    if (pathname === "/login" || !loaded) {
       setGate(null);
       return;
     }
-    try {
-      const res = await fetch("/api/auth/me");
-      const data = await res.json();
-      const user = data?.user as UserSession | null;
-      if (typeof data?.discordInvite === "string" && data.discordInvite) {
-        setInvite(data.discordInvite);
-      }
-      if (!user) {
-        setGate(null);
-        setDismissed(null);
-        return;
-      }
-      const next: Gate = !user.inGuild
-        ? "join"
-        : user.verified === false
-          ? "verify"
-          : null;
-      setGate(next);
-      if (next !== dismissed) setDismissed(null);
-    } catch {
-      /* ignore */
+    if (!session) {
+      setGate(null);
+      setDismissed(null);
+      return;
     }
-  }, [pathname, dismissed]);
-
-  useEffect(() => {
-    load();
-  }, [load, pathname]);
-
-  useEffect(() => {
-    if (!gate || dismissed === gate) return;
-    const id = setInterval(load, 8000);
-    return () => clearInterval(id);
-  }, [gate, dismissed, load]);
+    const next: Gate = !session.inGuild
+      ? "join"
+      : session.verified === false
+        ? "verify"
+        : null;
+    setGate(next);
+    if (next !== dismissed) setDismissed(null);
+  }, [pathname, loaded, session, session?.inGuild, session?.verified, dismissed]);
 
   const open = !!gate && dismissed !== gate;
-  const joinUrl = invite || "https://discord.gg/4UTrW6xJ39";
+  const joinUrl = discordInvite || "https://discord.gg/4UTrW6xJ39";
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && setDismissed(gate)}>
@@ -108,9 +88,9 @@ export function VerifyPrompt() {
                 refresh this page.
               </DialogDescription>
             </DialogHeader>
-            {invite ? (
+            {discordInvite ? (
               <a
-                href={invite}
+                href={discordInvite}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold text-sm transition-colors"

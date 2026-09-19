@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getParties, createParty } from "@/lib/parties";
+import { getParties, createParty, getPartyForMember } from "@/lib/parties";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 import { partyMaxForMatchType } from "@/lib/queue-modes";
 import { memberFromSession, withFreshCosmetics, withMemberStatus } from "@/lib/party-member";
@@ -9,9 +9,23 @@ import { getPartyInvitePartyIds, getInvitesForParties } from "@/lib/social";
 /** GET — list live parties. Private parties are hidden unless you're a member
  *  or have a pending invite to them. Each party carries the names it has pending
  *  invites out to, so members' invite menus can show "Invited". */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getSession();
+    const mineOnly = new URL(request.url).searchParams.get("mine") === "1";
+
+    if (mineOnly) {
+      if (!session) return NextResponse.json({ parties: [], count: 0 });
+      const mine = await getPartyForMember(session.discordId);
+      if (!mine) return NextResponse.json({ parties: [], count: 0 });
+      const fresh = await withMemberStatus(await withFreshCosmetics([mine]));
+      const invitesByParty = await getInvitesForParties([mine.id]);
+      return NextResponse.json({
+        parties: [{ ...fresh[0], invitedNames: invitesByParty.get(mine.id) ?? [] }],
+        count: 1,
+      });
+    }
+
     const parties = await getParties();
     const invitedIds =
       session?.playerName

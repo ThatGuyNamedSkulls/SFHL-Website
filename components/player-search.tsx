@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadgeInline } from "@/components/rank-badge";
 import { RankTierLetter } from "@/types";
 import { formatUsername } from "@/lib/format";
+import { apiGetJson } from "@/lib/client-api";
 
 interface SearchPlayer {
   id: string;
@@ -43,9 +44,8 @@ export function PlayerSearch({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/players")
-      .then((r) => r.json())
-      .then((data) => setPlayers(Array.isArray(data) ? data : []))
+    apiGetJson<SearchPlayer[]>("/api/players")
+      .then(({ json: data }) => setPlayers(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 

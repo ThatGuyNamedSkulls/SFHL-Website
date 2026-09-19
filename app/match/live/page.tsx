@@ -6,21 +6,21 @@ import { LiveMatchRoom, LiveLobby } from "@/components/live-match-room";
 import { markMatchAccepted } from "@/components/match-ready-modal";
 import { EmptyState } from "@/components/empty-state";
 import { Swords } from "lucide-react";
+import { useSession } from "@/components/session-provider";
+import { apiGetJson } from "@/lib/client-api";
 
 export default function LiveMatchPage() {
+  const { session } = useSession();
   const [lobby, setLobby] = useState<LiveLobby | null>(null);
-  const [selfId, setSelfId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const selfId = session?.discordId ?? null;
 
   useEffect(() => {
     const poll = async () => {
       try {
-        const [lRes, sRes] = await Promise.all([fetch("/api/lobby"), fetch("/api/auth/me")]);
-        const lData = await lRes.json();
-        const sData = await sRes.json();
-        setLobby((lData?.lobby as LiveLobby | null) ?? null);
-        setSelfId(sData.user?.discordId ?? null);
-        if (lData?.lobby?.channelId) markMatchAccepted(lData.lobby.channelId);
+        const { json } = await apiGetJson<{ lobby?: LiveLobby | null }>("/api/lobby");
+        setLobby((json?.lobby as LiveLobby | null) ?? null);
+        if (json?.lobby?.channelId) markMatchAccepted(json.lobby.channelId);
       } catch {
         /* ignore */
       } finally {

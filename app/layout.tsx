@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SessionProvider } from "@/components/session-provider";
 import { Sidebar } from "@/components/sidebar";
 import { RightSidebar } from "@/components/right-sidebar";
 import { TopBar } from "@/components/top-bar";
@@ -38,17 +39,19 @@ export default function RootLayout({
     >
       <body className="h-full bg-hl-base text-white">
         <TooltipProvider>
-          <div className="flex h-screen overflow-hidden bg-[#111]">
-            <Sidebar />
-            <div className="flex-1 min-w-0 flex flex-col">
-              <TopBar />
-              <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
+          <SessionProvider>
+            <div className="flex h-screen overflow-hidden bg-[#111]">
+              <Sidebar />
+              <div className="flex-1 min-w-0 flex flex-col">
+                <TopBar />
+                <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
+              </div>
+              <RightSidebar />
             </div>
-            <RightSidebar />
-          </div>
-          <CountryPrompt />
-          <VerifyPrompt />
-          <MatchReadyModal />
+            <CountryPrompt />
+            <VerifyPrompt />
+            <MatchReadyModal />
+          </SessionProvider>
         </TooltipProvider>
         <SpeedInsights />
       </body>

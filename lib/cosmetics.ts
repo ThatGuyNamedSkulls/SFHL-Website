@@ -14,6 +14,7 @@
  */
 
 import { client, ensurePlayerCoinsColumn } from "@/lib/db";
+import { remember } from "@/lib/server-cache";
 import { DEFAULT_PROFILE_BACKGROUNDS } from "@/lib/profile-backgrounds";
 
 export type CosmeticType = "card" | "title" | "badge" | "frame" | "background";
@@ -88,45 +89,57 @@ function ensureCosmeticsSchema(): Promise<void> {
 
 async function seedDefaultBackgrounds(): Promise<void> {
   const now = Date.now();
-  for (const bg of DEFAULT_PROFILE_BACKGROUNDS) {
-    await client.execute({
-      sql: `INSERT OR IGNORE INTO cosmetic_items
-            (slug, type, name, description, asset, category, season, rarity, created_at, price)
-            VALUES (?, 'background', ?, 'Profile page background', ?, 'default', NULL, 'common', ?, 0)`,
-      args: [bg.slug, bg.name, bg.color, now],
-    });
-    await client.execute({
-      sql: `UPDATE cosmetic_items SET name = ?, asset = ?, type = 'background', price = 0
-            WHERE slug = ?`,
-      args: [bg.name, bg.color, bg.slug],
-    });
-  }
+  await client.batch(
+    DEFAULT_PROFILE_BACKGROUNDS.flatMap((bg) => [
+      {
+        sql: `INSERT OR IGNORE INTO cosmetic_items
+              (slug, type, name, description, asset, category, season, rarity, created_at, price)
+              VALUES (?, 'background', ?, 'Profile page background', ?, 'default', NULL, 'common', ?, 0)`,
+        args: [bg.slug, bg.name, bg.color, now],
+      },
+      {
+        sql: `UPDATE cosmetic_items SET name = ?, asset = ?, type = 'background', price = 0
+              WHERE slug = ?`,
+        args: [bg.name, bg.color, bg.slug],
+      },
+    ])
+  );
 }
 
 /** Give a player (or every player) the 10 default page backgrounds. Idempotent. */
 export async function grantDefaultBackgrounds(playerName?: string): Promise<void> {
   await ensureCosmeticsSchema();
-  const now = Date.now();
   const rs = await client.execute(
     "SELECT id FROM cosmetic_items WHERE type = 'background' AND category = 'default'"
   );
-  for (const row of rs.rows) {
-    const itemId = Number(row.id);
-    if (playerName) {
-      await client.execute({
+  const ids = rs.rows.map((row) => Number(row.id)).filter((id) => Number.isFinite(id) && id > 0);
+  if (ids.length === 0) return;
+  const now = Date.now();
+  if (playerName) {
+    const placeholders = ids.map(() => "?").join(",");
+    const owned = await client.execute({
+      sql: `SELECT COUNT(*) AS c FROM cosmetic_inventory
+            WHERE player_name = ? AND item_id IN (${placeholders})`,
+      args: [playerName, ...ids],
+    });
+    if (Number(owned.rows[0]?.c ?? 0) >= ids.length) return;
+    await client.batch(
+      ids.map((itemId) => ({
         sql: `INSERT OR IGNORE INTO cosmetic_inventory
               (player_name, item_id, granted_by, granted_at) VALUES (?, ?, 'system:default-background', ?)`,
         args: [playerName, itemId, now],
-      });
-    } else {
-      await client.execute({
-        sql: `INSERT OR IGNORE INTO cosmetic_inventory
-              (player_name, item_id, granted_by, granted_at)
-              SELECT name, ?, 'system:default-background', ? FROM players`,
-        args: [itemId, now],
-      });
-    }
+      }))
+    );
+    return;
   }
+  await client.batch(
+    ids.map((itemId) => ({
+      sql: `INSERT OR IGNORE INTO cosmetic_inventory
+            (player_name, item_id, granted_by, granted_at)
+            SELECT name, ?, 'system:default-background', ? FROM players`,
+      args: [itemId, now],
+    }))
+  );
 }
 
 function rowToItem(r: Record<string, unknown>): InventoryItem {
@@ -241,26 +254,27 @@ export interface EquippedVisuals {
 
 /** player_name → equipped card/frame assets, for list views (single query). */
 export async function getEquippedVisualsMap(): Promise<Map<string, EquippedVisuals>> {
-  await ensureCosmeticsSchema();
-  const rs = await client.execute(
-    `SELECT inv.player_name AS name, i.type AS type, i.asset AS asset
-     FROM cosmetic_inventory inv JOIN cosmetic_items i ON i.id = inv.item_id
-     WHERE inv.equipped = 1 AND i.type IN ('card', 'frame') AND i.asset IS NOT NULL`
-  );
-  const map = new Map<string, EquippedVisuals>();
-  for (const r of rs.rows as unknown as { name: string; type: string; asset: string }[]) {
-    const v = map.get(r.name) ?? { card: null, frame: null };
-    if (r.type === "card" && !v.card) v.card = r.asset;
-    if (r.type === "frame" && !v.frame) v.frame = r.asset;
-    map.set(r.name, v);
-  }
-  return map;
+  return remember("equipped-visuals", 3000, async () => {
+    await ensureCosmeticsSchema();
+    const rs = await client.execute(
+      `SELECT inv.player_name AS name, i.type AS type, i.asset AS asset
+       FROM cosmetic_inventory inv JOIN cosmetic_items i ON i.id = inv.item_id
+       WHERE inv.equipped = 1 AND i.type IN ('card', 'frame') AND i.asset IS NOT NULL`
+    );
+    const map = new Map<string, EquippedVisuals>();
+    for (const r of rs.rows as unknown as { name: string; type: string; asset: string }[]) {
+      const v = map.get(r.name) ?? { card: null, frame: null };
+      if (r.type === "card" && !v.card) v.card = r.asset;
+      if (r.type === "frame" && !v.frame) v.frame = r.asset;
+      map.set(r.name, v);
+    }
+    return map;
+  });
 }
 
 /** The equipped cosmetics for a public profile (card, title text, ≤5 badges). */
 export async function getEquippedCosmetics(playerName: string): Promise<ProfileCosmetics> {
   await ensureCosmeticsSchema();
-  await grantDefaultBackgrounds(playerName);
   const rs = await client.execute({
     sql: `SELECT i.slug, i.type, i.name, i.description, i.asset
           FROM cosmetic_inventory inv JOIN cosmetic_items i ON i.id = inv.item_id

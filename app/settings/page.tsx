@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserSession } from "@/types";
+import { useSession } from "@/components/session-provider";
 import { PageHeader } from "@/components/page-header";
 import { CountrySelect } from "@/components/country-select";
 import { LogoutButton } from "@/components/logout-button";
@@ -26,20 +26,13 @@ import {
 } from "lucide-react";
 
 export default function SettingsPage() {
-  const [session, setSession] = useState<UserSession | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { session, loaded } = useSession();
   const [country, setCountry] = useState<string | null>(null);
   const [countryDraft, setCountryDraft] = useState<string | null>(null);
   const [editingCountry, setEditingCountry] = useState(false);
   const [savingCountry, setSavingCountry] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((data) => setSession(data.user || null))
-      .catch(() => setSession(null))
-      .finally(() => setLoading(false));
-
     fetch("/api/players/country")
       .then((r) => r.json())
       .then((d) => {
@@ -80,7 +73,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) {
+  if (!loaded) {
     return (
       <div className="hl-page py-16 text-center text-hl-muted">
         Loading settings…

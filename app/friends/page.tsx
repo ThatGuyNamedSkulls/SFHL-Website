@@ -6,8 +6,9 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
-import { UserSession, RankTierLetter } from "@/types";
+import { RankTierLetter } from "@/types";
 import { UserPlus, Users, Check, X, Search, UserMinus, Clock } from "lucide-react";
+import { useSession } from "@/components/session-provider";
 
 interface Friend {
   name: string;
@@ -45,7 +46,7 @@ function FriendRow({ friend, actions }: { friend: Friend; actions: React.ReactNo
 }
 
 export default function FriendsPage() {
-  const [session, setSession] = useState<UserSession | null | undefined>(undefined);
+  const { session, loaded: sessionLoaded } = useSession();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [incoming, setIncoming] = useState<RequestView[]>([]);
   const [outgoing, setOutgoing] = useState<RequestView[]>([]);
@@ -68,7 +69,7 @@ export default function FriendsPage() {
       /* ignore */
     }
     try {
-      const pRes = await fetch("/api/parties");
+      const pRes = await fetch("/api/parties?mine=1");
       const pData = await pRes.json();
       const mine = (pData.parties as { id: string; members: { discordId: string }[] }[] | undefined)?.find(
         (p) => session?.discordId && p.members.some((m) => m.discordId === session.discordId)
@@ -80,10 +81,6 @@ export default function FriendsPage() {
   }, [session?.discordId]);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => setSession(d.user ?? null))
-      .catch(() => setSession(null));
     load();
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
@@ -167,6 +164,14 @@ export default function FriendsPage() {
 
   const outgoingNames = new Set(outgoing.map((r) => r.name));
   const friendNames = new Set(friends.map((f) => f.name));
+
+  if (!sessionLoaded) {
+    return (
+      <div className="flex items-center justify-center h-full py-24">
+        <div className="w-10 h-10 rounded-full border-2 border-hl-border border-t-hl-gold animate-spin" />
+      </div>
+    );
+  }
 
   if (session === null) {
     return (

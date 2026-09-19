@@ -17,6 +17,7 @@ import {
   Trophy,
   type LucideIcon,
 } from "lucide-react";
+import { apiGetJson } from "@/lib/client-api";
 
 interface NavItem {
   href?: string;
@@ -94,10 +95,9 @@ function PlaySubBadge() {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch("/api/subs");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled) setCount(Number(data.count ?? 0));
+        const { ok, json } = await apiGetJson<{ count?: number }>("/api/subs");
+        if (!ok) return;
+        if (!cancelled) setCount(Number(json.count ?? 0));
       } catch {
         /* ignore */
       }

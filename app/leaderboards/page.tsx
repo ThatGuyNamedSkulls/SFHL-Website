@@ -11,6 +11,8 @@ import { useLeaderboardRegion } from "@/components/use-play-region";
 import { PLAY_REGIONS, isGlobalRegion, regionMeta, type PlayRegionId } from "@/lib/regions";
 import { countryName, flagPath, COUNTRY_CHANGE_EVENT } from "@/lib/countries";
 import { countryToPlayRegion } from "@/lib/country-regions";
+import { useSession } from "@/components/session-provider";
+import { apiGetJson } from "@/lib/client-api";
 
 interface ApiPlayer {
   id: string;
@@ -74,29 +76,19 @@ function FilterSelect({
 export default function LeaderboardsPage() {
   const [players, setPlayers] = useState<ApiPlayer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [myPlayer, setMyPlayer] = useState<string | null>(null);
-  const [loggedIn, setLoggedIn] = useState(false);
+  const { session } = useSession();
+  const loggedIn = !!session;
+  const myPlayer = session?.playerName || session?.username || null;
   const [countryFilter, setCountryFilter] = useState("All");
   const { region, setRegion, meta } = useLeaderboardRegion();
 
   useEffect(() => {
-    fetch("/api/players")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        setPlayers(Array.isArray(data) ? data : []);
+    apiGetJson<ApiPlayer[]>("/api/players")
+      .then(({ ok, json }) => {
+        setPlayers(ok && Array.isArray(json) ? json : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.user) {
-          setLoggedIn(true);
-          setMyPlayer(data.user.playerName || data.user.username);
-        }
-      })
-      .catch(() => {});
   }, []);
 
   useEffect(() => {

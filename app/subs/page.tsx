@@ -7,8 +7,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { SubRequestCard } from "@/components/sub-request-card";
-import type { SubRequestView, UserSession } from "@/types";
+import type { SubRequestView } from "@/types";
 import { AlertCircle, Clock, UserPlus, Zap } from "lucide-react";
+import { useSession } from "@/components/session-provider";
+import { apiGetJson } from "@/lib/client-api";
 
 /** How a sub's Elo works, so nobody claims a slot without knowing the deal. */
 const RULES = [
@@ -19,8 +21,8 @@ const RULES = [
 
 export default function SubsPage() {
   const router = useRouter();
+  const { session } = useSession();
   const [requests, setRequests] = useState<SubRequestView[]>([]);
-  const [session, setSession] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [joiningId, setJoiningId] = useState<number | null>(null);
   const [claimed, setClaimed] = useState<SubRequestView | null>(null);
@@ -31,15 +33,9 @@ export default function SubsPage() {
 
   const poll = useCallback(async () => {
     try {
-      const [sRes, rRes] = await Promise.all([
-        fetch("/api/auth/me"),
-        fetch("/api/subs"),
-      ]);
-      const sData = await sRes.json();
-      setSession((sData.user as UserSession | undefined) ?? null);
-      const rData = await rRes.json();
+      const { json } = await apiGetJson<{ requests?: SubRequestView[] }>("/api/subs");
       if (!claimInFlight.current) {
-        setRequests((rData.requests as SubRequestView[]) ?? []);
+        setRequests((json.requests as SubRequestView[]) ?? []);
       }
     } catch {
       /* transient — the next poll will catch up */
