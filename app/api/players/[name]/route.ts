@@ -63,6 +63,7 @@ export async function GET(
         getEquippedCosmetics(playerName).catch(() => ({
           card: null,
           frame: null,
+          background: null,
           title: null,
           badges: [],
         })),

@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { InventoryItem, CosmeticType } from "@/types";
 import { Award, Check, UserRound } from "lucide-react";
+import { BackgroundSwatch } from "@/components/profile-background";
 
 const FILTERS: { id: CosmeticType | "all"; label: string }[] = [
   { id: "all", label: "All" },
+  { id: "background", label: "Backgrounds" },
   { id: "card", label: "Profile cards" },
   { id: "frame", label: "Avatar frames" },
   { id: "title", label: "Titles" },
@@ -13,6 +15,7 @@ const FILTERS: { id: CosmeticType | "all"; label: string }[] = [
 ];
 
 const TYPE_LABEL: Record<CosmeticType, string> = {
+  background: "Background",
   card: "Profile card",
   frame: "Avatar frame",
   title: "Title",
@@ -80,6 +83,9 @@ function ItemPreview({ item }: { item: InventoryItem }) {
       </div>
     );
   }
+  if (item.type === "background") {
+    return <BackgroundSwatch color={item.asset} />;
+  }
   return (
     <div className="w-full h-full flex items-center justify-center text-xs font-bold text-hl-muted header-caps px-3 text-center">
       {item.name}
@@ -92,10 +98,11 @@ interface ProfileInventoryProps {
   items: InventoryItem[];
   /** Equip/unequip enabled only on your own profile. */
   isOwn: boolean;
+  onChange?: (items: InventoryItem[]) => void;
 }
 
 /** FACEIT-style inventory grid: portrait previews with Equipped chips. */
-export function ProfileInventory({ items: initial, isOwn }: ProfileInventoryProps) {
+export function ProfileInventory({ items: initial, isOwn, onChange }: ProfileInventoryProps) {
   const [items, setItems] = useState<InventoryItem[]>(initial);
   const [filter, setFilter] = useState<CosmeticType | "all">("all");
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -111,8 +118,10 @@ export function ProfileInventory({ items: initial, isOwn }: ProfileInventoryProp
         body: JSON.stringify({ itemId: item.id, equip: !item.equipped }),
       });
       const data = await res.json();
-      if (res.ok && data.items) setItems(data.items);
-      else {
+      if (res.ok && data.items) {
+        setItems(data.items);
+        onChange?.(data.items);
+      } else {
         setNotice(data.error || "Failed to update item.");
         setTimeout(() => setNotice(null), 4000);
       }

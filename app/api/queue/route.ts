@@ -3,7 +3,7 @@ import { getSession, isUserInGuildCached, getGuildPresenceCached } from "@/lib/a
 import {
   getWebQueue,
   joinWebQueue,
-  leaveWebQueue,
+  leaveWebQueueMany,
   getWebQueueSpot,
   getQueueTeamSize,
   getQueueGate,
@@ -275,13 +275,8 @@ export async function DELETE(request: Request) {
     // Leaving as part of a party pulls the whole party out of the queue, the
     // same way joining put them all in.
     const party = await getPartyForMember(session.discordId);
-    if (party) {
-      for (const m of party.members) {
-        await leaveWebQueue(m.discordId);
-      }
-    } else {
-      await leaveWebQueue(session.discordId);
-    }
+    const ids = party ? party.members.map((m) => m.discordId) : [session.discordId];
+    await leaveWebQueueMany(ids);
 
     const { searchParams } = new URL(request.url);
     const regionParam = (searchParams.get("region") || "").toUpperCase();

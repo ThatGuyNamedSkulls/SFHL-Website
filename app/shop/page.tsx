@@ -14,6 +14,7 @@ const FILTERS: { id: CosmeticType | "all"; label: string }[] = [
 ];
 
 const TYPE_LABEL: Record<CosmeticType, string> = {
+  background: "Background",
   card: "Profile card",
   frame: "Avatar frame",
   title: "Title",
@@ -66,6 +67,14 @@ function ShopPreview({ item }: { item: ShopItem }) {
       <div className="w-full h-full flex items-center justify-center px-3">
         <span className="text-sm font-bold italic text-hl-gold text-center">{item.name}</span>
       </div>
+    );
+  }
+  if (item.type === "background") {
+    return (
+      <div
+        className="w-full h-full"
+        style={{ backgroundImage: `linear-gradient(to top, ${item.asset || "#333"} 0%, #000000 100%)` }}
+      />
     );
   }
   return (

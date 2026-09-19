@@ -88,7 +88,7 @@ export interface Player {
 }
 
 /** Cosmetic item types (profile customization inventory). */
-export type CosmeticType = "card" | "title" | "badge" | "frame";
+export type CosmeticType = "card" | "title" | "badge" | "frame" | "background";
 
 /** An owned cosmetic item, as returned by /api/inventory. */
 export interface InventoryItem {
@@ -123,6 +123,8 @@ export interface ProfileCosmetics {
   card: { slug: string; name: string; asset: string | null } | null;
   /** Decorative ring PNG rendered around the avatar. */
   frame: { slug: string; name: string; asset: string | null } | null;
+  /** Equipped page background (asset is a #hex color). */
+  background: { slug: string; name: string; asset: string | null } | null;
   title: string | null;
   badges: { slug: string; name: string; description: string; asset: string | null }[];
 }

@@ -14,8 +14,9 @@
  */
 
 import { client, ensurePlayerCoinsColumn } from "@/lib/db";
+import { DEFAULT_PROFILE_BACKGROUNDS } from "@/lib/profile-backgrounds";
 
-export type CosmeticType = "card" | "title" | "badge" | "frame";
+export type CosmeticType = "card" | "title" | "badge" | "frame" | "background";
 
 export interface InventoryItem {
   id: number; // catalog item id (what equip endpoints take)
@@ -35,6 +36,7 @@ export interface InventoryItem {
 export interface ProfileCosmetics {
   card: { slug: string; name: string; asset: string | null } | null;
   frame: { slug: string; name: string; asset: string | null } | null;
+  background: { slug: string; name: string; asset: string | null } | null;
   title: string | null;
   badges: { slug: string; name: string; description: string; asset: string | null }[];
 }
@@ -78,9 +80,53 @@ function ensureCosmeticsSchema(): Promise<void> {
       await client
         .execute("ALTER TABLE cosmetic_items ADD COLUMN price INTEGER DEFAULT 0")
         .catch(() => undefined); // already exists — fine
+      await seedDefaultBackgrounds();
     })();
   }
   return schemaReady;
+}
+
+async function seedDefaultBackgrounds(): Promise<void> {
+  const now = Date.now();
+  for (const bg of DEFAULT_PROFILE_BACKGROUNDS) {
+    await client.execute({
+      sql: `INSERT OR IGNORE INTO cosmetic_items
+            (slug, type, name, description, asset, category, season, rarity, created_at, price)
+            VALUES (?, 'background', ?, 'Profile page background', ?, 'default', NULL, 'common', ?, 0)`,
+      args: [bg.slug, bg.name, bg.color, now],
+    });
+    await client.execute({
+      sql: `UPDATE cosmetic_items SET name = ?, asset = ?, type = 'background', price = 0
+            WHERE slug = ?`,
+      args: [bg.name, bg.color, bg.slug],
+    });
+  }
+}
+
+/** Give a player (or every player) the 10 default page backgrounds. Idempotent. */
+export async function grantDefaultBackgrounds(playerName?: string): Promise<void> {
+  await ensureCosmeticsSchema();
+  const now = Date.now();
+  const rs = await client.execute(
+    "SELECT id FROM cosmetic_items WHERE type = 'background' AND category = 'default'"
+  );
+  for (const row of rs.rows) {
+    const itemId = Number(row.id);
+    if (playerName) {
+      await client.execute({
+        sql: `INSERT OR IGNORE INTO cosmetic_inventory
+              (player_name, item_id, granted_by, granted_at) VALUES (?, ?, 'system:default-background', ?)`,
+        args: [playerName, itemId, now],
+      });
+    } else {
+      await client.execute({
+        sql: `INSERT OR IGNORE INTO cosmetic_inventory
+              (player_name, item_id, granted_by, granted_at)
+              SELECT name, ?, 'system:default-background', ? FROM players`,
+        args: [itemId, now],
+      });
+    }
+  }
 }
 
 function rowToItem(r: Record<string, unknown>): InventoryItem {
@@ -102,6 +148,7 @@ function rowToItem(r: Record<string, unknown>): InventoryItem {
 /** Everything the player owns, catalog details included. */
 export async function getInventory(playerName: string): Promise<InventoryItem[]> {
   await ensureCosmeticsSchema();
+  await grantDefaultBackgrounds(playerName);
   const rs = await client.execute({
     sql: `SELECT i.id, i.slug, i.type, i.name, i.description, i.asset, i.category,
                  i.season, i.rarity, inv.granted_at, inv.equipped
@@ -213,6 +260,7 @@ export async function getEquippedVisualsMap(): Promise<Map<string, EquippedVisua
 /** The equipped cosmetics for a public profile (card, title text, ≤5 badges). */
 export async function getEquippedCosmetics(playerName: string): Promise<ProfileCosmetics> {
   await ensureCosmeticsSchema();
+  await grantDefaultBackgrounds(playerName);
   const rs = await client.execute({
     sql: `SELECT i.slug, i.type, i.name, i.description, i.asset
           FROM cosmetic_inventory inv JOIN cosmetic_items i ON i.id = inv.item_id
@@ -220,7 +268,7 @@ export async function getEquippedCosmetics(playerName: string): Promise<ProfileC
           ORDER BY inv.equipped_at ASC`,
     args: [playerName],
   });
-  const out: ProfileCosmetics = { card: null, frame: null, title: null, badges: [] };
+  const out: ProfileCosmetics = { card: null, frame: null, background: null, title: null, badges: [] };
   for (const r of rs.rows as unknown as Record<string, unknown>[]) {
     const type = r.type as CosmeticType;
     if (type === "card" && !out.card) {
@@ -231,6 +279,12 @@ export async function getEquippedCosmetics(playerName: string): Promise<ProfileC
       };
     } else if (type === "frame" && !out.frame) {
       out.frame = {
+        slug: r.slug as string,
+        name: r.name as string,
+        asset: (r.asset as string) ?? null,
+      };
+    } else if (type === "background" && !out.background) {
+      out.background = {
         slug: r.slug as string,
         name: r.name as string,
         asset: (r.asset as string) ?? null,

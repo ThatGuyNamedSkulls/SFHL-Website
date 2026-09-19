@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { InventoryItem, CosmeticType } from "@/types";
-import { CreditCard, Type, Award, Check, CircleUserRound, UserRound } from "lucide-react";
+import { CreditCard, Type, Award, Check, CircleUserRound, UserRound, Palette } from "lucide-react";
+import { BackgroundSwatch } from "@/components/profile-background";
 
 const TABS: { id: CosmeticType; label: string; icon: typeof Award }[] = [
+  { id: "background", label: "Backgrounds", icon: Palette },
   { id: "card", label: "Cards", icon: CreditCard },
   { id: "frame", label: "Frames", icon: CircleUserRound },
   { id: "title", label: "Titles", icon: Type },
@@ -21,6 +23,7 @@ const RARITY_COLORS: Record<string, string> = {
 };
 
 const EMPTY_HINTS: Record<CosmeticType, string> = {
+  background: "Default page backgrounds — equip one to theme your public profile.",
   card: "No profile cards yet — cards are granted by admins and events.",
   frame: "No avatar frames yet — frames are granted by admins and events.",
   title: "No titles yet — titles are granted by admins and events.",
@@ -188,7 +191,12 @@ export function InventoryPanel() {
               }`}
             >
               {item.type === "card" && <CardPreview item={item} />}
-              <div className={`flex items-center gap-3 ${item.type === "card" ? "mt-3" : ""}`}>
+              {item.type === "background" && (
+                <div className="w-full aspect-[3/1] rounded-lg overflow-hidden border border-hl-border">
+                  <BackgroundSwatch color={item.asset} />
+                </div>
+              )}
+              <div className={`flex items-center gap-3 ${item.type === "card" || item.type === "background" ? "mt-3" : ""}`}>
                 {item.type === "badge" && <BadgeIcon item={item} />}
                 {item.type === "frame" && <FramePreview item={item} />}
                 {item.type === "title" && (

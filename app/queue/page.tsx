@@ -217,7 +217,7 @@ export default function QueuePage() {
 
   const inQueue =
     !!queuedSpot ||
-    !!(session && queue.some((q) => q.discord_user_id === session.discordId));
+    !!(session && queue.some((q) => String(q.discord_user_id) === String(session.discordId)));
   const selectionLocked = inQueue || actionLoading;
   const visibleQueue = queue.filter((e) => parseQueueMode(e.queue_mode) === matchType);
   const canQueue =

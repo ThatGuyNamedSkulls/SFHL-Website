@@ -16,6 +16,7 @@ import { RecentPerformance } from "@/components/recent-performance";
 import { MapStatsTable } from "@/components/map-stats-table";
 import { MetricChart } from "@/components/metric-chart";
 import { ProfileInventory } from "@/components/profile-inventory";
+import { ProfilePageBackdrop } from "@/components/profile-background";
 import { EmptyState } from "@/components/empty-state";
 import { Flag } from "@/components/flag";
 import { flagPath, countryName as countryLabel, COUNTRY_CHANGE_EVENT } from "@/lib/countries";
@@ -218,6 +219,7 @@ function ProfileContent() {
   const [myName, setMyName] = useState<string | null>(null);
   const [friendState, setFriendState] = useState<"none" | "pending" | "friends">("none");
   const [friendMsg, setFriendMsg] = useState<string | null>(null);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   // Who am I, and is the profile I'm viewing already a friend / pending?
   useEffect(() => {
@@ -321,6 +323,7 @@ function ProfileContent() {
         const data = await res.json();
         setPlayer(data);
         setMatches(data.matchHistory || []);
+        setInventory(data.inventory ?? []);
         if (typeof data.username === "string" && data.username !== playerNameParam) {
           router.replace(`/profile?player=${encodeURIComponent(data.username)}`, { scroll: false });
         }
@@ -417,7 +420,10 @@ function ProfileContent() {
   const countryRank = player.rankings?.country ?? null;
   const regionRank = player.rankings?.region ?? null;
   const friends = player.friends ?? [];
-  const inventory = player.inventory ?? [];
+  const bgColor =
+    inventory.find((i) => i.type === "background" && i.equipped)?.asset ??
+    player.cosmetics?.background?.asset ??
+    null;
 
   const statTiles = [
     { label: "K/D/A", value: `${Math.round(s.kills / Math.max(1, s.matchesPlayed))} / ${Math.round(s.deaths / Math.max(1, s.matchesPlayed))} / ${Math.round(s.assists / Math.max(1, s.matchesPlayed))}` },
@@ -448,7 +454,9 @@ function ProfileContent() {
   );
 
   return (
-    <div className="hl-page-wide grid lg:grid-cols-[300px_1fr] gap-6 items-start">
+    <div className="relative min-h-full">
+      <ProfilePageBackdrop color={bgColor} />
+      <div className="hl-page-wide grid lg:grid-cols-[300px_1fr] gap-6 items-start relative">
       {/* ================= LEFT SIDEBAR ================= */}
       <div className="space-y-5">
         <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] overflow-hidden">
@@ -937,7 +945,12 @@ function ProfileContent() {
 
         {/* ================= INVENTORY ================= */}
         {mainTab === "inventory" && (
-          <ProfileInventory key={player.username} items={inventory} isOwn={isOwn} />
+          <ProfileInventory
+            key={player.username}
+            items={inventory}
+            isOwn={isOwn}
+            onChange={setInventory}
+          />
         )}
 
         {mainTab === "guestbook" && (
@@ -951,6 +964,7 @@ function ProfileContent() {
         {mainTab === "teams" && (
           <EmptyState icon={UsersRound} title="Teams" hint="Coming soon." />
         )}
+      </div>
       </div>
     </div>
   );

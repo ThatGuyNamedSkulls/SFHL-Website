@@ -245,7 +245,7 @@ export default function SettingsPage() {
             <Sparkles className="w-4 h-4 text-hl-gold" /> Inventory &amp; Customization
           </h2>
           <p className="text-xs text-hl-muted mb-4">
-            Equip a profile card, title and up to 5 badges — they show on your public profile.
+            Equip a page background, profile card, title and up to 5 badges — they show on your public profile.
           </p>
           <InventoryPanel />
         </Card>

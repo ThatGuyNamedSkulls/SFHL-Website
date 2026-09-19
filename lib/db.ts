@@ -833,12 +833,17 @@ export async function joinWebQueue(
 }
 
 export async function leaveWebQueue(discordUserId: string): Promise<void> {
-  try {
-    await client.execute({
-      sql: "DELETE FROM web_queue WHERE CAST(discord_user_id AS TEXT) = CAST(? AS TEXT)",
-      args: [String(discordUserId)],
-    });
-  } catch {}
+  await leaveWebQueueMany([discordUserId]);
+}
+
+export async function leaveWebQueueMany(discordUserIds: string[]): Promise<void> {
+  const ids = [...new Set(discordUserIds.map((id) => String(id ?? "").trim()).filter(Boolean))];
+  if (!ids.length) return;
+  const placeholders = ids.map(() => "?").join(",");
+  await client.execute({
+    sql: `DELETE FROM web_queue WHERE CAST(discord_user_id AS TEXT) IN (${placeholders})`,
+    args: ids,
+  });
 }
 
 /** Live queue format. */
