@@ -862,6 +862,12 @@ export async function joinWebQueue(
   const args = [String(discordUserId), discordUsername, playerName, region, mode];
   try {
     await client.execute({
+      sql: `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name, region, queue_mode)
+            VALUES (?, ?, ?, ?, ?)`,
+      args,
+    });
+  } catch {
+    await client.execute({
       sql: `INSERT INTO web_queue (discord_user_id, discord_username, player_name, region, queue_mode)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(discord_user_id) DO UPDATE SET
@@ -869,12 +875,6 @@ export async function joinWebQueue(
               player_name = excluded.player_name,
               region = excluded.region,
               queue_mode = excluded.queue_mode`,
-      args,
-    });
-  } catch {
-    await client.execute({
-      sql: `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name, region, queue_mode)
-            VALUES (?, ?, ?, ?, ?)`,
       args,
     });
   }
@@ -885,13 +885,35 @@ export async function leaveWebQueue(discordUserId: string): Promise<void> {
 }
 
 export async function leaveWebQueueMany(discordUserIds: string[]): Promise<void> {
-  const ids = [...new Set(discordUserIds.map((id) => String(id ?? "").trim()).filter(Boolean))];
+  const ids = [
+    ...new Set(
+      discordUserIds.flatMap((raw) => {
+        const s = String(raw ?? "").trim();
+        if (!s) return [];
+        const out = [s];
+        try {
+          out.push(BigInt(s).toString());
+        } catch {
+          /* ignore */
+        }
+        return out;
+      })
+    ),
+  ];
   if (!ids.length) return;
-  const placeholders = ids.map(() => "?").join(",");
-  await client.execute({
-    sql: `DELETE FROM web_queue WHERE CAST(discord_user_id AS TEXT) IN (${placeholders})`,
-    args: ids,
-  });
+  await ensureWebQueueModeColumn();
+  // Per-id equality deletes. `CAST(...) IN (?)` on Turso often matches 0 rows,
+  // so a website leave left the Discord queue untouched.
+  for (const id of ids) {
+    await client.execute({
+      sql: "DELETE FROM web_queue WHERE CAST(discord_user_id AS TEXT) = CAST(? AS TEXT)",
+      args: [id],
+    });
+    await client.execute({
+      sql: "DELETE FROM web_queue WHERE discord_user_id = ?",
+      args: [id],
+    });
+  }
 }
 
 /** Live queue format. */

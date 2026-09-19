@@ -159,7 +159,7 @@ export default function QueuePage() {
             region?: string;
             openModes?: Record<string, string[]>;
             me?: { region?: string; mode?: string } | null;
-          }>(`/api/queue?region=${encodeURIComponent(region)}`, { force: true }),
+          }>(`/api/queue?region=${encodeURIComponent(region)}&_=${Date.now()}`, { force: true }),
           apiGetJson<{ parties?: PartyLite[] }>("/api/parties?mine=1"),
           apiGetJson<{ count?: number }>("/api/subs"),
         ]);
@@ -253,7 +253,7 @@ export default function QueuePage() {
         body: JSON.stringify({ region, mode: matchType }),
       });
       const data = await res.json();
-      invalidateClientApi(`/api/queue?region=${encodeURIComponent(region)}`);
+      invalidateClientApi();
       if (!res.ok) setError(data.error || "Failed to join queue");
       else {
         setQueue(data.queue);
@@ -274,7 +274,7 @@ export default function QueuePage() {
     try {
       const res = await fetch(`/api/queue?region=${encodeURIComponent(region)}`, { method: "DELETE" });
       const data = await res.json();
-      invalidateClientApi(`/api/queue?region=${encodeURIComponent(region)}`);
+      invalidateClientApi();
       if (!res.ok) setError(data.error || "Failed to leave queue");
       else {
         setQueue(data.queue);

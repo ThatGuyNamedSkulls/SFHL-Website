@@ -24,6 +24,7 @@ import {
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 function queueJson(data: unknown, init?: { status?: number }) {
   const res = NextResponse.json(data, init);
@@ -284,7 +285,10 @@ export async function DELETE(request: Request) {
     // Leaving as part of a party pulls the whole party out of the queue, the
     // same way joining put them all in.
     const party = await getPartyForMember(session.discordId);
-    const ids = party ? party.members.map((m) => m.discordId) : [session.discordId];
+    const ids = [
+      session.discordId,
+      ...(party?.members?.map((m) => m.discordId) ?? []),
+    ];
     await leaveWebQueueMany(ids);
 
     const { searchParams } = new URL(request.url);
