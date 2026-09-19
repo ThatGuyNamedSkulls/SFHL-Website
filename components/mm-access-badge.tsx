@@ -10,7 +10,7 @@ export function MmAccessBadge({ className = "" }: { className?: string }) {
       title="Matchmaking access"
       width={16}
       height={19}
-      className={`inline-block shrink-0 align-middle ${className}`}
+      className={`inline-block shrink-0 align-middle object-contain ${className}`}
     />
   );
 }
