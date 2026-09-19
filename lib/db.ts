@@ -825,6 +825,9 @@ export function ensureWebQueueModeColumn(): Promise<void> {
       `);
       await client.execute("ALTER TABLE web_queue ADD COLUMN region TEXT").catch(() => {});
       await client.execute("ALTER TABLE web_queue ADD COLUMN queue_mode TEXT").catch(() => {});
+      await client.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_web_queue_discord_user_id ON web_queue (discord_user_id)"
+      ).catch(() => {});
     })();
   }
   return webQueueModeReady;
@@ -835,14 +838,15 @@ export async function getWebQueue(region?: string): Promise<WebQueueEntry[]> {
     await ensureWebQueueModeColumn();
     if (region) {
       const rs = await client.execute({
-        sql: "SELECT * FROM web_queue WHERE region = ? ORDER BY joined_at ASC",
+        sql: "SELECT * FROM web_queue WHERE UPPER(TRIM(COALESCE(region, ''))) = UPPER(TRIM(?)) ORDER BY joined_at ASC",
         args: [region],
       });
       return rs.rows as unknown as WebQueueEntry[];
     }
     const rs = await client.execute("SELECT * FROM web_queue ORDER BY joined_at ASC");
     return rs.rows as unknown as WebQueueEntry[];
-  } catch {
+  } catch (error) {
+    console.error("getWebQueue failed:", error);
     return [];
   }
 }
@@ -855,11 +859,25 @@ export async function joinWebQueue(
   mode: QueueModeId = "standard"
 ): Promise<void> {
   await ensureWebQueueModeColumn();
-  await client.execute({
-    sql: `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name, region, queue_mode)
-          VALUES (?, ?, ?, ?, ?)`,
-    args: [discordUserId, discordUsername, playerName, region, mode]
-  });
+  const args = [String(discordUserId), discordUsername, playerName, region, mode];
+  try {
+    await client.execute({
+      sql: `INSERT INTO web_queue (discord_user_id, discord_username, player_name, region, queue_mode)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(discord_user_id) DO UPDATE SET
+              discord_username = excluded.discord_username,
+              player_name = excluded.player_name,
+              region = excluded.region,
+              queue_mode = excluded.queue_mode`,
+      args,
+    });
+  } catch {
+    await client.execute({
+      sql: `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name, region, queue_mode)
+            VALUES (?, ?, ?, ?, ?)`,
+      args,
+    });
+  }
 }
 
 export async function leaveWebQueue(discordUserId: string): Promise<void> {

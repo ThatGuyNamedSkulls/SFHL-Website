@@ -27,7 +27,7 @@ import { QUEUE_REGIONS, regionQueueLabel, isQueueRegion } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 import { QUEUE_MODE_SUPER, SUPER_PARTY_MAX, SUPER_ELO_RANGE, parseQueueMode } from "@/lib/queue-modes";
 import { useSession } from "@/components/session-provider";
-import { apiGetJson } from "@/lib/client-api";
+import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
 
 interface WebQueueEntry {
   id: number;
@@ -159,7 +159,7 @@ export default function QueuePage() {
             region?: string;
             openModes?: Record<string, string[]>;
             me?: { region?: string; mode?: string } | null;
-          }>(`/api/queue?region=${encodeURIComponent(region)}`),
+          }>(`/api/queue?region=${encodeURIComponent(region)}`, { force: true }),
           apiGetJson<{ parties?: PartyLite[] }>("/api/parties?mine=1"),
           apiGetJson<{ count?: number }>("/api/subs"),
         ]);
@@ -253,6 +253,7 @@ export default function QueuePage() {
         body: JSON.stringify({ region, mode: matchType }),
       });
       const data = await res.json();
+      invalidateClientApi(`/api/queue?region=${encodeURIComponent(region)}`);
       if (!res.ok) setError(data.error || "Failed to join queue");
       else {
         setQueue(data.queue);
@@ -273,6 +274,7 @@ export default function QueuePage() {
     try {
       const res = await fetch(`/api/queue?region=${encodeURIComponent(region)}`, { method: "DELETE" });
       const data = await res.json();
+      invalidateClientApi(`/api/queue?region=${encodeURIComponent(region)}`);
       if (!res.ok) setError(data.error || "Failed to leave queue");
       else {
         setQueue(data.queue);
@@ -671,14 +673,14 @@ export default function QueuePage() {
       <Card className="bg-hl-panel border-hl-border overflow-hidden">
         <div className="px-5 py-4 border-b border-hl-border flex items-center justify-between bg-hl-panel-light/30">
           <h3 className="font-bold text-white header-caps flex items-center gap-2">
-            <Users className="w-4 h-4 text-hl-gold" /> Players from Web ({visibleQueue.length})
+            <Users className="w-4 h-4 text-hl-gold" /> Players queuing ({visibleQueue.length})
           </h3>
-          <Badge className="bg-hl-gold/10 text-hl-gold border-hl-gold/30">Syncs to Discord</Badge>
+          <Badge className="bg-hl-gold/10 text-hl-gold border-hl-gold/30">Live</Badge>
         </div>
         <div className="divide-y divide-hl-border">
           {visibleQueue.length === 0 ? (
             <div className="px-5 py-8 text-center text-hl-muted text-sm">
-              No one has joined from the web yet. Check the Discord bot for full queue status.
+              No one is queuing yet.
             </div>
           ) : (
             visibleQueue.map((entry, idx) => (
@@ -703,7 +705,7 @@ export default function QueuePage() {
 
       {/* Footer stat strip */}
       <div className="mt-6 border-t border-hl-border pt-4 text-center text-xs text-hl-muted">
-        Players queueing: <b className="text-white stat-number">{queue.length}</b>
+        Players queuing: <b className="text-white stat-number">{queue.length}</b>
       </div>
     </div>
   );

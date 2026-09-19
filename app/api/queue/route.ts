@@ -22,6 +22,15 @@ import {
   parseQueueMode,
 } from "@/lib/queue-modes";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+function queueJson(data: unknown, init?: { status?: number }) {
+  const res = NextResponse.json(data, init);
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  return res;
+}
+
 /** GET — returns current web queue state. */
 export async function GET(request: Request) {
   try {
@@ -35,7 +44,7 @@ export async function GET(request: Request) {
       getQueueGate(),
       session ? getWebQueueSpot(session.discordId) : Promise.resolve(null),
     ]);
-    return NextResponse.json({
+    return queueJson({
       queue,
       count: queue.length,
       teamSize,
@@ -47,7 +56,7 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Error fetching queue:", error);
-    return NextResponse.json({
+    return queueJson({
       queue: [],
       count: 0,
       teamSize: MATCH_TEAM_SIZE,
