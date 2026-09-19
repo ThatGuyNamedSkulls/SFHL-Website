@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, mapRank } from "@/lib/db";
+import { getSession, getGuildPresenceCached } from "@/lib/auth";
+import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, mapRank, setPlayerMmAccess } from "@/lib/db";
 import { buildEloTimeline } from "@/lib/elo-timeline";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
@@ -49,6 +49,22 @@ export async function GET(
     }
 
     const playerName = player.name;
+    const storedMmAccess = Number(player.mm_access) === 1;
+    let mmAccess = storedMmAccess;
+    const discordId = player.discord_id != null ? String(player.discord_id) : "";
+    if (discordId) {
+      try {
+        const live = await getGuildPresenceCached(discordId);
+        if (live) {
+          mmAccess = live.mmAccess;
+          if (mmAccess !== storedMmAccess) {
+            setPlayerMmAccess(discordId, mmAccess).catch(() => {});
+          }
+        }
+      } catch {
+        /* keep the stored flag */
+      }
+    }
 
     // These are all independent of one another — fetch them concurrently
     // instead of one sequential await per data source.
@@ -127,6 +143,7 @@ export async function GET(
       country: isValidCountry(player.country) ? player.country!.toLowerCase() : null,
       countryName: isValidCountry(player.country) ? countryName(player.country) : null,
       countryFlag: isValidCountry(player.country) ? flagPath(player.country) : null,
+      mmAccess,
       stats: {
         wins: player.matches_won,
         losses: player.matches_played - player.matches_won,

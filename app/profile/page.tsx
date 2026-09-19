@@ -17,6 +17,7 @@ import { MapStatsTable } from "@/components/map-stats-table";
 import { MetricChart } from "@/components/metric-chart";
 import { ProfileInventory } from "@/components/profile-inventory";
 import { ProfilePageBackdrop } from "@/components/profile-background";
+import { MmAccessBadge } from "@/components/mm-access-badge";
 import { EmptyState } from "@/components/empty-state";
 import { Flag } from "@/components/flag";
 import { flagPath, countryName as countryLabel, COUNTRY_CHANGE_EVENT } from "@/lib/countries";
@@ -485,8 +486,9 @@ function ProfileContent() {
                   </AvatarFallback>
                 </Avatar>
               </AvatarFrame>
-              <h1 className="mt-5 text-xl font-bold text-white tracking-tight">
-                {formatUsername(player.username, player.discordUsername)}
+              <h1 className="mt-5 text-xl font-bold text-white tracking-tight inline-flex items-center justify-center gap-1.5 max-w-full">
+                <span className="truncate">{formatUsername(player.username, player.discordUsername)}</span>
+                {player.mmAccess ? <MmAccessBadge /> : null}
               </h1>
               {player.cosmetics?.title && (
                 <div className="text-xs font-semibold italic text-[#ff5500] mt-1">{player.cosmetics.title}</div>

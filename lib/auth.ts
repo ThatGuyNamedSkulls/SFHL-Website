@@ -104,6 +104,8 @@ export type GuildPresence = {
   inGuild: boolean;
   /** True when the member has MM access or the Bloxlink verified role. */
   verified: boolean;
+  /** True when they have the Get Matchmaking Access role. */
+  mmAccess: boolean;
   /** Guild nickname, else Discord display name. */
   displayName?: string | null;
 };
@@ -120,7 +122,7 @@ export async function getGuildPresence(userId: string): Promise<GuildPresence | 
       `https://discord.com/api/v10/guilds/${DISCORD_CONFIG.guildId}/members/${userId}`,
       { headers: { Authorization: `Bot ${token}` }, cache: "no-store" }
     );
-    if (res.status === 404) return { inGuild: false, verified: false, displayName: null };
+    if (res.status === 404) return { inGuild: false, verified: false, mmAccess: false, displayName: null };
     if (!res.ok) return null;
     const member = (await res.json()) as {
       roles?: string[];
@@ -133,6 +135,7 @@ export async function getGuildPresence(userId: string): Promise<GuildPresence | 
     return {
       inGuild: true,
       verified: LEAGUE_ACCESS_ROLE_IDS.some((id) => roles.includes(id)),
+      mmAccess: roles.includes(MM_ACCESS_ROLE_ID),
       displayName,
     };
   } catch {
@@ -232,10 +235,14 @@ export async function getDiscordInviteUrl(): Promise<string | null> {
 export async function withLiveGuildFlag(session: UserSession): Promise<UserSession> {
   const live = await getGuildPresenceCached(session.discordId);
   if (live === null) return session;
-  if (live.inGuild === session.inGuild && session.verified === live.verified) {
+  if (
+    live.inGuild === session.inGuild &&
+    session.verified === live.verified &&
+    session.mmAccess === live.mmAccess
+  ) {
     return session;
   }
-  return { ...session, inGuild: live.inGuild, verified: live.verified };
+  return { ...session, inGuild: live.inGuild, verified: live.verified, mmAccess: live.mmAccess };
 }
 
 /** Per-instance cache of Discord avatar URLs (the queue page polls every 5s;

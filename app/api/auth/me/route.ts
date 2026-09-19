@@ -6,7 +6,7 @@ import {
   withLiveGuildFlag,
   getDiscordInviteUrl,
 } from "@/lib/auth";
-import { getPlayerByDiscordId, getPlayerCoins } from "@/lib/db";
+import { getPlayerByDiscordId, getPlayerCoins, setPlayerMmAccess } from "@/lib/db";
 import { UserSession } from "@/types";
 
 /** Session cookies can outlive a Discord nick change. Re-read the linked
@@ -46,6 +46,7 @@ function sessionNeedsCookieWrite(before: UserSession, after: UserSession, exp: n
   if ((before.discordUsername ?? null) !== (after.discordUsername ?? null)) return true;
   if (before.inGuild !== after.inGuild) return true;
   if (before.verified !== after.verified) return true;
+  if (before.mmAccess !== after.mmAccess) return true;
   if (before.avatar !== after.avatar) return true;
   // Sliding 7-day session: re-issue when less than 6 days remain so daily
   // use never expires, without signing a new JWT on every chrome poll.
@@ -70,6 +71,9 @@ export async function GET() {
   }
 
   const fresh = await withLivePlayerIdentity(await withLiveGuildFlag(session));
+  if (fresh.mmAccess !== session.mmAccess) {
+    setPlayerMmAccess(fresh.discordId, !!fresh.mmAccess).catch(() => {});
+  }
   const coins = fresh.playerName
     ? await getPlayerCoins(fresh.playerName).catch(() => 0)
     : 0;

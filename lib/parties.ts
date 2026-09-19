@@ -49,6 +49,8 @@ export interface PartyMember {
   verified?: boolean | null;
   /** Whether this member currently meets queue requirements (read time). */
   canQueue?: boolean;
+  /** Get Matchmaking Access Discord role (read time). */
+  mmAccess?: boolean | null;
 }
 
 export interface Party {

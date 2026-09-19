@@ -89,16 +89,17 @@ export async function withFreshCosmetics<T extends Party>(parties: T[]): Promise
  */
 export async function withMemberStatus<T extends Party>(parties: T[]): Promise<T[]> {
   const ids = Array.from(new Set(parties.flatMap((p) => p.members.map((m) => m.discordId))));
-  const status = new Map<string, { inGuild: boolean; verified: boolean } | null>();
+  const status = new Map<string, { inGuild: boolean; verified: boolean; mmAccess: boolean } | null>();
   await Promise.all(ids.map(async (id) => status.set(id, await getGuildPresenceCached(id))));
   return parties.map((p) => ({
     ...p,
     members: p.members.map((m) => {
       const presence = status.get(m.discordId) ?? null;
       const verified = presence === null ? null : presence.inGuild && presence.verified;
+      const mmAccess = presence === null ? null : presence.mmAccess;
       const canQueue =
         (presence === null || (presence.inGuild && presence.verified)) && !!m.playerName;
-      return { ...m, verified, canQueue };
+      return { ...m, verified, mmAccess, canQueue };
     }),
   }));
 }

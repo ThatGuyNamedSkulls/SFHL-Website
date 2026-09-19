@@ -85,6 +85,8 @@ export interface Player {
   placementGamesPlayed?: number;
   placementGamesTotal?: number;
   placementMatches?: Match[];
+  /** True when this player has the Get Matchmaking Access Discord role. */
+  mmAccess?: boolean;
 }
 
 /** Cosmetic item types (profile customization inventory). */
@@ -320,6 +322,8 @@ export interface PartyMemberView {
   verified?: boolean | null;
   /** Whether this member currently meets the queue requirements. */
   canQueue?: boolean;
+  /** Get Matchmaking Access Discord role. */
+  mmAccess?: boolean | null;
 }
 
 export interface PartyView {
@@ -399,4 +403,6 @@ export interface UserSession {
   inGuild: boolean;
   /** Whether they have the Bloxlink verified role in the guild. */
   verified?: boolean;
+  /** Whether they have the Get Matchmaking Access Discord role. */
+  mmAccess?: boolean;
 }

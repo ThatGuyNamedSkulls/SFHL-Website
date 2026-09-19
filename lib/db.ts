@@ -121,6 +121,8 @@ export interface DbPlayer {
    *  local to its host and 404 on Vercel, which is why avatars degraded to
    *  initials there. Null until the bot's sync has run. */
   discord_avatar: string | null;
+  /** 1 when the member has the Get Matchmaking Access Discord role. */
+  mm_access?: number;
 }
 
 /** Lazily add the Discord-identity columns if the bot hasn't migrated them yet
@@ -134,6 +136,7 @@ export function ensurePlayerDiscordColumns(): Promise<void> {
       await client.execute("ALTER TABLE players ADD COLUMN discord_username TEXT DEFAULT NULL").catch(() => {});
       await client.execute("ALTER TABLE players ADD COLUMN discord_avatar TEXT DEFAULT NULL").catch(() => {});
       await client.execute("ALTER TABLE players ADD COLUMN country TEXT DEFAULT NULL").catch(() => {});
+      await client.execute("ALTER TABLE players ADD COLUMN mm_access INTEGER DEFAULT 0").catch(() => {});
     })();
   }
   return discordColsReady;
@@ -144,7 +147,7 @@ const PLAYER_SELECT = `SELECT id, name, elo, rank, country, total_kills, total_d
             avg_hs_percent, matches_played, matches_won, peak_elo,
             total_play_time, roblox_avatar_image, placement_done,
             placement_games_played, CAST(discord_id AS TEXT) AS discord_id,
-            discord_username, discord_avatar
+            discord_username, discord_avatar, COALESCE(mm_access, 0) AS mm_access
      FROM players`;
 
 function playerFromRows(rs: ResultSet): DbPlayer | undefined {
@@ -291,6 +294,15 @@ export async function getPlayerCoins(name: string): Promise<number> {
   await ensurePlayerCoinsColumn();
   const rs = await client.execute({ sql: "SELECT coins FROM players WHERE name = ?", args: [name] });
   return Number(rs.rows[0]?.coins ?? 0);
+}
+
+/** Persist the Get Matchmaking Access role flag (best-effort). */
+export async function setPlayerMmAccess(discordId: string, has: boolean): Promise<void> {
+  await ensurePlayerDiscordColumns();
+  await client.execute({
+    sql: "UPDATE players SET mm_access = ? WHERE CAST(discord_id AS TEXT) = ?",
+    args: [has ? 1 : 0, String(discordId)],
+  });
 }
 
 /** Leaderboard positions by elo: overall, within the player's country, and

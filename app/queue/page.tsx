@@ -49,6 +49,7 @@ interface PlayerInfo {
   frame: string | null;
   placementDone: boolean;
   placementGamesPlayed: number;
+  mmAccess: boolean;
 }
 
 // Minimal shape of the party API response (avoids importing lib/parties, which
@@ -65,6 +66,7 @@ interface PartyMemberLite {
   frame?: string | null;
   verified?: boolean | null;
   canQueue?: boolean;
+  mmAccess?: boolean | null;
 }
 interface PartyLite {
   id: string;
@@ -214,6 +216,7 @@ export default function QueuePage() {
           frame: d.cosmetics?.frame?.asset ?? null,
           placementDone: !!d.placementDone,
           placementGamesPlayed: d.placementGamesPlayed ?? 0,
+          mmAccess: !!d.mmAccess,
         }))
         .catch(() => { });
     }
@@ -297,6 +300,7 @@ export default function QueuePage() {
       frame: player?.frame ?? null,
       self: true,
       verified: session.verified !== false && session.inGuild,
+      mmAccess: !!(player?.mmAccess || session.mmAccess),
       canQueue,
     }
     : null;
@@ -318,6 +322,7 @@ export default function QueuePage() {
         frame: (isMe ? player?.frame ?? m.frame : m.frame) ?? null,
         self: isMe,
         verified: isMe ? session.verified !== false && session.inGuild : m.verified ?? null,
+        mmAccess: isMe ? !!(player?.mmAccess || session.mmAccess) : m.mmAccess ?? null,
         canQueue: isMe ? canQueue : m.canQueue,
       };
     });

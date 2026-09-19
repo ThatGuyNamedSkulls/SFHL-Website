@@ -8,7 +8,7 @@ import {
   SESSION_COOKIE,
   OAUTH_STATE_COOKIE,
 } from "@/lib/auth";
-import { getPlayerByDiscordId, setPlayerDiscordIdentity } from "@/lib/db";
+import { getPlayerByDiscordId, setPlayerDiscordIdentity, setPlayerMmAccess } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
 
 export async function GET(request: Request) {
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
       const listed =
         Array.isArray(guildsData) &&
         guildsData.some((g: { id: string }) => g.id === DISCORD_CONFIG.guildId);
-      presence = { inGuild: listed, verified: false, displayName: null };
+      presence = { inGuild: listed, verified: false, mmAccess: false, displayName: null };
     }
     if (!presence.inGuild) {
       const joined = await addUserToGuild(userData.id, accessToken);
@@ -84,12 +84,14 @@ export async function GET(request: Request) {
         presence = (await getGuildPresence(userData.id)) ?? {
           inGuild: true,
           verified: false,
+          mmAccess: false,
           displayName: null,
         };
       }
     }
     const inGuild = presence.inGuild;
     const verified = presence.verified;
+    const mmAccess = presence.mmAccess;
 
     // Match the Discord account to a player the bot enrolled after Bloxlink
     // verification. Login never creates a players row.
@@ -116,6 +118,7 @@ export async function GET(request: Request) {
       playerName,
       inGuild,
       verified,
+      mmAccess,
     };
 
     // Remember this player's Discord id so the bot can DM them by id later.
@@ -132,6 +135,14 @@ export async function GET(request: Request) {
         await setPlayerDiscordIdentity(playerName, userData.id, userData.username, discordAvatar);
       } catch (e) {
         console.error("Failed to record Discord identity:", e);
+      }
+    }
+
+    if (playerName) {
+      try {
+        await setPlayerMmAccess(userData.id, mmAccess);
+      } catch (e) {
+        console.error("Failed to record MM access flag:", e);
       }
     }
 

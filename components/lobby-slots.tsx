@@ -9,6 +9,7 @@ import { flagPath, countryName } from "@/lib/countries";
 import { RankTierLetter } from "@/types";
 import { Plus, Search, Crown, BadgeCheck, CircleAlert } from "lucide-react";
 import { formatUsername } from "@/lib/format";
+import { MmAccessBadge } from "@/components/mm-access-badge";
 
 export interface LobbyMember {
   username: string;
@@ -25,6 +26,8 @@ export interface LobbyMember {
   self?: boolean;
   /** Live guild-membership check: green badge (true), red badge (false). */
   verified?: boolean | null;
+  /** Get Matchmaking Access Discord role. */
+  mmAccess?: boolean | null;
   /** False → this member blocks the queue; shows the warning on their slot. */
   canQueue?: boolean;
 }
@@ -123,11 +126,13 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
               </div>
               <div className="relative z-10 flex items-center gap-1.5 max-w-full">
                 <span className="text-sm font-bold text-white truncate">{formatUsername(member.username, member.discordUsername)}</span>
-                {member.verified !== null && member.verified !== undefined && (
+                {member.mmAccess ? (
+                  <MmAccessBadge />
+                ) : member.verified != null ? (
                   <span title={member.verified ? "Verified — in the Discord server" : "Not verified — not in the Discord server"}>
                     <BadgeCheck className={`w-3.5 h-3.5 shrink-0 ${member.verified ? "text-hl-green" : "text-hl-red"}`} />
                   </span>
-                )}
+                ) : null}
                 {member.country && <Flag src={flagPath(member.country)} name={countryName(member.country)} className="w-4 h-3 shrink-0" />}
               </div>
               {/* Skill-level chip under the name, like FACEIT */}
