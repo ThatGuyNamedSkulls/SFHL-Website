@@ -189,6 +189,26 @@ export function MyPartyRail() {
     }
   };
 
+  const makeCaptain = async (discordId: string) => {
+    if (!party) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/parties/${party.id}/captain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ discordId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) flash(data.error || "Failed to transfer captain");
+      else flash("Captain transferred.");
+      invalidateClientApi("/api/parties?mine=1");
+      invalidateClientApi("/api/parties");
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const invite = async (toName: string) => {
     if (!party) {
       flash("Create a party first.");
@@ -360,14 +380,24 @@ export function MyPartyRail() {
                           </button>
                         )}
                         {isLeader && !self && (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => kick(m.discordId)}
-                            className="text-[11px] text-hl-red hover:underline"
-                          >
-                            Kick
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => makeCaptain(m.discordId)}
+                              className="text-[11px] text-hl-gold hover:underline"
+                            >
+                              Make captain
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => kick(m.discordId)}
+                              className="text-[11px] text-hl-red hover:underline"
+                            >
+                              Kick
+                            </button>
+                          </div>
                         )}
                       </div>
                       <RankBadge

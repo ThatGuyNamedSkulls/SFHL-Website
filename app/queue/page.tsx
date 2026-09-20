@@ -119,6 +119,11 @@ const TIER_LADDER: RankTierLetter[] = ["D", "C", "B", "A1", "A2", "A3", "S1", "S
 /** Placement games required before a rank is assigned (matches the bot). */
 const PLACEMENT_GAMES = 3;
 
+function isUnrankedRank(rank: string | undefined | null): boolean {
+  const r = (rank || "").toUpperCase();
+  return !r || r === "UNRANKED" || r.includes("UNRANKED") || r.includes("[?]");
+}
+
 export default function QueuePage() {
   const { session, discordInvite: sessionInvite } = useSession();
   const [discordInvite, setDiscordInvite] = useState<string | null>(null);
@@ -334,22 +339,33 @@ export default function QueuePage() {
 
   // One ineligible party member blocks the whole party from queueing.
   const partyBlocked = lobbyMembers.some((m) => m.canQueue === false);
+  const selfPlacing = !!player && !player.placementDone;
+  const partyStillPlacing = lobbyMembers.some((m) =>
+    m.self ? selfPlacing : isUnrankedRank(m.rank)
+  );
+  const superPlacementBlocked = selfPlacing || partyStillPlacing;
 
   const modeLabel = `${teamSize}v${teamSize}`;
   const regionOk = openRegions.includes(region);
   const modesForRegion = openModes[region] ?? (queueOpen && regionOk ? ["standard", "super"] : []);
   const modeOk = modesForRegion.includes(matchType);
   const superPartyTooBig = matchType === QUEUE_MODE_SUPER && lobbyMembers.length > SUPER_PARTY_MAX;
+  const superBlockedHere = matchType === QUEUE_MODE_SUPER && superPlacementBlocked;
+  const isPartyCaptain = !party || !session || party.leaderId === session.discordId;
   const findDisabled =
-    actionLoading || loading || ((!canQueue || partyBlocked || !regionOk || !modeOk || superPartyTooBig) && !inQueue);
+    actionLoading || loading || ((!canQueue || partyBlocked || !regionOk || !modeOk || superPartyTooBig || superBlockedHere || !isPartyCaptain) && !inQueue);
   const findHint = !session
     ? null
     : !canQueue
       ? null
       : partyBlocked
         ? null
+        : !isPartyCaptain
+          ? "Only the party captain can start the queue."
         : superPartyTooBig
           ? `Super Match only allows solo, duo, or trio. Leave extra party members first.`
+          : superBlockedHere
+            ? "Super Match is for ranked players. Everyone in the party must finish placements first."
           : !queueOpen
           ? "No Discord queue is open. Match Staff need to run /queue with a region first."
           : !regionOk
@@ -591,18 +607,20 @@ export default function QueuePage() {
           {MATCH_TYPES.map((mt) => {
             const active = matchType === mt.id;
             const TypeIcon = mt.icon;
+            const superLocked = mt.id === QUEUE_MODE_SUPER && superPlacementBlocked;
+            const typeDisabled = (selectionLocked && mt.id !== matchType) || superLocked;
             return (
               <button
                 key={mt.id}
                 type="button"
-                disabled={selectionLocked && mt.id !== matchType}
+                disabled={typeDisabled}
                 onClick={() => {
-                  if (selectionLocked) return;
+                  if (typeDisabled) return;
                   setMatchType(mt.id);
                 }}
                 className={`relative w-full text-left p-4 rounded-xl border overflow-hidden bg-hl-panel ${
                   active ? "border-white/60" : "border-hl-border hover:border-hl-gold/40"
-                } ${selectionLocked && mt.id !== matchType ? "opacity-40 cursor-not-allowed hover:border-hl-border" : "transition-colors"}`}
+                } ${typeDisabled ? "opacity-40 cursor-not-allowed hover:border-hl-border" : "transition-colors"}`}
               >
                 {mt.green && (
                   <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-hl-green/15 to-transparent pointer-events-none" />

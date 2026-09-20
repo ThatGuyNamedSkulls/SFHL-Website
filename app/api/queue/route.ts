@@ -160,10 +160,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // If the user is in a party, queue the whole party together — otherwise
-    // only the person who clicked would join. Matches the Discord behaviour
-    // where any party member joining queues everyone.
+    // If the user is in a party, queue the whole party together — only the
+    // captain can start that. Matches Discord: `/setcaptain` / party leader.
     const party = await getPartyForMember(session.discordId);
+    if (party && party.leaderId !== session.discordId) {
+      return NextResponse.json(
+        { error: "Only the party captain can start the queue." },
+        { status: 403 }
+      );
+    }
 
     // Block re-queueing while a match is still live: a player already in a
     // match channel (their web_lobby row exists until that channel is deleted)
@@ -215,11 +220,24 @@ export async function POST(request: Request) {
         );
       }
       const elos: number[] = [];
+      const placing: string[] = [];
       for (const m of group) {
         const name = m.playerName;
         if (!name) continue;
         const row = await getPlayer(name);
         elos.push(Number(row?.elo ?? 0));
+        if (!row || Number(row.placement_done) !== 1) {
+          placing.push(m.playerName || m.username);
+        }
+      }
+      if (placing.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Super Match is for ranked players. Everyone in the party must finish placements first.",
+          },
+          { status: 403 }
+        );
       }
       if (!eloRangeOk(elos, SUPER_ELO_RANGE)) {
         return NextResponse.json(

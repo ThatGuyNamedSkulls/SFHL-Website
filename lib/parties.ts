@@ -501,3 +501,43 @@ export async function kickMember(
   await leaveParty(id, targetDiscordId);
   return {};
 }
+
+/** Leader hands captain to another member. Does not dequeue the party. */
+export async function transferLeader(
+  id: string,
+  leaderDiscordId: string,
+  targetDiscordId: string
+): Promise<{ error?: string }> {
+  if (leaderDiscordId === targetDiscordId) {
+    return { error: "They are already the party captain." };
+  }
+  await ensureSchema();
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const rs = await client.execute({
+      sql: "SELECT data, updated_at FROM web_parties WHERE id = ?",
+      args: [id],
+    });
+    if (rs.rows.length === 0) return { error: "Party not found or expired" };
+    let party: Party;
+    try {
+      party = JSON.parse(rs.rows[0].data as string) as Party;
+    } catch {
+      return { error: "Party not found or expired" };
+    }
+    if (party.leaderId !== leaderDiscordId) {
+      return { error: "Only the party captain can transfer captain." };
+    }
+    if (!party.members.some((m) => m.discordId === targetDiscordId)) {
+      return { error: "They are not in this party." };
+    }
+    const prevToken = Number(rs.rows[0].updated_at);
+    party.leaderId = targetDiscordId;
+    party.updatedAt = Math.max(Date.now(), prevToken + 1);
+    const upd = await client.execute({
+      sql: "UPDATE web_parties SET data = ?, updated_at = ? WHERE id = ? AND updated_at = ?",
+      args: [JSON.stringify(party), party.updatedAt, id, prevToken],
+    });
+    if (upd.rowsAffected > 0) return {};
+  }
+  return { error: "Party is busy — please try again." };
+}
