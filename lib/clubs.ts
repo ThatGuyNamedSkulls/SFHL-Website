@@ -17,6 +17,8 @@ import { remember } from "@/lib/server-cache";
 export const OWNER_ROLE_ID = "owner";
 export const MEMBER_ROLE_ID = "member";
 export const MAX_CLUB_ROLES = 7;
+export const MAX_OWNED_CLUBS = 3;
+export const CLUB_CREATE_COST = 1000;
 
 export interface ClubRoleDef {
   id: string;
@@ -288,6 +290,11 @@ export async function clubsForPlayer(playerName: string): Promise<Club[]> {
   );
 }
 
+export async function ownedClubCount(discordId: string): Promise<number> {
+  const clubs = await listClubs();
+  return clubs.filter((club) => club.ownerId === discordId).length;
+}
+
 async function tagTaken(tag: string, exceptId?: string): Promise<boolean> {
   const clubs = await listClubs();
   return clubs.some((club) => club.tag === tag && club.id !== exceptId);
@@ -363,6 +370,9 @@ export async function createClub(input: {
   if (name.length < 3) throw new Error("Club name must be at least 3 characters.");
   const tag = assertClubTag(input.tag?.trim() ? input.tag : fallbackTag(name));
   if (await tagTaken(tag)) throw new Error("That club tag is already in use.");
+  if ((await ownedClubCount(input.owner.discordId)) >= MAX_OWNED_CLUBS) {
+    throw new Error(`You can own at most ${MAX_OWNED_CLUBS} clubs.`);
+  }
   const accentColor = assertAccent(input.accentColor);
   const logoUrl = assertLogoUrl(input.logoUrl);
   const rawRegion = input.region ?? "";
@@ -453,7 +463,7 @@ export async function leaveClub(id: string, discordId: string): Promise<Club | n
   const club = await getClub(id);
   if (!club) throw new Error("Club not found.");
   if (club.ownerId === discordId) {
-    throw new Error("The owner cannot leave. Delete the club instead.");
+    throw new Error("The owner cannot leave. Transfer the club or delete it.");
   }
   club.members = club.members.filter((m) => m.discordId !== discordId);
   return writeClub(club);
@@ -523,6 +533,28 @@ export async function setMemberRole(
     if (next.rank <= actorRank) throw new Error("You can only assign roles below yours.");
   }
   target.role = roleId;
+  return writeClub(club);
+}
+
+export async function transferOwnership(
+  id: string,
+  actorId: string,
+  targetId: string
+): Promise<Club> {
+  if (actorId === targetId) throw new Error("You already own this club.");
+  const club = await getClub(id);
+  if (!club) throw new Error("Club not found.");
+  if (club.ownerId !== actorId) throw new Error("Only the owner can transfer the club.");
+  const target = memberOf(club, targetId);
+  if (!target) throw new Error("They must be a member of the club first.");
+  if ((await ownedClubCount(targetId)) >= MAX_OWNED_CLUBS) {
+    throw new Error(`That player already owns ${MAX_OWNED_CLUBS} clubs.`);
+  }
+  const prev = memberOf(club, actorId);
+  if (prev) prev.role = MEMBER_ROLE_ID;
+  target.role = OWNER_ROLE_ID;
+  club.ownerId = target.discordId;
+  club.ownerName = target.playerName || target.username;
   return writeClub(club);
 }
 

@@ -296,6 +296,30 @@ export async function getPlayerCoins(name: string): Promise<number> {
   return Number(rs.rows[0]?.coins ?? 0);
 }
 
+/** Guarded spend. 0 rows means the balance was too low or the player is missing. */
+export async function spendPlayerCoins(
+  name: string,
+  amount: number
+): Promise<{ ok: boolean; coins: number }> {
+  await ensurePlayerCoinsColumn();
+  if (amount <= 0) return { ok: true, coins: await getPlayerCoins(name) };
+  const deduct = await client.execute({
+    sql: "UPDATE players SET coins = coins - ? WHERE name = ? AND coins >= ?",
+    args: [amount, name, amount],
+  });
+  const coins = await getPlayerCoins(name);
+  return { ok: deduct.rowsAffected > 0, coins };
+}
+
+export async function refundPlayerCoins(name: string, amount: number): Promise<void> {
+  if (amount <= 0) return;
+  await ensurePlayerCoinsColumn();
+  await client.execute({
+    sql: "UPDATE players SET coins = coins + ? WHERE name = ?",
+    args: [amount, name],
+  });
+}
+
 /** Persist the Get Matchmaking Access role flag (best-effort). */
 export async function setPlayerMmAccess(discordId: string, has: boolean): Promise<void> {
   await ensurePlayerDiscordColumns();

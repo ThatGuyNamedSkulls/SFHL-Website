@@ -6,8 +6,9 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Card } from "@/components/ui/card";
 import { ClubColorPicker, ClubMark } from "@/components/club-identity";
-import { Building2, Lock, Search, Users } from "lucide-react";
+import { Building2, Coins, Lock, Search, Users } from "lucide-react";
 import { useSession } from "@/components/session-provider";
+import { invalidateClientApi } from "@/lib/client-api";
 import { DEFAULT_PROFILE_BACKGROUNDS } from "@/lib/profile-backgrounds";
 import { QUEUE_REGIONS, regionMeta } from "@/lib/regions";
 
@@ -28,8 +29,11 @@ interface ClubRow {
 const DEFAULT_ACCENT: string = DEFAULT_PROFILE_BACKGROUNDS[1].color;
 
 export default function ClubsPage() {
-  const { session, loaded } = useSession();
+  const { session, loaded, coins, refresh } = useSession();
   const [clubs, setClubs] = useState<ClubRow[]>([]);
+  const [createCost, setCreateCost] = useState(1000);
+  const [maxOwned, setMaxOwned] = useState(3);
+  const [ownedCount, setOwnedCount] = useState(0);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
@@ -49,6 +53,9 @@ export default function ClubsPage() {
       const res = await fetch("/api/clubs");
       const data = await res.json();
       setClubs(Array.isArray(data.clubs) ? data.clubs : []);
+      if (typeof data.createCost === "number") setCreateCost(data.createCost);
+      if (typeof data.maxOwned === "number") setMaxOwned(data.maxOwned);
+      if (typeof data.ownedCount === "number") setOwnedCount(data.ownedCount);
     } catch {
       setClubs([]);
     }
@@ -89,7 +96,8 @@ export default function ClubsPage() {
       setAccentColor(DEFAULT_ACCENT);
       setIsPrivate(false);
       setCreating(false);
-      await load();
+      invalidateClientApi("/api/auth/me");
+      await Promise.all([load(), refresh({ force: true })]);
     } catch {
       setError("Could not create club");
     } finally {
@@ -130,13 +138,20 @@ export default function ClubsPage() {
             to create or join a club.
           </p>
         ) : !creating ? (
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="find-match-btn h-10 rounded-xl px-5 text-sm font-black header-caps text-hl-base"
-          >
-            Create Club
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              disabled={ownedCount >= maxOwned}
+              className="find-match-btn h-10 rounded-xl px-5 text-sm font-black header-caps text-hl-base disabled:opacity-50"
+            >
+              Create Club
+            </button>
+            <span className="text-xs text-hl-muted flex items-center gap-1">
+              <Coins className="w-3.5 h-3.5 text-hl-gold" />
+              {createCost.toLocaleString()} HL Coins · {ownedCount}/{maxOwned} owned
+            </span>
+          </div>
         ) : (
           <Card className="bg-hl-panel border-hl-border p-4 md:p-5">
             <div className="flex items-center justify-between mb-3">
@@ -213,14 +228,29 @@ export default function ClubsPage() {
                 <ClubColorPicker value={accentColor} onChange={setAccentColor} />
               </div>
               <div className="flex items-center justify-between gap-3">
-                {error ? <p className="text-sm text-hl-red">{error}</p> : <span />}
+                {error ? (
+                  <p className="text-sm text-hl-red">{error}</p>
+                ) : (
+                  <span className="text-xs text-hl-muted flex items-center gap-1">
+                    <Coins className="w-3.5 h-3.5 text-hl-gold" />
+                    Costs {createCost.toLocaleString()} HL Coins
+                    {coins < createCost ? ` · you have ${coins.toLocaleString()}` : ""}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={create}
-                  disabled={busy || name.trim().length < 3 || tag.length < 2}
+                  disabled={
+                    busy ||
+                    name.trim().length < 3 ||
+                    tag.length < 2 ||
+                    coins < createCost ||
+                    ownedCount >= maxOwned ||
+                    !session?.playerName
+                  }
                   className="find-match-btn h-10 rounded-xl px-5 text-sm font-black header-caps text-hl-base disabled:opacity-50"
                 >
-                  {busy ? "Creating…" : "Create"}
+                  {busy ? "Creating…" : `Create · ${createCost.toLocaleString()}`}
                 </button>
               </div>
             </div>

@@ -1,13 +1,13 @@
 "use client";
 
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { RankBadge } from "@/components/rank-badge";
 import { ClubColorPicker, ClubMark, ClubTaggedName } from "@/components/club-identity";
-import { Crown, Lock, Users } from "lucide-react";
+import { Crown, Lock, MessageSquare, Users } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { profileBackgroundImage } from "@/lib/profile-backgrounds";
 import { regionMeta } from "@/lib/regions";
@@ -538,6 +538,24 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                         ) : null}
                       </div>
                     ) : null}
+                    {owner && row.discordId !== me ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Transfer ownership of this club to ${label}? You will become a member.`
+                            )
+                          ) {
+                            act(`/api/clubs/${id}/transfer`, "POST", { discordId: row.discordId });
+                          }
+                        }}
+                        className="text-xs font-bold text-hl-gold hover:underline"
+                      >
+                        Make owner
+                      </button>
+                    ) : null}
                   </div>
                 );
               })}
@@ -586,13 +604,186 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           </Card>
         </div>
-        <Card className="bg-hl-panel border-hl-border p-4">
-          <h2 className="mb-2 text-sm font-bold text-white">Rules</h2>
-          <p className="whitespace-pre-wrap text-sm text-hl-muted">
-            {club.rules || "The owner has not published club rules yet."}
-          </p>
-        </Card>
+        <div className="space-y-5">
+          <Card className="bg-hl-panel border-hl-border p-4">
+            <h2 className="mb-2 text-sm font-bold text-white">Rules</h2>
+            <p className="whitespace-pre-wrap text-sm text-hl-muted">
+              {club.rules || "The owner has not published club rules yet."}
+            </p>
+          </Card>
+          <ClubChat clubId={id} member={member} owner={owner} me={me} />
+        </div>
       </div>
     </div>
+  );
+}
+
+interface ChatRow {
+  id: number;
+  discordId: string;
+  username: string;
+  playerName: string | null;
+  avatar: string | null;
+  message: string;
+  createdAt: number;
+}
+
+function ClubChat({
+  clubId,
+  member,
+  owner,
+  me,
+}: {
+  clubId: string;
+  member: boolean;
+  owner: boolean;
+  me: string | null;
+}) {
+  const [messages, setMessages] = useState<ChatRow[]>([]);
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const load = useCallback(async () => {
+    if (!member) return;
+    try {
+      const res = await fetch(`/api/clubs/${clubId}/chat`);
+      const data = await res.json();
+      if (res.ok) setMessages(Array.isArray(data.messages) ? data.messages : []);
+    } catch {
+      /* ignore */
+    }
+  }, [clubId, member]);
+
+  useEffect(() => {
+    load();
+    if (!member) return;
+    const id = window.setInterval(load, 4000);
+    return () => window.clearInterval(id);
+  }, [load, member]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length]);
+
+  const send = async () => {
+    const message = text.trim();
+    if (!message || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/clubs/${clubId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Could not send");
+        return;
+      }
+      setText("");
+      if (data.message) setMessages((prev) => [...prev, data.message]);
+      else await load();
+    } catch {
+      setError("Could not send");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: number) => {
+    await fetch(`/api/clubs/${clubId}/chat?id=${id}`, { method: "DELETE" });
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  return (
+    <Card className="bg-hl-panel border-hl-border overflow-hidden p-0 flex flex-col min-h-[320px] max-h-[480px]">
+      <div className="border-b border-hl-border px-4 py-3 text-sm font-bold text-white flex items-center gap-2">
+        <MessageSquare className="w-4 h-4 text-hl-gold" />
+        Club chat
+      </div>
+      {!member ? (
+        <div className="flex-1 px-4 py-8 text-sm text-hl-muted text-center">
+          Join the club to read and send messages.
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            {messages.length === 0 ? (
+              <p className="text-sm text-hl-muted">No messages yet.</p>
+            ) : (
+              messages.map((row) => {
+                const label = row.playerName || row.username;
+                return (
+                  <div key={row.id} className="flex items-start gap-2">
+                    <Avatar className="h-7 w-7 border border-hl-border mt-0.5">
+                      {row.avatar ? <AvatarImage src={row.avatar} alt="" /> : null}
+                      <AvatarFallback className="bg-hl-panel-light text-[9px] font-bold text-hl-gold">
+                        {label.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline gap-2">
+                        {row.playerName ? (
+                          <Link
+                            href={`/profile?player=${encodeURIComponent(row.playerName)}`}
+                            className="text-xs font-bold text-white hover:text-hl-gold truncate"
+                          >
+                            {label}
+                          </Link>
+                        ) : (
+                          <span className="text-xs font-bold text-white truncate">{label}</span>
+                        )}
+                        <span className="text-[10px] text-hl-muted shrink-0">
+                          {new Date(row.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        {owner || row.discordId === me ? (
+                          <button
+                            type="button"
+                            onClick={() => remove(row.id)}
+                            className="text-[10px] text-hl-muted hover:text-hl-red"
+                          >
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="text-sm text-[#d0d0d0] whitespace-pre-wrap break-words">{row.message}</p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={bottomRef} />
+          </div>
+          <form
+            className="border-t border-hl-border p-3 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              send();
+            }}
+          >
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value.slice(0, 250))}
+              placeholder="Message the club…"
+              className="h-9 flex-1 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
+            />
+            <button
+              type="submit"
+              disabled={busy || text.trim().length < 1}
+              className="h-9 rounded-lg px-3 text-xs font-black header-caps find-match-btn text-hl-base disabled:opacity-50"
+            >
+              Send
+            </button>
+          </form>
+          {error ? <p className="px-3 pb-3 text-xs text-hl-red">{error}</p> : null}
+        </>
+      )}
+    </Card>
   );
 }
