@@ -32,7 +32,7 @@ export function CountryPrompt() {
   const savedRef = useRef(false);
 
   useEffect(() => {
-    if (!loaded || !session?.playerName || savedRef.current) return;
+    if (!loaded || !session || savedRef.current) return;
     if (typeof window !== "undefined") {
       if (sessionStorage.getItem("hl_country_skipped")) return;
       if (sessionStorage.getItem("hl_country_saved")) return;
@@ -79,9 +79,10 @@ export function CountryPrompt() {
       cancelled = true;
       if (id) clearInterval(id);
     };
-  }, [loaded, session?.playerName]);
+  }, [loaded, session?.discordId]);
 
   const close = (skipped: boolean) => {
+    if (saving) return;
     setOpen(false);
     if (skipped && !savedRef.current) {
       try {
@@ -104,14 +105,15 @@ export function CountryPrompt() {
         body: JSON.stringify({ code }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      const saved = typeof data.country === "string" ? data.country : "";
+      if (!res.ok || !saved) {
         setError(typeof data.error === "string" ? data.error : "Could not save country");
         return;
       }
-      const saved = typeof data.country === "string" ? data.country : code;
       savedRef.current = true;
       try {
         sessionStorage.setItem("hl_country_saved", saved);
+        sessionStorage.removeItem("hl_country_skipped");
       } catch {
         /* ignore */
       }
@@ -128,8 +130,9 @@ export function CountryPrompt() {
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (saving) return;
         if (next) setOpen(true);
-        else close(!savedRef.current);
+        else setOpen(false);
       }}
     >
       <DialogContent

@@ -61,7 +61,7 @@ interface BoardRow {
 export default function ClubDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { session } = useSession();
+  const { session, refresh } = useSession();
   const [inviteFromUrl, setInviteFromUrl] = useState("");
   const [club, setClub] = useState<Club | null>(null);
   const [board, setBoard] = useState<BoardRow[]>([]);
@@ -77,6 +77,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
   const [isPrivate, setIsPrivate] = useState(false);
   const [newRole, setNewRole] = useState("");
   const [copied, setCopied] = useState(false);
+  const [activeClubId, setActiveClubId] = useState<string | null>(null);
 
   const applyPayload = (data: { club?: Club; leaderboard?: BoardRow[] }) => {
     if (!data.club) return;
@@ -101,6 +102,17 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     load().catch(() => setClub(null));
   }, [load]);
+
+  useEffect(() => {
+    if (!session?.discordId) {
+      setActiveClubId(null);
+      return;
+    }
+    fetch("/api/clubs/tag")
+      .then((r) => r.json())
+      .then((d) => setActiveClubId(typeof d.activeClubId === "string" ? d.activeClubId : null))
+      .catch(() => setActiveClubId(null));
+  }, [session?.discordId]);
 
   useEffect(() => {
     setInviteFromUrl(new URLSearchParams(window.location.search).get("invite") || "");
@@ -212,6 +224,37 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                     Join club
                   </button>
                 )
+              ) : null}
+              {member ? (
+                <button
+                  type="button"
+                  disabled={busy || activeClubId === id}
+                  onClick={async () => {
+                    setError(null);
+                    setBusy(true);
+                    try {
+                      const res = await fetch("/api/clubs/tag", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ clubId: id }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) {
+                        setError(typeof data.error === "string" ? data.error : "Failed");
+                        return;
+                      }
+                      setActiveClubId(id);
+                      await refresh({ force: true });
+                    } catch {
+                      setError("Failed");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  className="h-9 rounded-xl border border-hl-border px-4 text-sm font-bold text-white hover:border-hl-gold/40 disabled:opacity-50"
+                >
+                  {activeClubId === id ? "Using this tag" : "Use this tag"}
+                </button>
               ) : null}
               {member && !owner ? (
                 <button

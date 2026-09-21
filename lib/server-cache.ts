@@ -28,3 +28,7 @@ export async function remember<T>(key: string, ttlMs: number, fn: () => Promise<
   slots.set(key, { at: slot.at, value: slot.value, inflight });
   return inflight;
 }
+
+export function forget(key: string) {
+  slots.delete(key);
+}

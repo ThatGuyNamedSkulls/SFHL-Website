@@ -192,11 +192,30 @@ export async function getPlayer(name: string): Promise<DbPlayer | undefined> {
  *  only after Bloxlink verification — the website never inserts players. */
 export async function getPlayerByDiscordId(discordId: string): Promise<DbPlayer | undefined> {
   await ensurePlayerDiscordColumns();
+  const id = String(discordId || "").trim();
+  if (!id) return undefined;
   const rs = await client.execute({
-    sql: `${PLAYER_SELECT} WHERE CAST(discord_id AS TEXT) = ? LIMIT 1`,
-    args: [String(discordId)],
+    sql: `${PLAYER_SELECT}
+          WHERE CAST(discord_id AS TEXT) = ?
+             OR discord_id = CAST(? AS INTEGER)
+          LIMIT 1`,
+    args: [id, id],
   });
   return playerFromRows(rs);
+}
+
+/** Linked player row: Discord snowflake first, then name / Discord handle. */
+export async function resolveLinkedPlayer(
+  name?: string | null,
+  discordId?: string | null
+): Promise<DbPlayer | undefined> {
+  if (discordId) {
+    const byDiscord = await getPlayerByDiscordId(String(discordId));
+    if (byDiscord) return byDiscord;
+  }
+  const key = (name || "").trim();
+  if (!key) return undefined;
+  return getPlayer(key);
 }
 
 /** Record a player's Discord identity (called on login for the user's own row;
@@ -211,14 +230,18 @@ export async function setPlayerDiscordIdentity(
   if (avatar) {
     await client.execute({
       sql: `UPDATE players SET discord_id = ?, discord_username = ?, discord_avatar = ?
-            WHERE CAST(discord_id AS TEXT) = ? OR name = ?`,
-      args: [discordId, username, avatar, String(discordId), name],
+            WHERE CAST(discord_id AS TEXT) = ?
+               OR discord_id = CAST(? AS INTEGER)
+               OR lower(name) = lower(?)`,
+      args: [discordId, username, avatar, String(discordId), String(discordId), name],
     });
   } else {
     await client.execute({
       sql: `UPDATE players SET discord_id = ?, discord_username = ?
-            WHERE CAST(discord_id AS TEXT) = ? OR name = ?`,
-      args: [discordId, username, String(discordId), name],
+            WHERE CAST(discord_id AS TEXT) = ?
+               OR discord_id = CAST(? AS INTEGER)
+               OR lower(name) = lower(?)`,
+      args: [discordId, username, String(discordId), String(discordId), name],
     });
   }
 }
@@ -235,19 +258,8 @@ export async function getPlayerCountry(
   discordId?: string | null
 ): Promise<string | null> {
   await ensurePlayerDiscordColumns();
-  if (discordId) {
-    const byDiscord = await client.execute({
-      sql: "SELECT country FROM players WHERE CAST(discord_id AS TEXT) = ?",
-      args: [String(discordId)],
-    });
-    if (byDiscord.rows.length > 0) return readCountry(byDiscord.rows[0]);
-  }
-  const rs = await client.execute({
-    sql: "SELECT country FROM players WHERE name = ?",
-    args: [name],
-  });
-  if (rs.rows.length === 0) return null;
-  return readCountry(rs.rows[0]);
+  const player = await resolveLinkedPlayer(name, discordId);
+  return readCountry(player ?? null);
 }
 
 export async function setPlayerCountry(
@@ -257,23 +269,30 @@ export async function setPlayerCountry(
 ): Promise<boolean> {
   await ensurePlayerDiscordColumns();
   const normalized = code.toLowerCase();
-  if (discordId) {
-    const existing = await getPlayerByDiscordId(String(discordId));
-    if (existing) {
-      await client.execute({
-        sql: "UPDATE players SET country = ? WHERE CAST(discord_id AS TEXT) = ?",
-        args: [normalized, String(discordId)],
-      });
-      return true;
-    }
-  }
-  const existing = await getPlayer(name);
-  if (!existing) return false;
+  const player = await resolveLinkedPlayer(name, discordId);
+  if (!player) return false;
+
+  const did = String(discordId || player.discord_id || "").trim();
   await client.execute({
-    sql: "UPDATE players SET country = ? WHERE name = ?",
-    args: [normalized, name],
+    sql: `UPDATE players SET country = ?
+          WHERE id = ?
+             OR lower(name) = lower(?)
+             OR (? != '' AND (
+                  CAST(discord_id AS TEXT) = ?
+                  OR discord_id = CAST(? AS INTEGER)
+             ))`,
+    args: [normalized, player.id, player.name, did, did, did],
   });
-  return true;
+
+  if (did && (player.discord_id == null || String(player.discord_id) !== did)) {
+    await client.execute({
+      sql: `UPDATE players SET discord_id = CAST(? AS INTEGER)
+            WHERE id = ? AND discord_id IS NULL`,
+      args: [did, player.id],
+    });
+  }
+
+  return (await getPlayerCountry(player.name, did || null)) === normalized;
 }
 
 /** Lazily add the shop-currency column if the bot hasn't migrated it yet

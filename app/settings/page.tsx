@@ -11,7 +11,9 @@ import { CountrySelect } from "@/components/country-select";
 import { LogoutButton } from "@/components/logout-button";
 import { InventoryPanel } from "@/components/inventory-panel";
 import { Flag } from "@/components/flag";
+import { ClubMark } from "@/components/club-identity";
 import { countryName, flagPath, notifyCountryChanged, COUNTRY_CHANGE_EVENT } from "@/lib/countries";
+import { invalidateClientApi } from "@/lib/client-api";
 import {
   User,
   Link2,
@@ -23,14 +25,30 @@ import {
   Info,
   MapPin,
   Sparkles,
+  Tag,
 } from "lucide-react";
 
+interface TagClub {
+  id: string;
+  name: string;
+  tag: string;
+  accentColor: string;
+  logoUrl: string | null;
+}
+
 export default function SettingsPage() {
-  const { session, loaded } = useSession();
+  const { session, loaded, refresh } = useSession();
   const [country, setCountry] = useState<string | null>(null);
   const [countryDraft, setCountryDraft] = useState<string | null>(null);
   const [editingCountry, setEditingCountry] = useState(false);
   const [savingCountry, setSavingCountry] = useState(false);
+  const [countryError, setCountryError] = useState<string | null>(null);
+  const [countryLinked, setCountryLinked] = useState(false);
+  const [tagClubs, setTagClubs] = useState<TagClub[]>([]);
+  const [activeClubId, setActiveClubId] = useState<string | null>(null);
+  const [displayedTag, setDisplayedTag] = useState<string | null>(null);
+  const [savingTag, setSavingTag] = useState(false);
+  const [tagError, setTagError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/players/country")
@@ -38,6 +56,15 @@ export default function SettingsPage() {
       .then((d) => {
         setCountry(d.country || null);
         setCountryDraft(d.country || null);
+        setCountryLinked(!!d.linked);
+      })
+      .catch(() => {});
+    fetch("/api/clubs/tag")
+      .then((r) => r.json())
+      .then((d) => {
+        setTagClubs(Array.isArray(d.clubs) ? d.clubs : []);
+        setActiveClubId(typeof d.activeClubId === "string" ? d.activeClubId : null);
+        setDisplayedTag(typeof d.displayedTag === "string" ? d.displayedTag : null);
       })
       .catch(() => {});
   }, []);
@@ -57,19 +84,55 @@ export default function SettingsPage() {
   const saveCountry = async () => {
     if (!countryDraft) return;
     setSavingCountry(true);
+    setCountryError(null);
     try {
       const res = await fetch("/api/players/country", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: countryDraft }),
       });
-      if (res.ok) {
-        setCountry(countryDraft);
-        setEditingCountry(false);
-        notifyCountryChanged(countryDraft);
+      const data = await res.json().catch(() => ({}));
+      const saved = typeof data.country === "string" ? data.country : null;
+      if (!res.ok || !saved) {
+        setCountryError(typeof data.error === "string" ? data.error : "Could not save country");
+        return;
       }
+      setCountry(saved);
+      setCountryDraft(saved);
+      setEditingCountry(false);
+      try {
+        sessionStorage.setItem("hl_country_saved", saved);
+        sessionStorage.removeItem("hl_country_skipped");
+      } catch {
+        /* ignore */
+      }
+      notifyCountryChanged(saved);
     } finally {
       setSavingCountry(false);
+    }
+  };
+
+  const saveClubTag = async (clubId: string | null) => {
+    setSavingTag(true);
+    setTagError(null);
+    try {
+      const res = await fetch("/api/clubs/tag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clubId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setTagError(typeof data.error === "string" ? data.error : "Could not save club tag");
+        return;
+      }
+      setActiveClubId(typeof data.activeClubId === "string" ? data.activeClubId : null);
+      setDisplayedTag(typeof data.displayedTag === "string" ? data.displayedTag : null);
+      if (Array.isArray(data.clubs)) setTagClubs(data.clubs);
+      invalidateClientApi("/api/auth/me");
+      await refresh({ force: true });
+    } finally {
+      setSavingTag(false);
     }
   };
 
@@ -178,7 +241,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* Country card (only when linked to a player) */}
-      {session.playerName && (
+      {(session.playerName || countryLinked) && (
         <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
           <h2 className="text-sm font-bold text-white header-caps mb-4 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-hl-gold" /> Country
@@ -207,12 +270,17 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div>
-              <CountrySelect value={countryDraft} onChange={setCountryDraft} />
+              <CountrySelect value={countryDraft} onChange={(code) => {
+                setCountryDraft(code);
+                setCountryError(null);
+              }} />
+              {countryError && <p className="text-sm text-hl-red mt-2">{countryError}</p>}
               <div className="flex gap-3 mt-3">
                 <button
                   onClick={() => {
                     setEditingCountry(false);
                     setCountryDraft(country);
+                    setCountryError(null);
                   }}
                   className="flex-1 py-2 rounded-lg border border-hl-border text-white font-bold text-sm hover:bg-hl-panel-light transition-colors"
                 >
@@ -228,6 +296,86 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </Card>
+      )}
+
+      {tagClubs.length > 0 && (
+        <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
+          <h2 className="text-sm font-bold text-white header-caps mb-4 flex items-center gap-2">
+            <Tag className="w-4 h-4 text-hl-gold" /> Club tag
+          </h2>
+          <p className="text-xs text-hl-muted mb-4">
+            Choose which club tag shows in front of your name. You can also hide it.
+          </p>
+          <div className="flex items-center gap-2 mb-4 text-sm text-white">
+            <span className="text-hl-muted">Showing</span>
+            {displayedTag ? (
+              <span className="font-black tracking-wide text-hl-gold">[{displayedTag}]</span>
+            ) : (
+              <span className="text-hl-muted">no tag</span>
+            )}
+          </div>
+          <div className="space-y-2">
+            <button
+              type="button"
+              disabled={savingTag}
+              onClick={() => void saveClubTag(null)}
+              className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm ${
+                !activeClubId
+                  ? "border-hl-gold/60 bg-hl-gold/10 text-white"
+                  : "border-hl-border text-white hover:border-hl-gold/40"
+              } disabled:opacity-50`}
+            >
+              <span>Auto (owned club first)</span>
+              {!activeClubId ? <span className="text-xs font-bold text-hl-gold">Using</span> : null}
+            </button>
+            {tagClubs.map((club) => {
+              const selected = activeClubId === club.id;
+              return (
+                <button
+                  key={club.id}
+                  type="button"
+                  disabled={savingTag}
+                  onClick={() => void saveClubTag(club.id)}
+                  className={`w-full flex items-center gap-3 rounded-lg border px-3 py-2 text-left ${
+                    selected
+                      ? "border-hl-gold/60 bg-hl-gold/10"
+                      : "border-hl-border hover:border-hl-gold/40"
+                  } disabled:opacity-50`}
+                >
+                  <ClubMark
+                    tag={club.tag}
+                    accentColor={club.accentColor}
+                    logoUrl={club.logoUrl}
+                    size={28}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="text-sm font-bold text-white">{club.name}</span>
+                    <span className="ml-2 text-xs font-black tracking-wide text-hl-gold">
+                      [{club.tag}]
+                    </span>
+                  </span>
+                  {selected ? <span className="text-xs font-bold text-hl-gold">Using</span> : null}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              disabled={savingTag}
+              onClick={() => void saveClubTag("none")}
+              className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm ${
+                activeClubId === "none"
+                  ? "border-hl-gold/60 bg-hl-gold/10 text-white"
+                  : "border-hl-border text-white hover:border-hl-gold/40"
+              } disabled:opacity-50`}
+            >
+              <span>Hide club tag</span>
+              {activeClubId === "none" ? (
+                <span className="text-xs font-bold text-hl-gold">Using</span>
+              ) : null}
+            </button>
+          </div>
+          {tagError && <p className="text-sm text-hl-red mt-3">{tagError}</p>}
         </Card>
       )}
 

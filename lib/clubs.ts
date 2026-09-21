@@ -12,13 +12,15 @@ import {
 } from "@/lib/db";
 import { DEFAULT_PROFILE_BACKGROUNDS } from "@/lib/profile-backgrounds";
 import { isQueueRegion, type QueueRegionId } from "@/lib/regions";
-import { remember } from "@/lib/server-cache";
+import { forget, remember } from "@/lib/server-cache";
 
 export const OWNER_ROLE_ID = "owner";
 export const MEMBER_ROLE_ID = "member";
 export const MAX_CLUB_ROLES = 7;
 export const MAX_OWNED_CLUBS = 3;
 export const CLUB_CREATE_COST = 1000;
+/** Stored preference: show no club tag. Null / missing preference = auto. */
+export const HIDE_CLUB_TAG_ID = "none";
 
 export interface ClubRoleDef {
   id: string;
@@ -106,17 +108,74 @@ let schemaReady: Promise<void> | null = null;
 
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = client
-      .execute(
+    schemaReady = (async () => {
+      await client.execute(
         `CREATE TABLE IF NOT EXISTS web_clubs (
            id TEXT PRIMARY KEY,
            data TEXT NOT NULL,
            updated_at INTEGER NOT NULL
          )`
-      )
-      .then(() => undefined);
+      );
+      await client.execute(
+        `CREATE TABLE IF NOT EXISTS web_club_tag_pref (
+           discord_id TEXT PRIMARY KEY,
+           club_id TEXT NOT NULL,
+           updated_at INTEGER NOT NULL
+         )`
+      );
+    })().then(() => undefined);
   }
   return schemaReady;
+}
+
+export function forgetClubTagIndex() {
+  forget("club-tag-index");
+}
+
+export async function getClubTagPref(discordId: string): Promise<string | null> {
+  if (!discordId) return null;
+  await ensureSchema();
+  const rs = await client.execute({
+    sql: "SELECT club_id FROM web_club_tag_pref WHERE CAST(discord_id AS TEXT) = CAST(? AS TEXT)",
+    args: [discordId],
+  });
+  const value = String(rs.rows[0]?.club_id ?? "").trim();
+  return value || null;
+}
+
+export async function setClubTagPref(discordId: string, clubId: string | null): Promise<void> {
+  if (!discordId) return;
+  await ensureSchema();
+  if (!clubId) {
+    await client.execute({
+      sql: "DELETE FROM web_club_tag_pref WHERE CAST(discord_id AS TEXT) = CAST(? AS TEXT)",
+      args: [discordId],
+    });
+    forgetClubTagIndex();
+    return;
+  }
+  await client.execute({
+    sql: `INSERT OR REPLACE INTO web_club_tag_pref (discord_id, club_id, updated_at)
+          VALUES (?, ?, ?)`,
+    args: [discordId, clubId, Date.now()],
+  });
+  forgetClubTagIndex();
+}
+
+export async function clearClubTagPrefIf(discordId: string, clubId: string): Promise<void> {
+  const current = await getClubTagPref(discordId);
+  if (current === clubId) await setClubTagPref(discordId, null);
+}
+
+async function listClubTagPrefs(): Promise<{ discordId: string; clubId: string }[]> {
+  await ensureSchema();
+  const rs = await client.execute("SELECT discord_id, club_id FROM web_club_tag_pref");
+  return rs.rows
+    .map((row) => ({
+      discordId: String(row.discord_id ?? ""),
+      clubId: String(row.club_id ?? "").trim(),
+    }))
+    .filter((row) => row.discordId && row.clubId);
 }
 
 async function writeClub(club: Club): Promise<Club> {
@@ -126,6 +185,7 @@ async function writeClub(club: Club): Promise<Club> {
     sql: "INSERT OR REPLACE INTO web_clubs (id, data, updated_at) VALUES (?, ?, ?)",
     args: [club.id, JSON.stringify(club), club.updatedAt],
   });
+  forgetClubTagIndex();
   return club;
 }
 
@@ -466,6 +526,7 @@ export async function leaveClub(id: string, discordId: string): Promise<Club | n
     throw new Error("The owner cannot leave. Transfer the club or delete it.");
   }
   club.members = club.members.filter((m) => m.discordId !== discordId);
+  await clearClubTagPrefIf(discordId, club.id);
   return writeClub(club);
 }
 
@@ -475,6 +536,10 @@ export async function deleteClub(id: string, discordId: string): Promise<void> {
   if (club.ownerId !== discordId) throw new Error("Only the owner can delete this club.");
   await ensureSchema();
   await client.execute({ sql: "DELETE FROM web_clubs WHERE id = ?", args: [id] });
+  for (const member of club.members) {
+    await clearClubTagPrefIf(member.discordId, club.id);
+  }
+  forgetClubTagIndex();
 }
 
 export async function createInvite(id: string, discordId: string): Promise<Club> {
@@ -505,6 +570,7 @@ export async function kickMember(id: string, actorId: string, targetId: string):
     throw new Error("You can only kick members below your role.");
   }
   club.members = club.members.filter((m) => m.discordId !== targetId);
+  await clearClubTagPrefIf(targetId, club.id);
   return writeClub(club);
 }
 
@@ -731,6 +797,37 @@ export async function clubTagIndex(): Promise<ClubTagIndex> {
         if (key && (owned || !byName[key])) byName[key] = club.tag;
       }
     }
+    const prefs = await listClubTagPrefs();
+    if (prefs.length) {
+      const clubById = new Map(clubs.map((club) => [club.id, club]));
+      for (const pref of prefs) {
+        const memberClubs = clubs.filter((club) =>
+          club.members.some((m) => m.discordId === pref.discordId)
+        );
+        const names = [
+          ...new Set(
+            memberClubs
+              .flatMap((club) =>
+                club.members
+                  .filter((m) => m.discordId === pref.discordId)
+                  .map((m) => (m.playerName || "").trim().toLowerCase())
+              )
+              .filter(Boolean)
+          ),
+        ];
+        if (pref.clubId === HIDE_CLUB_TAG_ID) {
+          byDiscord[pref.discordId] = "";
+          for (const key of names) byName[key] = "";
+          continue;
+        }
+        const chosen = clubById.get(pref.clubId);
+        if (!chosen || !chosen.members.some((m) => m.discordId === pref.discordId)) {
+          continue;
+        }
+        byDiscord[pref.discordId] = chosen.tag;
+        for (const key of names) byName[key] = chosen.tag;
+      }
+    }
     return { byName, byDiscord };
   });
 }
@@ -740,8 +837,12 @@ export function lookupClubTag(
   playerName?: string | null,
   discordId?: string | null
 ): string | null {
-  if (discordId && index.byDiscord[discordId]) return index.byDiscord[discordId];
+  if (discordId && Object.prototype.hasOwnProperty.call(index.byDiscord, discordId)) {
+    return index.byDiscord[discordId] || null;
+  }
   const key = (playerName || "").trim().toLowerCase();
-  if (key && index.byName[key]) return index.byName[key];
+  if (key && Object.prototype.hasOwnProperty.call(index.byName, key)) {
+    return index.byName[key] || null;
+  }
   return null;
 }
