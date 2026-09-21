@@ -27,7 +27,7 @@ export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
     ? `/profile?player=${encodeURIComponent(session.playerName || session.username)}`
     : "/login";
   const label = session
-    ? formatUsername(session.username, session.discordUsername)
+    ? formatUsername(session.username, session.discordUsername, session.clubTag)
     : "Log in";
 
   return (

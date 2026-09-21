@@ -8,7 +8,7 @@ import { Flag } from "@/components/flag";
 import { flagPath, countryName } from "@/lib/countries";
 import { RankTierLetter } from "@/types";
 import { Plus, Search, Crown, BadgeCheck, CircleAlert } from "lucide-react";
-import { formatUsername } from "@/lib/format";
+import { ClubTaggedName } from "@/components/club-identity";
 import { MmAccessBadge } from "@/components/mm-access-badge";
 
 export interface LobbyMember {
@@ -30,6 +30,7 @@ export interface LobbyMember {
   mmAccess?: boolean | null;
   /** False → this member blocks the queue; shows the warning on their slot. */
   canQueue?: boolean;
+  clubTag?: string | null;
 }
 
 interface LobbySlotsProps {
@@ -125,7 +126,13 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
                 )}
               </div>
               <div className="relative z-10 flex items-center gap-1.5 max-w-full">
-                <span className="text-sm font-bold text-white truncate">{formatUsername(member.username, member.discordUsername)}</span>
+                <span className="text-sm font-bold text-white truncate">
+                  <ClubTaggedName
+                    name={member.username}
+                    tag={member.clubTag}
+                    discordUsername={member.discordUsername}
+                  />
+                </span>
                 {member.mmAccess ? (
                   <MmAccessBadge />
                 ) : member.verified != null ? (

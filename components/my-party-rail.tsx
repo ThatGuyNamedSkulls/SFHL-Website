@@ -17,6 +17,7 @@ interface PartyMember {
   playerName: string | null;
   avatar: string | null;
   rank: string;
+  clubTag?: string | null;
 }
 
 interface PartyLite {
@@ -366,7 +367,10 @@ export function MyPartyRail() {
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-semibold text-white truncate">{label}</span>
+                          <span className="text-sm font-semibold text-white truncate">
+                            {m.clubTag ? <span className="text-hl-gold font-bold mr-1">[{m.clubTag}]</span> : null}
+                            {label}
+                          </span>
                           {leader && <Crown className="w-3.5 h-3.5 text-[#ff5500] shrink-0" />}
                         </div>
                         {isLeader && self && (

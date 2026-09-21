@@ -1,22 +1,35 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
-import { clubLeaderboard, deleteClub, getClub, updateClub } from "@/lib/clubs";
+import {
+  clubForClient,
+  clubLeaderboard,
+  deleteClub,
+  getClub,
+  updateClub,
+} from "@/lib/clubs";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
-  const { id } = await ctx.params;
-  const club = await getClub(id);
-  if (!club) return NextResponse.json({ error: "Club not found." }, { status: 404 });
+async function payload(clubId: string, viewerId?: string | null) {
+  const club = await getClub(clubId);
+  if (!club) return null;
   let leaderboard: Awaited<ReturnType<typeof clubLeaderboard>> = [];
   try {
     leaderboard = await clubLeaderboard(club);
   } catch (error) {
     console.error("club leaderboard", error);
   }
-  return NextResponse.json({ club, leaderboard });
+  return { club: clubForClient(club, viewerId), leaderboard };
+}
+
+export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const session = await getSession();
+  const data = await payload(id, session?.discordId);
+  if (!data) return NextResponse.json({ error: "Club not found." }, { status: 404 });
+  return NextResponse.json(data);
 }
 
 export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -33,6 +46,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   const accentColor = typeof body.accentColor === "string" ? body.accentColor : undefined;
   const logoUrl =
     body.logoUrl === null ? null : typeof body.logoUrl === "string" ? body.logoUrl : undefined;
+  const isPrivate = typeof body.private === "boolean" ? body.private : undefined;
   if (containsProfanity(`${name ?? ""} ${tag ?? ""} ${description ?? ""} ${rules ?? ""}`)) {
     return NextResponse.json(
       { error: "Name, tag, description, or rules contain language that is not allowed." },
@@ -40,16 +54,17 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     );
   }
   try {
-    const club = await updateClub(id, session.discordId, {
+    await updateClub(id, session.discordId, {
       name,
       description,
       rules,
       tag,
       accentColor,
       logoUrl,
+      private: isPrivate,
     });
-    const leaderboard = await clubLeaderboard(club);
-    return NextResponse.json({ club, leaderboard });
+    const data = await payload(id, session.discordId);
+    return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update club." },

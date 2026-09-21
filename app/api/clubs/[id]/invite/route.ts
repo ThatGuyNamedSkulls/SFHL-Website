@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { clubForClient, clubLeaderboard, leaveClub } from "@/lib/clubs";
+import { clubForClient, clubLeaderboard, createInvite } from "@/lib/clubs";
 
 export const dynamic = "force-dynamic";
 
@@ -11,13 +11,12 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
   }
   const { id } = await ctx.params;
   try {
-    const club = await leaveClub(id, session.discordId);
-    if (!club) return NextResponse.json({ ok: true });
+    const club = await createInvite(id, session.discordId);
     const leaderboard = await clubLeaderboard(club);
     return NextResponse.json({ club: clubForClient(club, session.discordId), leaderboard });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to leave." },
+      { error: error instanceof Error ? error.message : "Failed to create invite." },
       { status: 400 }
     );
   }

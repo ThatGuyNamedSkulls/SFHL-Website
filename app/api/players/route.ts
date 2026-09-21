@@ -6,6 +6,7 @@ import { countryName, flagPath, isValidCountry } from "@/lib/countries";
 import { countryToPlayRegion } from "@/lib/country-regions";
 import { regionMeta } from "@/lib/regions";
 import { remember } from "@/lib/server-cache";
+import { clubTagIndex, lookupClubTag } from "@/lib/clubs";
 
 export async function GET(request: Request) {
   try {
@@ -17,9 +18,10 @@ export async function GET(request: Request) {
     const modeParam = searchParams.get("mode");
     if (modeParam && modeParam !== "5v5") {
       const mappedModes = await remember(`players:mode:${modeParam}`, 8000, async () => {
-        const [rows, cards] = await Promise.all([
+        const [rows, cards, tags] = await Promise.all([
           getModeLeaderboard(modeParam),
           getEquippedVisualsMap().catch(() => new Map<string, EquippedVisuals>()),
+          clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
         ]);
         return rows.map((r, idx) => {
           const hasCountry = isValidCountry(r.country);
@@ -51,6 +53,7 @@ export async function GET(request: Request) {
               avgMvp: 0,
               playtimeHours: 0,
             },
+            clubTag: lookupClubTag(tags, r.player_name, r.discord_id != null ? String(r.discord_id) : null),
             placementDone: Number(r.placement_done) === 1,
             placementGamesPlayed: r.placement_games_played,
           };
@@ -63,10 +66,11 @@ export async function GET(request: Request) {
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.floor(limitRaw) : undefined;
 
     const mapped = await remember(`players:${cacheKey}`, 8000, async () => {
-      const [players, cards, placementGamesTotal] = await Promise.all([
+      const [players, cards, placementGamesTotal, tags] = await Promise.all([
         getAllPlayers(limit),
         getEquippedVisualsMap().catch(() => new Map<string, EquippedVisuals>()),
         getPlacementGamesTotal(),
+        clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
       ]);
 
       return players.map((p, idx) => {
@@ -88,6 +92,7 @@ export async function GET(request: Request) {
         countryName: hasCountry ? countryName(p.country) : null,
         countryFlag: hasCountry ? flagPath(p.country) : null,
         position: idx + 1,
+        clubTag: lookupClubTag(tags, p.name, p.discord_id != null ? String(p.discord_id) : null),
         stats: {
           wins: p.matches_won,
           losses: p.matches_played - p.matches_won,

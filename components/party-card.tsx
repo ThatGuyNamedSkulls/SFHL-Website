@@ -8,7 +8,7 @@ import { Flag } from "@/components/flag";
 import { PartyView, PartyMemberView, RankTierLetter } from "@/types";
 import { getRankForElo, getRankByLetter } from "@/data/ranks";
 import { flagPath, countryName } from "@/lib/countries";
-import { formatUsername } from "@/lib/format";
+import { ClubTaggedName } from "@/components/club-identity";
 import {
   Crown,
   Plus,
@@ -90,7 +90,13 @@ function MemberSlot({ member, isLeader }: { member: PartyMemberView; isLeader: b
         </AvatarFrame>
       </div>
       <div className="relative z-10 flex items-center gap-1 max-w-full">
-        <span className="text-xs font-bold text-white truncate">{formatUsername(member.playerName ?? member.username, member.discordUsername)}</span>
+        <span className="text-xs font-bold text-white truncate">
+          <ClubTaggedName
+            name={member.playerName ?? member.username}
+            tag={member.clubTag}
+            discordUsername={member.discordUsername}
+          />
+        </span>
         {member.verified !== null && member.verified !== undefined && (
           <span title={member.verified ? "Verified — in the Discord server" : "Not verified — not in the Discord server"}>
             <BadgeCheck className={`w-3.5 h-3.5 shrink-0 ${member.verified ? "text-hl-green" : "text-hl-red"}`} />

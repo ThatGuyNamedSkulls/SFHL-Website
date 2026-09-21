@@ -67,13 +67,17 @@ export function regionMeta(raw: string | null | undefined): { label: string; fla
  */
 export function formatUsername(
   robloxName: string,
-  discordUsername?: string | null
+  discordUsername?: string | null,
+  clubTag?: string | null
 ): string {
   const handle = (discordUsername ?? "").trim();
-  if (!handle) return robloxName;
-  // Guard against the handle duplicating the display name (nothing to add).
-  if (handle.toLowerCase() === robloxName.toLowerCase()) return robloxName;
-  return `${robloxName} (@${handle})`;
+  let base = robloxName;
+  if (handle && handle.toLowerCase() !== robloxName.toLowerCase()) {
+    base = `${robloxName} (@${handle})`;
+  }
+  const tag = (clubTag ?? "").trim().toUpperCase();
+  if (!tag) return base;
+  return `[${tag}] ${base}`;
 }
 
 /**

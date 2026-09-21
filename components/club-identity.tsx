@@ -77,3 +77,25 @@ export function ClubColorPicker({
     </div>
   );
 }
+
+export function ClubTaggedName({
+  name,
+  tag,
+  discordUsername,
+  className = "",
+}: {
+  name: string;
+  tag?: string | null;
+  discordUsername?: string | null;
+  className?: string;
+}) {
+  const handle = (discordUsername ?? "").trim();
+  const shown =
+    handle && handle.toLowerCase() !== name.toLowerCase() ? `${name} (@${handle})` : name;
+  return (
+    <span className={className}>
+      {tag ? <span className="text-hl-gold font-bold mr-1">[{tag}]</span> : null}
+      {shown}
+    </span>
+  );
+}

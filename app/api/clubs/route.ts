@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       description,
       region: String(body.region ?? ""),
       rules,
+      private: !!body.private,
       owner: {
         discordId: session.discordId,
         username: session.username,

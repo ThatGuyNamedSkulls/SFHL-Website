@@ -91,6 +91,16 @@ export async function withMemberStatus<T extends Party>(parties: T[]): Promise<T
   const ids = Array.from(new Set(parties.flatMap((p) => p.members.map((m) => m.discordId))));
   const status = new Map<string, { inGuild: boolean; verified: boolean; mmAccess: boolean } | null>();
   await Promise.all(ids.map(async (id) => status.set(id, await getGuildPresenceCached(id))));
+  let tags: { byName: Record<string, string>; byDiscord: Record<string, string> } = {
+    byName: {},
+    byDiscord: {},
+  };
+  try {
+    const { clubTagIndex } = await import("@/lib/clubs");
+    tags = await clubTagIndex();
+  } catch {
+    /* clubs table may be empty */
+  }
   return parties.map((p) => ({
     ...p,
     members: p.members.map((m) => {
@@ -99,7 +109,11 @@ export async function withMemberStatus<T extends Party>(parties: T[]): Promise<T
       const mmAccess = presence === null ? null : presence.mmAccess;
       const canQueue =
         (presence === null || (presence.inGuild && presence.verified)) && !!m.playerName;
-      return { ...m, verified, mmAccess, canQueue };
+      const clubTag =
+        (m.discordId && tags.byDiscord[m.discordId]) ||
+        (m.playerName ? tags.byName[m.playerName.toLowerCase()] : null) ||
+        null;
+      return { ...m, verified, mmAccess, canQueue, clubTag };
     }),
   }));
 }

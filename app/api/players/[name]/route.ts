@@ -9,6 +9,7 @@ import { prettyMap, prettyRegion, formatRoundScore } from "@/lib/format";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
 import { countryToPlayRegion } from "@/lib/country-regions";
 import { regionMeta } from "@/lib/regions";
+import { clubTagIndex, lookupClubTag } from "@/lib/clubs";
 
 export async function GET(
   _request: Request,
@@ -144,6 +145,11 @@ export async function GET(
       countryName: isValidCountry(player.country) ? countryName(player.country) : null,
       countryFlag: isValidCountry(player.country) ? flagPath(player.country) : null,
       mmAccess,
+      clubTag: lookupClubTag(
+        await clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
+        player.name,
+        player.discord_id != null ? String(player.discord_id) : null
+      ),
       stats: {
         wins: player.matches_won,
         losses: player.matches_played - player.matches_won,

@@ -28,6 +28,7 @@ import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 import { QUEUE_MODE_SUPER, SUPER_PARTY_MAX, SUPER_ELO_RANGE, parseQueueMode } from "@/lib/queue-modes";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
+import { ClubTaggedName } from "@/components/club-identity";
 
 interface WebQueueEntry {
   id: number;
@@ -36,6 +37,7 @@ interface WebQueueEntry {
   player_name: string | null;
   joined_at: string;
   queue_mode?: string | null;
+  clubTag?: string | null;
 }
 
 interface PlayerInfo {
@@ -67,6 +69,7 @@ interface PartyMemberLite {
   verified?: boolean | null;
   canQueue?: boolean;
   mmAccess?: boolean | null;
+  clubTag?: string | null;
 }
 interface PartyLite {
   id: string;
@@ -309,6 +312,7 @@ export default function QueuePage() {
       verified: session.verified !== false && session.inGuild,
       mmAccess: !!(player?.mmAccess || session.mmAccess),
       canQueue,
+      clubTag: session.clubTag ?? null,
     }
     : null;
 
@@ -331,6 +335,7 @@ export default function QueuePage() {
         verified: isMe ? session.verified !== false && session.inGuild : m.verified ?? null,
         mmAccess: isMe ? !!(player?.mmAccess || session.mmAccess) : m.mmAccess ?? null,
         canQueue: isMe ? canQueue : m.canQueue,
+        clubTag: isMe ? session.clubTag ?? m.clubTag : m.clubTag,
       };
     });
   } else {
@@ -711,7 +716,12 @@ export default function QueuePage() {
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="font-semibold text-white text-sm">{entry.discord_username}</div>
+                    <div className="font-semibold text-white text-sm">
+                      <ClubTaggedName
+                        name={entry.player_name || entry.discord_username}
+                        tag={entry.clubTag}
+                      />
+                    </div>
                     {entry.player_name && <div className="text-[10px] text-hl-muted">Linked: {entry.player_name}</div>}
                   </div>
                 </div>

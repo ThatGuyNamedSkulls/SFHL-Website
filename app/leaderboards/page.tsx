@@ -13,6 +13,7 @@ import { countryName, flagPath, COUNTRY_CHANGE_EVENT } from "@/lib/countries";
 import { countryToPlayRegion } from "@/lib/country-regions";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson } from "@/lib/client-api";
+import { ClubTaggedName } from "@/components/club-identity";
 
 interface ApiPlayer {
   id: string;
@@ -30,6 +31,7 @@ interface ApiPlayer {
   countryName: string | null;
   countryFlag: string | null;
   placementDone?: boolean;
+  clubTag?: string | null;
   stats: { wins: number; kd: number; winPercent: number; headshotPercent: number; matchesPlayed: number };
 }
 
@@ -286,7 +288,9 @@ export default function LeaderboardsPage() {
                       {player.username.slice(0, 2).toUpperCase()}
                     </span>
                   )}
-                  <span className="text-[15px] font-medium text-white truncate">{player.username}</span>
+                  <span className="text-[15px] font-medium text-white truncate">
+                    <ClubTaggedName name={player.username} tag={player.clubTag} />
+                  </span>
                   <span className="md:hidden shrink-0">
                     <RankBadge rank={player.rank as RankTierLetter} size="sm" showGlow={false} className="!w-5 !h-5" />
                   </span>

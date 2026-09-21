@@ -38,7 +38,10 @@ export function PlayerCard({ player, className = "" }: PlayerCardProps) {
         </Avatar>
 
         {/* Username */}
-        <h2 className="text-xl font-bold text-white">{player.username}</h2>
+        <h2 className="text-xl font-bold text-white">
+          {player.clubTag ? <span className="text-hl-gold mr-1">[{player.clubTag}]</span> : null}
+          {player.username}
+        </h2>
 
         {/* Rank Badge */}
         <RankBadge rank={player.rank} size="lg" />

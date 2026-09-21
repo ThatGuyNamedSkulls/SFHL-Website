@@ -10,6 +10,7 @@ import {
   getPlayer,
 } from "@/lib/db";
 import { getPartyForMember } from "@/lib/parties";
+import { clubTagIndex, lookupClubTag } from "@/lib/clubs";
 import { getActiveLobbyMemberIds } from "@/lib/lobby";
 import { upsertWebUser } from "@/lib/social";
 import { isQueueRegion, regionMeta } from "@/lib/regions";
@@ -39,14 +40,22 @@ export async function GET(request: Request) {
     const regionParam = (searchParams.get("region") || "").toUpperCase();
     const region = isQueueRegion(regionParam) ? regionParam : undefined;
     const session = await getSession();
-    const [queue, teamSize, gate, me] = await Promise.all([
+    const [queue, teamSize, gate, me, tags] = await Promise.all([
       getWebQueue(region),
       getQueueTeamSize(),
       getQueueGate(),
       session ? getWebQueueSpot(session.discordId) : Promise.resolve(null),
+      clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
     ]);
     return queueJson({
-      queue,
+      queue: queue.map((entry) => ({
+        ...entry,
+        clubTag: lookupClubTag(
+          tags,
+          entry.player_name,
+          entry.discord_user_id != null ? String(entry.discord_user_id) : null
+        ),
+      })),
       count: queue.length,
       teamSize,
       open: gate.open,

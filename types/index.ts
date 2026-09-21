@@ -87,6 +87,7 @@ export interface Player {
   placementMatches?: Match[];
   /** True when this player has the Get Matchmaking Access Discord role. */
   mmAccess?: boolean;
+  clubTag?: string | null;
 }
 
 /** Cosmetic item types (profile customization inventory). */
@@ -324,6 +325,7 @@ export interface PartyMemberView {
   canQueue?: boolean;
   /** Get Matchmaking Access Discord role. */
   mmAccess?: boolean | null;
+  clubTag?: string | null;
 }
 
 export interface PartyView {
@@ -405,4 +407,6 @@ export interface UserSession {
   verified?: boolean;
   /** Whether they have the Get Matchmaking Access Discord role. */
   mmAccess?: boolean;
+  /** Club tag shown in front of the username. */
+  clubTag?: string | null;
 }

@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth";
 import { getPlayerByDiscordId, getPlayerCoins, setPlayerMmAccess } from "@/lib/db";
 import { UserSession } from "@/types";
+import { clubTagIndex, lookupClubTag } from "@/lib/clubs";
 
 /** Session cookies can outlive a Discord nick change. Re-read the linked
  *  players row by discord_id so "My profile" uses the current website name. */
@@ -77,7 +78,12 @@ export async function GET() {
   const coins = fresh.playerName
     ? await getPlayerCoins(fresh.playerName).catch(() => 0)
     : 0;
-  const res = NextResponse.json({ user: fresh, discordInvite, coins }, { headers: noStore });
+  const tags = await clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} }));
+  const user = {
+    ...fresh,
+    clubTag: lookupClubTag(tags, fresh.playerName, fresh.discordId),
+  };
+  const res = NextResponse.json({ user, discordInvite, coins }, { headers: noStore });
 
   if (!sessionNeedsCookieWrite(session, fresh, exp)) return res;
 

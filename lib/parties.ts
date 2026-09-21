@@ -51,6 +51,8 @@ export interface PartyMember {
   canQueue?: boolean;
   /** Get Matchmaking Access Discord role (read time). */
   mmAccess?: boolean | null;
+  /** Club tag shown in front of the username. */
+  clubTag?: string | null;
 }
 
 export interface Party {
