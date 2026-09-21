@@ -167,7 +167,9 @@ export async function getInventory(playerName: string): Promise<InventoryItem[]>
                  i.season, i.rarity, inv.granted_at, inv.equipped
           FROM cosmetic_inventory inv JOIN cosmetic_items i ON i.id = inv.item_id
           WHERE inv.player_name = ?
-          ORDER BY i.type, inv.granted_at DESC`,
+          ORDER BY i.type,
+                   CASE WHEN i.category = 'default' THEN 1 ELSE 0 END,
+                   inv.granted_at DESC`,
     args: [playerName],
   });
   return (rs.rows as unknown as Record<string, unknown>[]).map(rowToItem);

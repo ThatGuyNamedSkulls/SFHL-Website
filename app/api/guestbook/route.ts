@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { addGuestbookEntry, listGuestbook } from "@/lib/guestbook";
+import { GUESTBOOK_MAX_LENGTH, containsProfanity } from "@/lib/content-moderation";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -31,8 +32,17 @@ export async function POST(request: Request) {
   if (!toName) {
     return NextResponse.json({ error: "Missing profile" }, { status: 400 });
   }
-  if (message.length < 1 || message.length > 280) {
-    return NextResponse.json({ error: "Message must be 1–280 characters." }, { status: 400 });
+  if (message.length < 1 || message.length > GUESTBOOK_MAX_LENGTH) {
+    return NextResponse.json(
+      { error: `Message must be 1–${GUESTBOOK_MAX_LENGTH} characters.` },
+      { status: 400 }
+    );
+  }
+  if (containsProfanity(message)) {
+    return NextResponse.json(
+      { error: "Message contains language that is not allowed." },
+      { status: 400 }
+    );
   }
   try {
     const entry = await addGuestbookEntry(toName, session.playerName, message);

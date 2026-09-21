@@ -959,7 +959,7 @@ function ProfileContent() {
         )}
 
         {mainTab === "clubs" && (
-          <EmptyState icon={Building2} title="Clubs" hint="Coming soon." />
+          <ProfileClubsPanel playerName={player.username} />
         )}
 
         {mainTab === "teams" && (
@@ -1016,13 +1016,13 @@ function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost
           <div className="text-xs header-caps text-hl-muted mb-2">Write a message</div>
           <textarea
             value={message}
-            onChange={(e) => setMessage(e.target.value.slice(0, 280))}
+            onChange={(e) => setMessage(e.target.value.slice(0, 250))}
             rows={3}
             placeholder="Say something…"
             className="w-full bg-hl-base border border-hl-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
           />
           <div className="flex items-center justify-between mt-2">
-            <span className="text-[11px] text-hl-muted">{message.length}/280</span>
+            <span className="text-[11px] text-hl-muted">{message.length}/250</span>
             <button
               type="button"
               onClick={post}
@@ -1066,6 +1066,59 @@ function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ProfileClubsPanel({ playerName }: { playerName: string }) {
+  const [clubs, setClubs] = useState<{ id: string; name: string; description: string; region: string; memberCount: number }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/clubs?player=${encodeURIComponent(playerName)}`)
+      .then((r) => r.json())
+      .then((d) => setClubs(Array.isArray(d.clubs) ? d.clubs : []))
+      .catch(() => setClubs([]))
+      .finally(() => setLoaded(true));
+  }, [playerName]);
+
+  if (!loaded) {
+    return <p className="text-sm text-hl-muted">Loading clubs…</p>;
+  }
+  if (clubs.length === 0) {
+    return (
+      <EmptyState
+        icon={Building2}
+        title="No clubs"
+        hint="This player hasn't joined a club yet."
+      >
+        <Link href="/clubs" className="text-sm font-bold text-hl-gold hover:underline">
+          Browse clubs
+        </Link>
+      </EmptyState>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {clubs.map((club) => (
+        <Link
+          key={club.id}
+          href={`/clubs/${club.id}`}
+          className="block rounded-xl border border-hl-border bg-hl-panel px-4 py-3 hover:border-hl-gold/40 transition-colors"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-white truncate">{club.name}</div>
+              <p className="text-xs text-hl-muted truncate mt-0.5">
+                {club.description || "No description yet."}
+              </p>
+            </div>
+            <span className="text-[11px] text-hl-muted shrink-0">
+              {club.memberCount} {club.memberCount === 1 ? "member" : "members"}
+            </span>
+          </div>
+        </Link>
+      ))}
     </div>
   );
 }

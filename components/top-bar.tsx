@@ -26,7 +26,7 @@ const PAGE_TITLE: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/track", label: "Track" },
   { test: (p) => p === "/feed", label: "Feed" },
   { test: (p) => p === "/settings", label: "Settings" },
-  { test: (p) => p === "/alerts", label: "Alerts" },
+  { test: (p) => p === "/clubs" || p.startsWith("/clubs/"), label: "Clubs" },
 ];
 
 /** Game + region on the left, MATCHMAKING / LEAGUE / TOURNAMENTS center, avatar right. */
