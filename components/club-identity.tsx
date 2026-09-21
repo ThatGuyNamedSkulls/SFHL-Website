@@ -94,7 +94,11 @@ export function ClubTaggedName({
     handle && handle.toLowerCase() !== name.toLowerCase() ? `${name} (@${handle})` : name;
   return (
     <span className={className}>
-      {tag ? <span className="text-hl-gold font-bold mr-1">[{tag}]</span> : null}
+      {tag ? (
+        <span className="text-hl-gold font-semibold mr-1 text-[0.78em] tracking-wide align-middle">
+          [{tag}]
+        </span>
+      ) : null}
       {shown}
     </span>
   );
