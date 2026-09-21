@@ -1,30 +1,43 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Card } from "@/components/ui/card";
-import { Building2, Users } from "lucide-react";
+import { ClubColorPicker, ClubMark } from "@/components/club-identity";
+import { Building2, Search, Users } from "lucide-react";
 import { useSession } from "@/components/session-provider";
+import { DEFAULT_PROFILE_BACKGROUNDS } from "@/lib/profile-backgrounds";
 import { QUEUE_REGIONS, regionMeta } from "@/lib/regions";
 
 interface ClubRow {
   id: string;
   name: string;
+  tag: string;
+  accentColor: string;
+  logoUrl: string | null;
   description: string;
   region: string;
   ownerName: string;
   memberCount: number;
+  mine?: boolean;
 }
+
+const DEFAULT_ACCENT: string = DEFAULT_PROFILE_BACKGROUNDS[1].color;
 
 export default function ClubsPage() {
   const { session, loaded } = useSession();
   const [clubs, setClubs] = useState<ClubRow[]>([]);
   const [name, setName] = useState("");
+  const [tag, setTag] = useState("");
   const [description, setDescription] = useState("");
   const [rules, setRules] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT);
   const [region, setRegion] = useState(QUEUE_REGIONS[0].id);
+  const [query, setQuery] = useState("");
+  const [regionFilter, setRegionFilter] = useState("ALL");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -49,7 +62,15 @@ export default function ClubsPage() {
       const res = await fetch("/api/clubs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description, region, rules }),
+        body: JSON.stringify({
+          name,
+          tag,
+          description,
+          region,
+          rules,
+          accentColor,
+          logoUrl,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -57,8 +78,11 @@ export default function ClubsPage() {
         return;
       }
       setName("");
+      setTag("");
       setDescription("");
       setRules("");
+      setLogoUrl("");
+      setAccentColor(DEFAULT_ACCENT);
       await load();
     } catch {
       setError("Could not create club");
@@ -67,12 +91,28 @@ export default function ClubsPage() {
     }
   };
 
+  const { mine, rest } = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const matched = clubs.filter((club) => {
+      if (regionFilter !== "ALL" && club.region !== regionFilter) return false;
+      if (!q) return true;
+      return (
+        club.name.toLowerCase().includes(q) ||
+        (club.tag || "").toLowerCase().includes(q)
+      );
+    });
+    return {
+      mine: session ? matched.filter((c) => c.mine) : [],
+      rest: session ? matched.filter((c) => !c.mine) : matched,
+    };
+  }, [clubs, query, regionFilter, session]);
+
   return (
     <div className="hl-page">
       <PageHeader
         icon={Building2}
         title="Clubs"
-        subtitle="Open communities with their own rules. Anyone can create or join."
+        subtitle="Open communities with their own identity, rules, and member board."
       />
 
       <Card className="bg-hl-panel border-hl-border p-4 md:p-5 mb-6">
@@ -86,12 +126,20 @@ export default function ClubsPage() {
           </p>
         ) : (
           <div className="space-y-3">
-            <div className="grid gap-3 md:grid-cols-[1fr_160px]">
+            <div className="grid gap-3 md:grid-cols-[1fr_120px_160px]">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value.slice(0, 40))}
                 placeholder="Club name"
                 className="h-10 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
+              />
+              <input
+                value={tag}
+                onChange={(e) =>
+                  setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5))
+                }
+                placeholder="TAG"
+                className="h-10 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50 tracking-widest"
               />
               <select
                 value={region}
@@ -118,12 +166,22 @@ export default function ClubsPage() {
               placeholder="Club rules (optional)"
               className="w-full rounded-lg border border-hl-border bg-hl-base px-3 py-2 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
             />
+            <input
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value.slice(0, 500))}
+              placeholder="Logo image URL (https, optional)"
+              className="w-full h-10 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
+            />
+            <div>
+              <div className="text-[11px] header-caps text-hl-muted mb-2">Banner color</div>
+              <ClubColorPicker value={accentColor} onChange={setAccentColor} />
+            </div>
             <div className="flex items-center justify-between gap-3">
               {error ? <p className="text-sm text-hl-red">{error}</p> : <span />}
               <button
                 type="button"
                 onClick={create}
-                disabled={busy || name.trim().length < 3}
+                disabled={busy || name.trim().length < 3 || tag.length < 2}
                 className="find-match-btn h-10 rounded-xl px-5 text-sm font-black header-caps text-hl-base disabled:opacity-50"
               >
                 {busy ? "Creating…" : "Create"}
@@ -133,36 +191,98 @@ export default function ClubsPage() {
         )}
       </Card>
 
-      {clubs.length === 0 ? (
-        <EmptyState icon={Building2} title="No clubs yet" hint="Be the first to start one." />
-      ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {clubs.map((club) => (
-            <Link
-              key={club.id}
-              href={`/clubs/${club.id}`}
-              className="block rounded-xl border border-hl-border bg-hl-panel p-4 hover:border-hl-gold/40 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-base font-bold text-white truncate">{club.name}</h2>
-                  <p className="mt-1 text-sm text-hl-muted line-clamp-2">
-                    {club.description || "No description yet."}
-                  </p>
-                </div>
-                <span className="text-[11px] font-bold header-caps text-hl-muted shrink-0">
-                  {regionMeta(club.region).short}
-                </span>
-              </div>
-              <div className="mt-3 flex items-center gap-1.5 text-xs text-hl-muted">
-                <Users className="w-3.5 h-3.5" />
-                {club.memberCount} {club.memberCount === 1 ? "member" : "members"} · Owner{" "}
-                {club.ownerName}
-              </div>
-            </Link>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-hl-muted" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or tag"
+            className="h-10 w-full rounded-lg border border-hl-border bg-hl-panel pl-9 pr-3 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
+          />
+        </div>
+        <select
+          value={regionFilter}
+          onChange={(e) => setRegionFilter(e.target.value)}
+          className="h-10 rounded-lg border border-hl-border bg-hl-panel px-3 text-sm text-white focus:outline-none focus:border-hl-gold/50 sm:w-44"
+        >
+          <option value="ALL">All regions</option>
+          {QUEUE_REGIONS.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.label}
+            </option>
           ))}
+        </select>
+      </div>
+
+      {mine.length === 0 && rest.length === 0 ? (
+        <EmptyState
+          icon={Building2}
+          title={clubs.length === 0 ? "No clubs yet" : "No matching clubs"}
+          hint={clubs.length === 0 ? "Be the first to start one." : "Try a different name, tag, or region."}
+        />
+      ) : (
+        <div className="space-y-6">
+          {mine.length > 0 ? (
+            <section>
+              <div className="mb-3 text-[11px] font-bold header-caps text-hl-gold">My clubs</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {mine.map((club) => (
+                  <ClubCard key={club.id} club={club} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+          {rest.length > 0 ? (
+            <section>
+              {mine.length > 0 ? (
+                <div className="mb-3 text-[11px] font-bold header-caps text-hl-muted">All clubs</div>
+              ) : null}
+              <div className="grid gap-3 md:grid-cols-2">
+                {rest.map((club) => (
+                  <ClubCard key={club.id} club={club} />
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
       )}
     </div>
+  );
+}
+
+function ClubCard({ club }: { club: ClubRow }) {
+  return (
+    <Link
+      href={`/clubs/${club.id}`}
+      className="block rounded-xl border border-hl-border bg-hl-panel p-4 hover:border-hl-gold/40 transition-colors"
+    >
+      <div className="flex items-start gap-3">
+        <ClubMark
+          tag={club.tag}
+          accentColor={club.accentColor}
+          logoUrl={club.logoUrl}
+          size={48}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-white truncate">{club.name}</h2>
+              <div className="text-xs font-bold text-hl-gold tracking-wide">[{club.tag}]</div>
+            </div>
+            <span className="text-[11px] font-bold header-caps text-hl-muted shrink-0">
+              {regionMeta(club.region).short}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-hl-muted line-clamp-2">
+            {club.description || "No description yet."}
+          </p>
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-hl-muted">
+            <Users className="w-3.5 h-3.5" />
+            {club.memberCount} {club.memberCount === 1 ? "member" : "members"}
+          </div>
+        </div>
+      </div>
+    </Link>
   );
 }

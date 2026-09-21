@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { joinClub } from "@/lib/clubs";
+import { clubLeaderboard, joinClub } from "@/lib/clubs";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,8 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
       playerName: session.playerName,
       avatar: session.avatar,
     });
-    return NextResponse.json({ club });
+    const leaderboard = await clubLeaderboard(club);
+    return NextResponse.json({ club, leaderboard });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to join." },

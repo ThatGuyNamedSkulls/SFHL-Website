@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { leaveClub } from "@/lib/clubs";
+import { clubLeaderboard, leaveClub } from "@/lib/clubs";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,9 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
   const { id } = await ctx.params;
   try {
     const club = await leaveClub(id, session.discordId);
-    return NextResponse.json({ club });
+    if (!club) return NextResponse.json({ ok: true });
+    const leaderboard = await clubLeaderboard(club);
+    return NextResponse.json({ club, leaderboard });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to leave." },

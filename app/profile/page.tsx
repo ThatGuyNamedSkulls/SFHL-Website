@@ -19,6 +19,7 @@ import { ProfileInventory } from "@/components/profile-inventory";
 import { ProfilePageBackdrop } from "@/components/profile-background";
 import { MmAccessBadge } from "@/components/mm-access-badge";
 import { EmptyState } from "@/components/empty-state";
+import { ClubMark } from "@/components/club-identity";
 import { Flag } from "@/components/flag";
 import { flagPath, countryName as countryLabel, COUNTRY_CHANGE_EVENT } from "@/lib/countries";
 import { formatUsername } from "@/lib/format";
@@ -1071,7 +1072,18 @@ function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost
 }
 
 function ProfileClubsPanel({ playerName }: { playerName: string }) {
-  const [clubs, setClubs] = useState<{ id: string; name: string; description: string; region: string; memberCount: number }[]>([]);
+  const [clubs, setClubs] = useState<
+    {
+      id: string;
+      name: string;
+      tag: string;
+      accentColor: string;
+      logoUrl: string | null;
+      description: string;
+      region: string;
+      memberCount: number;
+    }[]
+  >([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -1106,9 +1118,18 @@ function ProfileClubsPanel({ playerName }: { playerName: string }) {
           href={`/clubs/${club.id}`}
           className="block rounded-xl border border-hl-border bg-hl-panel px-4 py-3 hover:border-hl-gold/40 transition-colors"
         >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-sm font-bold text-white truncate">{club.name}</div>
+          <div className="flex items-center gap-3">
+            <ClubMark
+              tag={club.tag}
+              accentColor={club.accentColor}
+              logoUrl={club.logoUrl}
+              size={40}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <div className="text-sm font-bold text-white truncate">{club.name}</div>
+                <span className="text-xs font-bold text-hl-gold shrink-0">[{club.tag}]</span>
+              </div>
               <p className="text-xs text-hl-muted truncate mt-0.5">
                 {club.description || "No description yet."}
               </p>
