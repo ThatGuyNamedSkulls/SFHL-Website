@@ -339,6 +339,42 @@ export async function refundPlayerCoins(name: string, amount: number): Promise<v
   });
 }
 
+let lastQueueRegionColReady: Promise<void> | null = null;
+export function ensureLastQueueRegionColumn(): Promise<void> {
+  if (!lastQueueRegionColReady) {
+    lastQueueRegionColReady = client
+      .execute("ALTER TABLE players ADD COLUMN last_queue_region TEXT DEFAULT NULL")
+      .then(() => undefined)
+      .catch(() => undefined);
+  }
+  return lastQueueRegionColReady;
+}
+
+export async function getPlayerLastQueueRegion(
+  name: string | null | undefined
+): Promise<string | null> {
+  if (!name?.trim()) return null;
+  await ensureLastQueueRegionColumn();
+  const rs = await client.execute({
+    sql: "SELECT last_queue_region FROM players WHERE lower(name) = lower(?)",
+    args: [name],
+  });
+  const raw = String(rs.rows[0]?.last_queue_region ?? "").toUpperCase();
+  return isQueueRegion(raw) ? raw : null;
+}
+
+export async function setPlayerLastQueueRegion(
+  name: string | null | undefined,
+  region: string
+): Promise<void> {
+  if (!name?.trim() || !isQueueRegion(region)) return;
+  await ensureLastQueueRegionColumn();
+  await client.execute({
+    sql: "UPDATE players SET last_queue_region = ? WHERE lower(name) = lower(?)",
+    args: [region, name],
+  });
+}
+
 /** Persist the Get Matchmaking Access role flag (best-effort). */
 export async function setPlayerMmAccess(discordId: string, has: boolean): Promise<void> {
   await ensurePlayerDiscordColumns();
