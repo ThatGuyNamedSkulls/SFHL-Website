@@ -13,18 +13,30 @@ let schemaReady: Promise<void> | null = null;
 
 export function ensureGuestbookSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = client
-      .execute(
-        `CREATE TABLE IF NOT EXISTS guestbook (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          profile_name TEXT NOT NULL,
-          from_name TEXT NOT NULL,
-          message TEXT NOT NULL,
-          created_at INTEGER NOT NULL
-        )`
-      )
-      .then(() => undefined)
-      .catch(() => undefined);
+    schemaReady = (async () => {
+      await client
+        .execute(
+          `CREATE TABLE IF NOT EXISTS guestbook (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            profile_name TEXT NOT NULL,
+            from_name TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+          )`
+        )
+        .catch(() => undefined);
+      // player_id columns (Phase 1 of the players(name) -> players(id) FK
+      // migration; see docs/DATABASE_PK_FK_RELATIONSHIPS.docx). Not used to
+      // read here — listGuestbook/authorRank deliberately match case-
+      // insensitively (lower(name)), which a strict id lookup can't
+      // replicate — but dual-written so they're ready once that's revisited.
+      await client
+        .execute("ALTER TABLE guestbook ADD COLUMN profile_player_id INTEGER")
+        .catch(() => undefined);
+      await client
+        .execute("ALTER TABLE guestbook ADD COLUMN from_player_id INTEGER")
+        .catch(() => undefined);
+    })();
   }
   return schemaReady;
 }
@@ -71,8 +83,11 @@ export async function addGuestbookEntry(
   await ensureGuestbookSchema();
   const createdAt = Date.now();
   const rs = await client.execute({
-    sql: "INSERT INTO guestbook (profile_name, from_name, message, created_at) VALUES (?, ?, ?, ?)",
-    args: [profileName, fromName, message, createdAt],
+    sql: `INSERT INTO guestbook
+              (profile_name, from_name, profile_player_id, from_player_id, message, created_at)
+          VALUES (?, ?, (SELECT id FROM players WHERE lower(name) = lower(?)),
+                  (SELECT id FROM players WHERE lower(name) = lower(?)), ?, ?)`,
+    args: [profileName, fromName, profileName, fromName, message, createdAt],
   });
   return {
     id: Number(rs.lastInsertRowid ?? 0),

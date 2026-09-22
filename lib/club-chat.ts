@@ -37,6 +37,12 @@ function ensureSchema(): Promise<void> {
           "CREATE INDEX IF NOT EXISTS idx_web_club_chat_club ON web_club_chat (club_id, created_at)"
         )
         .catch(() => undefined);
+      // player_id (Phase 1 of the players(name) -> players(id) FK migration;
+      // see docs/DATABASE_PK_FK_RELATIONSHIPS.docx). web_club_chat had no
+      // player FK governance at all before Phase 1.
+      await client
+        .execute("ALTER TABLE web_club_chat ADD COLUMN player_id INTEGER")
+        .catch(() => undefined);
     })();
   }
   return schemaReady;
@@ -91,12 +97,13 @@ export async function postClubChat(
   const createdAt = Date.now();
   const rs = await client.execute({
     sql: `INSERT INTO web_club_chat
-          (club_id, discord_id, username, player_name, avatar, message, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          (club_id, discord_id, username, player_name, player_id, avatar, message, created_at)
+          VALUES (?, ?, ?, ?, (SELECT id FROM players WHERE name = ?), ?, ?, ?)`,
     args: [
       clubId,
       author.discordId,
       author.username,
+      author.playerName,
       author.playerName,
       author.avatar,
       text,

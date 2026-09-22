@@ -326,12 +326,16 @@ export async function claimSubRequest(
 
   let changed = 0;
   try {
+    // sub_player_id dual-written alongside sub_name — mirrors
+    // core/sub_requests.py's claim() on the bot side; see
+    // docs/DATABASE_PK_FK_RELATIONSHIPS.docx.
     const rs = await client.execute({
       sql: `UPDATE sub_requests
-               SET status = 'filled', sub_name = ?, sub_discord_id = ?,
-                   claim_source = 'website', filled_at = ?, applied = 0
+               SET status = 'filled', sub_name = ?,
+                   sub_player_id = (SELECT id FROM players WHERE name = ?),
+                   sub_discord_id = ?, claim_source = 'website', filled_at = ?, applied = 0
              WHERE id = ? AND status = 'open'`,
-      args: [claimer.playerName, claimer.discordId, Date.now(), requestId],
+      args: [claimer.playerName, claimer.playerName, claimer.discordId, Date.now(), requestId],
     });
     changed = Number(rs.rowsAffected ?? 0);
   } catch {

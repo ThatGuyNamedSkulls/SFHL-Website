@@ -81,6 +81,17 @@ function ensureCosmeticsSchema(): Promise<void> {
       await client
         .execute("ALTER TABLE cosmetic_items ADD COLUMN price INTEGER DEFAULT 0")
         .catch(() => undefined); // already exists — fine
+      // player_id (Phase 1 of the players(name) -> players(id) FK migration;
+      // see docs/DATABASE_PK_FK_RELATIONSHIPS.docx). cosmetic_inventory's real
+      // primary key is its own surrogate `id`, not (player_name, item_id) — so
+      // unlike friendships/mode_ratings, preferring player_id in WHERE clauses
+      // below carries no addressing risk.
+      await client
+        .execute("ALTER TABLE cosmetic_inventory ADD COLUMN player_id INTEGER")
+        .catch(() => undefined);
+      await client
+        .execute("CREATE INDEX IF NOT EXISTS idx_cosmetic_inventory_player_id ON cosmetic_inventory(player_id)")
+        .catch(() => undefined);
       await seedDefaultBackgrounds();
     })();
   }
@@ -119,15 +130,17 @@ export async function grantDefaultBackgrounds(playerName?: string): Promise<void
     const placeholders = ids.map(() => "?").join(",");
     const owned = await client.execute({
       sql: `SELECT COUNT(*) AS c FROM cosmetic_inventory
-            WHERE player_name = ? AND item_id IN (${placeholders})`,
-      args: [playerName, ...ids],
+            WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+              AND item_id IN (${placeholders})`,
+      args: [playerName, playerName, ...ids],
     });
     if (Number(owned.rows[0]?.c ?? 0) >= ids.length) return;
     await client.batch(
       ids.map((itemId) => ({
         sql: `INSERT OR IGNORE INTO cosmetic_inventory
-              (player_name, item_id, granted_by, granted_at) VALUES (?, ?, 'system:default-background', ?)`,
-        args: [playerName, itemId, now],
+              (player_name, player_id, item_id, granted_by, granted_at)
+              VALUES (?, (SELECT id FROM players WHERE name = ?), ?, 'system:default-background', ?)`,
+        args: [playerName, playerName, itemId, now],
       }))
     );
     return;
@@ -135,8 +148,8 @@ export async function grantDefaultBackgrounds(playerName?: string): Promise<void
   await client.batch(
     ids.map((itemId) => ({
       sql: `INSERT OR IGNORE INTO cosmetic_inventory
-            (player_name, item_id, granted_by, granted_at)
-            SELECT name, ?, 'system:default-background', ? FROM players`,
+            (player_name, player_id, item_id, granted_by, granted_at)
+            SELECT name, id, ?, 'system:default-background', ? FROM players`,
       args: [itemId, now],
     }))
   );
@@ -166,11 +179,11 @@ export async function getInventory(playerName: string): Promise<InventoryItem[]>
     sql: `SELECT i.id, i.slug, i.type, i.name, i.description, i.asset, i.category,
                  i.season, i.rarity, inv.granted_at, inv.equipped
           FROM cosmetic_inventory inv JOIN cosmetic_items i ON i.id = inv.item_id
-          WHERE inv.player_name = ?
+          WHERE inv.player_id = (SELECT id FROM players WHERE name = ?) OR inv.player_name = ?
           ORDER BY i.type,
                    CASE WHEN i.category = 'default' THEN 1 ELSE 0 END,
                    inv.granted_at DESC`,
-    args: [playerName],
+    args: [playerName, playerName],
   });
   return (rs.rows as unknown as Record<string, unknown>[]).map(rowToItem);
 }
@@ -189,8 +202,9 @@ export async function setEquipped(
   const rs = await client.execute({
     sql: `SELECT i.type, i.name FROM cosmetic_inventory inv
           JOIN cosmetic_items i ON i.id = inv.item_id
-          WHERE inv.player_name = ? AND inv.item_id = ?`,
-    args: [playerName, itemId],
+          WHERE (inv.player_id = (SELECT id FROM players WHERE name = ?) OR inv.player_name = ?)
+            AND inv.item_id = ?`,
+    args: [playerName, playerName, itemId],
   });
   if (rs.rows.length === 0) return "not_owned";
   const type = rs.rows[0].type as CosmeticType;
@@ -200,8 +214,10 @@ export async function setEquipped(
   if (!equip) {
     const stmts = [
       {
-        sql: "UPDATE cosmetic_inventory SET equipped = 0, equipped_at = NULL WHERE player_name = ? AND item_id = ?",
-        args: [playerName, itemId] as (string | number)[],
+        sql: `UPDATE cosmetic_inventory SET equipped = 0, equipped_at = NULL
+              WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+                AND item_id = ?`,
+        args: [playerName, playerName, itemId] as (string | number)[],
       },
     ];
     if (type === "title") {
@@ -215,14 +231,17 @@ export async function setEquipped(
     const countRs = await client.execute({
       sql: `SELECT COUNT(*) AS c FROM cosmetic_inventory inv
             JOIN cosmetic_items i ON i.id = inv.item_id
-            WHERE inv.player_name = ? AND i.type = 'badge' AND inv.equipped = 1
+            WHERE (inv.player_id = (SELECT id FROM players WHERE name = ?) OR inv.player_name = ?)
+              AND i.type = 'badge' AND inv.equipped = 1
               AND inv.item_id != ?`,
-      args: [playerName, itemId],
+      args: [playerName, playerName, itemId],
     });
     if (Number(countRs.rows[0]?.c ?? 0) >= MAX_EQUIPPED_BADGES) return "badge_limit";
     await client.execute({
-      sql: "UPDATE cosmetic_inventory SET equipped = 1, equipped_at = ? WHERE player_name = ? AND item_id = ?",
-      args: [now, playerName, itemId],
+      sql: `UPDATE cosmetic_inventory SET equipped = 1, equipped_at = ?
+            WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+              AND item_id = ?`,
+      args: [now, playerName, playerName, itemId],
     });
     return "ok";
   }
@@ -231,13 +250,15 @@ export async function setEquipped(
   const stmts = [
     {
       sql: `UPDATE cosmetic_inventory SET equipped = 0, equipped_at = NULL
-            WHERE player_name = ? AND item_id IN
-              (SELECT id FROM cosmetic_items WHERE type = ?)`,
-      args: [playerName, type] as (string | number)[],
+            WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+              AND item_id IN (SELECT id FROM cosmetic_items WHERE type = ?)`,
+      args: [playerName, playerName, type] as (string | number)[],
     },
     {
-      sql: "UPDATE cosmetic_inventory SET equipped = 1, equipped_at = ? WHERE player_name = ? AND item_id = ?",
-      args: [now, playerName, itemId],
+      sql: `UPDATE cosmetic_inventory SET equipped = 1, equipped_at = ?
+            WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+              AND item_id = ?`,
+      args: [now, playerName, playerName, itemId],
     },
   ];
   if (type === "title") {
@@ -280,9 +301,10 @@ export async function getEquippedCosmetics(playerName: string): Promise<ProfileC
   const rs = await client.execute({
     sql: `SELECT i.slug, i.type, i.name, i.description, i.asset
           FROM cosmetic_inventory inv JOIN cosmetic_items i ON i.id = inv.item_id
-          WHERE inv.player_name = ? AND inv.equipped = 1
+          WHERE (inv.player_id = (SELECT id FROM players WHERE name = ?) OR inv.player_name = ?)
+            AND inv.equipped = 1
           ORDER BY inv.equipped_at ASC`,
-    args: [playerName],
+    args: [playerName, playerName],
   });
   const out: ProfileCosmetics = { card: null, frame: null, background: null, title: null, badges: [] };
   for (const r of rs.rows as unknown as Record<string, unknown>[]) {
@@ -346,11 +368,13 @@ export async function getShop(
     client.execute({
       sql: `SELECT i.id, i.slug, i.type, i.name, i.description, i.asset, i.rarity, i.price,
                    EXISTS(SELECT 1 FROM cosmetic_inventory inv
-                          WHERE inv.player_name = ? AND inv.item_id = i.id) AS owned
+                          WHERE (inv.player_id = (SELECT id FROM players WHERE name = ?)
+                                 OR inv.player_name = ?)
+                            AND inv.item_id = i.id) AS owned
             FROM cosmetic_items i
             WHERE i.price > 0
             ORDER BY i.price ASC, i.type`,
-      args: [playerName],
+      args: [playerName, playerName],
     }),
   ]);
   const coins = Number(balanceRs.rows[0]?.coins ?? 0);
@@ -402,8 +426,10 @@ export async function purchaseItem(
   if (price <= 0) return { status: "not_for_sale", coins };
 
   const alreadyRs = await client.execute({
-    sql: "SELECT 1 FROM cosmetic_inventory WHERE player_name = ? AND item_id = ?",
-    args: [playerName, itemId],
+    sql: `SELECT 1 FROM cosmetic_inventory
+          WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+            AND item_id = ?`,
+    args: [playerName, playerName, itemId],
   });
   if (alreadyRs.rows.length > 0) return { status: "already_owned", coins };
   if (coins < price) return { status: "insufficient", coins };
@@ -419,9 +445,10 @@ export async function purchaseItem(
   }
 
   const insert = await client.execute({
-    sql: `INSERT OR IGNORE INTO cosmetic_inventory (player_name, item_id, granted_by, granted_at)
-          VALUES (?, ?, 'shop', ?)`,
-    args: [playerName, itemId, Date.now()],
+    sql: `INSERT OR IGNORE INTO cosmetic_inventory
+              (player_name, player_id, item_id, granted_by, granted_at)
+          VALUES (?, (SELECT id FROM players WHERE name = ?), ?, 'shop', ?)`,
+    args: [playerName, playerName, itemId, Date.now()],
   });
   if (insert.rowsAffected === 0) {
     // Lost the ownership race — refund the deducted coins.

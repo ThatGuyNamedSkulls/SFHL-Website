@@ -538,15 +538,19 @@ export async function getMatchesForPlayer(playerName: string, limit = 100): Prom
   // covers legacy rows written before the column existed. Mirrors the bot's
   // /matchhistory + /checkperformance filters. Dummy /rankdummies rows are
   // hidden unless staff passed history=True (is_test=0).
+  // Matches by player_id when the row has one, falling back to player_name —
+  // see docs/DATABASE_PK_FK_RELATIONSHIPS.docx.
   const where =
-    "FROM match_history WHERE player_name = ? AND COALESCE(is_placement, 0) = 0";
+    "FROM match_history " +
+    "WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?) " +
+    "AND COALESCE(is_placement, 0) = 0";
   try {
     return await selectMatchRows(
       `${where} AND COALESCE(is_test, 0) = 0 ORDER BY id DESC LIMIT ?`,
-      [playerName, limit]
+      [playerName, playerName, limit]
     );
   } catch {
-    return selectMatchRows(`${where} ORDER BY id DESC LIMIT ?`, [playerName, limit]);
+    return selectMatchRows(`${where} ORDER BY id DESC LIMIT ?`, [playerName, playerName, limit]);
   }
 }
 
@@ -558,9 +562,10 @@ export async function getPlacementMatchesForPlayer(playerName: string): Promise<
                    hs_percentage, elo_change, result, points, mvps, match_id,
                    timestamp, executed_by, round_score
             FROM match_history
-            WHERE player_name = ? AND COALESCE(is_placement, 0) = 1
+            WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+              AND COALESCE(is_placement, 0) = 1
             ORDER BY id ASC`,
-      args: [playerName],
+      args: [playerName, playerName],
     });
     return rs.rows as unknown as DbMatch[];
   } catch {
@@ -578,19 +583,21 @@ export async function getEloChanges(
 ): Promise<{ eloChange: number; timestamp: string }[]> {
   const sql =
     `SELECT elo_change, timestamp FROM match_history
-          WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
+          WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+            AND COALESCE(is_placement, 0) = 0
             AND COALESCE(is_test, 0) = 0
           ORDER BY id DESC
           LIMIT ?`;
   let rs;
   try {
-    rs = await client.execute({ sql, args: [playerName, limit] });
+    rs = await client.execute({ sql, args: [playerName, playerName, limit] });
   } catch {
     rs = await client.execute({
       sql: `SELECT elo_change, timestamp FROM match_history
-            WHERE player_name = ? AND COALESCE(is_placement, 0) = 0
+            WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+              AND COALESCE(is_placement, 0) = 0
             ORDER BY id DESC LIMIT ?`,
-      args: [playerName, limit],
+      args: [playerName, playerName, limit],
     });
   }
   return rs.rows.map((r) => ({
@@ -631,8 +638,9 @@ export async function getSeasonFinalElos(
   const out = new Map<string, number>();
   try {
     const rs = await client.execute({
-      sql: "SELECT season_name, elo FROM season_stats WHERE player_name = ?",
-      args: [playerName],
+      sql: `SELECT season_name, elo FROM season_stats
+            WHERE player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?`,
+      args: [playerName, playerName],
     });
     for (const r of rs.rows) {
       out.set(r.season_name as string, Number(r.elo ?? 0));
@@ -647,8 +655,9 @@ export async function getSeasonFinalElos(
 export async function getCareerMatchCount(playerName: string): Promise<number> {
   try {
     const rs = await client.execute({
-      sql: "SELECT COUNT(*) AS n FROM match_history WHERE player_name = ?",
-      args: [playerName],
+      sql: `SELECT COUNT(*) AS n FROM match_history
+            WHERE player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?`,
+      args: [playerName, playerName],
     });
     return Number(rs.rows[0]?.n ?? 0);
   } catch {
@@ -663,10 +672,10 @@ export async function getLastSeasonArchive(
   try {
     const rs = await client.execute({
       sql: `SELECT season_name, elo, rank FROM season_stats
-            WHERE player_name = ?
+            WHERE player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?
             ORDER BY archived_at DESC
             LIMIT 1`,
-      args: [playerName],
+      args: [playerName, playerName],
     });
     const row = rs.rows[0];
     if (!row) return null;
@@ -729,8 +738,10 @@ export async function getModeRatings(playerName: string): Promise<DbModeRating[]
     const rs = await client.execute({
       sql: `SELECT mode, elo, rank, peak_elo, matches_played, matches_won,
                    placement_done, placement_games_played
-            FROM mode_ratings WHERE player_name = ? ORDER BY mode`,
-      args: [playerName],
+            FROM mode_ratings
+            WHERE player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?
+            ORDER BY mode`,
+      args: [playerName, playerName],
     });
     return rs.rows as unknown as DbModeRating[];
   } catch {
@@ -751,7 +762,7 @@ export async function getModeLeaderboard(
                    p.roblox_avatar_image, p.country, p.discord_username, p.discord_avatar,
                    CAST(p.discord_id AS TEXT) AS discord_id
             FROM mode_ratings mr
-            JOIN players p ON p.name = mr.player_name
+            JOIN players p ON p.id = mr.player_id OR p.name = mr.player_name
             WHERE mr.mode = ? AND mr.placement_done = 1
             ORDER BY mr.elo DESC`,
       args: [mode],
@@ -834,12 +845,12 @@ export async function getMostPlayedWith(
               ON me.match_id = other.match_id
              AND other.player_name <> me.player_name
             LEFT JOIN players p ON other.player_name = p.name
-            WHERE me.player_name = ?
+            WHERE (me.player_id = (SELECT id FROM players WHERE name = ?) OR me.player_name = ?)
               AND me.match_id IS NOT NULL
             GROUP BY other.player_name
             ORDER BY count DESC
             LIMIT ?`,
-      args: [playerName, limit]
+      args: [playerName, playerName, limit]
     });
     return rs.rows
       .map((r) => ({
@@ -942,6 +953,11 @@ export function ensureWebQueueModeColumn(): Promise<void> {
       `);
       await client.execute("ALTER TABLE web_queue ADD COLUMN region TEXT").catch(() => {});
       await client.execute("ALTER TABLE web_queue ADD COLUMN queue_mode TEXT").catch(() => {});
+      // player_id (Phase 1 of the players(name) -> players(id) FK migration;
+      // see docs/DATABASE_PK_FK_RELATIONSHIPS.docx). web_queue is keyed by
+      // discord_id everywhere else — player_id is dual-written for
+      // consistency, not used as a lookup key here.
+      await client.execute("ALTER TABLE web_queue ADD COLUMN player_id INTEGER").catch(() => {});
       await client.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_web_queue_discord_id ON web_queue (discord_id)"
       ).catch(() => {});
@@ -976,20 +992,26 @@ export async function joinWebQueue(
   mode: QueueModeId = "standard"
 ): Promise<void> {
   await ensureWebQueueModeColumn();
-  const args = [String(discordUserId), discordUsername, playerName, region, mode];
+  // player_id dual-written via subquery — see
+  // docs/DATABASE_PK_FK_RELATIONSHIPS.docx. NULL when playerName is null or
+  // doesn't match a player, same as the text column's existing behavior.
+  const args = [String(discordUserId), discordUsername, playerName, playerName, region, mode];
   try {
     await client.execute({
-      sql: `INSERT OR REPLACE INTO web_queue (discord_id, discord_username, player_name, region, queue_mode)
-            VALUES (?, ?, ?, ?, ?)`,
+      sql: `INSERT OR REPLACE INTO web_queue
+                (discord_id, discord_username, player_name, player_id, region, queue_mode)
+            VALUES (?, ?, ?, (SELECT id FROM players WHERE name = ?), ?, ?)`,
       args,
     });
   } catch {
     await client.execute({
-      sql: `INSERT INTO web_queue (discord_id, discord_username, player_name, region, queue_mode)
-            VALUES (?, ?, ?, ?, ?)
+      sql: `INSERT INTO web_queue
+                (discord_id, discord_username, player_name, player_id, region, queue_mode)
+            VALUES (?, ?, ?, (SELECT id FROM players WHERE name = ?), ?, ?)
             ON CONFLICT(discord_id) DO UPDATE SET
               discord_username = excluded.discord_username,
               player_name = excluded.player_name,
+              player_id = excluded.player_id,
               region = excluded.region,
               queue_mode = excluded.queue_mode`,
       args,

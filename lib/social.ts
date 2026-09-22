@@ -75,6 +75,25 @@ export function ensureSocialSchema(): Promise<void> {
            message TEXT NOT NULL, sent INTEGER NOT NULL DEFAULT 0,
            created_at INTEGER )`,
       ]);
+      // player_id columns (Phase 1 of the players(name) -> players(id) FK
+      // migration; see docs/DATABASE_PK_FK_RELATIONSHIPS.docx). This mirrors
+      // core/schema.py's own ALTER-guarded back-fill so a database this
+      // standalone fallback created doesn't crash the id-aware queries below.
+      const idColumns = [
+        "ALTER TABLE web_users ADD COLUMN player_id INTEGER",
+        "ALTER TABLE friendships ADD COLUMN player_a_id INTEGER",
+        "ALTER TABLE friendships ADD COLUMN player_b_id INTEGER",
+        "ALTER TABLE friend_requests ADD COLUMN from_player_id INTEGER",
+        "ALTER TABLE friend_requests ADD COLUMN to_player_id INTEGER",
+        "ALTER TABLE party_invites ADD COLUMN from_player_id INTEGER",
+        "ALTER TABLE party_invites ADD COLUMN to_player_id INTEGER",
+        "ALTER TABLE notifications ADD COLUMN player_id INTEGER",
+        "ALTER TABLE notifications ADD COLUMN actor_player_id INTEGER",
+        "ALTER TABLE discord_dm_outbox ADD COLUMN player_id INTEGER",
+      ];
+      for (const sql of idColumns) {
+        await client.execute(sql).catch(() => undefined);
+      }
       const indexes = [
         "CREATE INDEX IF NOT EXISTS idx_web_users_player ON web_users(player_name)",
         "CREATE INDEX IF NOT EXISTS idx_friendships_player_b ON friendships(player_b)",
@@ -82,6 +101,11 @@ export function ensureSocialSchema(): Promise<void> {
         "CREATE INDEX IF NOT EXISTS idx_party_invites_to ON party_invites(to_player)",
         "CREATE INDEX IF NOT EXISTS idx_notifications_player ON notifications(player_name, read)",
         "CREATE INDEX IF NOT EXISTS idx_dm_outbox_sent ON discord_dm_outbox(sent)",
+        "CREATE INDEX IF NOT EXISTS idx_web_users_player_id ON web_users(player_id)",
+        "CREATE INDEX IF NOT EXISTS idx_friendships_player_b_id ON friendships(player_b_id)",
+        "CREATE INDEX IF NOT EXISTS idx_friend_requests_to_id ON friend_requests(to_player_id)",
+        "CREATE INDEX IF NOT EXISTS idx_party_invites_to_id ON party_invites(to_player_id)",
+        "CREATE INDEX IF NOT EXISTS idx_notifications_player_id ON notifications(player_id, read)",
       ];
       for (const sql of indexes) {
         await client.execute(sql).catch(() => undefined);
@@ -109,14 +133,18 @@ export async function upsertWebUser(
 ): Promise<void> {
   if (!playerName) return; // only useful once linked to a player
   await ensureSocialSchema();
+  // player_id is dual-written alongside player_name — see
+  // docs/DATABASE_PK_FK_RELATIONSHIPS.docx. Resolved via a subquery rather
+  // than a separate lookup; NULL if playerName doesn't match a player.
   await client.execute({
-    sql: `INSERT INTO web_users (discord_id, player_name, username, updated_at)
-          VALUES (?, ?, ?, ?)
+    sql: `INSERT INTO web_users (discord_id, player_name, player_id, username, updated_at)
+          VALUES (?, ?, (SELECT id FROM players WHERE name = ?), ?, ?)
           ON CONFLICT(discord_id) DO UPDATE SET
             player_name = excluded.player_name,
+            player_id = excluded.player_id,
             username = excluded.username,
             updated_at = excluded.updated_at`,
-    args: [discordId, playerName, username, now()],
+    args: [discordId, playerName, playerName, username, now()],
   });
 }
 
@@ -124,8 +152,10 @@ export async function upsertWebUser(
 export async function getDiscordIdForPlayer(name: string): Promise<string | null> {
   await ensureSocialSchema();
   const rs = await client.execute({
-    sql: "SELECT discord_id FROM web_users WHERE player_name = ? ORDER BY updated_at DESC LIMIT 1",
-    args: [name],
+    sql: `SELECT discord_id FROM web_users
+          WHERE player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?
+          ORDER BY updated_at DESC LIMIT 1`,
+    args: [name, name],
   });
   return (rs.rows[0]?.discord_id as string) ?? null;
 }
@@ -235,8 +265,9 @@ export async function sendFriendRequest(
   if (await requestExists(fromName, toName)) return "exists";
 
   await client.execute({
-    sql: "INSERT INTO friend_requests (from_player, to_player, created_at) VALUES (?, ?, ?)",
-    args: [fromName, toName, now()],
+    sql: `INSERT INTO friend_requests (from_player, to_player, from_player_id, to_player_id, created_at)
+          VALUES (?, ?, (SELECT id FROM players WHERE name = ?), (SELECT id FROM players WHERE name = ?), ?)`,
+    args: [fromName, toName, fromName, toName, now()],
   });
   await addNotification(toName, "friend_request", `${fromName} sent you a friend request.`, fromName);
   await enqueueDM(
@@ -256,16 +287,27 @@ export async function acceptFriendRequest(meName: string, fromName: string): Pro
   await client.batch([
     { sql: "DELETE FROM friend_requests WHERE from_player = ? AND to_player = ?", args: [fromName, meName] },
     { sql: "DELETE FROM friend_requests WHERE from_player = ? AND to_player = ?", args: [meName, fromName] },
-    { sql: "DELETE FROM notifications WHERE player_name = ? AND type = 'friend_request' AND actor_name = ?", args: [meName, fromName] },
+    {
+      sql: `DELETE FROM notifications
+            WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+              AND type = 'friend_request'
+              AND (actor_player_id = (SELECT id FROM players WHERE name = ?) OR actor_name = ?)`,
+      args: [meName, meName, fromName, fromName],
+    },
   ]);
   // Only actually befriend + notify when there was a real request to accept —
   // otherwise POST /api/friends/accept could conjure a friendship (and a DM to
   // the target) with no handshake.
   if (!pending) return;
   const [x, y] = pair(meName, fromName);
+  // player_a_id/player_b_id dual-written alongside the names — see
+  // docs/DATABASE_PK_FK_RELATIONSHIPS.docx. The pair's (player_a, player_b)
+  // ordering stays the real primary key untouched, same reasoning as
+  // core/schema.py's Phase 1 for this table.
   await client.execute({
-    sql: "INSERT OR IGNORE INTO friendships (player_a, player_b, created_at) VALUES (?, ?, ?)",
-    args: [x, y, now()],
+    sql: `INSERT OR IGNORE INTO friendships (player_a, player_b, player_a_id, player_b_id, created_at)
+          VALUES (?, ?, (SELECT id FROM players WHERE name = ?), (SELECT id FROM players WHERE name = ?), ?)`,
+    args: [x, y, x, y, now()],
   });
   await addNotification(fromName, "friend_accepted", `${meName} accepted your friend request.`, meName);
   await enqueueDM(fromName, `✅ **${meName}** accepted your friend request on HyperLeague.`);
@@ -275,7 +317,13 @@ export async function rejectFriendRequest(meName: string, fromName: string): Pro
   await ensureSocialSchema();
   await client.batch([
     { sql: "DELETE FROM friend_requests WHERE from_player = ? AND to_player = ?", args: [fromName, meName] },
-    { sql: "DELETE FROM notifications WHERE player_name = ? AND type = 'friend_request' AND actor_name = ?", args: [meName, fromName] },
+    {
+      sql: `DELETE FROM notifications
+            WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+              AND type = 'friend_request'
+              AND (actor_player_id = (SELECT id FROM players WHERE name = ?) OR actor_name = ?)`,
+      args: [meName, meName, fromName, fromName],
+    },
   ]);
 }
 
@@ -344,8 +392,9 @@ export async function createPartyInvite(
   if (await hasPartyInvite(partyId, toName)) return "pending";
 
   await client.execute({
-    sql: "INSERT INTO party_invites (party_id, from_player, to_player, created_at) VALUES (?, ?, ?, ?)",
-    args: [partyId, fromName, toName, now()],
+    sql: `INSERT INTO party_invites (party_id, from_player, to_player, from_player_id, to_player_id, created_at)
+          VALUES (?, ?, ?, (SELECT id FROM players WHERE name = ?), (SELECT id FROM players WHERE name = ?), ?)`,
+    args: [partyId, fromName, toName, fromName, toName, now()],
   });
   await addNotification(
     toName,
@@ -392,7 +441,12 @@ export async function clearPartyInvite(partyId: string, toName: string): Promise
   await ensureSocialSchema();
   await client.batch([
     { sql: "DELETE FROM party_invites WHERE party_id = ? AND to_player = ?", args: [partyId, toName] },
-    { sql: "DELETE FROM notifications WHERE player_name = ? AND type = 'party_invite' AND ref_id = ?", args: [toName, partyId] },
+    {
+      sql: `DELETE FROM notifications
+            WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+              AND type = 'party_invite' AND ref_id = ?`,
+      args: [toName, toName, partyId],
+    },
   ]);
 }
 
@@ -434,10 +488,15 @@ export async function addNotification(
   refId: string | null = null
 ): Promise<void> {
   await ensureSocialSchema();
+  // player_id/actor_player_id dual-written — see
+  // docs/DATABASE_PK_FK_RELATIONSHIPS.docx. actorName is nullable, so its
+  // subquery naturally resolves to NULL when there's no actor.
   await client.execute({
-    sql: `INSERT INTO notifications (player_name, type, message, actor_name, ref_id, read, created_at)
-          VALUES (?, ?, ?, ?, ?, 0, ?)`,
-    args: [userName, type, message, actorName, refId, now()],
+    sql: `INSERT INTO notifications
+              (player_name, player_id, type, message, actor_name, actor_player_id, ref_id, read, created_at)
+          VALUES (?, (SELECT id FROM players WHERE name = ?), ?, ?, ?,
+                  (SELECT id FROM players WHERE name = ?), ?, 0, ?)`,
+    args: [userName, userName, type, message, actorName, actorName, refId, now()],
   });
 }
 
@@ -445,8 +504,10 @@ export async function getNotifications(meName: string, limit = 30): Promise<Noti
   await ensureSocialSchema();
   const rs = await client.execute({
     sql: `SELECT id, type, message, actor_name, ref_id, read, created_at
-          FROM notifications WHERE player_name = ? ORDER BY created_at DESC LIMIT ?`,
-    args: [meName, limit],
+          FROM notifications
+          WHERE player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?
+          ORDER BY created_at DESC LIMIT ?`,
+    args: [meName, meName, limit],
   });
   return rs.rows.map((r) => ({
     id: Number(r.id),
@@ -462,15 +523,20 @@ export async function getNotifications(meName: string, limit = 30): Promise<Noti
 export async function getUnreadCount(meName: string): Promise<number> {
   await ensureSocialSchema();
   const rs = await client.execute({
-    sql: "SELECT COUNT(*) AS c FROM notifications WHERE player_name = ? AND read = 0",
-    args: [meName],
+    sql: `SELECT COUNT(*) AS c FROM notifications
+          WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?) AND read = 0`,
+    args: [meName, meName],
   });
   return Number(rs.rows[0]?.c ?? 0);
 }
 
 export async function markNotificationsRead(meName: string): Promise<void> {
   await ensureSocialSchema();
-  await client.execute({ sql: "UPDATE notifications SET read = 1 WHERE player_name = ?", args: [meName] });
+  await client.execute({
+    sql: `UPDATE notifications SET read = 1
+          WHERE player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?`,
+    args: [meName, meName],
+  });
 }
 
 // --- Discord DM outbox -----------------------------------------------------
@@ -485,7 +551,8 @@ export async function enqueueDM(toName: string, message: string): Promise<void> 
   await ensureSocialSchema();
   const discordId = await getDiscordIdForPlayer(toName);
   await client.execute({
-    sql: "INSERT INTO discord_dm_outbox (discord_id, player_name, message, sent, created_at) VALUES (?, ?, ?, 0, ?)",
-    args: [discordId, toName, message, now()],
+    sql: `INSERT INTO discord_dm_outbox (discord_id, player_name, player_id, message, sent, created_at)
+          VALUES (?, ?, (SELECT id FROM players WHERE name = ?), ?, 0, ?)`,
+    args: [discordId, toName, toName, message, now()],
   });
 }
