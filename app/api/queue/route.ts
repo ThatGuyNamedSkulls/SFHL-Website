@@ -53,7 +53,7 @@ export async function GET(request: Request) {
         clubTag: lookupClubTag(
           tags,
           entry.player_name,
-          entry.discord_user_id != null ? String(entry.discord_user_id) : null
+          entry.discord_id != null ? String(entry.discord_id) : null
         ),
       })),
       count: queue.length,

@@ -45,6 +45,7 @@ interface Club {
     playerName: string | null;
     avatar: string | null;
     role: string;
+    clubTag?: string | null;
   }[];
 }
 
@@ -57,6 +58,7 @@ interface BoardRow {
   elo: number;
   rank: RankTierLetter;
   placementDone: boolean;
+  clubTag?: string | null;
 }
 
 export default function ClubDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -541,11 +543,11 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                           href={`/profile?player=${encodeURIComponent(row.playerName)}`}
                           className="truncate text-sm font-semibold text-white hover:text-hl-gold block"
                         >
-                          <ClubTaggedName name={label} tag={club.tag} />
+                          <ClubTaggedName name={label} tag={row.clubTag} />
                         </Link>
                       ) : (
                         <div className="truncate text-sm font-semibold text-white">
-                          <ClubTaggedName name={label} tag={club.tag} />
+                          <ClubTaggedName name={label} tag={row.clubTag} />
                         </div>
                       )}
                       <div className="text-xs text-hl-muted">{roleName(row.role)}</div>
@@ -632,11 +634,11 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                           href={`/profile?player=${encodeURIComponent(row.playerName)}`}
                           className="truncate text-sm font-semibold text-white hover:text-hl-gold block"
                         >
-                          <ClubTaggedName name={label} tag={club.tag} />
+                          <ClubTaggedName name={label} tag={row.clubTag} />
                         </Link>
                       ) : (
                         <div className="truncate text-sm font-semibold text-white">
-                          <ClubTaggedName name={label} tag={club.tag} />
+                          <ClubTaggedName name={label} tag={row.clubTag} />
                         </div>
                       )}
                     </div>

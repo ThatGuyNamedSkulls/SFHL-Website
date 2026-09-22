@@ -18,7 +18,7 @@ export const OWNER_ROLE_ID = "owner";
 export const MEMBER_ROLE_ID = "member";
 export const MAX_CLUB_ROLES = 7;
 export const MAX_OWNED_CLUBS = 3;
-export const CLUB_CREATE_COST = 1000;
+export const CLUB_CREATE_COST = 2000;
 /** Stored preference: show no club tag. Null / missing preference = auto. */
 export const HIDE_CLUB_TAG_ID = "none";
 
@@ -123,6 +123,12 @@ function ensureSchema(): Promise<void> {
            updated_at INTEGER NOT NULL
          )`
       );
+      await client
+        .execute("CREATE INDEX IF NOT EXISTS idx_web_clubs_updated ON web_clubs (updated_at)")
+        .catch(() => undefined);
+      await client
+        .execute("CREATE INDEX IF NOT EXISTS idx_web_club_tag_pref_club ON web_club_tag_pref (club_id)")
+        .catch(() => undefined);
     })().then(() => undefined);
   }
   return schemaReady;
@@ -719,7 +725,7 @@ export async function clubLeaderboard(club: Club): Promise<ClubLeaderboardRow[]>
   if (names.length > 0) {
     const rs = await client.execute({
       sql: `SELECT name, elo, rank, placement_done, roblox_avatar_image,
-                   CAST(discord_id AS TEXT) AS discord_id, discord_avatar, discord_username
+                   discord_id, discord_avatar, discord_username
             FROM players
             WHERE ${names.map(() => "lower(name) = lower(?)").join(" OR ")}`,
       args: names,
@@ -735,9 +741,9 @@ export async function clubLeaderboard(club: Club): Promise<ClubLeaderboardRow[]>
   if (missingIds.length > 0) {
     const rs = await client.execute({
       sql: `SELECT name, elo, rank, placement_done, roblox_avatar_image,
-                   CAST(discord_id AS TEXT) AS discord_id, discord_avatar, discord_username
+                   discord_id, discord_avatar, discord_username
             FROM players
-            WHERE ${missingIds.map(() => "CAST(discord_id AS TEXT) = ?").join(" OR ")}`,
+            WHERE ${missingIds.map(() => "discord_id = ?").join(" OR ")}`,
       args: missingIds,
     });
     for (const row of rs.rows) {

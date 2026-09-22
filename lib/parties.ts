@@ -88,15 +88,18 @@ let schemaReady: Promise<void> | null = null;
 /** Create the table once per process (idempotent). */
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = client
-      .execute(
+    schemaReady = (async () => {
+      await client.execute(
         `CREATE TABLE IF NOT EXISTS web_parties (
            id TEXT PRIMARY KEY,
            data TEXT NOT NULL,
            updated_at INTEGER NOT NULL
          )`
-      )
-      .then(() => undefined);
+      );
+      await client
+        .execute("CREATE INDEX IF NOT EXISTS idx_web_parties_updated ON web_parties (updated_at)")
+        .catch(() => undefined);
+    })();
   }
   return schemaReady;
 }
@@ -190,7 +193,7 @@ async function dequeueMembers(members: PartyMember[]): Promise<void> {
   try {
     await client.batch(
       members.map((m) => ({
-        sql: "DELETE FROM web_queue WHERE discord_user_id = ?",
+        sql: "DELETE FROM web_queue WHERE discord_id = ?",
         args: [m.discordId],
       }))
     );

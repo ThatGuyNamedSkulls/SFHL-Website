@@ -59,17 +59,17 @@ export function ClubTournaments({ clubId, owner }: { clubId: string; owner: bool
         </div>
       ) : null}
       {cups.length === 0 ? (
-        <p className="text-sm text-hl-muted">No cups for this club right now.</p>
+        <p className="text-sm text-hl-muted">This club has not created a cup yet.</p>
       ) : (
         <div className="space-y-3">
           {cups.map((cup) => (
-            <div key={cup.id} className="rounded-lg border border-hl-border px-3 py-3">
+            <div key={cup.id} className="rounded-xl border border-hl-border bg-hl-base px-3 py-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Link href={`/tournaments/${cup.id}`} className="font-bold text-white hover:text-hl-gold">
                   {cup.name}
                 </Link>
-                <span className="text-[11px] font-bold uppercase text-hl-muted">
-                  {cup.kind === "official" ? "Official" : "Club"} · {cup.status} · {cup.teamCount}/{cup.size}
+                <span className="rounded-full border border-hl-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl-muted">
+                  {cup.status} · {cup.teamCount}/{cup.size}
                 </span>
               </div>
               {cup.teams.length > 0 ? (

@@ -6,7 +6,7 @@ import { Gamepad2 } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
 
 interface QueueEntry {
-  discord_user_id: string;
+  discord_id: string;
 }
 
 /**
@@ -27,7 +27,7 @@ export function QueuePill({ discordId }: { discordId?: string | null }) {
           const q: QueueEntry[] = d.queue || [];
           setCount(q.length);
           setInQueue(
-            discordId ? q.some((e) => e.discord_user_id === discordId) : false
+            discordId ? q.some((e) => e.discord_id === discordId) : false
           );
         })
         .catch(() => {});

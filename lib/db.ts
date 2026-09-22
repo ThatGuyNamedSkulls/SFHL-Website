@@ -1,6 +1,6 @@
 import { createClient, type Client, type ResultSet, type InArgs } from "@libsql/client";
 import { isQueueRegion } from "@/lib/regions";
-import { countryToPlayRegion } from "@/lib/country-regions";
+import { countryToPlayRegion, countriesInPlayRegion } from "@/lib/country-regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 import { parseQueueMode, type QueueModeId } from "@/lib/queue-modes";
 
@@ -132,21 +132,65 @@ let discordColsReady: Promise<void> | null = null;
 export function ensurePlayerDiscordColumns(): Promise<void> {
   if (!discordColsReady) {
     discordColsReady = (async () => {
-      await client.execute("ALTER TABLE players ADD COLUMN discord_id INTEGER DEFAULT NULL").catch(() => {});
+      await client.execute("ALTER TABLE players ADD COLUMN discord_id TEXT DEFAULT NULL").catch(() => {});
       await client.execute("ALTER TABLE players ADD COLUMN discord_username TEXT DEFAULT NULL").catch(() => {});
       await client.execute("ALTER TABLE players ADD COLUMN discord_avatar TEXT DEFAULT NULL").catch(() => {});
       await client.execute("ALTER TABLE players ADD COLUMN country TEXT DEFAULT NULL").catch(() => {});
       await client.execute("ALTER TABLE players ADD COLUMN mm_access INTEGER DEFAULT 0").catch(() => {});
+      await ensureLookupIndexes();
     })();
   }
   return discordColsReady;
+}
+
+/** Lookup indexes for columns the site and bot query constantly.
+ *  Foreign keys are added by the bot's schema ensure (table rebuild); these
+ *  indexes are safe to create from the website because they do not rename columns. */
+const LOOKUP_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS idx_players_discord_id ON players(discord_id)",
+  "CREATE INDEX IF NOT EXISTS idx_players_name_lower ON players(lower(name))",
+  "CREATE INDEX IF NOT EXISTS idx_players_elo ON players(elo DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_match_history_player ON match_history(player_name)",
+  "CREATE INDEX IF NOT EXISTS idx_match_history_match ON match_history(match_id)",
+  "CREATE INDEX IF NOT EXISTS idx_match_history_timestamp ON match_history(timestamp)",
+  "CREATE INDEX IF NOT EXISTS idx_match_history_player_public ON match_history(player_name, is_placement, is_test, id DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_match_history_player_time ON match_history(player_name, timestamp DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_mode_ratings_player ON mode_ratings(player_name)",
+  "CREATE INDEX IF NOT EXISTS idx_mode_ratings_leaderboard ON mode_ratings(mode, placement_done, elo DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_guestbook_profile ON guestbook(profile_name, created_at)",
+  "CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_player)",
+  "CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_name)",
+  "CREATE INDEX IF NOT EXISTS idx_achievements_player ON achievements(player_name)",
+  "CREATE INDEX IF NOT EXISTS idx_badges_player ON badges(player_name)",
+  "CREATE INDEX IF NOT EXISTS idx_season_stats_player ON season_stats(player_name)",
+  "CREATE INDEX IF NOT EXISTS idx_season_stats_player_archived ON season_stats(player_name, archived_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_timeouts_discord ON timeouts(discord_id)",
+  "CREATE INDEX IF NOT EXISTS idx_warnings_discord ON warnings(discord_id)",
+  "CREATE INDEX IF NOT EXISTS idx_leaving_discord ON leaving_incidents(discord_id)",
+  "CREATE INDEX IF NOT EXISTS idx_web_queue_player ON web_queue(player_name)",
+  "CREATE INDEX IF NOT EXISTS idx_web_queue_region ON web_queue(region)",
+  "CREATE INDEX IF NOT EXISTS idx_lobby_messages_channel ON web_lobby_messages(channel_id, created_at)",
+  "CREATE INDEX IF NOT EXISTS idx_sub_requests_status ON sub_requests(status)",
+  "CREATE INDEX IF NOT EXISTS idx_sub_requests_channel ON sub_requests(channel_id)",
+];
+
+let lookupIndexesReady: Promise<void> | null = null;
+export function ensureLookupIndexes(): Promise<void> {
+  if (!lookupIndexesReady) {
+    lookupIndexesReady = (async () => {
+      for (const sql of LOOKUP_INDEXES) {
+        await client.execute(sql).catch(() => undefined);
+      }
+    })();
+  }
+  return lookupIndexesReady;
 }
 
 const PLAYER_SELECT = `SELECT id, name, elo, rank, country, total_kills, total_deaths, total_assists,
             kd_ratio, total_mvps, total_score, total_headshot_percentage,
             avg_hs_percent, matches_played, matches_won, peak_elo,
             total_play_time, roblox_avatar_image, placement_done,
-            placement_games_played, CAST(discord_id AS TEXT) AS discord_id,
+            placement_games_played, discord_id,
             discord_username, discord_avatar, COALESCE(mm_access, 0) AS mm_access
      FROM players`;
 
@@ -196,10 +240,9 @@ export async function getPlayerByDiscordId(discordId: string): Promise<DbPlayer 
   if (!id) return undefined;
   const rs = await client.execute({
     sql: `${PLAYER_SELECT}
-          WHERE CAST(discord_id AS TEXT) = ?
-             OR discord_id = CAST(? AS INTEGER)
+          WHERE discord_id = ?
           LIMIT 1`,
-    args: [id, id],
+    args: [id],
   });
   return playerFromRows(rs);
 }
@@ -230,18 +273,16 @@ export async function setPlayerDiscordIdentity(
   if (avatar) {
     await client.execute({
       sql: `UPDATE players SET discord_id = ?, discord_username = ?, discord_avatar = ?
-            WHERE CAST(discord_id AS TEXT) = ?
-               OR discord_id = CAST(? AS INTEGER)
+            WHERE discord_id = ?
                OR lower(name) = lower(?)`,
-      args: [discordId, username, avatar, String(discordId), String(discordId), name],
+      args: [discordId, username, avatar, String(discordId), name],
     });
   } else {
     await client.execute({
       sql: `UPDATE players SET discord_id = ?, discord_username = ?
-            WHERE CAST(discord_id AS TEXT) = ?
-               OR discord_id = CAST(? AS INTEGER)
+            WHERE discord_id = ?
                OR lower(name) = lower(?)`,
-      args: [discordId, username, String(discordId), String(discordId), name],
+      args: [discordId, username, String(discordId), name],
     });
   }
 }
@@ -277,16 +318,13 @@ export async function setPlayerCountry(
     sql: `UPDATE players SET country = ?
           WHERE id = ?
              OR lower(name) = lower(?)
-             OR (? != '' AND (
-                  CAST(discord_id AS TEXT) = ?
-                  OR discord_id = CAST(? AS INTEGER)
-             ))`,
-    args: [normalized, player.id, player.name, did, did, did],
+             OR (? != '' AND discord_id = ?)`,
+    args: [normalized, player.id, player.name, did, did],
   });
 
   if (did && (player.discord_id == null || String(player.discord_id) !== did)) {
     await client.execute({
-      sql: `UPDATE players SET discord_id = CAST(? AS INTEGER)
+      sql: `UPDATE players SET discord_id = ?
             WHERE id = ? AND discord_id IS NULL`,
       args: [did, player.id],
     });
@@ -379,7 +417,7 @@ export async function setPlayerLastQueueRegion(
 export async function setPlayerMmAccess(discordId: string, has: boolean): Promise<void> {
   await ensurePlayerDiscordColumns();
   await client.execute({
-    sql: "UPDATE players SET mm_access = ? WHERE CAST(discord_id AS TEXT) = ?",
+    sql: "UPDATE players SET mm_access = ? WHERE discord_id = ?",
     args: [has ? 1 : 0, String(discordId)],
   });
 }
@@ -398,9 +436,9 @@ export async function getPlayerRankings(
   const ctry = ((rs.rows[0].country as string) || "").toLowerCase() || null;
   const playRegion = countryToPlayRegion(ctry);
 
-  const [higherRs, countryRs] = await Promise.all([
+  const [higherRs, countryRs, regionRs] = await Promise.all([
     client.execute({
-      sql: "SELECT country FROM players WHERE elo > ?",
+      sql: "SELECT COUNT(*) AS c FROM players WHERE elo > ?",
       args: [elo],
     }),
     ctry
@@ -409,18 +447,18 @@ export async function getPlayerRankings(
           args: [ctry, elo],
         })
       : Promise.resolve(null),
+    playRegion
+      ? client.execute({
+          sql: `SELECT COUNT(*) AS c FROM players WHERE lower(country) IN (${countriesInPlayRegion(playRegion)
+            .map(() => "?")
+            .join(",")}) AND elo > ?`,
+          args: [...countriesInPlayRegion(playRegion), elo],
+        })
+      : Promise.resolve(null),
   ]);
-  const overall = higherRs.rows.length + 1;
+  const overall = Number(higherRs.rows[0]?.c ?? 0) + 1;
   const country = ctry ? Number(countryRs?.rows[0]?.c ?? 0) + 1 : null;
-  let region: number | null = null;
-  if (playRegion) {
-    let n = 1;
-    for (const row of higherRs.rows) {
-      const rowCountry = ((row.country as string) || "").toLowerCase() || null;
-      if (countryToPlayRegion(rowCountry) === playRegion) n += 1;
-    }
-    region = n;
-  }
+  const region = playRegion ? Number(regionRs?.rows[0]?.c ?? 0) + 1 : null;
   return { overall, country, region };
 }
 
@@ -879,7 +917,7 @@ export async function getAggregateStats(): Promise<AggregateStats> {
 
 export interface WebQueueEntry {
   id: number;
-  discord_user_id: string;
+  discord_id: string;
   discord_username: string;
   player_name: string | null;
   joined_at: string;
@@ -894,7 +932,7 @@ export function ensureWebQueueModeColumn(): Promise<void> {
       await client.execute(`
         CREATE TABLE IF NOT EXISTS web_queue (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          discord_user_id TEXT NOT NULL UNIQUE,
+          discord_id TEXT NOT NULL UNIQUE,
           discord_username TEXT NOT NULL,
           player_name TEXT,
           joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -905,7 +943,7 @@ export function ensureWebQueueModeColumn(): Promise<void> {
       await client.execute("ALTER TABLE web_queue ADD COLUMN region TEXT").catch(() => {});
       await client.execute("ALTER TABLE web_queue ADD COLUMN queue_mode TEXT").catch(() => {});
       await client.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_web_queue_discord_user_id ON web_queue (discord_user_id)"
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_web_queue_discord_id ON web_queue (discord_id)"
       ).catch(() => {});
     })();
   }
@@ -941,15 +979,15 @@ export async function joinWebQueue(
   const args = [String(discordUserId), discordUsername, playerName, region, mode];
   try {
     await client.execute({
-      sql: `INSERT OR REPLACE INTO web_queue (discord_user_id, discord_username, player_name, region, queue_mode)
+      sql: `INSERT OR REPLACE INTO web_queue (discord_id, discord_username, player_name, region, queue_mode)
             VALUES (?, ?, ?, ?, ?)`,
       args,
     });
   } catch {
     await client.execute({
-      sql: `INSERT INTO web_queue (discord_user_id, discord_username, player_name, region, queue_mode)
+      sql: `INSERT INTO web_queue (discord_id, discord_username, player_name, region, queue_mode)
             VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(discord_user_id) DO UPDATE SET
+            ON CONFLICT(discord_id) DO UPDATE SET
               discord_username = excluded.discord_username,
               player_name = excluded.player_name,
               region = excluded.region,
@@ -985,11 +1023,11 @@ export async function leaveWebQueueMany(discordUserIds: string[]): Promise<void>
   // so a website leave left the Discord queue untouched.
   for (const id of ids) {
     await client.execute({
-      sql: "DELETE FROM web_queue WHERE CAST(discord_user_id AS TEXT) = CAST(? AS TEXT)",
+      sql: "DELETE FROM web_queue WHERE discord_id = CAST(? AS TEXT)",
       args: [id],
     });
     await client.execute({
-      sql: "DELETE FROM web_queue WHERE discord_user_id = ?",
+      sql: "DELETE FROM web_queue WHERE discord_id = ?",
       args: [id],
     });
   }
@@ -1003,7 +1041,7 @@ export async function getQueueTeamSize(): Promise<number> {
 export async function isInWebQueue(discordUserId: string): Promise<boolean> {
   try {
     const rs = await client.execute({
-      sql: "SELECT 1 FROM web_queue WHERE CAST(discord_user_id AS TEXT) = CAST(? AS TEXT)",
+      sql: "SELECT 1 FROM web_queue WHERE discord_id = CAST(? AS TEXT)",
       args: [String(discordUserId)],
     });
     return rs.rows.length > 0;
@@ -1024,7 +1062,7 @@ export async function getWebQueueSpot(
   try {
     await ensureWebQueueModeColumn();
     const rs = await client.execute({
-      sql: "SELECT region, queue_mode FROM web_queue WHERE CAST(discord_user_id AS TEXT) = CAST(? AS TEXT)",
+      sql: "SELECT region, queue_mode FROM web_queue WHERE discord_id = CAST(? AS TEXT)",
       args: [String(discordUserId)],
     });
     if (!rs.rows.length) return null;

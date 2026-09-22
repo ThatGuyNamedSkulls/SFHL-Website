@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { BracketView } from "@/components/bracket-view";
+import { PlayerSearch } from "@/components/player-search";
 import { useSession } from "@/components/session-provider";
 import { matchesToView, roundLabel } from "@/lib/tournament-bracket";
 import { regionMeta } from "@/lib/regions";
@@ -15,6 +16,7 @@ interface Viewer {
   captainOf: string | null;
   inviteTeamId: string | null;
   pendingRequest: boolean;
+  clubMember: boolean;
 }
 
 type ScoreRow = { map: string; scoreA: string; scoreB: string };
@@ -111,84 +113,144 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       scoreB: "",
     }));
 
+  const showRequest =
+    open &&
+    !!session &&
+    !onRoster &&
+    !viewer.pendingRequest &&
+    !viewer.inviteTeamId &&
+    (tournament.kind === "official" || viewer.clubMember);
+  const showPrivateBlock =
+    open &&
+    tournament.kind === "community" &&
+    !viewer.clubMember &&
+    !onRoster &&
+    !viewer.pendingRequest &&
+    !viewer.inviteTeamId;
+  const reviewer = tournament.kind === "official" ? "Match Staff" : "the club owner";
+  const pendingRequests = tournament.requests.filter((r) => r.status === "pending");
+  const statusPill =
+    tournament.status === "live"
+      ? "bg-hl-red/15 text-hl-red border-hl-red/40"
+      : tournament.status === "open"
+        ? "bg-hl-teal/15 text-hl-teal border-hl-teal/40"
+        : "bg-hl-base text-hl-muted border-hl-border";
+
   return (
     <div className="hl-page">
       <Link href="/tournaments" className="text-xs font-bold text-hl-gold hover:underline">
         ← All tournaments
       </Link>
-      <div className="mt-3 mb-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-black text-white">{tournament.name}</h1>
-            <p className="mt-1 text-sm text-hl-muted">
-              {tournament.kind === "official" ? "Official" : "Club cup"}
-              {clubName ? ` · ${clubName}` : ""} · {regionMeta(tournament.region).label} · {elim} · BO
-              {tournament.bo} · {tournament.status.toUpperCase()}
-            </p>
-            <p className="mt-1 text-xs text-hl-muted">
-              Results do not change ranked Elo. Pot split {tournament.potSplit.join(" / ")}.
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-black text-hl-gold">{tournament.pot.toLocaleString()}</div>
-            <div className="text-xs text-hl-muted">
-              Pot · entry {tournament.entryFee.toLocaleString()} · {tournament.teams.length}/{tournament.size} teams
+      <Card className="mt-3 mb-6 bg-hl-panel border-hl-border overflow-hidden p-0">
+        <div
+          className={`h-1 ${
+            tournament.status === "live" ? "bg-hl-red" : tournament.status === "open" ? "bg-hl-teal" : "bg-hl-muted/40"
+          }`}
+        />
+        <div className="p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusPill}`}>
+                  {tournament.status}
+                </span>
+                <span className="rounded-full border border-hl-border bg-hl-base px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl-muted">
+                  {tournament.kind === "official" ? "Official" : "Club cup"}
+                </span>
+                {tournament.clubId && clubName ? (
+                  <Link
+                    href={`/clubs/${tournament.clubId}`}
+                    className="rounded-full border border-hl-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl-gold hover:border-hl-gold/40"
+                  >
+                    {clubName}
+                  </Link>
+                ) : null}
+              </div>
+              <h1 className="text-2xl font-black text-white">{tournament.name}</h1>
+              <p className="mt-1 text-sm text-hl-muted">
+                {regionMeta(tournament.region).label} · {elim} · best of {tournament.bo}
+              </p>
+              <p className="mt-1 text-xs text-hl-muted">
+                Results do not change ranked Elo. Pot split {tournament.potSplit.join(" / ")}.
+              </p>
+            </div>
+            <div className="rounded-xl border border-hl-border bg-hl-base px-4 py-3 text-right min-w-[9rem]">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-hl-muted">Pot</div>
+              <div className="text-2xl font-black text-hl-gold tabular-nums">{tournament.pot.toLocaleString()}</div>
+              <div className="text-[11px] text-hl-muted">
+                Entry {tournament.entryFee.toLocaleString()} · {tournament.teams.length}/{tournament.size}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {tournament.mapPool.map((map) => (
-            <span key={map} className="rounded bg-hl-panel-light border border-hl-border px-2 py-0.5 text-xs text-hl-muted">
-              {map}
-            </span>
-          ))}
-        </div>
-        {viewer.organizer && open ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy || tournament.teams.length < 2}
-              onClick={() => void act({ action: "start" })}
-              className="h-9 rounded-xl bg-gold-gradient px-4 text-sm font-black text-hl-base disabled:opacity-40"
-            >
-              Start bracket
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                if (window.confirm("Cancel this cup and refund entry fees?")) void act({ action: "cancel" });
-              }}
-              className="h-9 rounded-xl border border-hl-red/40 px-4 text-sm font-bold text-hl-red"
-            >
-              Cancel cup
-            </button>
+          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-hl-base">
+            <div
+              className="h-full bg-gold-gradient"
+              style={{ width: `${Math.min(100, Math.round((tournament.teams.length / tournament.size) * 100))}%` }}
+            />
           </div>
-        ) : null}
-        {viewer.organizer && tournament.status === "live" ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              if (window.confirm("Cancel this cup and refund entry fees?")) void act({ action: "cancel" });
-            }}
-            className="mt-4 h-9 rounded-xl border border-hl-red/40 px-4 text-sm font-bold text-hl-red"
-          >
-            Cancel cup
-          </button>
-        ) : null}
-        {error ? <p className="mt-3 text-sm text-hl-red">{error}</p> : null}
-      </div>
+          {tournament.mapPool.length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {tournament.mapPool.map((map) => (
+                <span key={map} className="rounded-md bg-hl-base border border-hl-border px-2 py-0.5 text-xs text-hl-muted">
+                  {map}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {viewer.organizer && (open || tournament.status === "live") ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {open ? (
+                <button
+                  type="button"
+                  disabled={busy || tournament.teams.length < 2}
+                  onClick={() => void act({ action: "start" })}
+                  className="h-9 rounded-xl bg-gold-gradient px-4 text-sm font-black text-hl-base disabled:opacity-40"
+                >
+                  Start bracket
+                </button>
+              ) : null}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  if (window.confirm("Cancel this cup and refund entry fees?")) void act({ action: "cancel" });
+                }}
+                className="h-9 rounded-xl border border-hl-red/40 px-4 text-sm font-bold text-hl-red"
+              >
+                Cancel cup
+              </button>
+            </div>
+          ) : null}
+          {error ? <p className="mt-3 text-sm text-hl-red">{error}</p> : null}
+        </div>
+      </Card>
 
-      {open &&
-      tournament.kind === "official" &&
-      !onRoster &&
-      !viewer.pendingRequest &&
-      !viewer.inviteTeamId ? (
+      {showPrivateBlock ? (
+        <Card className="bg-hl-panel border-hl-border p-4 mb-5">
+          <div className="text-sm font-bold text-white">Private cup</div>
+          <p className="mt-1 text-sm text-hl-muted">You need to be in the club to join.</p>
+          {!session ? (
+            <p className="mt-2 text-xs text-hl-muted">Log in if you are already in this club.</p>
+          ) : null}
+          {tournament.clubId && clubName ? (
+            <Link href={`/clubs/${tournament.clubId}`} className="mt-3 inline-block text-xs font-bold text-hl-gold hover:underline">
+              Open {clubName}
+            </Link>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {open && !session && tournament.kind === "official" && !onRoster ? (
+        <p className="mb-5 text-sm text-hl-muted">Log in to request a team.</p>
+      ) : null}
+
+      {showRequest ? (
         <Card className="bg-hl-panel border-hl-border p-4 mb-5">
           <div className="text-sm font-bold text-white mb-2">Request a team</div>
           <p className="text-xs text-hl-muted mb-3">
-            Match Staff accept or deny. The entry fee is charged when you are accepted.
+            {tournament.entryFee > 0
+              ? `Requesting charges ${tournament.entryFee.toLocaleString()} HL Coins now. ${reviewer} accept or deny. A denial refunds the fee.`
+              : `${reviewer} accept or deny. This cup has no entry fee.`}
           </p>
           <div className="flex flex-wrap gap-2">
             <input
@@ -203,21 +265,28 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               onClick={() => void act({ action: "request", teamName })}
               className="h-10 rounded-lg bg-gold-gradient px-4 text-sm font-black text-hl-base disabled:opacity-40"
             >
-              Request
+              {tournament.entryFee > 0 ? `Pay ${tournament.entryFee.toLocaleString()} & request` : "Request"}
             </button>
           </div>
         </Card>
       ) : null}
       {viewer.pendingRequest ? (
-        <p className="mb-5 text-sm text-hl-muted">Your team request is waiting for Match Staff.</p>
+        <Card className="bg-hl-panel border-hl-gold/30 p-4 mb-5">
+          <p className="text-sm text-white font-semibold">Your team request is waiting for {reviewer}.</p>
+          <p className="mt-1 text-xs text-hl-muted">
+            {tournament.entryFee > 0
+              ? "The entry fee is held until the request is accepted or denied. A denial refunds it."
+              : "You will be added as captain if the request is accepted."}
+          </p>
+        </Card>
       ) : null}
 
-      {open && viewer.organizer && tournament.kind === "official" && tournament.requests.length > 0 ? (
+      {open && viewer.organizer && pendingRequests.length > 0 ? (
         <Card className="bg-hl-panel border-hl-border p-4 mb-5">
           <div className="text-sm font-bold text-white mb-3">Requests</div>
           <div className="space-y-2">
-            {tournament.requests.filter((r) => r.status === "pending").map((r) => (
-              <div key={r.id} className="flex flex-wrap items-center gap-2">
+            {pendingRequests.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-hl-border bg-hl-base px-3 py-2">
                 <span className="text-sm text-white font-semibold">{r.teamName}</span>
                 <span className="text-xs text-hl-muted">{r.playerName}</span>
                 <button
@@ -234,7 +303,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                   onClick={() => void act({ action: "review", requestId: r.id, accept: false })}
                   className="h-8 rounded-lg border border-hl-border px-3 text-xs font-bold text-white"
                 >
-                  Deny
+                  Deny & refund
                 </button>
               </div>
             ))}
@@ -247,13 +316,14 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           <div className="text-sm font-bold text-white mb-2">Add a team captain</div>
           <p className="text-xs text-hl-muted mb-3">
             Pick a club member. Their entry fee is charged now, then they invite the rest of the roster.
+            Members can also request a team themselves.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <input
-              value={captainName}
-              onChange={(e) => setCaptainName(e.target.value)}
-              placeholder="Player name"
-              className={`${field} flex-1 min-w-[10rem]`}
+          <div className="flex flex-wrap gap-2 items-start">
+            <PlayerSearch
+              className="flex-1 min-w-[14rem]"
+              placeholder="Search a club member"
+              onPick={setCaptainName}
+              onQueryChange={setCaptainName}
             />
             <input
               value={teamName}
@@ -359,12 +429,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 </div>
               ) : null}
               {viewer.captainOf === team.id && open ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <input
-                    value={inviteName}
-                    onChange={(e) => setInviteName(e.target.value)}
-                    placeholder="Player name to invite"
-                    className={`${field} flex-1 min-w-[12rem]`}
+                <div className="mt-3 flex flex-wrap gap-2 items-start">
+                  <PlayerSearch
+                    className="flex-1 min-w-[14rem]"
+                    placeholder="Search a player to invite"
+                    onPick={setInviteName}
+                    onQueryChange={setInviteName}
                   />
                   <button
                     type="button"

@@ -23,7 +23,7 @@ export function ensureLobbyChatSchema(): Promise<void> {
            id INTEGER PRIMARY KEY AUTOINCREMENT,
            channel_id TEXT NOT NULL,
            discord_message_id TEXT,
-           author_id TEXT NOT NULL,
+           discord_id TEXT NOT NULL,
            author_name TEXT NOT NULL,
            content TEXT NOT NULL,
            source TEXT NOT NULL,
@@ -38,7 +38,7 @@ export function ensureLobbyChatSchema(): Promise<void> {
 export async function listLobbyChat(channelId: string, limit = 80): Promise<ChatMessage[]> {
   await ensureLobbyChatSchema();
   const rs = await client.execute({
-    sql: `SELECT id, author_id, author_name, content, source, created_at
+    sql: `SELECT id, discord_id, author_name, content, source, created_at
           FROM web_lobby_messages
           WHERE channel_id = ?
           ORDER BY id DESC
@@ -47,7 +47,7 @@ export async function listLobbyChat(channelId: string, limit = 80): Promise<Chat
   });
   return [...rs.rows].reverse().map((r) => ({
     id: Number(r.id),
-    authorId: String(r.author_id),
+    authorId: String(r.discord_id),
     authorName: String(r.author_name),
     content: String(r.content),
     source: r.source === "website" ? "website" : "discord",
@@ -67,7 +67,7 @@ export async function postLobbyChat(input: {
   const now = Date.now();
   const ins = await client.execute({
     sql: `INSERT INTO web_lobby_messages
-          (channel_id, discord_message_id, author_id, author_name, content, source, created_at)
+          (channel_id, discord_message_id, discord_id, author_name, content, source, created_at)
           VALUES (?, 'pending', ?, ?, ?, 'website', ?)`,
     args: [input.channelId, input.authorId, input.authorName.slice(0, 80), text, now],
   });

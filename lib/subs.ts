@@ -345,7 +345,7 @@ export async function claimSubRequest(
   // and playing one at the same time.
   try {
     await client.execute({
-      sql: "DELETE FROM web_queue WHERE discord_user_id = ?",
+      sql: "DELETE FROM web_queue WHERE discord_id = ?",
       args: [claimer.discordId],
     });
   } catch {

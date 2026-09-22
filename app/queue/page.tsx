@@ -32,7 +32,7 @@ import { ClubTaggedName } from "@/components/club-identity";
 
 interface WebQueueEntry {
   id: number;
-  discord_user_id: string;
+  discord_id: string;
   discord_username: string;
   player_name: string | null;
   joined_at: string;
@@ -232,7 +232,7 @@ export default function QueuePage() {
 
   const inQueue =
     !!queuedSpot ||
-    !!(session && queue.some((q) => String(q.discord_user_id) === String(session.discordId)));
+    !!(session && queue.some((q) => String(q.discord_id) === String(session.discordId)));
   const selectionLocked = inQueue || actionLoading;
   const visibleQueue = queue.filter((e) => parseQueueMode(e.queue_mode) === matchType);
   const canQueue =

@@ -31,7 +31,7 @@ const DEFAULT_ACCENT: string = DEFAULT_PROFILE_BACKGROUNDS[1].color;
 export default function ClubsPage() {
   const { session, loaded, coins, refresh } = useSession();
   const [clubs, setClubs] = useState<ClubRow[]>([]);
-  const [createCost, setCreateCost] = useState(1000);
+  const [createCost, setCreateCost] = useState(2000);
   const [maxOwned, setMaxOwned] = useState(3);
   const [ownedCount, setOwnedCount] = useState(0);
   const [creating, setCreating] = useState(false);

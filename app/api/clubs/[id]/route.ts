@@ -4,8 +4,10 @@ import { containsProfanity } from "@/lib/content-moderation";
 import {
   clubForClient,
   clubLeaderboard,
+  clubTagIndex,
   deleteClub,
   getClub,
+  lookupClubTag,
   updateClub,
 } from "@/lib/clubs";
 
@@ -21,7 +23,21 @@ async function payload(clubId: string, viewerId?: string | null) {
   } catch (error) {
     console.error("club leaderboard", error);
   }
-  return { club: clubForClient(club, viewerId), leaderboard };
+  const tags = await clubTagIndex();
+  const clientClub = clubForClient(club, viewerId);
+  return {
+    club: {
+      ...clientClub,
+      members: clientClub.members.map((member) => ({
+        ...member,
+        clubTag: lookupClubTag(tags, member.playerName, member.discordId),
+      })),
+    },
+    leaderboard: leaderboard.map((row) => ({
+      ...row,
+      clubTag: lookupClubTag(tags, row.playerName, row.discordId),
+    })),
+  };
 }
 
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {

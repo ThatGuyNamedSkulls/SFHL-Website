@@ -178,7 +178,7 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
       await ensurePlayerDiscordColumns();
       const rs = await client.execute({
         sql: `SELECT name, rank, elo, roblox_avatar_image, discord_avatar,
-                     CAST(discord_id AS TEXT) AS discord_id
+                     discord_id
               FROM players WHERE name IN (${placeholders})`,
         args: names,
       });

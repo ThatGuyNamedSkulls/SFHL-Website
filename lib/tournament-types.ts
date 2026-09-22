@@ -39,6 +39,9 @@ export interface JoinRequest {
   playerName: string;
   avatar: string | null;
   status: "pending" | "denied";
+  /** Coins already taken for this request. Missing on requests made before fees were charged up front. */
+  paidAmount?: number;
+  paidBy?: string | null;
   createdAt: number;
 }
 

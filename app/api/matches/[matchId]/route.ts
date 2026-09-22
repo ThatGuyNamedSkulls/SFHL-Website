@@ -78,7 +78,7 @@ export async function GET(
         await ensurePlayerDiscordColumns();
         const rs = await client.execute({
           sql: `SELECT name, rank, elo, country, roblox_avatar_image, discord_avatar,
-                       CAST(discord_id AS TEXT) AS discord_id
+                       discord_id
                 FROM players WHERE name IN (${placeholders})`,
           args: rows.map((r) => r.player_name),
         });

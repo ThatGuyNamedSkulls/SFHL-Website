@@ -136,15 +136,15 @@ export function VsMatchesPanel() {
       const [l, m, q] = await Promise.all([
         apiGetJson<{ lobby?: LiveLobby | null }>("/api/lobby"),
         apiGetJson<{ matches?: RecentMatch[] }>("/api/matches/recent"),
-        apiGetJson<{ queue?: { discord_user_id: string; joined_at: string }[] }>("/api/queue"),
+        apiGetJson<{ queue?: { discord_id: string; joined_at: string }[] }>("/api/queue"),
       ]);
       const user = session;
       setLobby((l.json?.lobby as LiveLobby | null) ?? null);
       setLoggedIn(!!user);
       setMatches(Array.isArray(m.json?.matches) ? m.json.matches : []);
       const mine = user
-        ? (q.json?.queue as { discord_user_id: string; joined_at: string }[] | undefined)?.find(
-            (entry) => entry.discord_user_id === user.discordId
+        ? (q.json?.queue as { discord_id: string; joined_at: string }[] | undefined)?.find(
+            (entry) => entry.discord_id === user.discordId
           )
         : null;
       setQueuedAt(mine?.joined_at ? parseJoinedAt(mine.joined_at) : null);

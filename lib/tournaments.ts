@@ -7,7 +7,7 @@ import { randomUUID } from "crypto";
 import { MAP_NAMES } from "@/data/maps";
 import { getClub } from "@/lib/clubs";
 import { containsProfanity } from "@/lib/content-moderation";
-import { client, getPlayer, refundPlayerCoins, spendPlayerCoins } from "@/lib/db";
+import { client, ensurePlayerCoinsColumn, getPlayer, refundPlayerCoins, spendPlayerCoins } from "@/lib/db";
 import { isQueueRegion } from "@/lib/regions";
 import {
   applyResult,
@@ -59,15 +59,30 @@ let schemaReady: Promise<void> | null = null;
 
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = client
-      .execute(
+    schemaReady = (async () => {
+      await client.execute(
         `CREATE TABLE IF NOT EXISTS web_tournaments (
            id TEXT PRIMARY KEY,
            data TEXT NOT NULL,
            updated_at INTEGER NOT NULL
          )`
-      )
-      .then(() => undefined);
+      );
+      await client.execute("ALTER TABLE web_tournaments ADD COLUMN club_id TEXT").catch(() => undefined);
+      await client
+        .execute("CREATE INDEX IF NOT EXISTS idx_web_tournaments_club ON web_tournaments (club_id)")
+        .catch(() => undefined);
+      await client
+        .execute("CREATE INDEX IF NOT EXISTS idx_web_tournaments_updated ON web_tournaments (updated_at)")
+        .catch(() => undefined);
+      await client
+        .execute(
+          `UPDATE web_tournaments
+           SET club_id = json_extract(data, '$.clubId')
+           WHERE (club_id IS NULL OR club_id = '')
+             AND json_extract(data, '$.clubId') IS NOT NULL`
+        )
+        .catch(() => undefined);
+    })();
   }
   return schemaReady;
 }
@@ -98,14 +113,29 @@ function parseTournament(raw: unknown): Tournament | null {
   }
 }
 
-async function writeTournament(t: Tournament): Promise<Tournament> {
+type SqlStmt = { sql: string; args: (string | number | null)[] };
+
+async function writeTournament(t: Tournament, extra: SqlStmt[] = []): Promise<Tournament> {
   await ensureSchema();
   t.updatedAt = Date.now();
-  await client.execute({
-    sql: "INSERT OR REPLACE INTO web_tournaments (id, data, updated_at) VALUES (?, ?, ?)",
-    args: [t.id, JSON.stringify(t), t.updatedAt],
-  });
+  const save: SqlStmt = {
+    sql: "INSERT OR REPLACE INTO web_tournaments (id, data, updated_at, club_id) VALUES (?, ?, ?, ?)",
+    args: [t.id, JSON.stringify(t), t.updatedAt, t.clubId],
+  };
+  if (extra.length) {
+    await ensurePlayerCoinsColumn();
+    await client.batch([...extra, save], "write");
+  } else {
+    await client.execute(save);
+  }
   return t;
+}
+
+function coinCredit(name: string, amount: number): SqlStmt {
+  return {
+    sql: "UPDATE players SET coins = coins + ? WHERE name = ?",
+    args: [amount, name],
+  };
 }
 
 export async function listTournaments(): Promise<Tournament[]> {
@@ -135,13 +165,19 @@ async function mustGet(id: string): Promise<Tournament> {
 }
 
 export async function tournamentsForClub(clubId: string): Promise<Tournament[]> {
-  const [all, club] = await Promise.all([listTournaments(), getClub(clubId)]);
-  const ids = new Set((club?.members ?? []).map((m) => m.discordId));
-  return all.filter((t) => {
-    if (t.status === "cancelled") return false;
-    if (t.clubId === clubId) return true;
-    return t.teams.some((team) => team.members.some((m) => ids.has(m.discordId)));
-  });
+  await ensureSchema();
+  try {
+    const rs = await client.execute({
+      sql: "SELECT data FROM web_tournaments WHERE club_id = ? ORDER BY updated_at DESC",
+      args: [clubId],
+    });
+    return rs.rows
+      .map((row) => parseTournament(row.data))
+      .filter((t): t is Tournament => !!t && t.status !== "cancelled" && t.clubId === clubId);
+  } catch {
+    const all = await listTournaments();
+    return all.filter((t) => t.status !== "cancelled" && t.clubId === clubId);
+  }
 }
 
 async function isOrganizer(t: Tournament, actor: TournamentActor): Promise<boolean> {
@@ -169,12 +205,18 @@ export async function tournamentViewer(t: Tournament, actor: TournamentActor | n
       captainOf: null as string | null,
       inviteTeamId: null as string | null,
       pendingRequest: false,
+      clubMember: false,
     };
   }
   const invite = t.teams.find((team) =>
     team.members.some((m) => m.discordId === actor.discordId && m.status === "invited")
   );
   const captain = t.teams.find((team) => team.captainId === actor.discordId);
+  let clubMember = false;
+  if (t.kind === "community" && t.clubId) {
+    const club = await getClub(t.clubId);
+    clubMember = !!club?.members.some((m) => m.discordId === actor.discordId);
+  }
   return {
     organizer: await isOrganizer(t, actor),
     staff: actor.staff,
@@ -183,6 +225,7 @@ export async function tournamentViewer(t: Tournament, actor: TournamentActor | n
     pendingRequest: t.requests.some(
       (r) => r.captainId === actor.discordId && r.status === "pending"
     ),
+    clubMember,
   };
 }
 
@@ -371,19 +414,24 @@ export async function requestJoin(
 ): Promise<Tournament> {
   const t = await mustGet(id);
   assertOpen(t);
-  if (t.kind !== "official") {
-    throw new Error("This cup is run by a club. The owner picks the captains.");
-  }
   if (!actor.playerName) throw new Error("Link a HyperLeague player before requesting a team.");
   const player = await resolvePlayer(actor.playerName);
   if (player.discordId !== actor.discordId) {
     throw new Error("Your linked player does not match this Discord account.");
+  }
+  if (t.kind === "community") {
+    if (!t.clubId) throw new Error("This cup is not attached to a club.");
+    const club = await getClub(t.clubId);
+    if (!club || !club.members.some((m) => m.discordId === actor.discordId)) {
+      throw new Error("You need to be in the club to join.");
+    }
   }
   if (t.teams.length >= t.size) throw new Error("This cup is full.");
   const pending = t.requests.filter((r) => r.status === "pending").length;
   if (t.teams.length + pending >= t.size) throw new Error("This cup has no open slots.");
   assertFree(t, actor.discordId);
   const teamName = cleanTeamName(t, teamNameRaw);
+  await takeFee(player.playerName, t.entryFee);
   const request: JoinRequest = {
     id: randomUUID(),
     teamName,
@@ -392,13 +440,20 @@ export async function requestJoin(
     playerName: player.playerName,
     avatar: player.avatar,
     status: "pending",
+    paidAmount: t.entryFee,
+    paidBy: player.playerName,
     createdAt: Date.now(),
   };
   t.requests = [
     request,
     ...t.requests.filter((r) => !(r.captainId === actor.discordId && r.status === "denied")),
   ];
-  return writeTournament(t);
+  try {
+    return await writeTournament(t);
+  } catch (error) {
+    if (t.entryFee > 0) await refundPlayerCoins(player.playerName, t.entryFee).catch(() => {});
+    throw error;
+  }
 }
 
 export async function reviewRequest(
@@ -413,8 +468,11 @@ export async function reviewRequest(
   const request = t.requests.find((r) => r.id === requestId && r.status === "pending");
   if (!request) throw new Error("Request not found.");
   if (!accept) {
+    const paid = Number(request.paidAmount) || 0;
+    const paidBy = request.paidBy || "";
     request.status = "denied";
-    return writeTournament(t);
+    request.paidAmount = 0;
+    return writeTournament(t, paid > 0 && paidBy ? [coinCredit(paidBy, paid)] : []);
   }
   if (t.teams.length >= t.size) throw new Error("This cup is full.");
   if (onTeam(t, request.captainId)) {
@@ -424,9 +482,17 @@ export async function reviewRequest(
   if (player.discordId !== request.captainId) {
     throw new Error("That Discord account no longer matches this request.");
   }
-  await takeFee(player.playerName, t.entryFee);
+  if (t.kind === "community" && t.clubId) {
+    const club = await getClub(t.clubId);
+    if (!club || !club.members.some((m) => m.discordId === player.discordId)) {
+      throw new Error("That player is not in the club.");
+    }
+  }
+  const alreadyPaid = request.paidAmount != null;
+  const fee = alreadyPaid ? Number(request.paidAmount) || 0 : t.entryFee;
+  if (!alreadyPaid) await takeFee(player.playerName, fee);
   try {
-    t.pot += t.entryFee;
+    t.pot += fee;
     t.teams.push(
       makeTeam({
         name: request.teamName,
@@ -434,13 +500,13 @@ export async function reviewRequest(
         username: player.username,
         playerName: player.playerName,
         avatar: player.avatar,
-        fee: t.entryFee,
+        fee,
       })
     );
     t.requests = t.requests.filter((r) => r.id !== request.id);
     return await writeTournament(t);
   } catch (error) {
-    if (t.entryFee > 0) await refundPlayerCoins(player.playerName, t.entryFee).catch(() => {});
+    if (!alreadyPaid && fee > 0) await refundPlayerCoins(player.playerName, fee).catch(() => {});
     throw error;
   }
 }
@@ -595,12 +661,14 @@ export async function setRosterSlot(
   return writeTournament(t);
 }
 
-async function refundTeam(t: Tournament, team: TournamentTeam) {
+function refundTeamCredit(t: Tournament, team: TournamentTeam): SqlStmt | null {
   if (team.paidAmount > 0 && team.paidBy) {
-    await refundPlayerCoins(team.paidBy, team.paidAmount);
+    const credit = coinCredit(team.paidBy, team.paidAmount);
     t.pot = Math.max(0, t.pot - team.paidAmount);
     team.paidAmount = 0;
+    return credit;
   }
+  return null;
 }
 
 export async function withdrawTeam(
@@ -616,9 +684,9 @@ export async function withdrawTeam(
   if (team.captainId !== actor.discordId && !organizer) {
     throw new Error("Only the captain or the organizer can withdraw this team.");
   }
-  await refundTeam(t, team);
+  const credit = refundTeamCredit(t, team);
   t.teams = t.teams.filter((row) => row.id !== team.id);
-  return writeTournament(t);
+  return writeTournament(t, credit ? [credit] : []);
 }
 
 async function starterElo(team: TournamentTeam): Promise<number> {
@@ -677,6 +745,9 @@ export async function startTournament(id: string, actor: TournamentActor): Promi
   assertOpen(t);
   await assertOrganizer(t, actor);
   if (t.teams.length < 2) throw new Error("Need at least 2 teams to start.");
+  if (t.requests.some((r) => r.status === "pending")) {
+    throw new Error("Accept or deny pending requests before starting.");
+  }
   const ranked = await Promise.all(
     t.teams.map(async (team) => ({ team, elo: await starterElo(team) }))
   );
@@ -774,10 +845,21 @@ export async function cancelTournament(id: string, actor: TournamentActor): Prom
     throw new Error("This cup can no longer be cancelled.");
   }
   await assertOrganizer(t, actor);
-  for (const team of t.teams) await refundTeam(t, team);
+  const credits: SqlStmt[] = [];
+  for (const request of t.requests) {
+    if (request.status !== "pending") continue;
+    const paid = Number(request.paidAmount) || 0;
+    if (paid > 0 && request.paidBy) credits.push(coinCredit(request.paidBy, paid));
+    request.paidAmount = 0;
+    request.status = "denied";
+  }
+  for (const team of t.teams) {
+    const credit = refundTeamCredit(t, team);
+    if (credit) credits.push(credit);
+  }
   t.status = "cancelled";
   t.pot = 0;
-  return writeTournament(t);
+  return writeTournament(t, credits);
 }
 
 export function summarizeTournament(t: Tournament) {

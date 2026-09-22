@@ -24,6 +24,10 @@ interface PlayerSearchProps {
   placeholder?: string;
   /** Called after navigating to a profile (e.g. to close a mobile menu). */
   onNavigate?: () => void;
+  /** When set, choosing a player fills this instead of opening their profile. */
+  onPick?: (username: string) => void;
+  /** Fired as the query changes, including when a suggestion is chosen. */
+  onQueryChange?: (query: string) => void;
   autoFocus?: boolean;
 }
 
@@ -35,6 +39,8 @@ export function PlayerSearch({
   className = "",
   placeholder = "Search players…",
   onNavigate,
+  onPick,
+  onQueryChange,
   autoFocus = false,
 }: PlayerSearchProps) {
   const [players, setPlayers] = useState<SearchPlayer[]>([]);
@@ -65,11 +71,22 @@ export function PlayerSearch({
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return players
-      .filter((p) => p.username.toLowerCase().includes(q))
-      .slice(0, 6);
+      .filter((p) => {
+        const handle = (p.discordUsername || "").replace(/^@/, "").toLowerCase();
+        return p.username.toLowerCase().includes(q) || (handle && handle.includes(q));
+      })
+      .slice(0, 8);
   }, [players, query]);
 
   const go = (name: string) => {
+    if (onPick) {
+      onPick(name);
+      onQueryChange?.(name);
+      setQuery(name);
+      setOpen(false);
+      setActive(0);
+      return;
+    }
     router.push(`/profile?player=${encodeURIComponent(name)}`);
     setQuery("");
     setOpen(false);
@@ -112,6 +129,7 @@ export function PlayerSearch({
               setQuery(e.target.value);
               setOpen(true);
               setActive(0);
+              onQueryChange?.(e.target.value);
             }}
             onFocus={() => setOpen(true)}
             onKeyDown={onKeyDown}
