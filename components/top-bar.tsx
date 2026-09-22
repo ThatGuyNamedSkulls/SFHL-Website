@@ -11,7 +11,7 @@ import { QUEUE_REGIONS, isQueueRegion } from "@/lib/regions";
 const CENTER_TABS = [
   { id: "matchmaking", label: "Matchmaking", href: "/queue" as const },
   { id: "league", label: "League", soon: true },
-  { id: "tournaments", label: "Tournaments", soon: true },
+  { id: "tournaments", label: "Tournaments", href: "/tournaments" as const },
 ] as const;
 
 const PAGE_TITLE: { test: (path: string) => boolean; label: string }[] = [
@@ -27,6 +27,7 @@ const PAGE_TITLE: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/feed", label: "Feed" },
   { test: (p) => p === "/settings", label: "Settings" },
   { test: (p) => p === "/clubs" || p.startsWith("/clubs/"), label: "Clubs" },
+  { test: (p) => p === "/tournaments" || p.startsWith("/tournaments/"), label: "Tournaments" },
 ];
 
 /** Game + region on the left, MATCHMAKING / LEAGUE / TOURNAMENTS center, avatar right. */
@@ -39,6 +40,7 @@ export function TopBar() {
     pathname === "/queue" ||
     pathname === "/leaderboards" ||
     pathname.startsWith("/match");
+  const tournamentsOn = pathname === "/tournaments" || pathname.startsWith("/tournaments/");
   const onRank = pathname === "/leaderboards";
   const mobileTitle = PAGE_TITLE.find((t) => t.test(pathname))?.label ?? "HyperLeague";
 
@@ -115,7 +117,9 @@ export function TopBar() {
               </span>
             );
           }
-          const active = tab.id === "matchmaking" && matchmakingOn;
+          const active =
+            (tab.id === "matchmaking" && matchmakingOn) ||
+            (tab.id === "tournaments" && tournamentsOn);
           return (
             <Link
               key={tab.id}

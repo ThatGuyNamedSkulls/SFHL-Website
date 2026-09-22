@@ -1,161 +1,135 @@
 "use client";
 
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { TOURNAMENTS } from "@/data/tournaments";
-import { BRACKETS } from "@/data/brackets";
-import { BracketView } from "@/components/bracket-view";
-import { Swords, Trophy, Users, MapPin, Calendar, Flame, Info } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
+import { Card } from "@/components/ui/card";
+import { TournamentCreateForm } from "@/components/tournament-create-form";
+import { regionMeta } from "@/lib/regions";
+import { Swords, Trophy } from "lucide-react";
+
+interface CupCard {
+  id: string;
+  name: string;
+  kind: "official" | "community";
+  region: string;
+  bracket: "single" | "double";
+  size: number;
+  bo: number;
+  entryFee: number;
+  pot: number;
+  status: "open" | "live" | "completed" | "cancelled";
+  teamCount: number;
+}
+
+function formatLabel(cup: CupCard) {
+  const elim = cup.bracket === "double" ? "Double elim" : "Single elim";
+  return `${elim} · BO${cup.bo}`;
+}
 
 export default function TournamentsPage() {
+  const [cups, setCups] = useState<CupCard[]>([]);
+  const [staff, setStaff] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/tournaments");
+    const data = await res.json().catch(() => ({}));
+    setCups(Array.isArray(data.tournaments) ? data.tournaments : []);
+    setStaff(!!data.staff);
+  }, []);
+
+  useEffect(() => {
+    load().catch(() => setCups([]));
+  }, [load]);
+
+  const visible = cups.filter((cup) => cup.status !== "cancelled");
+
   return (
     <div className="hl-page-wide">
       <PageHeader
         icon={Swords}
         title="Tournaments"
-        subtitle="Organized SFHL cups and leagues"
+        subtitle="Official cups and club cups. Results do not change ranked Elo."
         className="mb-6"
       />
 
-      {/* Preview notice */}
-      <div className="mb-8 flex items-start gap-3 rounded-xl border border-hl-gold/30 bg-hl-gold/10 px-4 py-3">
-        <Info className="w-5 h-5 text-hl-gold shrink-0 mt-0.5" />
-        <p className="text-sm text-hl-muted">
-          <span className="text-hl-gold font-semibold">Preview:</span>{" "}
-          Tournaments aren&apos;t running through the site yet. The cups below are
-          a preview of how brackets and results will look once the feature goes
-          live.
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-hl-muted max-w-xl">
+          Match Staff open official cups. Club owners open community cups from their club page.
+          Captains build a roster of 5 starters and 2 subs.
         </p>
-      </div>
-
-      {/* Tournament list */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {TOURNAMENTS.map((tournament) => (
-          <Card
-            key={tournament.id}
-            className="bg-hl-panel border-hl-border p-6 card-hover-glow group relative overflow-hidden"
+        {staff ? (
+          <button
+            type="button"
+            onClick={() => setCreating((v) => !v)}
+            className="h-10 rounded-xl bg-gold-gradient px-4 text-sm font-black text-hl-base"
           >
-            {/* Status indicator line */}
-            <div
-              className={`absolute top-0 left-0 right-0 h-1 ${
-                tournament.status === "live"
-                  ? "bg-hl-red"
-                  : tournament.status === "upcoming"
-                  ? "bg-hl-teal"
-                  : "bg-hl-muted/30"
-              }`}
-            />
-
-            <div className="flex items-start justify-between mb-4 mt-1">
-              <div>
-                <h3 className="text-lg font-bold text-white group-hover:text-hl-gold transition-colors">
-                  {tournament.name}
-                </h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge
-                    className={`text-xs font-bold px-2 py-0.5 border-0 ${
-                      tournament.status === "live"
-                        ? "bg-hl-red/15 text-hl-red"
-                        : tournament.status === "upcoming"
-                        ? "bg-hl-teal/15 text-hl-teal"
-                        : "bg-hl-muted/15 text-hl-muted"
-                    }`}
-                  >
-                    {tournament.status === "live" && (
-                      <Flame className="w-3 h-3 mr-1" />
-                    )}
-                    {tournament.status.toUpperCase()}
-                  </Badge>
-                  <span className="text-xs text-hl-muted">
-                    {tournament.region}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-bold text-hl-gold">
-                  {tournament.prizePool}
-                </div>
-                <div className="text-xs text-hl-muted">Prize Pool</div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="flex items-center gap-2 text-hl-muted">
-                <Users className="w-4 h-4" />
-                <span>
-                  {tournament.teams}/{tournament.maxTeams} Teams
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-hl-muted">
-                <Trophy className="w-4 h-4" />
-                <span>{tournament.format}</span>
-              </div>
-              <div className="flex items-center gap-2 text-hl-muted">
-                <Calendar className="w-4 h-4" />
-                <span>
-                  {new Date(tournament.startDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-hl-muted">
-                <MapPin className="w-4 h-4" />
-                <span>{tournament.mapPool.length} Maps</span>
-              </div>
-            </div>
-
-            {/* Map pool */}
-            <div className="mt-4 pt-3 border-t border-hl-border">
-              <div className="text-xs text-hl-muted header-caps mb-2">
-                Map Pool
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {tournament.mapPool.map((map) => (
-                  <span
-                    key={map}
-                    className="text-xs px-2 py-0.5 rounded bg-hl-panel-light text-hl-muted border border-hl-border"
-                  >
-                    {map}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Bracket view */}
-            {tournament.status !== "completed" && BRACKETS[tournament.id] && (
-              <div className="mt-4 pt-3 border-t border-hl-border overflow-hidden">
-                <div className="text-xs text-hl-muted header-caps mb-2">
-                  Bracket
-                </div>
-                <div className="bg-hl-base/30 rounded-lg border border-hl-border p-2">
-                    <BracketView bracket={BRACKETS[tournament.id]} />
-                </div>
-              </div>
-            )}
-            {tournament.status === "completed" && BRACKETS[tournament.id] && (
-               <div className="mt-4 pt-3 border-t border-hl-border overflow-hidden">
-                 <div className="text-xs text-hl-muted header-caps mb-2">
-                   Final Bracket
-                 </div>
-                 <div className="bg-hl-base/30 rounded-lg border border-hl-border p-2">
-                     <BracketView bracket={BRACKETS[tournament.id]} />
-                 </div>
-               </div>
-            )}
-            {tournament.status !== "completed" && !BRACKETS[tournament.id] && (
-               <div className="mt-4 pt-3 border-t border-hl-border">
-                 <div className="flex items-center justify-center py-3 text-xs text-hl-muted bg-hl-base/40 rounded-lg border border-dashed border-hl-border">
-                   <Swords className="w-4 h-4 mr-2" />
-                   Bracket forming...
-                 </div>
-               </div>
-            )}
-          </Card>
-        ))}
+            {creating ? "Close" : "Create cup"}
+          </button>
+        ) : null}
       </div>
+
+      {creating && staff ? (
+        <Card className="bg-hl-panel border-hl-border p-4 mb-6">
+          <TournamentCreateForm
+            kind="official"
+            onCancel={() => setCreating(false)}
+            onCreated={(id) => {
+              setCreating(false);
+              window.location.href = `/tournaments/${id}`;
+            }}
+          />
+        </Card>
+      ) : null}
+
+      {visible.length === 0 ? (
+        <EmptyState
+          icon={Trophy}
+          title="No cups yet"
+          hint="When Match Staff or a club owner opens one, it will show up here."
+        />
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          {visible.map((cup) => (
+            <Link key={cup.id} href={`/tournaments/${cup.id}`} className="block">
+              <Card className="bg-hl-panel border-hl-border p-5 card-hover-glow relative overflow-hidden h-full">
+                <div
+                  className={`absolute top-0 left-0 right-0 h-1 ${
+                    cup.status === "live"
+                      ? "bg-hl-red"
+                      : cup.status === "open"
+                        ? "bg-hl-teal"
+                        : "bg-hl-muted/30"
+                  }`}
+                />
+                <div className="flex items-start justify-between gap-3 mt-1">
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-bold text-white truncate">{cup.name}</h3>
+                    <div className="mt-1 text-xs text-hl-muted">
+                      {cup.kind === "official" ? "Official" : "Club cup"} · {regionMeta(cup.region).short} ·{" "}
+                      {cup.status.toUpperCase()}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-lg font-black text-hl-gold">{cup.pot.toLocaleString()}</div>
+                    <div className="text-[11px] text-hl-muted">Pot</div>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-hl-muted">
+                  <span>
+                    {cup.teamCount}/{cup.size} teams
+                  </span>
+                  <span>{formatLabel(cup)}</span>
+                  <span>Entry {cup.entryFee.toLocaleString()}</span>
+                  <span>{cup.status === "open" ? "Registration open" : cup.status}</span>
+                </div>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

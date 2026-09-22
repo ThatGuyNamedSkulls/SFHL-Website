@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { RankBadge } from "@/components/rank-badge";
 import { ClubColorPicker, ClubMark, ClubTaggedName } from "@/components/club-identity";
+import { ClubTournaments } from "@/components/club-tournaments";
 import { Crown, Lock, MessageSquare, Users } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { profileBackgroundImage } from "@/lib/profile-backgrounds";
@@ -508,6 +509,8 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
           ) : null}
         </Card>
       ) : null}
+
+      <ClubTournaments clubId={club.id} owner={owner} />
 
       <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-5">

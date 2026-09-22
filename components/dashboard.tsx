@@ -124,12 +124,12 @@ export function Dashboard({ session }: DashboardProps) {
       soon: true,
     },
     {
-      href: "#",
+      href: "/tournaments",
       title: "Tournaments",
-      desc: "Coming soon",
+      desc: "Cups and brackets",
       icon: Globe,
       glow: "from-hl-teal/25",
-      soon: true,
+      soon: false,
     },
   ];
 

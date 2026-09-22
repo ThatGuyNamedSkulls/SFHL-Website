@@ -55,6 +55,16 @@ async function matchStaffRoleId(): Promise<string | null> {
   return staffRoleId;
 }
 
+/** True when this Discord user has the Match Staff role in the league server. */
+export async function isMatchStaff(userId: string): Promise<boolean> {
+  const roleId = await matchStaffRoleId();
+  if (!roleId || !userId) return false;
+  const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/members/${userId}`);
+  if (!res?.ok) return false;
+  const member = (await res.json()) as { roles?: string[] };
+  return (member.roles ?? []).includes(roleId);
+}
+
 function channelUrl(channelId: string) {
   return `discord://-/channels/${DISCORD_CONFIG.guildId}/${channelId}`;
 }
