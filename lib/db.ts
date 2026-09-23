@@ -198,25 +198,22 @@ function playerFromRows(rs: ResultSet): DbPlayer | undefined {
   return (rs.rows[0] as unknown as DbPlayer) || undefined;
 }
 
-/** The leaderboard (only caller of this function). placement_done = 1 only —
- *  a placement player's elo is a real, live number under
- *  placement.mode = "performance" (it's what the queue balances on and what
- *  placement grading reads), but it's a calibrating estimate, not a settled
- *  rank. It must never be shown — or affect standings — on a ranked
- *  leaderboard before the player has actually graduated. Same rule
- *  getModeLeaderboard already applies for the own-ladder leaderboards. */
+/** The leaderboard (only caller of this function). Placement players stay on
+ *  the board (not hidden) — their `elo` is genuinely 0 until graduation (the
+ *  bot only writes a real value at the end of placements; see
+ *  cogs/ranking.py's "performance" mode placement write), so they naturally
+ *  sort last and display as 0 rather than a mid-calibration number. */
 export async function getAllPlayers(limit?: number): Promise<DbPlayer[]> {
   await ensurePlayerDiscordColumns();
   const cap = limit != null && Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 0;
-  const where = `${PLAYER_SELECT} WHERE COALESCE(placement_done, 0) = 1`;
   if (cap > 0) {
     const rs = await client.execute({
-      sql: `${where} ORDER BY elo DESC LIMIT ?`,
+      sql: `${PLAYER_SELECT} ORDER BY elo DESC LIMIT ?`,
       args: [cap],
     });
     return rs.rows as unknown as DbPlayer[];
   }
-  const rs = await client.execute(`${where} ORDER BY elo DESC`);
+  const rs = await client.execute(`${PLAYER_SELECT} ORDER BY elo DESC`);
   return rs.rows as unknown as DbPlayer[];
 }
 
@@ -433,42 +430,37 @@ export async function setPlayerMmAccess(discordId: string, has: boolean): Promis
 /** Leaderboard positions by elo: overall, within the player's country, and
  *  within the play region that country maps to (EU/NA/SA/APAC/OC).
  *
- *  placement_done = 1 only, on both sides: a placement player's elo is a
- *  real, live number (used for placement/balancing math), not a settled
- *  rank, so (a) it must not count toward anyone else's position, and (b) a
- *  placement player doesn't have a position of their own to report yet —
- *  same rule as getAllPlayers/getModeLeaderboard. */
+ *  Placement players are counted like anyone else — their `elo` is
+ *  genuinely 0 until graduation (see getAllPlayers), so they can never
+ *  outrank a graduated player and simply get an honest (low) position of
+ *  their own, same as any other 0-elo row. */
 export async function getPlayerRankings(
   name: string
 ): Promise<{ overall: number | null; country: number | null; region: number | null }> {
   const rs = await client.execute({
-    sql: "SELECT elo, country, placement_done FROM players WHERE name = ?",
+    sql: "SELECT elo, country FROM players WHERE name = ?",
     args: [name],
   });
   if (rs.rows.length === 0) return { overall: null, country: null, region: null };
-  if (Number(rs.rows[0].placement_done) !== 1) {
-    return { overall: null, country: null, region: null };
-  }
   const elo = Number(rs.rows[0].elo);
   const ctry = ((rs.rows[0].country as string) || "").toLowerCase() || null;
   const playRegion = countryToPlayRegion(ctry);
 
   const [higherRs, countryRs, regionRs] = await Promise.all([
     client.execute({
-      sql: "SELECT COUNT(*) AS c FROM players WHERE COALESCE(placement_done, 0) = 1 AND elo > ?",
+      sql: "SELECT COUNT(*) AS c FROM players WHERE elo > ?",
       args: [elo],
     }),
     ctry
       ? client.execute({
-          sql: "SELECT COUNT(*) AS c FROM players "
-            + "WHERE COALESCE(placement_done, 0) = 1 AND lower(country) = ? AND elo > ?",
+          sql: "SELECT COUNT(*) AS c FROM players WHERE lower(country) = ? AND elo > ?",
           args: [ctry, elo],
         })
       : Promise.resolve(null),
     playRegion
       ? client.execute({
-          sql: `SELECT COUNT(*) AS c FROM players WHERE COALESCE(placement_done, 0) = 1 `
-            + `AND lower(country) IN (${countriesInPlayRegion(playRegion)
+          sql: `SELECT COUNT(*) AS c FROM players `
+            + `WHERE lower(country) IN (${countriesInPlayRegion(playRegion)
             .map(() => "?")
             .join(",")}) AND elo > ?`,
           args: [...countriesInPlayRegion(playRegion), elo],
