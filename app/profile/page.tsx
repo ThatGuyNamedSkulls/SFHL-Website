@@ -801,8 +801,18 @@ function ProfileContent() {
                     <div className="flex items-center gap-3">
                       <RankBadge rank={player.rank} size="md" />
                       <div>
-                        <div className="stat-number text-2xl text-white">{player.elo}</div>
-                        <div className="text-xs text-hl-muted">Season 1</div>
+                        {/* A placement player's elo is a real, live number
+                           (used for placement/balancing math), not a settled
+                           rank — same rule as SkillLevelBox in GameSkillBar
+                           (Summary tab), which already gets this right. */}
+                        <div className="stat-number text-2xl text-white">
+                          {player.placementDone ? player.elo : "—"}
+                        </div>
+                        <div className="text-xs text-hl-muted">
+                          {player.placementDone
+                            ? "Season 1"
+                            : `Placement ${player.placementGamesPlayed ?? 0}/${player.placementGamesTotal ?? 3}`}
+                        </div>
                       </div>
                     </div>
                     {eloNeeded !== null && (
