@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
+import { RAIL_CHAT_MESSAGES, parseChatLimit } from "@/lib/chat-limits";
 import {
   PartyChatError,
   assertPartyMember,
@@ -20,17 +21,20 @@ function fail(error: unknown, fallback: string) {
   return NextResponse.json({ error: fallback }, { status: 500 });
 }
 
-/** GET ?after=<id> — party chat for members (only newer messages with `after`). */
+/** GET ?after=<id>&limit=<n> — party chat for members: the latest `limit`
+ *  messages (default 10), or only newer ones with `after`. */
 export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Log in to view party chat." }, { status: 401 });
   }
   const { id } = await ctx.params;
-  const after = Number(new URL(request.url).searchParams.get("after") || 0);
+  const params = new URL(request.url).searchParams;
+  const after = Number(params.get("after") || 0);
+  const limit = parseChatLimit(params.get("limit"), RAIL_CHAT_MESSAGES);
   try {
     await assertPartyMember(id, session.discordId);
-    const messages = await listPartyChat(id, Number.isFinite(after) && after > 0 ? after : 0);
+    const messages = await listPartyChat(id, Number.isFinite(after) && after > 0 ? after : 0, limit);
     return NextResponse.json({ messages });
   } catch (error) {
     return fail(error, "Failed to load party chat.");

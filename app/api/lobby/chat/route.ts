@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getLobbyForUser } from "@/lib/lobby";
 import { listLobbyChat, postLobbyChat } from "@/lib/lobby-chat";
+import { MAX_CHAT_FETCH, parseChatLimit } from "@/lib/chat-limits";
 
-/** GET — latest match-room chat for the logged-in player's live lobby. */
-export async function GET() {
+/** GET ?limit=<n> — latest match-room chat for the logged-in player's live
+ *  lobby (the right-bar chat asks for the last 10). */
+export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ messages: [] });
   try {
     const lobby = await getLobbyForUser(session.discordId);
     if (!lobby) return NextResponse.json({ messages: [] });
-    const messages = await listLobbyChat(lobby.channelId);
+    const limit = parseChatLimit(new URL(request.url).searchParams.get("limit"), MAX_CHAT_FETCH);
+    const messages = await listLobbyChat(lobby.channelId, limit);
     return NextResponse.json({ messages });
   } catch (error) {
     console.error("Error fetching lobby chat:", error);

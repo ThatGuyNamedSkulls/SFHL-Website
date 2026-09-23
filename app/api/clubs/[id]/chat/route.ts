@@ -3,11 +3,13 @@ import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
 import { getClub, memberOf } from "@/lib/clubs";
 import { deleteClubChat, listClubChat, postClubChat } from "@/lib/club-chat";
+import { MAX_CHAT_FETCH, parseChatLimit } from "@/lib/chat-limits";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
+/** GET ?limit=<n> — club chat (the right-bar chat asks for the last 10). */
+export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Log in to view club chat." }, { status: 401 });
@@ -19,7 +21,8 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     return NextResponse.json({ error: "Join the club to view chat." }, { status: 403 });
   }
   try {
-    const messages = await listClubChat(id);
+    const limit = parseChatLimit(new URL(request.url).searchParams.get("limit"), MAX_CHAT_FETCH);
+    const messages = await listClubChat(id, limit);
     return NextResponse.json({ messages });
   } catch (error) {
     console.error("club chat GET", error);

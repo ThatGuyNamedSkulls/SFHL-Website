@@ -61,7 +61,7 @@ function rowToMessage(row: Record<string, unknown>): ClubChatMessage {
   };
 }
 
-export async function listClubChat(clubId: string): Promise<ClubChatMessage[]> {
+export async function listClubChat(clubId: string, limit = CHAT_LIMIT): Promise<ClubChatMessage[]> {
   await ensureSchema();
   const rs = await client.execute({
     sql: `SELECT id, club_id, discord_id, username, player_name, avatar, message, created_at
@@ -69,7 +69,7 @@ export async function listClubChat(clubId: string): Promise<ClubChatMessage[]> {
           WHERE club_id = ?
           ORDER BY created_at DESC
           LIMIT ?`,
-    args: [clubId, CHAT_LIMIT],
+    args: [clubId, Math.max(1, Math.min(CHAT_LIMIT, limit))],
   });
   return rs.rows
     .map((row) => rowToMessage(row as unknown as Record<string, unknown>))

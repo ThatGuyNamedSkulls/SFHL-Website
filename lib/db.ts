@@ -8,6 +8,11 @@ import { parseQueueMode, type QueueModeId } from "@/lib/queue-modes";
 if (!process.env.TURSO_DATABASE_URL) {
   throw new Error("TURSO_DATABASE_URL is not set in environment variables");
 }
+// Test runs (tests/helpers/temp-db.ts sets HL_TESTING) may only ever use a
+// throwaway local file — never the live Turso database.
+if (process.env.HL_TESTING && !process.env.TURSO_DATABASE_URL.startsWith("file:")) {
+  throw new Error("Refusing to open a non-local database during tests");
+}
 
 /** Discord snowflakes (and other 64-bit ints) overflow JS numbers. Read them as
  *  bigint, then keep safe values as Number and oversized ones as strings so

@@ -77,8 +77,13 @@ export class PartyChatError extends Error {
   }
 }
 
-/** Latest messages, oldest first. With `afterId`, only messages newer than it. */
-export async function listPartyChat(partyId: string, afterId = 0): Promise<PartyChatMessage[]> {
+/** Latest messages (at most `limit`), oldest first. With `afterId`, only
+ *  messages newer than it. */
+export async function listPartyChat(
+  partyId: string,
+  afterId = 0,
+  limit = CHAT_LIMIT
+): Promise<PartyChatMessage[]> {
   await ensureSchema();
   const rs = await client.execute({
     sql: `SELECT id, party_id, discord_id, username, player_name, avatar, message, created_at
@@ -86,7 +91,7 @@ export async function listPartyChat(partyId: string, afterId = 0): Promise<Party
           WHERE party_id = ? AND id > ?
           ORDER BY id DESC
           LIMIT ?`,
-    args: [partyId, afterId, CHAT_LIMIT],
+    args: [partyId, afterId, Math.max(1, Math.min(CHAT_LIMIT, limit))],
   });
   return rs.rows
     .map((row) => rowToMessage(row as unknown as Record<string, unknown>))
