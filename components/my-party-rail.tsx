@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Crown, Headphones, Plus, Search, UsersRound, X } from "lucide-react";
+import { Crown, Headphones, MessageSquare, Plus, Search, UsersRound, X } from "lucide-react";
 import { RankTierLetter } from "@/types";
 import { RankBadge } from "@/components/rank-badge";
 import { MATCH_MODE_LABEL, PARTY_MAX_SIZE } from "@/lib/match-mode";
 import { RailBadge } from "@/components/rail-badge";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
+import { OnlineBadge, OnlineLabel, useOnline } from "@/components/online-status";
+import { PartyChatPanel, usePartyChat } from "@/components/party-chat";
 
 interface PartyMember {
   discordId: string;
@@ -237,6 +239,9 @@ export function MyPartyRail() {
   };
 
   const isLeader = !!(session && party && party.leaderId === session.discordId);
+  const chatVisible = open && !inviteMode && !!party;
+  const chat = usePartyChat(party?.id ?? null, session?.discordId ?? null, chatVisible);
+  const isOnline = useOnline({ ids: party?.members.map((m) => m.discordId) ?? [] });
   const iconBtn =
     "flex items-center justify-center w-11 h-10 text-[#8a8a8a] hover:text-white hover:bg-white/5";
 
@@ -264,17 +269,32 @@ export function MyPartyRail() {
               onClick={() => openPanel(false)}
               className="flex items-center justify-center w-11 h-10 hover:bg-white/5"
             >
-              {m.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.avatar} alt="" referrerPolicy="no-referrer" className="w-6 h-6 rounded-md object-cover" />
-              ) : (
-                <span className="w-6 h-6 rounded-md bg-[#2a2a2a] text-[8px] font-bold text-[#ff5500] flex items-center justify-center">
-                  {label.slice(0, 2).toUpperCase()}
-                </span>
-              )}
+              <OnlineBadge online={isOnline({ id: m.discordId })} size="xs">
+                {m.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.avatar} alt="" referrerPolicy="no-referrer" className="w-6 h-6 rounded-md object-cover" />
+                ) : (
+                  <span className="w-6 h-6 rounded-md bg-[#2a2a2a] text-[8px] font-bold text-[#ff5500] flex items-center justify-center">
+                    {label.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+              </OnlineBadge>
             </button>
           );
         })}
+        {party ? (
+          <button
+            type="button"
+            title="Party chat"
+            onClick={() => openPanel(false)}
+            className={`${iconBtn} border-t border-white/10 ${chatVisible ? "text-[#ff5500]" : ""}`}
+          >
+            <span className="relative">
+              <MessageSquare className="w-4 h-4" strokeWidth={1.75} />
+              <RailBadge count={chat.unread} />
+            </span>
+          </button>
+        ) : null}
         <button
           type="button"
           title="Invite to party"
@@ -357,14 +377,16 @@ export function MyPartyRail() {
                       key={m.discordId}
                       className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/[0.04]"
                     >
-                      {m.avatar ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={m.avatar} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-md object-cover" />
-                      ) : (
-                        <span className="w-8 h-8 rounded-md bg-[#1a1a1a] text-[10px] font-bold text-[#ff5500] flex items-center justify-center">
-                          {label.slice(0, 2).toUpperCase()}
-                        </span>
-                      )}
+                      <OnlineBadge online={isOnline({ id: m.discordId })}>
+                        {m.avatar ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={m.avatar} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-md object-cover" />
+                        ) : (
+                          <span className="w-8 h-8 rounded-md bg-[#1a1a1a] text-[10px] font-bold text-[#ff5500] flex items-center justify-center">
+                            {label.slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                      </OnlineBadge>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm font-semibold text-white truncate">
@@ -373,6 +395,7 @@ export function MyPartyRail() {
                           </span>
                           {leader && <Crown className="w-3.5 h-3.5 text-[#ff5500] shrink-0" />}
                         </div>
+                        <OnlineLabel online={isOnline({ id: m.discordId })} />
                         {isLeader && self && (
                           <button
                             type="button"
@@ -440,6 +463,16 @@ export function MyPartyRail() {
                   </a>
                 )}
               </div>
+            )}
+
+            {session && party && !inviteMode && (
+              <PartyChatPanel
+                messages={chat.messages}
+                me={session.discordId}
+                isLeader={isLeader}
+                onSend={chat.send}
+                onDelete={chat.remove}
+              />
             )}
 
             {session && party && inviteMode && (

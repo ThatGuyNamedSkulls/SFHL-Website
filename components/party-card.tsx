@@ -9,6 +9,7 @@ import { PartyView, PartyMemberView, RankTierLetter } from "@/types";
 import { getRankForElo, getRankByLetter } from "@/data/ranks";
 import { flagPath, countryName } from "@/lib/countries";
 import { ClubTaggedName } from "@/components/club-identity";
+import { OnlineBadge, useOnline } from "@/components/online-status";
 import {
   Crown,
   Plus,
@@ -50,7 +51,15 @@ function avgRank(party: PartyView): RankTierLetter {
   return getRankForElo(avg).letter;
 }
 
-function MemberSlot({ member, isLeader }: { member: PartyMemberView; isLeader: boolean }) {
+function MemberSlot({
+  member,
+  isLeader,
+  online,
+}: {
+  member: PartyMemberView;
+  isLeader: boolean;
+  online: boolean;
+}) {
   const rank = (member.rank || "UNRANKED") as RankTierLetter;
   return (
     <div className="lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center py-4 px-2 gap-2 min-h-[160px] rounded-xl">
@@ -80,14 +89,16 @@ function MemberSlot({ member, isLeader }: { member: PartyMemberView; isLeader: b
       )}
       {isLeader && <Crown className="relative z-10 w-4 h-4 text-hl-gold -mb-1" />}
       <div className="relative z-10">
-        <AvatarFrame frame={member.frame}>
-          <Avatar className="w-14 h-14 border-2 border-hl-border">
-            {member.avatar ? <AvatarImage src={member.avatar} /> : null}
-            <AvatarFallback className="bg-hl-panel-light text-xs font-bold text-hl-gold">
-              {member.username.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        </AvatarFrame>
+        <OnlineBadge online={online} size="md">
+          <AvatarFrame frame={member.frame}>
+            <Avatar className="w-14 h-14 border-2 border-hl-border">
+              {member.avatar ? <AvatarImage src={member.avatar} /> : null}
+              <AvatarFallback className="bg-hl-panel-light text-xs font-bold text-hl-gold">
+                {member.username.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </AvatarFrame>
+        </OnlineBadge>
       </div>
       <div className="relative z-10 flex items-center gap-1 max-w-full">
         <span className="text-xs font-bold text-white truncate">
@@ -127,6 +138,7 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onIn
   const avgColor = getRankByLetter(avg).color;
 
   // Friends not already in this party — the invitable set.
+  const isOnline = useOnline({ ids: party.members.map((m) => m.discordId) });
   const invitable = (friends ?? []).filter(
     (f) => !party.members.some((m) => m.playerName === f.name)
   );
@@ -145,7 +157,12 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onIn
       {/* Member slots */}
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         {party.members.map((m) => (
-          <MemberSlot key={m.discordId} member={m} isLeader={m.discordId === party.leaderId} />
+          <MemberSlot
+            key={m.discordId}
+            member={m}
+            isLeader={m.discordId === party.leaderId}
+            online={isOnline({ id: m.discordId })}
+          />
         ))}
         {Array.from({ length: emptySlots }).map((_, i) => (
           <button

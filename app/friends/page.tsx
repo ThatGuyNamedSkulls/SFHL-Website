@@ -9,6 +9,7 @@ import { RankBadge } from "@/components/rank-badge";
 import { RankTierLetter } from "@/types";
 import { UserPlus, Users, Check, X, Search, UserMinus, Clock } from "lucide-react";
 import { useSession } from "@/components/session-provider";
+import { OnlineBadge, OnlineLabel, useOnline } from "@/components/online-status";
 
 interface Friend {
   name: string;
@@ -22,22 +23,35 @@ interface RequestView {
   createdAt: number;
 }
 
-function FriendRow({ friend, actions }: { friend: Friend; actions: React.ReactNode }) {
+function FriendRow({
+  friend,
+  actions,
+  online = false,
+  showStatus = false,
+}: {
+  friend: Friend;
+  actions: React.ReactNode;
+  online?: boolean;
+  showStatus?: boolean;
+}) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-hl-panel-light/40 transition-colors">
-      <Avatar className="w-9 h-9 border border-hl-border shrink-0">
-        {friend.avatar ? <AvatarImage src={friend.avatar} /> : null}
-        <AvatarFallback className="bg-hl-panel-light text-xs font-bold text-hl-gold">
-          {friend.name.slice(0, 2).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
-      <div className="min-w-0 flex-1">
+      <OnlineBadge online={online}>
+        <Avatar className="w-9 h-9 border border-hl-border shrink-0">
+          {friend.avatar ? <AvatarImage src={friend.avatar} /> : null}
+          <AvatarFallback className="bg-hl-panel-light text-xs font-bold text-hl-gold">
+            {friend.name.slice(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+      </OnlineBadge>
+      <div className="min-w-0 flex-1 flex flex-col">
         <Link
           href={`/profile?player=${encodeURIComponent(friend.name)}`}
           className="text-sm font-semibold text-white truncate hover:text-hl-gold"
         >
           {friend.name}
         </Link>
+        {showStatus ? <OnlineLabel online={online} /> : null}
       </div>
       <RankBadge rank={(friend.rank || "UNRANKED") as RankTierLetter} size="sm" />
       <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">{actions}</div>
@@ -164,6 +178,19 @@ export default function FriendsPage() {
 
   const outgoingNames = new Set(outgoing.map((r) => r.name));
   const friendNames = new Set(friends.map((f) => f.name));
+  const isOnline = useOnline({
+    names: [
+      ...friends.map((f) => f.name),
+      ...incoming.map((r) => r.name),
+      ...outgoing.map((r) => r.name),
+      ...results.map((u) => u.name),
+    ],
+  });
+  // Online friends first, then alphabetical (stable within each group).
+  const sortedFriends = [...friends].sort(
+    (a, b) => Number(isOnline({ name: b.name })) - Number(isOnline({ name: a.name }))
+  );
+  const onlineCount = friends.filter((f) => isOnline({ name: f.name })).length;
 
   if (!sessionLoaded) {
     return (
@@ -225,6 +252,7 @@ export default function FriendsPage() {
                 <FriendRow
                   key={u.name}
                   friend={u}
+                  online={isOnline({ name: u.name })}
                   actions={
                     friendNames.has(u.name) ? (
                       <span className="text-xs text-hl-muted">Friends</span>
@@ -255,6 +283,7 @@ export default function FriendsPage() {
               <FriendRow
                 key={r.name}
                 friend={r.friend}
+                online={isOnline({ name: r.name })}
                 actions={
                   <>
                     <button onClick={() => accept(r.name)} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-md bg-hl-green/15 text-hl-green border border-hl-green/30 hover:bg-hl-green/25">
@@ -275,15 +304,20 @@ export default function FriendsPage() {
       <section className="mb-6">
         <h2 className="text-sm font-bold text-white header-caps mb-2 flex items-center gap-2">
           <Users className="w-4 h-4 text-hl-gold" /> Friends ({friends.length})
+          {friends.length > 0 ? (
+            <span className="text-[11px] font-semibold normal-case text-hl-green">{onlineCount} online</span>
+          ) : null}
         </h2>
         {friends.length === 0 ? (
           <EmptyState icon={Users} title="No friends yet" hint="Search above to add your first friend." />
         ) : (
           <div className="rounded-lg border border-hl-border bg-hl-panel divide-y divide-hl-border overflow-hidden">
-            {friends.map((f) => (
+            {sortedFriends.map((f) => (
               <FriendRow
                 key={f.name}
                 friend={f}
+                online={isOnline({ name: f.name })}
+                showStatus
                 actions={
                   <>
                     {myPartyId && (
@@ -311,7 +345,7 @@ export default function FriendsPage() {
           <h2 className="text-sm font-bold text-white header-caps mb-2">Sent ({outgoing.length})</h2>
           <div className="rounded-lg border border-hl-border bg-hl-panel divide-y divide-hl-border overflow-hidden">
             {outgoing.map((r) => (
-              <FriendRow key={r.name} friend={r.friend} actions={<span className="flex items-center gap-1 text-xs text-hl-muted"><Clock className="w-3.5 h-3.5" /> Pending</span>} />
+              <FriendRow key={r.name} friend={r.friend} online={isOnline({ name: r.name })} actions={<span className="flex items-center gap-1 text-xs text-hl-muted"><Clock className="w-3.5 h-3.5" /> Pending</span>} />
             ))}
           </div>
         </section>

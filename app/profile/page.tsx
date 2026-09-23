@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { OnlineBadge, OnlineLabel, useOnline } from "@/components/online-status";
 import { AvatarFrame } from "@/components/avatar-frame";
 import { RankBadge } from "@/components/rank-badge";
 import { GameSkillBar } from "@/components/game-skill-bar";
@@ -393,6 +394,8 @@ function ProfileContent() {
     return { kdSeries, swingSeries, consistency, longestWin, avgSwing };
   }, [matches]);
 
+  const isOnline = useOnline({ names: [player?.username] });
+
   if (loading) return <ProfileSkeleton />;
 
   if (error || !player) {
@@ -483,14 +486,16 @@ function ProfileContent() {
               <div className="absolute inset-0 bg-[#161616]" />
             )}
             <div className="relative h-full flex flex-col items-center justify-center px-5 text-center">
-              <AvatarFrame frame={player.cosmetics?.frame?.asset}>
-                <Avatar className="w-[120px] h-[120px] border-0">
-                  {player.avatarUrl ? <AvatarImage src={player.avatarUrl} alt={player.username} /> : null}
-                  <AvatarFallback className="bg-[#2a2a2a] text-2xl font-bold text-white">
-                    {(player.username || "?").slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </AvatarFrame>
+              <OnlineBadge online={isOnline({ name: player.username })} size="md" className="[&>span:last-child]:bottom-2 [&>span:last-child]:right-2 [&>span:last-child]:w-5 [&>span:last-child]:h-5">
+                <AvatarFrame frame={player.cosmetics?.frame?.asset}>
+                  <Avatar className="w-[120px] h-[120px] border-0">
+                    {player.avatarUrl ? <AvatarImage src={player.avatarUrl} alt={player.username} /> : null}
+                    <AvatarFallback className="bg-[#2a2a2a] text-2xl font-bold text-white">
+                      {(player.username || "?").slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </AvatarFrame>
+              </OnlineBadge>
               <h1 className="mt-5 text-xl font-bold text-white tracking-tight inline-flex items-center justify-center gap-1.5 max-w-full">
                 <span className="truncate">
                   <ClubTaggedName
@@ -504,6 +509,9 @@ function ProfileContent() {
               {player.cosmetics?.title && (
                 <div className="text-xs font-semibold italic text-[#ff5500] mt-1">{player.cosmetics.title}</div>
               )}
+              <div className="mt-1.5">
+                <OnlineLabel online={isOnline({ name: player.username })} />
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 border-t border-white/[0.08]">

@@ -10,6 +10,7 @@ import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { CountryPrompt } from "@/components/country-prompt";
 import { MatchReadyModal } from "@/components/match-ready-modal";
 import { VerifyPrompt } from "@/components/verify-prompt";
+import { PresenceHeartbeat } from "@/components/online-status";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -61,6 +62,7 @@ export default function RootLayout({
             <CountryPrompt />
             <VerifyPrompt />
             <MatchReadyModal />
+            <PresenceHeartbeat />
           </SessionProvider>
         </TooltipProvider>
         <SpeedInsights />
