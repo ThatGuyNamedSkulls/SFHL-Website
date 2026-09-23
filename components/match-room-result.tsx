@@ -18,6 +18,7 @@ import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 import { cn } from "@/lib/utils";
 import { Calendar, Star, Swords } from "lucide-react";
 import { SubRolePill } from "@/components/sub-role-pill";
+import { WinChanceBar } from "@/components/win-chance-bar";
 
 function initials(name: string) {
   return (name || "?").slice(0, 2).toUpperCase();
@@ -46,7 +47,7 @@ function PlayerCard({
       </Avatar>
       <span className="text-sm font-semibold text-white truncate flex-1">{player.username}</span>
       <SubRolePill isSub={player.isSub} leftEarly={player.leftEarly} share={player.subShare} compact />
-      {typeof player.elo === "number" && (
+      {player.rank !== "UNRANKED" && typeof player.elo === "number" && (
         <span className="text-[12px] tabular-nums text-[#8a8a8a] shrink-0">{player.elo}</span>
       )}
       <span
@@ -601,6 +602,10 @@ export function MatchRoomResult({ match }: { match: MatchDetail }) {
               </div>
             </div>
           </div>
+
+          {match.teamAWinChance != null && match.teamBWinChance != null && (
+            <WinChanceBar left={match.teamAWinChance} right={match.teamBWinChance} />
+          )}
         </div>
       </div>
 

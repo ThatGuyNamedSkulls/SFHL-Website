@@ -10,6 +10,7 @@ import { prettyMap } from "@/lib/format";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 import { ExternalLink, Mic, Crown, Calendar, Send, Gamepad2 } from "lucide-react";
 import { SubRolePill } from "@/components/sub-role-pill";
+import { WinChanceBar } from "@/components/win-chance-bar";
 
 export interface LiveLobbyMember {
   discordId: string;
@@ -18,6 +19,7 @@ export interface LiveLobbyMember {
   avatar: string | null;
   rank: string;
   elo?: number;
+  placementDone?: boolean;
   left?: boolean;
   sub?: boolean;
 }
@@ -44,6 +46,7 @@ export interface LiveLobby {
     turnDeadlineAt?: number | null;
   } | null;
   members: LiveLobbyMember[];
+  winChance?: { team1: number; team2: number } | null;
   createdAt?: number;
   server?: { url: string } | null;
   matchNumber?: number | null;
@@ -88,7 +91,7 @@ function PlayerRow({
       <span className="text-sm font-semibold text-white truncate flex-1">{member.name}</span>
       <SubRolePill isSub={member.sub} leftEarly={member.left} compact />
       {captain && <Crown className="w-3.5 h-3.5 text-[#ff5500] shrink-0" />}
-      {typeof member.elo === "number" && member.elo > 0 && (
+      {member.placementDone !== false && typeof member.elo === "number" && member.elo > 0 && (
         <span className="text-[12px] tabular-nums text-[#8a8a8a] shrink-0">{member.elo}</span>
       )}
       <RankBadge
@@ -332,6 +335,11 @@ export function LiveMatchRoom({
           </Avatar>
           <span className="text-sm md:text-lg font-bold text-white truncate max-w-[28%] md:max-w-[36%]">{name2}</span>
         </div>
+        {lobby.winChance && (
+          <div className="mb-4">
+            <WinChanceBar left={lobby.winChance.team1} right={lobby.winChance.team2} />
+          </div>
+        )}
 
         {tab === "stats" ? (
           <p className="text-sm text-[#8a8a8a] text-center py-16">Stats appear after the match ends.</p>

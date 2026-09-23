@@ -879,6 +879,7 @@ export function summarizeTournament(t: Tournament) {
     status: t.status,
     teamCount: t.teams.length,
     pendingRequests: t.requests.filter((r) => r.status === "pending").length,
+    createdBy: t.createdBy,
     teams: t.teams.map((team) => ({
       id: team.id,
       name: team.name,
@@ -893,4 +894,15 @@ export function summarizeTournament(t: Tournament) {
     })),
     createdAt: t.createdAt,
   };
+}
+
+export function viewerInTournament(t: Tournament, discordId: string | null | undefined): boolean {
+  if (!discordId) return false;
+  if (t.createdBy === discordId) return true;
+  if (t.requests.some((r) => r.captainId === discordId && r.status === "pending")) return true;
+  return t.teams.some(
+    (team) =>
+      team.captainId === discordId ||
+      team.members.some((m) => m.discordId === discordId)
+  );
 }

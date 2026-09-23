@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { TournamentCreateForm } from "@/components/tournament-create-form";
-import { Trophy } from "lucide-react";
+import { CupFacts } from "@/components/cup-facts";
 
 interface CupRow {
   id: string;
@@ -16,7 +16,17 @@ interface CupRow {
   teams: { id: string; name: string; seed: number; placement: number | null }[];
 }
 
-export function ClubTournaments({ clubId, owner }: { clubId: string; owner: boolean }) {
+export function ClubTournaments({
+  clubId,
+  owner,
+  region,
+  rules,
+}: {
+  clubId: string;
+  owner: boolean;
+  region: string;
+  rules: string;
+}) {
   const [cups, setCups] = useState<CupRow[]>([]);
   const [creating, setCreating] = useState(false);
 
@@ -31,23 +41,21 @@ export function ClubTournaments({ clubId, owner }: { clubId: string; owner: bool
   }, [load]);
 
   return (
-    <Card className="bg-hl-panel border-hl-border p-4 mb-5">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h2 className="text-sm font-bold text-white header-caps flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-hl-gold" /> Current tournaments
-        </h2>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-bold text-white">Club tournaments</h2>
         {owner ? (
           <button
             type="button"
             onClick={() => setCreating((v) => !v)}
-            className="text-xs font-bold text-hl-gold hover:underline"
+            className="text-xs font-bold text-[#ff5500] hover:underline"
           >
-            {creating ? "Close" : "Create club cup"}
+            {creating ? "Close" : "+ Create"}
           </button>
         ) : null}
       </div>
       {creating && owner ? (
-        <div className="mb-4">
+        <Card className="bg-hl-panel border-hl-border p-4">
           <TournamentCreateForm
             kind="community"
             clubId={clubId}
@@ -56,10 +64,11 @@ export function ClubTournaments({ clubId, owner }: { clubId: string; owner: bool
               window.location.href = `/tournaments/${cupId}`;
             }}
           />
-        </div>
+        </Card>
       ) : null}
+      <CupFacts region={region} rules={rules} />
       {cups.length === 0 ? (
-        <p className="text-sm text-hl-muted">This club has not created a cup yet.</p>
+        <p className="text-sm text-hl-muted">This club has not created a tournament yet.</p>
       ) : (
         <div className="space-y-3">
           {cups.map((cup) => (
@@ -88,6 +97,6 @@ export function ClubTournaments({ clubId, owner }: { clubId: string; owner: bool
           ))}
         </div>
       )}
-    </Card>
+    </div>
   );
 }

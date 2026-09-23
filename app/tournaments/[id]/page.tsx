@@ -9,6 +9,7 @@ import { useSession } from "@/components/session-provider";
 import { matchesToView, roundLabel } from "@/lib/tournament-bracket";
 import { regionMeta } from "@/lib/regions";
 import type { BracketMatch, Tournament } from "@/lib/tournament-types";
+import { CupFacts } from "@/components/cup-facts";
 
 interface Viewer {
   organizer: boolean;
@@ -34,6 +35,8 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [missing, setMissing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [teamName, setTeamName] = useState("");
+  const [myTeams, setMyTeams] = useState<{ id: string; name: string; tag: string }[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState("");
   const [captainName, setCaptainName] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [drafts, setDrafts] = useState<Record<string, ScoreRow[]>>({});
@@ -53,6 +56,24 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     load().catch(() => setMissing(true));
   }, [load]);
+
+  useEffect(() => {
+    if (!session?.discordId) {
+      setMyTeams([]);
+      return;
+    }
+    fetch("/api/teams?mine=1")
+      .then((r) => r.json())
+      .then((d) => {
+        const rows = Array.isArray(d.teams) ? d.teams : [];
+        setMyTeams(
+          rows
+            .filter((t: { captain?: boolean; id: string; name: string; tag: string }) => t.captain)
+            .map((t: { id: string; name: string; tag: string }) => ({ id: t.id, name: t.name, tag: t.tag }))
+        );
+      })
+      .catch(() => setMyTeams([]));
+  }, [session?.discordId]);
 
   const act = async (body: Record<string, unknown>) => {
     setError(null);
@@ -188,6 +209,11 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               style={{ width: `${Math.min(100, Math.round((tournament.teams.length / tournament.size) * 100))}%` }}
             />
           </div>
+          {tournament.kind === "community" ? (
+            <div className="mt-5 border-t border-hl-border pt-5">
+              <CupFacts region={tournament.region} />
+            </div>
+          ) : null}
           {tournament.mapPool.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-1.5">
               {tournament.mapPool.map((map) => (
@@ -252,10 +278,48 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               ? `Requesting charges ${tournament.entryFee.toLocaleString()} HL Coins now. ${reviewer} accept or deny. A denial refunds the fee.`
               : `${reviewer} accept or deny. This cup has no entry fee.`}
           </p>
+          {myTeams.length > 0 ? (
+            <div className="mb-3">
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-hl-muted">
+                Use one of your teams
+              </label>
+              <select
+                value={selectedTeamId}
+                onChange={(e) => {
+                  const idSel = e.target.value;
+                  setSelectedTeamId(idSel);
+                  const picked = myTeams.find((t) => t.id === idSel);
+                  if (picked) setTeamName(picked.name);
+                }}
+                className={`${field} w-full`}
+              >
+                <option value="">Type a new name…</option>
+                {myTeams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} [{t.tag}]
+                  </option>
+                ))}
+              </select>
+              <Link href="/teams" className="mt-1 inline-block text-[11px] font-bold text-hl-gold hover:underline">
+                Manage teams
+              </Link>
+            </div>
+          ) : (
+            <p className="mb-3 text-xs text-hl-muted">
+              Prefer a saved roster?{" "}
+              <Link href="/teams?create=1" className="font-bold text-hl-gold hover:underline">
+                Create a team
+              </Link>{" "}
+              first, then come back.
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             <input
               value={teamName}
-              onChange={(e) => setTeamName(e.target.value.slice(0, 24))}
+              onChange={(e) => {
+                setTeamName(e.target.value.slice(0, 24));
+                setSelectedTeamId("");
+              }}
               placeholder="Team name"
               className={`${field} flex-1 min-w-[12rem]`}
             />

@@ -346,6 +346,7 @@
   background: #181818;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   width: var(--hl-sidebar-w);
+  transition: width 0.16s ease;
 }
 
 .hl-nav-item {

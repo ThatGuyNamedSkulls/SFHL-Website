@@ -12,6 +12,7 @@ import {
   teamHandle,
 } from "@/lib/match-stats";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
+import { perceivedSkill, teamWinChances } from "@/lib/win-chance";
 
 export async function GET(
   _request: Request,
@@ -72,26 +73,39 @@ export async function GET(
       string,
       { rank: string; avatar: string; elo: number; placementDone: boolean; country: string | null; countryFlag: string | null }
     >();
+    const rawSkill = new Map<string, { elo: number; mmr: number | null; placementDone: boolean }>();
     if (rows.length > 0) {
       const placeholders = rows.map(() => "?").join(",");
       try {
         await ensurePlayerDiscordColumns();
-        const rs = await client.execute({
-          sql: `SELECT name, rank, elo, placement_done, country, roblox_avatar_image, discord_avatar,
-                       discord_id
-                FROM players WHERE name IN (${placeholders})`,
-          args: rows.map((r) => r.player_name),
-        });
-        const playerRows = rs.rows as unknown as {
+        let playerRows: {
           name: string;
           rank: string;
           elo: number;
+          mmr?: number | null;
           placement_done: number;
           country: string | null;
           roblox_avatar_image: string | null;
           discord_avatar: string | null;
           discord_id: string | null;
         }[];
+        try {
+          const rs = await client.execute({
+            sql: `SELECT name, rank, elo, mmr, placement_done, country, roblox_avatar_image, discord_avatar,
+                         discord_id
+                  FROM players WHERE name IN (${placeholders})`,
+            args: rows.map((r) => r.player_name),
+          });
+          playerRows = rs.rows as unknown as typeof playerRows;
+        } catch {
+          const rs = await client.execute({
+            sql: `SELECT name, rank, elo, placement_done, country, roblox_avatar_image, discord_avatar,
+                         discord_id
+                  FROM players WHERE name IN (${placeholders})`,
+            args: rows.map((r) => r.player_name),
+          });
+          playerRows = rs.rows as unknown as typeof playerRows;
+        }
         const avatars = await resolveAvatarMap(playerRows);
         for (const r of playerRows) {
           const cc = isValidCountry(r.country) ? r.country!.toLowerCase() : null;
@@ -103,6 +117,11 @@ export async function GET(
             placementDone: rating.placementDone,
             country: cc ? countryName(cc) : null,
             countryFlag: cc ? flagPath(cc) : null,
+          });
+          rawSkill.set(r.name, {
+            elo: Number(r.elo ?? 0),
+            mmr: r.mmr == null ? null : Number(r.mmr),
+            placementDone: rating.placementDone,
           });
         }
         const missing = rows
@@ -199,6 +218,23 @@ export async function GET(
       scoreType = "points";
     }
 
+    const withSkill = (players: typeof rows) =>
+      players.map((p) => {
+        const before = Number(p.elo_before ?? 0);
+        const raw = rawSkill.get(p.player_name);
+        const wasUnranked = before <= 0 || /unranked/i.test(String(p.player_rank || ""));
+        const skill = wasUnranked
+          ? perceivedSkill({
+              placementDone: false,
+              elo: raw?.elo,
+              mmr: raw?.mmr,
+              eloBefore: before,
+            })
+          : before;
+        return { ...p, skill };
+      });
+    const chances = teamWinChances(withSkill(teamAPlayers), withSkill(teamBPlayers));
+
     const capA = teamAPlayers[0]?.player_name || "team";
     const capB = teamBPlayers[0]?.player_name || "team";
     const detail = {
@@ -215,6 +251,8 @@ export async function GET(
       teamBAvatar: playerInfo.get(capB)?.avatar ?? "",
       teamAScore,
       teamBScore,
+      teamAWinChance: chances?.teamA,
+      teamBWinChance: chances?.teamB,
       scoreType,
       winner: (isTie ? "A" : winners.length > 0 ? "A" : "B") as "A" | "B",
       teamARoundsFirstHalf: 0,

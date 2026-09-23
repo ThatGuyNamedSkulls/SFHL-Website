@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { getClub } from "@/lib/clubs";
 import { isMatchStaff } from "@/lib/discord-party-voice";
 import {
   createTournament,
   listTournaments,
   summarizeTournament,
   tournamentsForClub,
+  viewerInTournament,
   type TournamentActor,
 } from "@/lib/tournaments";
 
@@ -34,9 +36,19 @@ export async function GET(request: Request) {
     const me = await actor();
     const clubId = new URL(request.url).searchParams.get("clubId")?.trim();
     const rows = clubId ? await tournamentsForClub(clubId) : await listTournaments();
+    const clubNames = new Map<string, string>();
+    for (const t of rows) {
+      if (!t.clubId || clubNames.has(t.clubId)) continue;
+      const club = await getClub(t.clubId).catch(() => null);
+      if (club) clubNames.set(t.clubId, club.name);
+    }
     return NextResponse.json({
       staff: !!me?.staff,
-      tournaments: rows.map(summarizeTournament),
+      tournaments: rows.map((t) => ({
+        ...summarizeTournament(t),
+        organizer: t.kind === "official" ? "HyperLeague" : clubNames.get(t.clubId || "") || "Club",
+        mine: viewerInTournament(t, me?.discordId),
+      })),
     });
   } catch (error) {
     console.error("tournaments GET", error);

@@ -242,6 +242,9 @@ export interface MatchDetail {
   teamBName: string;
   teamAScore: number;
   teamBScore: number;
+  /** Pre-match Elo win chance for each side. Missing on matches with no stored Elo. */
+  teamAWinChance?: number;
+  teamBWinChance?: number;
   /** Whether the headline score is the real round score or a fallback point sum. */
   scoreType?: "rounds" | "points";
   winner: "A" | "B";

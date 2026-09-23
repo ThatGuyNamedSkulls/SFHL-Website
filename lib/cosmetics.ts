@@ -356,6 +356,27 @@ export interface ShopItem {
   owned: boolean;
 }
 
+/** Public catalog (no ownership flags). Used when the visitor is not linked. */
+export async function listShopCatalog(): Promise<Omit<ShopItem, "owned">[]> {
+  await ensureCosmeticsSchema();
+  const itemsRs = await client.execute(
+    `SELECT id, slug, type, name, description, asset, rarity, price
+     FROM cosmetic_items
+     WHERE price > 0
+     ORDER BY price ASC, type`
+  );
+  return (itemsRs.rows as unknown as Record<string, unknown>[]).map((r) => ({
+    id: Number(r.id),
+    slug: r.slug as string,
+    type: r.type as CosmeticType,
+    name: r.name as string,
+    description: (r.description as string) ?? "",
+    asset: (r.asset as string) ?? null,
+    rarity: (r.rarity as string) || "common",
+    price: Number(r.price ?? 0),
+  }));
+}
+
 /** Everything for the shop page: the player's balance + the purchasable
  *  catalog (price > 0), each flagged with whether they already own it. */
 export async function getShop(

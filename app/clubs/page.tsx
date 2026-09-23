@@ -65,6 +65,12 @@ export default function ClubsPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("create") === "1") {
+      setCreating(true);
+    }
+  }, []);
+
   const create = async () => {
     setError(null);
     setBusy(true);

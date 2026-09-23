@@ -6,6 +6,7 @@
  */
 
 import { client, publicRating, ensurePlayerDiscordColumns } from "@/lib/db";
+import { perceivedSkill, teamWinChances } from "@/lib/win-chance";
 import { ChatMessage, listLobbyChat } from "@/lib/lobby-chat";
 import { pickAvatar, resolveAvatarsByDiscordId } from "@/lib/avatar";
 
@@ -19,6 +20,8 @@ export interface LobbyMemberView {
   avatar: string | null;
   rank: string;
   elo: number;
+  /** False while the player is still in placements. Their Elo is not shown. */
+  placementDone: boolean;
   left?: boolean;
   sub?: boolean;
 }
@@ -64,6 +67,8 @@ export interface LobbyView {
   veto: VetoState | null;
   createdAt: number;
   members: LobbyMemberView[];
+  /** Pre-match win chance from perceived ratings. Null if a side is empty. */
+  winChance: { team1: number; team2: number } | null;
   server: { url: string } | null;
   matchNumber: number | null;
   messages: ChatMessage[];
@@ -171,18 +176,33 @@ function resolveSidePicker(data: RawLobby): { captainId: string; team: number; o
 /** Enrich the raw members with avatar, rank, and elo from the players table (one query). */
 async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<LobbyView> {
   const names = raw.members.map((m) => m.name);
-  const byName = new Map<string, { avatar: string | null; rank: string; elo: number }>();
+  const byName = new Map<
+    string,
+    { avatar: string | null; rank: string; elo: number; placementDone: boolean; skill: number }
+  >();
   if (names.length > 0) {
     const placeholders = names.map(() => "?").join(",");
     try {
       await ensurePlayerDiscordColumns();
-      const rs = await client.execute({
-        sql: `SELECT name, rank, elo, placement_done, roblox_avatar_image, discord_avatar,
-                     discord_id
-              FROM players WHERE name IN (${placeholders})`,
-        args: names,
-      });
-      for (const r of rs.rows as unknown as Record<string, unknown>[]) {
+      let playerRows: Record<string, unknown>[];
+      try {
+        const rs = await client.execute({
+          sql: `SELECT name, rank, elo, mmr, placement_done, roblox_avatar_image, discord_avatar,
+                       discord_id
+                FROM players WHERE name IN (${placeholders})`,
+          args: names,
+        });
+        playerRows = rs.rows as unknown as Record<string, unknown>[];
+      } catch {
+        const rs = await client.execute({
+          sql: `SELECT name, rank, elo, placement_done, roblox_avatar_image, discord_avatar,
+                       discord_id
+                FROM players WHERE name IN (${placeholders})`,
+          args: names,
+        });
+        playerRows = rs.rows as unknown as Record<string, unknown>[];
+      }
+      for (const r of playerRows) {
         const rating = publicRating({
           elo: Number(r.elo ?? 0),
           rank: String(r.rank || ""),
@@ -197,6 +217,12 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
             ) || null,
           rank: rating.rank,
           elo: rating.elo,
+          placementDone: rating.placementDone,
+          skill: perceivedSkill({
+            placementDone: rating.placementDone,
+            elo: Number(r.elo ?? 0),
+            mmr: r.mmr == null ? null : Number(r.mmr),
+          }),
         });
       }
     } catch {
@@ -213,6 +239,23 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
   } catch {
     /* chat table may not exist yet */
   }
+  const members = raw.members.map((m) => ({
+    discordId: m.discordId,
+    name: m.name,
+    team: m.team,
+    avatar: byDiscordId.get(m.discordId) || byName.get(m.name)?.avatar || null,
+    rank: byName.get(m.name)?.rank ?? "UNRANKED",
+    elo: byName.get(m.name)?.elo ?? 0,
+    placementDone: byName.get(m.name)?.placementDone ?? false,
+    skill: byName.get(m.name)?.skill ?? 1000,
+    left: !!m.left,
+    sub: !!m.sub,
+  }));
+  const chances = teamWinChances(
+    members.filter((m) => m.team === 1).map((m) => ({ skill: m.skill, left_early: m.left ? 1 : 0, is_sub: m.sub ? 1 : 0 })),
+    members.filter((m) => m.team === 2).map((m) => ({ skill: m.skill, left_early: m.left ? 1 : 0, is_sub: m.sub ? 1 : 0 }))
+  );
+
   return {
     channelId: raw.channelId,
     channelName: raw.channelName,
@@ -232,16 +275,8 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
     },
     veto: normalizeVeto(raw),
     createdAt: raw.createdAt,
-    members: raw.members.map((m) => ({
-      discordId: m.discordId,
-      name: m.name,
-      team: m.team,
-      avatar: byDiscordId.get(m.discordId) || byName.get(m.name)?.avatar || null,
-      rank: byName.get(m.name)?.rank ?? "UNRANKED",
-      elo: byName.get(m.name)?.elo ?? 0,
-      left: !!m.left,
-      sub: !!m.sub,
-    })),
+    members: members.map(({ skill: _skill, ...member }) => member),
+    winChance: chances ? { team1: chances.teamA, team2: chances.teamB } : null,
     server: serverUrl ? { url: serverUrl } : null,
     matchNumber:
       typeof raw.matchNumber === "number" && raw.matchNumber > 0
