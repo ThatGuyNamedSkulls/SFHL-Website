@@ -5,7 +5,7 @@
  * bot then reconciles onto the live Discord MapVoteView.
  */
 
-import { client, mapRank, ensurePlayerDiscordColumns } from "@/lib/db";
+import { client, publicRating, ensurePlayerDiscordColumns } from "@/lib/db";
 import { ChatMessage, listLobbyChat } from "@/lib/lobby-chat";
 import { pickAvatar, resolveAvatarsByDiscordId } from "@/lib/avatar";
 
@@ -177,12 +177,17 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
     try {
       await ensurePlayerDiscordColumns();
       const rs = await client.execute({
-        sql: `SELECT name, rank, elo, roblox_avatar_image, discord_avatar,
+        sql: `SELECT name, rank, elo, placement_done, roblox_avatar_image, discord_avatar,
                      discord_id
               FROM players WHERE name IN (${placeholders})`,
         args: names,
       });
       for (const r of rs.rows as unknown as Record<string, unknown>[]) {
+        const rating = publicRating({
+          elo: Number(r.elo ?? 0),
+          rank: String(r.rank || ""),
+          placement_done: Number(r.placement_done ?? 0),
+        });
         byName.set(r.name as string, {
           avatar:
             pickAvatar(
@@ -190,8 +195,8 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
               r.discord_avatar as string | null,
               r.discord_id as string | null
             ) || null,
-          rank: mapRank((r.rank as string) || ""),
-          elo: Number(r.elo ?? 0),
+          rank: rating.rank,
+          elo: rating.elo,
         });
       }
     } catch {

@@ -11,6 +11,7 @@ import { useSession } from "@/components/session-provider";
 interface TrackStats {
   rank: RankTierLetter;
   elo: number;
+  placementDone: boolean;
   stats: {
     wins: number;
     matchesPlayed: number;
@@ -33,6 +34,7 @@ export default function TrackPage() {
         setPlayer({
           rank: d.rank,
           elo: d.elo,
+          placementDone: d.placementDone !== false,
           stats: {
             wins: d.stats?.wins ?? 0,
             matchesPlayed: d.stats?.matchesPlayed ?? 0,
@@ -79,7 +81,7 @@ export default function TrackPage() {
 
   const s = player?.stats;
   const tiles = [
-    { label: "Elo", value: player ? String(player.elo) : "—" },
+    { label: "Elo", value: player?.placementDone ? String(player.elo) : "—" },
     { label: "Win %", value: s ? `${s.winPercent.toFixed(0)}%` : "—" },
     { label: "K/D", value: s ? s.kd.toFixed(2) : "—" },
     { label: "HS %", value: s ? `${s.headshotPercent.toFixed(0)}%` : "—" },

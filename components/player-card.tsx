@@ -44,11 +44,13 @@ export function PlayerCard({ player, className = "" }: PlayerCardProps) {
         </h2>
 
         {/* Rank Badge */}
-        <RankBadge rank={player.rank} size="lg" />
+        <RankBadge rank={player.placementDone === false ? "UNRANKED" : player.rank} size="lg" />
 
         {/* ELO */}
         <div className="text-center">
-          <div className="text-3xl stat-number text-hl-gold">{player.elo}</div>
+          <div className="text-3xl stat-number text-hl-gold">
+            {player.placementDone === false ? "—" : player.elo}
+          </div>
           <div className="text-xs text-hl-muted header-caps mt-1">
             Current ELO
           </div>
@@ -57,7 +59,7 @@ export function PlayerCard({ player, className = "" }: PlayerCardProps) {
         {/* Peak ELO */}
         <div className="text-center">
           <div className="text-lg stat-number text-hl-muted">
-            {player.peakElo}
+            {player.placementDone === false ? "—" : player.peakElo}
           </div>
           <div className="text-xs text-hl-muted header-caps mt-0.5">
             Peak ELO

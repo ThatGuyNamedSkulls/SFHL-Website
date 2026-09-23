@@ -411,8 +411,12 @@ function ProfileContent() {
   const memberSince = matches.length > 0 ? matches[matches.length - 1].date : null;
   // Ladder position: STAR sits above the whole ladder, UNRANKED below it (-1).
   const currentTierIdx =
-    player.rank === "STAR" ? LADDER.length : LADDER.findIndex((t) => t.letter === player.rank);
-  const nextTier = getNextRank(player.rank);
+    player.placementDone && player.rank === "STAR"
+      ? LADDER.length
+      : player.placementDone
+        ? LADDER.findIndex((t) => t.letter === player.rank)
+        : -1;
+  const nextTier = player.placementDone ? getNextRank(player.rank) : undefined;
   const eloNeeded =
     currentTierIdx >= 0 && nextTier && nextTier.minElo > player.elo
       ? nextTier.minElo - player.elo
@@ -664,8 +668,8 @@ function ProfileContent() {
             {tab === "summary" && (
               <div className="space-y-6">
                 <GameSkillBar
-                  rank={player.rank}
-                  elo={player.elo}
+                  rank={player.placementDone ? player.rank : "UNRANKED"}
+                  elo={player.placementDone ? player.elo : 0}
                   header={
                     <>
                       <div>
@@ -799,15 +803,10 @@ function ProfileContent() {
                 <Card className="bg-hl-panel border-hl-border p-5">
                   <div className="flex items-center justify-between gap-3 mb-5">
                     <div className="flex items-center gap-3">
-                      <RankBadge rank={player.rank} size="md" />
+                      <RankBadge rank={player.placementDone ? player.rank : "UNRANKED"} size="md" />
                       <div>
-                        {/* A placement player's elo is genuinely 0 until
-                           graduation (the running calibration lives
-                           server-side only) — so this just shows player.elo
-                           as-is, same as SkillLevelBox in GameSkillBar
-                           (Summary tab) already does. */}
                         <div className="stat-number text-2xl text-white">
-                          {player.elo}
+                          {player.placementDone ? player.elo : "—"}
                         </div>
                         <div className="text-xs text-hl-muted">
                           {player.placementDone

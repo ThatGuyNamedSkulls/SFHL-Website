@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllPlayers, getModeLeaderboard, getPlacementGamesTotal, mapRank } from "@/lib/db";
+import { getAllPlayers, getModeLeaderboard, getPlacementGamesTotal, publicRating } from "@/lib/db";
 import { getEquippedVisualsMap, EquippedVisuals } from "@/lib/cosmetics";
 import { pickAvatar } from "@/lib/avatar";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
@@ -26,6 +26,7 @@ export async function GET(request: Request) {
         return rows.map((r, idx) => {
           const hasCountry = isValidCountry(r.country);
           const playRegion = countryToPlayRegion(r.country);
+          const rating = publicRating(r);
           return {
             id: `m${modeParam}-${idx}`,
             username: r.player_name,
@@ -33,9 +34,9 @@ export async function GET(request: Request) {
             avatarUrl: pickAvatar(r.roblox_avatar_image, r.discord_avatar, r.discord_id),
             cardAsset: cards.get(r.player_name)?.card ?? null,
             frameAsset: cards.get(r.player_name)?.frame ?? null,
-            rank: mapRank(r.rank),
-            elo: r.elo,
-            peakElo: r.peak_elo,
+            rank: rating.rank,
+            elo: rating.elo,
+            peakElo: rating.peakElo,
             region: playRegion ?? "",
             regionFlag: playRegion ?? "🌐",
             country: hasCountry ? r.country!.toLowerCase() : null,
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
               playtimeHours: 0,
             },
             clubTag: lookupClubTag(tags, r.player_name, r.discord_id != null ? String(r.discord_id) : null),
-            placementDone: Number(r.placement_done) === 1,
+            placementDone: rating.placementDone,
             placementGamesPlayed: r.placement_games_played,
           };
         });
@@ -76,6 +77,7 @@ export async function GET(request: Request) {
       return players.map((p, idx) => {
         const playRegion = countryToPlayRegion(p.country);
         const hasCountry = isValidCountry(p.country);
+        const rating = publicRating(p);
         return {
         id: `p${p.id}`,
         username: p.name,
@@ -83,9 +85,9 @@ export async function GET(request: Request) {
         avatarUrl: pickAvatar(p.roblox_avatar_image, p.discord_avatar, p.discord_id),
         cardAsset: cards.get(p.name)?.card ?? null,
         frameAsset: cards.get(p.name)?.frame ?? null,
-        rank: mapRank(p.rank),
-        elo: p.elo,
-        peakElo: p.peak_elo,
+        rank: rating.rank,
+        elo: rating.elo,
+        peakElo: rating.peakElo,
         region: playRegion ?? "",
         regionFlag: playRegion ? regionMeta(playRegion).short : "🌐",
         country: hasCountry ? p.country!.toLowerCase() : null,
@@ -116,7 +118,7 @@ export async function GET(request: Request) {
               : 0,
           playtimeHours: Math.round(p.total_play_time / 3600),
         },
-        placementDone: p.placement_done === 1,
+        placementDone: rating.placementDone,
         placementGamesPlayed: p.placement_games_played,
         placementGamesTotal,
         };

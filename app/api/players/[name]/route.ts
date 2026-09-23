@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession, getGuildPresenceCached } from "@/lib/auth";
-import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, mapRank, setPlayerMmAccess } from "@/lib/db";
+import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, mapRank, publicRating, setPlayerMmAccess } from "@/lib/db";
 import { buildEloTimeline } from "@/lib/elo-timeline";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
@@ -104,6 +104,7 @@ export async function GET(
 
     const playRegion = countryToPlayRegion(player.country);
     const region = playRegion ? regionMeta(playRegion) : { label: "", short: "" };
+    const rating = publicRating(player);
 
     // Build the ELO history season by season. Reconstructing the whole curve
     // backwards from the CURRENT Elo breaks after a season reset (everyone drops
@@ -111,7 +112,7 @@ export async function GET(
     // to the final Elo /resetdb archived for it, and the line is broken at every
     // reset boundary so the new season starts fresh.
     const { history: eloHistory, resets: eloResets } = buildEloTimeline(
-      player.elo,
+      rating.elo,
       eloChanges,
       seasonResets,
       seasonFinalElos
@@ -136,9 +137,9 @@ export async function GET(
       username: player.name,
       discordUsername: player.discord_username ?? null,
       avatarUrl: avatar,
-      rank: mapRank(player.rank),
-      elo: player.elo,
-      peakElo: player.peak_elo,
+      rank: rating.rank,
+      elo: rating.elo,
+      peakElo: rating.peakElo,
       region: region.short || "",
       regionFlag: region.short || "🌐",
       country: isValidCountry(player.country) ? player.country!.toLowerCase() : null,
@@ -187,7 +188,7 @@ export async function GET(
             rank: mapRank(lastSeasonArchive.rank),
           }
         : null,
-      placementDone: player.placement_done === 1,
+      placementDone: rating.placementDone,
       placementGamesPlayed: player.placement_games_played,
       placementGamesTotal,
       placementMatches: placementThisSeason.map((m) => ({
@@ -210,16 +211,19 @@ export async function GET(
         mvps: m.mvps || 0,
       })),
       // Own-ladder gamemode ratings (e.g. the separate 1v1 ladder).
-      modes: modeRatings.map((mr) => ({
-        mode: mr.mode,
-        elo: mr.elo,
-        rank: mapRank(mr.rank),
-        peakElo: mr.peak_elo,
-        matchesPlayed: mr.matches_played,
-        matchesWon: mr.matches_won,
-        placementDone: Number(mr.placement_done) === 1,
-        placementGamesPlayed: mr.placement_games_played,
-      })),
+      modes: modeRatings.map((mr) => {
+        const modeRating = publicRating(mr);
+        return {
+          mode: mr.mode,
+          elo: modeRating.elo,
+          rank: modeRating.rank,
+          peakElo: modeRating.peakElo,
+          matchesPlayed: mr.matches_played,
+          matchesWon: mr.matches_won,
+          placementDone: modeRating.placementDone,
+          placementGamesPlayed: mr.placement_games_played,
+        };
+      }),
       playedWith,
       rankings,
       cosmetics,

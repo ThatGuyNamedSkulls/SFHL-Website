@@ -225,7 +225,7 @@ export function LandingPage() {
                       <RankBadgeInline rank={player.rank as never} />
                     </div>
                     <div className="flex items-center gap-3 text-xs text-hl-muted mt-0.5">
-                      <span>ELO <span className="text-hl-gold font-semibold">{player.elo}</span></span>
+                      <span>ELO <span className="text-hl-gold font-semibold">{player.rank === "UNRANKED" || !player.elo ? "—" : player.elo}</span></span>
                       <span>K/D <span className="text-hl-teal font-semibold">{player.stats.kd.toFixed(2)}</span></span>
                       <span>Win <span className="text-hl-green font-semibold">{player.stats.winPercent.toFixed(0)}%</span></span>
                     </div>

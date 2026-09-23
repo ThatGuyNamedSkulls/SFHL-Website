@@ -397,7 +397,7 @@ export default function QueuePage() {
       {/* Season / skill-level banner (FACEIT-style) */}
       <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
         <div className="flex flex-wrap items-center gap-5">
-          <RankBadge rank={player?.rank ?? "UNRANKED"} size="lg" />
+          <RankBadge rank={placed && player ? player.rank : "UNRANKED"} size="lg" />
           <div className="min-w-0">
             <span className="inline-block bg-hl-panel-light text-hl-muted rounded-full px-3 py-0.5 text-[11px] font-bold mb-1.5">
               Season 1

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { client, getMatchesByMatchId, mapRank, ensurePlayerDiscordColumns } from "@/lib/db";
+import { client, getMatchesByMatchId, mapRank, publicRating, ensurePlayerDiscordColumns } from "@/lib/db";
 import { prettyMap, prettyRegion } from "@/lib/format";
 import { resolveAvatarMap } from "@/lib/avatar";
 import { isValidCountry, countryName, flagPath } from "@/lib/countries";
@@ -70,14 +70,14 @@ export async function GET(
     // One query for every player's current rank/avatar/elo/country.
     const playerInfo = new Map<
       string,
-      { rank: string; avatar: string; elo: number; country: string | null; countryFlag: string | null }
+      { rank: string; avatar: string; elo: number; placementDone: boolean; country: string | null; countryFlag: string | null }
     >();
     if (rows.length > 0) {
       const placeholders = rows.map(() => "?").join(",");
       try {
         await ensurePlayerDiscordColumns();
         const rs = await client.execute({
-          sql: `SELECT name, rank, elo, country, roblox_avatar_image, discord_avatar,
+          sql: `SELECT name, rank, elo, placement_done, country, roblox_avatar_image, discord_avatar,
                        discord_id
                 FROM players WHERE name IN (${placeholders})`,
           args: rows.map((r) => r.player_name),
@@ -86,6 +86,7 @@ export async function GET(
           name: string;
           rank: string;
           elo: number;
+          placement_done: number;
           country: string | null;
           roblox_avatar_image: string | null;
           discord_avatar: string | null;
@@ -94,10 +95,12 @@ export async function GET(
         const avatars = await resolveAvatarMap(playerRows);
         for (const r of playerRows) {
           const cc = isValidCountry(r.country) ? r.country!.toLowerCase() : null;
+          const rating = publicRating(r);
           playerInfo.set(r.name, {
-            rank: mapRank(r.rank || ""),
+            rank: rating.rank,
             avatar: avatars.get(r.name) ?? "",
-            elo: Number(r.elo ?? 0),
+            elo: rating.elo,
+            placementDone: rating.placementDone,
             country: cc ? countryName(cc) : null,
             countryFlag: cc ? flagPath(cc) : null,
           });
@@ -112,6 +115,7 @@ export async function GET(
               rank: "UNRANKED",
               avatar: extra.get(n) ?? "",
               elo: 0,
+              placementDone: false,
               country: null,
               countryFlag: null,
             });
@@ -140,8 +144,12 @@ export async function GET(
           playerId: p.player_name,
           username: p.player_name,
           avatarUrl: info?.avatar ?? "",
-          rank: p.player_rank ? mapRank(p.player_rank) : info?.rank ?? "UNRANKED",
-          elo: p.elo_before != null ? Number(p.elo_before) : undefined,
+          rank: info?.placementDone === false
+            ? "UNRANKED"
+            : p.player_rank ? mapRank(p.player_rank) : info?.rank ?? "UNRANKED",
+          elo: info?.placementDone === false
+            ? undefined
+            : p.elo_before != null ? Number(p.elo_before) : undefined,
           country: info?.country ?? null,
           countryFlag: info?.countryFlag ?? null,
           team,

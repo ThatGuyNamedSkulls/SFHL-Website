@@ -162,7 +162,9 @@ export default function LeaderboardsPage() {
     return players.filter((p) => p.region === me.region && p.position < me.position).length + 1;
   }, [players, me]);
 
-  const ranked = !!me && me.rank !== "UNRANKED" && me.placementDone !== false;
+  const ranked = !!me && me.placementDone !== false && me.rank !== "UNRANKED";
+
+  const isPlacing = (p: ApiPlayer) => p.placementDone === false || p.rank === "UNRANKED";
 
   return (
     <div className="hl-page">
@@ -265,6 +267,8 @@ export default function LeaderboardsPage() {
           filteredPlayers.map((player, idx) => {
             const isMe = myPlayer !== null && player.username === myPlayer;
             const boardRank = idx + 1;
+            const placing = isPlacing(player);
+            const displayRank = placing ? "UNRANKED" : (player.rank as RankTierLetter);
             return (
               <Link
                 key={player.id}
@@ -292,7 +296,7 @@ export default function LeaderboardsPage() {
                     <ClubTaggedName name={player.username} tag={player.clubTag} />
                   </span>
                   <span className="md:hidden shrink-0">
-                    <RankBadge rank={player.rank as RankTierLetter} size="sm" showGlow={false} className="!w-5 !h-5" />
+                    <RankBadge rank={displayRank} size="sm" showGlow={false} className="!w-5 !h-5" />
                   </span>
                 </span>
                 <span className="hidden md:flex items-center justify-center">
@@ -303,14 +307,16 @@ export default function LeaderboardsPage() {
                   )}
                 </span>
                 <span className="hidden md:flex items-center justify-center">
-                  {boardRank <= 10 ? (
-                    <SkillPill position={boardRank} rank={player.rank as RankTierLetter} />
+                  {placing ? (
+                    <RankBadge rank="UNRANKED" size="sm" showGlow={false} className="!w-6 !h-6" />
+                  ) : boardRank <= 10 ? (
+                    <SkillPill position={boardRank} rank={displayRank} />
                   ) : (
-                    <RankBadge rank={player.rank as RankTierLetter} size="sm" showGlow={false} className="!w-6 !h-6" />
+                    <RankBadge rank={displayRank} size="sm" showGlow={false} className="!w-6 !h-6" />
                   )}
                 </span>
-                <span className="text-right text-[15px] font-semibold text-white tabular-nums">
-                  {player.elo.toLocaleString()}
+                <span className={`text-right text-[15px] font-semibold tabular-nums ${placing ? "text-[#8a8a8a]" : "text-white"}`}>
+                  {placing ? "—" : player.elo.toLocaleString()}
                 </span>
               </Link>
             );

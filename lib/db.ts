@@ -87,6 +87,32 @@ export function mapRank(dbRank: string): string {
   return RANK_DB_MAP[dbRank] || "UNRANKED";
 }
 
+export function isPlacementComplete(placementDone: unknown): boolean {
+  return Number(placementDone) === 1;
+}
+
+/** Public rating for display. Mid-placement calibration lives in `mmr` and
+ *  is not a real Elo — never return that number (or a rank derived from it). */
+export function publicRating(player: {
+  elo: number;
+  peak_elo?: number;
+  rank: string;
+  placement_done: number;
+}): { elo: number; peakElo: number; rank: string; placementDone: boolean } {
+  const done = isPlacementComplete(player.placement_done);
+  return {
+    elo: done ? Number(player.elo) || 0 : 0,
+    peakElo: done ? Number(player.peak_elo) || 0 : 0,
+    rank: done ? mapRank(player.rank) : "UNRANKED",
+    placementDone: done,
+  };
+}
+
+/** Graduated players by Elo, then unfinished-placement players (no public
+ *  rating) alphabetically — leftover calibration numbers must not rank them. */
+const PUBLIC_LEADERBOARD_ORDER =
+  "ORDER BY CASE WHEN COALESCE(placement_done, 0) = 1 THEN elo END DESC, lower(name) ASC";
+
 // ---------------------------------------------------------------------------
 // Player queries
 // ---------------------------------------------------------------------------
@@ -123,6 +149,11 @@ export interface DbPlayer {
   discord_avatar: string | null;
   /** 1 when the member has the Get Matchmaking Access Discord role. */
   mm_access?: number;
+}
+
+function hidePlacementRating<T extends DbPlayer>(player: T): T {
+  if (isPlacementComplete(player.placement_done)) return player;
+  return { ...player, elo: 0, peak_elo: 0, rank: "[?] Unranked" };
 }
 
 /** Lazily add the Discord-identity columns if the bot hasn't migrated them yet
@@ -199,22 +230,19 @@ function playerFromRows(rs: ResultSet): DbPlayer | undefined {
 }
 
 /** The leaderboard (only caller of this function). Placement players stay on
- *  the board (not hidden) — their `elo` is genuinely 0 until graduation (the
- *  bot only writes a real value at the end of placements; see
- *  cogs/ranking.py's "performance" mode placement write), so they naturally
- *  sort last and display as 0 rather than a mid-calibration number. */
+ *  the board, but their calibration rating is stripped — it is not public Elo. */
 export async function getAllPlayers(limit?: number): Promise<DbPlayer[]> {
   await ensurePlayerDiscordColumns();
   const cap = limit != null && Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 0;
   if (cap > 0) {
     const rs = await client.execute({
-      sql: `${PLAYER_SELECT} ORDER BY elo DESC LIMIT ?`,
+      sql: `${PLAYER_SELECT} ${PUBLIC_LEADERBOARD_ORDER} LIMIT ?`,
       args: [cap],
     });
-    return rs.rows as unknown as DbPlayer[];
+    return (rs.rows as unknown as DbPlayer[]).map(hidePlacementRating);
   }
-  const rs = await client.execute(`${PLAYER_SELECT} ORDER BY elo DESC`);
-  return rs.rows as unknown as DbPlayer[];
+  const rs = await client.execute(`${PLAYER_SELECT} ${PUBLIC_LEADERBOARD_ORDER}`);
+  return (rs.rows as unknown as DbPlayer[]).map(hidePlacementRating);
 }
 
 /** Resolve a player by website username or Discord @handle (case-insensitive). */
@@ -427,40 +455,40 @@ export async function setPlayerMmAccess(discordId: string, has: boolean): Promis
   });
 }
 
-/** Leaderboard positions by elo: overall, within the player's country, and
- *  within the play region that country maps to (EU/NA/SA/APAC/OC).
+/** Leaderboard positions by public Elo: overall, within the player's country,
+ *  and within the play region that country maps to (EU/NA/SA/APAC/OC).
  *
- *  Placement players are counted like anyone else — their `elo` is
- *  genuinely 0 until graduation (see getAllPlayers), so they can never
- *  outrank a graduated player and simply get an honest (low) position of
- *  their own, same as any other 0-elo row. */
+ *  Only graduated players have a public rating. Unfinished-placement rows
+ *  are ignored even if `elo` still holds a leftover calibration number. */
 export async function getPlayerRankings(
   name: string
 ): Promise<{ overall: number | null; country: number | null; region: number | null }> {
   const rs = await client.execute({
-    sql: "SELECT elo, country FROM players WHERE name = ?",
+    sql: "SELECT elo, country, placement_done FROM players WHERE name = ?",
     args: [name],
   });
   if (rs.rows.length === 0) return { overall: null, country: null, region: null };
-  const elo = Number(rs.rows[0].elo);
+  const done = isPlacementComplete(rs.rows[0].placement_done);
+  const elo = done ? Number(rs.rows[0].elo) : 0;
   const ctry = ((rs.rows[0].country as string) || "").toLowerCase() || null;
   const playRegion = countryToPlayRegion(ctry);
+  const rankedOnly = "COALESCE(placement_done, 0) = 1";
 
   const [higherRs, countryRs, regionRs] = await Promise.all([
     client.execute({
-      sql: "SELECT COUNT(*) AS c FROM players WHERE elo > ?",
+      sql: `SELECT COUNT(*) AS c FROM players WHERE ${rankedOnly} AND elo > ?`,
       args: [elo],
     }),
     ctry
       ? client.execute({
-          sql: "SELECT COUNT(*) AS c FROM players WHERE lower(country) = ? AND elo > ?",
+          sql: `SELECT COUNT(*) AS c FROM players WHERE ${rankedOnly} AND lower(country) = ? AND elo > ?`,
           args: [ctry, elo],
         })
       : Promise.resolve(null),
     playRegion
       ? client.execute({
           sql: `SELECT COUNT(*) AS c FROM players `
-            + `WHERE lower(country) IN (${countriesInPlayRegion(playRegion)
+            + `WHERE ${rankedOnly} AND lower(country) IN (${countriesInPlayRegion(playRegion)
             .map(() => "?")
             .join(",")}) AND elo > ?`,
           args: [...countriesInPlayRegion(playRegion), elo],

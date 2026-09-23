@@ -65,9 +65,10 @@ export async function listGuestbook(profileName: string): Promise<GuestbookEntry
 async function authorRank(fromName: string): Promise<string> {
   try {
     const rs = await client.execute({
-      sql: "SELECT rank FROM players WHERE lower(name) = lower(?) LIMIT 1",
+      sql: "SELECT rank, placement_done FROM players WHERE lower(name) = lower(?) LIMIT 1",
       args: [fromName],
     });
+    if (Number(rs.rows[0]?.placement_done) !== 1) return "UNRANKED";
     const rank = rs.rows[0]?.rank;
     return mapRank(rank != null ? String(rank) : "");
   } catch {

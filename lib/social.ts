@@ -163,9 +163,10 @@ export async function getDiscordIdForPlayer(name: string): Promise<string | null
 // --- player directory (from the real players table) ------------------------
 
 function rowToFriend(r: Record<string, unknown>): Friend {
+  const placing = Number(r.placement_done) !== 1;
   return {
     name: r.name as string,
-    rank: mapRank((r.rank as string) || ""),
+    rank: placing ? "UNRANKED" : mapRank((r.rank as string) || ""),
     avatar: pickAvatar(
       r.roblox_avatar_image as string | null,
       r.discord_avatar as string | null,
@@ -181,7 +182,7 @@ async function resolvePlayers(names: string[]): Promise<Map<string, Friend>> {
   if (names.length === 0) return map;
   const placeholders = names.map(() => "?").join(",");
   const rs = await client.execute({
-    sql: `SELECT name, rank, roblox_avatar_image, country, discord_username, discord_avatar,
+    sql: `SELECT name, rank, placement_done, roblox_avatar_image, country, discord_username, discord_avatar,
                  discord_id FROM players WHERE name IN (${placeholders})`,
     args: names,
   });
@@ -204,7 +205,7 @@ export async function playerExists(name: string): Promise<boolean> {
 /** Search the player base by name to add friends (excludes yourself). */
 export async function searchPlayers(query: string, selfName: string): Promise<Friend[]> {
   const rs = await client.execute({
-    sql: `SELECT name, rank, roblox_avatar_image, country, discord_username, discord_avatar,
+    sql: `SELECT name, rank, placement_done, roblox_avatar_image, country, discord_username, discord_avatar,
                  discord_id FROM players
           WHERE name != ? AND name LIKE ? ORDER BY name LIMIT 20`,
     args: [selfName, `%${query.trim()}%`],
