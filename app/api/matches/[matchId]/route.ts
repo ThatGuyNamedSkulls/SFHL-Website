@@ -12,7 +12,7 @@ import {
   teamHandle,
 } from "@/lib/match-stats";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
-import { perceivedSkill, teamWinChances } from "@/lib/win-chance";
+import { preMatchElo, storedWinChances, teamWinChances } from "@/lib/win-chance";
 
 export async function GET(
   _request: Request,
@@ -73,7 +73,6 @@ export async function GET(
       string,
       { rank: string; avatar: string; elo: number; placementDone: boolean; country: string | null; countryFlag: string | null }
     >();
-    const rawSkill = new Map<string, { elo: number; mmr: number | null; placementDone: boolean }>();
     if (rows.length > 0) {
       const placeholders = rows.map(() => "?").join(",");
       try {
@@ -117,11 +116,6 @@ export async function GET(
             placementDone: rating.placementDone,
             country: cc ? countryName(cc) : null,
             countryFlag: cc ? flagPath(cc) : null,
-          });
-          rawSkill.set(r.name, {
-            elo: Number(r.elo ?? 0),
-            mmr: r.mmr == null ? null : Number(r.mmr),
-            placementDone: rating.placementDone,
           });
         }
         const missing = rows
@@ -218,22 +212,19 @@ export async function GET(
       scoreType = "points";
     }
 
+    // Win chance as it stood when the match was played. The bot freezes it on
+    // every row at /rank time; older rows fall back to the frozen per-player
+    // skill_before (backfilled from the pre-match snapshot), then elo_before.
+    // Live ratings are never used — they move after the match.
     const withSkill = (players: typeof rows) =>
       players.map((p) => {
+        const frozen = Number(p.skill_before ?? 0);
         const before = Number(p.elo_before ?? 0);
-        const raw = rawSkill.get(p.player_name);
-        const wasUnranked = before <= 0 || /unranked/i.test(String(p.player_rank || ""));
-        const skill = wasUnranked
-          ? perceivedSkill({
-              placementDone: false,
-              elo: raw?.elo,
-              mmr: raw?.mmr,
-              eloBefore: before,
-            })
-          : before;
-        return { ...p, skill };
+        return { ...p, skill: frozen > 0 ? frozen : preMatchElo(before) };
       });
-    const chances = teamWinChances(withSkill(teamAPlayers), withSkill(teamBPlayers));
+    const chances =
+      storedWinChances(teamAPlayers, teamBPlayers) ??
+      teamWinChances(withSkill(teamAPlayers), withSkill(teamBPlayers));
 
     const capA = teamAPlayers[0]?.player_name || "team";
     const capB = teamBPlayers[0]?.player_name || "team";

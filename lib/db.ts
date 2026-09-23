@@ -543,6 +543,11 @@ export interface DbMatch {
   player_rank?: string | null;
   /** Elo the player had when this match started. Null on legacy rows. */
   elo_before?: number | null;
+  /** This row's TEAM win chance (%) frozen at /rank time. Null on legacy rows. */
+  win_chance?: number | null;
+  /** Perceived pre-match rating the win-chance math used (seed / hidden
+   *  placement rating for unranked players, never 0). */
+  skill_before?: number | null;
 }
 
 const MATCH_BASE_COLS = `id, player_name, map_name, region, kills, deaths, assists,
@@ -551,6 +556,7 @@ const MATCH_BASE_COLS = `id, player_name, map_name, region, kills, deaths, assis
 const MATCH_SUB_COLS = `${MATCH_BASE_COLS}, COALESCE(is_sub, 0) AS is_sub, COALESCE(left_early, 0) AS left_early, sub_share`;
 const MATCH_RANK_COLS = `${MATCH_SUB_COLS}, player_rank`;
 const MATCH_ELO_COLS = `${MATCH_RANK_COLS}, elo_before`;
+const MATCH_ODDS_COLS = `${MATCH_ELO_COLS}, win_chance, skill_before`;
 
 async function selectMatchRows(whereSql: string, args: InArgs): Promise<DbMatch[]> {
   const variants = [MATCH_ELO_COLS, MATCH_RANK_COLS, MATCH_SUB_COLS, MATCH_BASE_COLS];
@@ -733,6 +739,7 @@ export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
   // the team column (it backfills via ALTER, but a not-yet-restarted bot
   // means the column may not exist — fall back to a team-less select).
   const variants = [
+    `${MATCH_ODDS_COLS}, team, mode`,
     `${MATCH_ELO_COLS}, team, mode`,
     `${MATCH_RANK_COLS}, team, mode`,
     `${MATCH_SUB_COLS}, team, mode`,

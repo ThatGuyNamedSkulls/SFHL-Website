@@ -247,7 +247,7 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
     rank: byName.get(m.name)?.rank ?? "UNRANKED",
     elo: byName.get(m.name)?.elo ?? 0,
     placementDone: byName.get(m.name)?.placementDone ?? false,
-    skill: byName.get(m.name)?.skill ?? 1000,
+    skill: byName.get(m.name)?.skill ?? 1200,
     left: !!m.left,
     sub: !!m.sub,
   }));

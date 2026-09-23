@@ -2,13 +2,13 @@
  * Pre-match team win chance. Same formula as the bot's expected_score
  * (config/games/counterstrike.toml: divisor 400, e_compress 0.7).
  *
- * A player with no stored pre-match Elo counts as the placement seed (1000),
- * which is how an unrated player is treated before their first game.
+ * A player with no rating yet (never played, or a 0 on record) counts as the
+ * perceived seed (placement.start_elo = 1200), never as 0.
  */
 
 const DIVISOR = 400;
 const COMPRESS = 0.7;
-const SEED_ELO = 1000;
+const SEED_ELO = 1200;
 
 export function preMatchElo(eloBefore: number | null | undefined): number {
   const elo = Number(eloBefore ?? 0);
@@ -47,6 +47,8 @@ type SideRow = {
   skill?: number | null;
   is_sub?: number;
   left_early?: number;
+  /** Fraction of the match this player was on the server (subs and leavers). */
+  sub_share?: number | null;
 };
 
 function ratingOf(player: SideRow): number {
@@ -55,10 +57,24 @@ function ratingOf(player: SideRow): number {
   return preMatchElo(player.elo_before);
 }
 
-/** Average pre-match Elo for one side. A sub replaces the leaver, so the
- *  leaver is not counted twice when a substitute row is present. */
+/** Average pre-match rating for one side, counted per roster SLOT like the
+ *  bot: a sub and the player they replaced are weighted by how much of the
+ *  match each played (their two sub_share values add up to one slot). Rows
+ *  without a share fall back to dropping the leaver. */
 export function sideAverage(players: SideRow[]): number | null {
   if (players.length === 0) return null;
+  const inSlot = (p: SideRow) => Number(p.is_sub) === 1 || Number(p.left_early) === 1;
+  const shared = players.filter(inSlot);
+  if (shared.length > 0 && shared.every((p) => p.sub_share != null && Number(p.sub_share) > 0)) {
+    let sum = 0;
+    let weight = 0;
+    for (const p of players) {
+      const w = inSlot(p) ? Number(p.sub_share) : 1;
+      sum += ratingOf(p) * w;
+      weight += w;
+    }
+    return weight > 0 ? sum / weight : null;
+  }
   const hasSub = players.some((p) => Number(p.is_sub) === 1);
   const counted = hasSub ? players.filter((p) => Number(p.left_early) !== 1) : players;
   const list = counted.length > 0 ? counted : players;
@@ -75,4 +91,21 @@ export function teamWinChances(
   if (avgA == null || avgB == null) return null;
   const a = expectedWinChance(avgA, avgB);
   return { teamA: a, teamB: 100 - a };
+}
+
+/** The win chance the bot froze onto the history rows when the match was
+ *  ranked, or null for rows written before it did. */
+export function storedWinChances(
+  teamA: { win_chance?: number | null }[],
+  teamB: { win_chance?: number | null }[]
+): { teamA: number; teamB: number } | null {
+  const pick = (rows: { win_chance?: number | null }[]) => {
+    const row = rows.find((r) => r.win_chance != null && Number.isFinite(Number(r.win_chance)));
+    return row ? Math.round(Number(row.win_chance)) : null;
+  };
+  const a = pick(teamA);
+  const b = pick(teamB);
+  if (a != null) return { teamA: a, teamB: b ?? 100 - a };
+  if (b != null) return { teamA: 100 - b, teamB: b };
+  return null;
 }
