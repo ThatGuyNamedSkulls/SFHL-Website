@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
   // CSRF check: the `state` echoed back by Discord must match the one we set in
   // the httpOnly cookie when starting the flow. A missing/mismatched state means
-  // this callback wasn't initiated by us in this browser — reject it.
+  // this callback wasn't initiated by us in this browser ΓÇö reject it.
   const cookieStore = await cookies();
   const expectedState = cookieStore.get(OAUTH_STATE_COOKIE)?.value;
   if (!state || !expectedState || state !== expectedState) {

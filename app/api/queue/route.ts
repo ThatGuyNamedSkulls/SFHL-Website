@@ -205,8 +205,11 @@ export async function POST(request: Request) {
           blocked.push(m.username);
           continue;
         }
-        const verified = await isUserInGuildCached(m.discordId);
-        if (verified === false) blocked.push(m.playerName || m.username);
+        const memberPresence = await getGuildPresenceCached(m.discordId);
+        if (memberPresence === null) continue;
+        if (!memberPresence.inGuild || !memberPresence.verified) {
+          blocked.push(m.playerName || m.username);
+        }
       }
       if (blocked.length > 0) {
         return NextResponse.json(
