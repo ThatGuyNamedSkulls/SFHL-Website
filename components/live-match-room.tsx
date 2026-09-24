@@ -52,6 +52,8 @@ export interface LiveLobby {
   server?: { url: string } | null;
   matchNumber?: number | null;
   queueMode?: string | null;
+  leagueMatchId?: number | null;
+  teamNames?: { team1: string; team2: string } | null;
   messages?: ChatLine[];
 }
 
@@ -145,8 +147,8 @@ export function LiveMatchRoom({
   const mySideTurn = !!selfId && pickingSide && pickerId === selfId;
   const sideOptions = lobby.sidePick?.options?.length ? lobby.sidePick.options : ["CT", "T"];
   const picker = lobby.members.find((m) => m.discordId === pickerId);
-  const name1 = teamHandle(team1, lobby.captains.team1);
-  const name2 = teamHandle(team2, lobby.captains.team2);
+  const name1 = lobby.teamNames?.team1 ?? teamHandle(team1, lobby.captains.team1);
+  const name2 = lobby.teamNames?.team2 ?? teamHandle(team2, lobby.captains.team2);
   const av1 = team1.find((m) => m.discordId === lobby.captains.team1) ?? team1[0];
   const av2 = team2.find((m) => m.discordId === lobby.captains.team2) ?? team2[0];
   const dateLabel = lobby.createdAt
@@ -272,7 +274,8 @@ export function LiveMatchRoom({
       <div className="flex-1 min-w-0 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
         <div className="flex items-center justify-between gap-3 mb-4">
           <h1 className="text-xl md:text-2xl font-bold text-white">
-            Matchroom{lobby.matchNumber ? ` · #${lobby.matchNumber}` : ""}
+            {lobby.leagueMatchId ? "League match" : "Matchroom"}
+            {lobby.matchNumber ? ` · #${lobby.matchNumber}` : ""}
           </h1>
           <div className="flex items-center gap-5">
             {(["overview", "stats"] as const).map((t) => (
@@ -291,7 +294,16 @@ export function LiveMatchRoom({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#8a8a8a] mb-4">
-          <span>Matchmaking / {MATCH_MODE_LABEL} / {queueModeLabel(lobby.queueMode)}</span>
+          {lobby.leagueMatchId ? (
+            <span>
+              <Link href="/league" className="hover:text-white">League</Link> /{" "}
+              <Link href={`/league/match/${lobby.leagueMatchId}`} className="hover:text-white">
+                Report the result
+              </Link>
+            </span>
+          ) : (
+            <span>Matchmaking / {MATCH_MODE_LABEL} / {queueModeLabel(lobby.queueMode)}</span>
+          )}
           <div className="flex items-center gap-2">
             {lobby.server?.url && (
               <a

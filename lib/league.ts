@@ -156,8 +156,23 @@ export function ensureLeagueSchema(): Promise<void> {
         winner TEXT,
         reported_by TEXT,
         confirmed_by TEXT,
-        updated_at INTEGER
+        updated_at INTEGER,
+        reported_at INTEGER,
+        result_kind TEXT,
+        reminded INTEGER NOT NULL DEFAULT 0,
+        note TEXT
       )`);
+      // Phase 3 columns on tables created before them (same list as core/league.py).
+      const cols = await client.execute("PRAGMA table_info(league_matches)");
+      const have = new Set(cols.rows.map((r) => String((r as Record<string, unknown>).name)));
+      for (const [col, ddl] of [
+        ["reported_at", "INTEGER"],
+        ["result_kind", "TEXT"],
+        ["reminded", "INTEGER NOT NULL DEFAULT 0"],
+        ["note", "TEXT"],
+      ]) {
+        if (!have.has(col)) await client.execute(`ALTER TABLE league_matches ADD COLUMN ${col} ${ddl}`);
+      }
     })().catch((e) => {
       schemaReady = null;
       throw e;

@@ -176,12 +176,18 @@ function MatchLine({ m }: { m: MatchRow }) {
       <div className={`flex justify-end ${bWon ? "opacity-60" : ""}`}>
         <TeamName team={m.teamA} />
       </div>
-      <div className="text-center">
+      <Link href={`/league/match/${m.id}`} className="rounded-md text-center hover:bg-white/[0.05]" title="Match page">
         <div className={`text-sm font-black tabular-nums ${done ? "text-white" : "text-hl-muted"}`}>{middle}</div>
         <div className="text-[10px] text-hl-muted">
-          {m.scheduledAt && !done ? fmtDateTime(m.scheduledAt) : `BO${m.bo}`}
+          {m.status === "live"
+            ? "Live"
+            : m.status === "reported" || m.status === "disputed"
+              ? "Result pending"
+              : m.scheduledAt && !done
+                ? fmtDateTime(m.scheduledAt)
+                : `BO${m.bo}`}
         </div>
-      </div>
+      </Link>
       <div className={aWon ? "opacity-60" : ""}>
         <TeamName team={m.teamB} />
       </div>
@@ -456,6 +462,11 @@ export default function LeaguePage() {
   const activeDiv = divisions.find((d) => d.id === divTab) ?? myDivision ?? divisions[0] ?? null;
   const signupPhase = season?.status === "draft" || season?.status === "signup";
   const ineligible = (data?.entries ?? []).filter((e) => e.status === "ineligible");
+  const nextMatch =
+    divisions
+      .flatMap((d) => d.weeks.flatMap((w) => w.matches.map((m) => ({ ...m, week: w.week }))))
+      .filter((m) => m.mine && m.status !== "final" && m.status !== "forfeit")
+      .sort((a, b) => a.week - b.week || a.id - b.id)[0] ?? null;
 
   return (
     <div className="hl-page-wide">
@@ -558,6 +569,29 @@ export default function LeaguePage() {
             </div>
           ) : (
             <>
+              {nextMatch ? (
+                <Card className="flex flex-wrap items-center justify-between gap-3 border-hl-gold/40 bg-hl-panel p-4">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold header-caps text-hl-gold">Your next match · Week {nextMatch.week}</div>
+                    <div className="mt-1 truncate text-sm font-black text-white">
+                      {nextMatch.teamA.name} vs {nextMatch.teamB.name}
+                    </div>
+                    <div className="text-xs text-hl-muted">
+                      {nextMatch.scheduledAt
+                        ? fmtDateTime(nextMatch.scheduledAt)
+                        : nextMatch.status === "proposed"
+                          ? "A time was proposed — the captains need to agree"
+                          : "No time agreed yet"}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/league/match/${nextMatch.id}`}
+                    className="find-match-btn inline-flex h-9 items-center rounded-xl px-4 text-xs font-black header-caps text-hl-base"
+                  >
+                    Match page
+                  </Link>
+                </Card>
+              ) : null}
               {divisions.length > 1 ? (
                 <div className="flex flex-wrap gap-2">
                   {divisions.map((d) => (

@@ -71,8 +71,11 @@ export interface LobbyView {
   winChance: { team1: number; team2: number } | null;
   server: { url: string } | null;
   matchNumber: number | null;
-  /** Which queue made this match: "standard" | "super" | "pro". */
+  /** Which queue made this match: "standard" | "super" | "pro" | "league". */
   queueMode: string | null;
+  /** Team League room: the league match id and the two team names. */
+  leagueMatchId: number | null;
+  teamNames: { team1: string; team2: string } | null;
   messages: ChatMessage[];
 }
 
@@ -102,6 +105,8 @@ interface RawLobby {
   server?: { url?: string } | null;
   matchNumber?: number | null;
   queueMode?: string | null;
+  leagueMatchId?: number | null;
+  teamNames?: { team1?: string; team2?: string } | null;
 }
 
 function discordUrl(guildId: string, channelId: string) {
@@ -289,6 +294,11 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
             10
           ) || null,
     queueMode: typeof raw.queueMode === "string" ? raw.queueMode : null,
+    leagueMatchId: typeof raw.leagueMatchId === "number" ? raw.leagueMatchId : null,
+    teamNames:
+      raw.teamNames && raw.teamNames.team1 && raw.teamNames.team2
+        ? { team1: String(raw.teamNames.team1), team2: String(raw.teamNames.team2) }
+        : null,
     messages,
   };
 }
