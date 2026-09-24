@@ -88,6 +88,7 @@ interface LeagueData {
     weeks: number;
   } | null;
   prizes: number[];
+  roster: { min: number; max: number };
   entries: EntryRow[];
   divisions: DivisionView[];
   viewer: { captainTeams: CaptainTeam[]; myTeamIds: string[] } | null;
@@ -305,7 +306,7 @@ function SignUpPanel({
     <Card className="border-hl-border bg-hl-panel p-4">
       <h2 className="mb-1 text-sm font-black header-caps text-white">Sign up your team</h2>
       <p className="mb-3 text-xs text-hl-muted">
-        Captains only. Rosters need 5–7 accepted members, all linked to a player, and each player can
+        Captains only. Rosters need {data.roster.min}–{data.roster.max} accepted members, all linked to a player, and each player can
         play for one team per season. Rosters lock when sign-ups close.
       </p>
       {captainTeams.length === 0 ? (
@@ -492,7 +493,7 @@ export default function LeaguePage() {
           <Trophy className="mx-auto mb-3 h-8 w-8 text-hl-gold" />
           <h2 className="text-lg font-black text-white">No season yet</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-hl-muted">
-            Match Staff announce sign-ups in Discord. Get ready by creating a team and inviting 5–7 players.
+            Match Staff announce sign-ups in Discord. Get ready by creating a team and inviting {data.roster.min}–{data.roster.max} players.
           </p>
           <Link
             href="/teams"

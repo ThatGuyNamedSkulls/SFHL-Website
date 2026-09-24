@@ -10,7 +10,9 @@
 import { client } from "@/lib/db";
 import { getTeam, listTeams, type Team } from "@/lib/teams";
 
-export const ROSTER_MIN = 5;
+/** TESTING: 1 so small teams can try the league. The real rule is 5 — change it
+ * back here and in core/league.py before a real season. */
+export const ROSTER_MIN = Number(process.env.HL_LEAGUE_ROSTER_MIN) || 1;
 export const ROSTER_MAX = 7;
 export const SEED_TOP_PLAYERS = 5;
 export const UNRANKED_ELO = 1200;
@@ -497,7 +499,15 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
   };
 
   if (!season) {
-    return { seasons: [], season: null, prizes: PRIZES, entries: [], divisions: [], viewer: null };
+    return {
+      seasons: [],
+      season: null,
+      prizes: PRIZES,
+      roster: { min: ROSTER_MIN, max: ROSTER_MAX },
+      entries: [],
+      divisions: [],
+      viewer: null,
+    };
   }
 
   const entries = await seasonEntries(season.id);
@@ -577,6 +587,7 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
     seasons: seasons.map((s) => ({ id: s.id, name: s.name, status: s.status })),
     season,
     prizes: PRIZES,
+    roster: { min: ROSTER_MIN, max: ROSTER_MAX },
     entries: entries.map((e) => ({
       teamId: e.teamId,
       team: badge(e.teamId, e),

@@ -6,6 +6,8 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createTempDb } from "./helpers/temp-db";
 
+// ROSTER_MIN is 1 while the league is tested live; check the real rule (5).
+process.env.HL_LEAGUE_ROSTER_MIN = "5";
 const tmp = createTempDb("league");
 let league: typeof import("@/lib/league");
 let teams: typeof import("@/lib/teams");
