@@ -1,7 +1,7 @@
 /**
  * League phase 4 on the website: the playoff/season-end rules match the bot
  * (tests/league-vectors.json), and Match Staff can run the playoffs and end a
- * season from the website — titles, prizes and promotion/relegation included.
+ * season from the website — titles and prizes (no promotion/relegation).
  */
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -18,6 +18,7 @@ let lm: typeof import("@/lib/league-matches");
 let client: typeof import("@/lib/db").client;
 
 const TABLES = [
+  "league_team_access",
   "league_events", "league_matches", "league_entries", "league_divisions", "league_seasons",
   "web_teams", "players", "team_titles", "discord_dm_outbox", "bot_state",
 ];
@@ -56,18 +57,28 @@ describe("playoff and season-end rules match the bot", () => {
     }
   });
 
-  it("semi-final seeding, final places and promotion/relegation", () => {
+  it("semi-final seeding and final places", () => {
     assert.deepEqual(lp.semiPairs(vectors.semis.standings), vectors.semis.pairs);
     const f = vectors.finalPlaces;
     assert.deepEqual(lp.finalPlaces(f.standings, f.final, f.third), f.places);
-    assert.deepEqual(lp.movements(vectors.movements.divisions), vectors.movements.expected);
   });
 
-  it("the draw keeps last season's divisions", () => {
+  it("the draw: access, Open skill bands, merge-down and groups", () => {
     for (const d of vectors.draws) {
-      const out = admin.assignDivisions(d.entries, d.sizes, d.targets);
-      assert.deepEqual(out.map((div: { teamId: string }[]) => div.map((e) => e.teamId)), d.expected);
+      const out = admin.planDivisions(d.entries, d.access);
+      assert.deepEqual(
+        out.map((div: { name: string; code: string; teams: { teamId: string }[] }) => ({
+          name: div.name,
+          code: div.code,
+          teams: div.teams.map((e) => e.teamId),
+        })),
+        d.expected,
+        d.label
+      );
     }
+    for (const b of vectors.openBands) assert.equal(league.openBand(b.elo), b.band, String(b.elo));
+    assert.equal(league.accessLabel("main"), "Main Access");
+    assert.equal(league.accessLabel(null, 1300), "Open 5-7 Access");
   });
 
   it("playoff weeks and best-of-3 scores", () => {
@@ -107,6 +118,11 @@ describe("running the playoffs and ending a season from the website", () => {
   }
 
   async function playSeason(name: string) {
+    // Invite-only: team0-3 have Advanced access, team4-7 Main access.
+    for (let t = 0; t < 8; t++) {
+      await addTeam(t);
+      await admin.setTeamAccess(`team${t}`, t < 4 ? "advanced" : "main", STAFF);
+    }
     const season = await admin.createSeason(name, STAFF);
     await admin.openSignups(season.id, 7, STAFF);
     for (let t = 0; t < 8; t++) await addTeam(t, season.id);
@@ -158,7 +174,6 @@ describe("running the playoffs and ending a season from the website", () => {
       ["team1", "team0", "team2", "team3"],
       ["team6", "team4", "team5", "team7"],
     ]);
-    assert.deepEqual(preview.movements, { team3: "down", team6: "up" });
     await assert.rejects(lp.endSeason(seasonId, "nope", STAFF), /Type the season name/);
     await lp.endSeason(seasonId, "Season 1", STAFF);
     await assert.rejects(lp.endSeason(seasonId, "Season 1", STAFF), /after its playoffs/);
@@ -166,22 +181,22 @@ describe("running the playoffs and ending a season from the website", () => {
     assert.equal((await league.getSeason(seasonId))!.status, "finished");
     const titles = await client.execute("SELECT team_id, title FROM team_titles ORDER BY team_id");
     assert.deepEqual(titles.rows.map((r) => `${r.team_id}:${r.title}`), [
-      "team1:Season 1 — Division 1 Champions",
-      "team6:Season 1 — Division 2 Champions",
+      "team1:Season 1 — Advanced Champions",
+      "team6:Season 1 — Main Champions",
     ]);
     const coins = Object.fromEntries((await client.execute("SELECT name, coins FROM players")).rows.map((r) => [String(r.name), Number(r.coins)]));
     assert.deepEqual([coins.p1010, coins.p1011, coins.p1000, coins.p1020, coins.p1030], [5000, 5000, 2500, 1000, 0]);
     const history = await league.teamLeagueHistory("team6");
-    assert.deepEqual([history[0].finalPlace, history[0].movement, history[0].prize], [1, "up", 5000]);
+    assert.deepEqual([history[0].finalPlace, history[0].movement, history[0].prize], [1, null, 5000]);
 
-    // Season 2: team6 moves up, team3 moves down.
+    // Season 2: no promotion/relegation — everyone stays where their access puts them.
     const s2 = await admin.createSeason("Season 2", STAFF);
     await admin.openSignups(s2.id, 7, STAFF);
     for (let t = 0; t < 8; t++) await league.signUpTeam(`team${t}`, String(1000 + t * 10));
     const draw = await admin.previewDraw(s2.id);
-    assert.deepEqual(draw.divisions.map((d) => d.teams.map((t) => t.teamId).sort()), [
-      ["team0", "team1", "team2", "team6"],
-      ["team3", "team4", "team5", "team7"],
+    assert.deepEqual(draw.divisions.map((d) => [d.name, d.teams.map((t) => t.teamId).sort()]), [
+      ["Advanced", ["team0", "team1", "team2", "team3"]],
+      ["Main", ["team4", "team5", "team6", "team7"]],
     ]);
 
     const kinds = (await admin.listEvents(seasonId)).map((e) => e.kind);

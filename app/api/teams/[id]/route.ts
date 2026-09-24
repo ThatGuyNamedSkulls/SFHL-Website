@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { titlesForTeam } from "@/lib/team-titles";
-import { teamLeagueHistory } from "@/lib/league";
+import { accessLabel, teamAccessMap, teamLeagueHistory } from "@/lib/league";
+import { isMatchStaff } from "@/lib/discord-party-voice";
 import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
 import { client } from "@/lib/db";
@@ -47,7 +48,17 @@ export async function GET(
   if (!team) return NextResponse.json({ error: "Team not found." }, { status: 404 });
   const titles = await titlesForTeam(id).catch(() => []);
   const league = await teamLeagueHistory(id).catch(() => []);
-  return NextResponse.json({ team, titles, league });
+  const access = (await teamAccessMap([id]).catch(() => new Map<string, string>())).get(id) ?? null;
+  const viewer = await getSession();
+  const staff = viewer ? await isMatchStaff(viewer.discordId).catch(() => false) : false;
+  return NextResponse.json({
+    team,
+    titles,
+    league,
+    // Invite-only named divisions: "Main Access", or null when the team plays in Open by skill.
+    leagueAccess: access ? { code: access, label: accessLabel(access) } : null,
+    staff,
+  });
 }
 
 export async function POST(

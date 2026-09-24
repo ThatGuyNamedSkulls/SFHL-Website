@@ -15,8 +15,15 @@
  */
 import { client } from "@/lib/db";
 import {
+  ACCESS_CODES,
+  DIVISION_NAMES,
+  DIVISION_ORDER,
+  LIVE_STATUSES,
+  UPCOMING_STATUSES,
   ensureLeagueSchema,
   getSeason,
+  openBand,
+  teamAccessMap,
   listSeasons,
   rosterFromTeam,
   seasonDivisions,
@@ -131,54 +138,132 @@ export function drawOrder<T extends { seedElo: number | null; signedUpAt: number
 
 type Seeded = { teamId: string; seedElo: number | null; signedUpAt: number; id: number };
 
-/**
- * Fill the divisions, top first (same as core/league.py assign_divisions):
- * last season's teams go to their target division; when a division has more
- * returners than places the weakest spill down (at the bottom, the strongest
- * go up); new teams then fill the free places by seed Elo.
- */
-export function assignDivisions<T extends Seeded>(eligible: T[], sizes: number[], targets: Record<string, number> = {}): T[][] {
-  const tiers = sizes.length;
-  const buckets: T[][] = sizes.map(() => []);
-  for (const e of drawOrder(eligible.filter((x) => x.teamId in targets))) {
-    buckets[Math.min(Math.max(targets[e.teamId], 1), tiers) - 1].push(e);
-  }
-  for (let t = 0; t < tiers - 1; t++) {
-    while (buckets[t].length > sizes[t]) buckets[t + 1].unshift(buckets[t].pop()!);
-    buckets[t + 1] = drawOrder(buckets[t + 1]);
-  }
-  for (let t = tiers - 1; t > 0; t--) {
-    while (buckets[t].length > sizes[t]) buckets[t - 1].push(buckets[t].shift()!);
-    buckets[t - 1] = drawOrder(buckets[t - 1]);
-  }
-  let newcomers = drawOrder(eligible.filter((x) => !(x.teamId in targets)));
-  for (let t = 0; t < tiers; t++) {
-    const free = sizes[t] - buckets[t].length;
-    buckets[t] = drawOrder([...buckets[t], ...newcomers.slice(0, Math.max(0, free))]);
-    newcomers = newcomers.slice(Math.max(0, free));
-  }
-  return buckets;
+export interface PlannedDivision<T> {
+  name: string;
+  /** "main", "open57", merged "pro+advanced" */
+  code: string;
+  teams: T[];
 }
 
-/** Where last season's teams start: their old division, moved by promotion/relegation. */
-export async function promotionTargets(teamIds: string[], tiers: number): Promise<Record<string, number>> {
-  if (!teamIds.length) return {};
-  const last = await client.execute(
-    "SELECT id FROM league_seasons WHERE status = 'finished' ORDER BY id DESC LIMIT 1"
-  );
-  if (!last.rows.length) return {};
-  const rs = await client.execute({
-    sql: `SELECT e.team_id, d.tier, e.movement FROM league_entries e
-          JOIN league_divisions d ON d.id = e.division_id
-          WHERE e.season_id = ? AND e.status = 'active' AND e.team_id IN (${teamIds.map(() => "?").join(",")})`,
-    args: [Number(last.rows[0].id), ...teamIds],
+/** Deal strongest-first teams into groups in a snake (1,2,3,3,2,1,...) so groups are even. */
+function snake<T>(teams: T[], sizes: number[]): T[][] {
+  const groups: T[][] = sizes.map(() => []);
+  const order = sizes.map((_, i) => i);
+  const pattern = [...order, ...[...order].reverse()];
+  let i = 0;
+  for (const e of teams) {
+    for (;;) {
+      const g = pattern[i % pattern.length];
+      i += 1;
+      if (groups[g].length < sizes[g]) {
+        groups[g].push(e);
+        break;
+      }
+    }
+  }
+  return groups;
+}
+
+/**
+ * Place teams (same as core/league.py plan_divisions): named division by the
+ * team's access, else its Open skill band. A division with fewer than 4 teams
+ * plays together with the next one down ("Pro/Advanced"); the last one merges
+ * up instead. A division with more than 7 teams splits into even groups of ~6.
+ */
+export function planDivisions<T extends Seeded>(eligible: T[], access: Record<string, string> = {}): PlannedDivision<T>[] {
+  if (eligible.length < DIVISION_MIN) fail(`At least ${DIVISION_MIN} eligible teams are needed (have ${eligible.length}).`);
+  const buckets = new Map<string, T[]>(DIVISION_ORDER.map(([code]) => [code, []]));
+  for (const e of eligible) {
+    const code = access[e.teamId];
+    buckets.get(code && ACCESS_CODES.includes(code) ? code : openBand(e.seedElo))!.push(e);
+  }
+  type Level = { codes: string[]; names: string[]; teams: T[] };
+  const levels: Level[] = [...buckets.entries()]
+    .filter(([, teams]) => teams.length)
+    .map(([code, teams]) => ({ codes: [code], names: [DIVISION_NAMES[code]], teams: drawOrder(teams) }));
+  const combine = (a: Level, b: Level): Level => ({
+    codes: [...a.codes, ...b.codes],
+    names: [...a.names, ...b.names],
+    teams: drawOrder([...a.teams, ...b.teams]),
   });
-  const out: Record<string, number> = {};
-  for (const r of rs.rows) {
-    const step = r.movement === "up" ? -1 : r.movement === "down" ? 1 : 0;
-    out[String(r.team_id)] = Math.min(Math.max(Number(r.tier) + step, 1), tiers);
+  const merged: Level[] = [];
+  let carry: Level | null = null;
+  for (let lvl of levels) {
+    if (carry) {
+      lvl = combine(carry, lvl);
+      carry = null;
+    }
+    if (lvl.teams.length < DIVISION_MIN) {
+      carry = lvl;
+      continue;
+    }
+    merged.push(lvl);
+  }
+  if (carry) merged[merged.length - 1] = combine(merged[merged.length - 1], carry);
+
+  const out: PlannedDivision<T>[] = [];
+  for (const { codes, names, teams } of merged) {
+    const name = names.join("/");
+    const code = codes.join("+");
+    if (teams.length <= DIVISION_MAX) {
+      out.push({ name, code, teams });
+      continue;
+    }
+    snake(teams, divisionSizes(teams.length)).forEach((group, i) => {
+      out.push({ name: `${name} ${String.fromCharCode(65 + i)}`, code, teams: drawOrder(group) });
+    });
   }
   return out;
+}
+
+/** Give a team access to a named division, or take it away (null → Open by skill). */
+export async function setTeamAccess(teamId: string, access: string | null, actor: Actor): Promise<void> {
+  await ensureLeagueSchema();
+  if (access !== null && !ACCESS_CODES.includes(access)) fail("Unknown division access.");
+  const team = await getTeam(teamId);
+  if (!team) fail("Team not found.");
+  if (access === null) {
+    await client.execute({ sql: "DELETE FROM league_team_access WHERE team_id = ?", args: [teamId] });
+  } else {
+    await client.execute({
+      sql: `INSERT OR REPLACE INTO league_team_access (team_id, access, set_by, set_by_id, set_at)
+            VALUES (?, ?, ?, ?, ?)`,
+      args: [teamId, access, actor.name, actor.discordId, Date.now()],
+    });
+  }
+  const label = access ? `${DIVISION_NAMES[access]} Access` : "Open (plays in its skill band)";
+  await logEvent(null, "access_set", actor, `${team!.name} → ${label}`);
+}
+
+/** Season page details (banner, description, rules, notice) — Match Staff. */
+export async function updateSeasonDetails(
+  seasonId: number,
+  details: { name?: string; bannerUrl?: string | null; description?: string | null; rules?: string | null; notice?: string | null },
+  actor: Actor
+): Promise<void> {
+  const season = await seasonOrFail(seasonId);
+  const text = (v: string | null | undefined, max: number) => {
+    const t = (v ?? "").trim().slice(0, max);
+    return t ? t : null;
+  };
+  const banner = text(details.bannerUrl, 500);
+  if (banner && !/^https:\/\//i.test(banner)) fail("The banner must be an https:// image link.");
+  const name = details.name === undefined ? season.name : details.name.split(/\s+/).join(" ").trim().slice(0, 40);
+  if (!name) fail("The season needs a name.");
+  await client.execute({
+    sql: `UPDATE league_seasons SET name = ?, banner_url = ?, description = ?, rules = ?, notice = ?, updated_at = ?
+          WHERE id = ?`,
+    args: [
+      name,
+      details.bannerUrl === undefined ? season.bannerUrl ?? null : banner,
+      details.description === undefined ? season.description ?? null : text(details.description, 4000),
+      details.rules === undefined ? season.rules ?? null : text(details.rules, 20000),
+      details.notice === undefined ? season.notice ?? null : text(details.notice, 500),
+      Date.now(),
+      season.id,
+    ],
+  });
+  await logEvent(season.id, "details_updated", actor, name);
 }
 
 // --- events -------------------------------------------------------------------------------------
@@ -253,9 +338,8 @@ async function seasonOrFail(seasonId: number): Promise<Season> {
 export async function createSeason(name: string, actor: Actor): Promise<Season> {
   await ensureLeagueSchema();
   const seasons = await listSeasons();
-  if (seasons.some((s) => OPEN_STATUSES.includes(s.status))) {
-    fail("A season is already running. Finish or cancel it first.");
-  }
+  const upcoming = seasons.find((s) => UPCOMING_STATUSES.includes(s.status));
+  if (upcoming) fail(`${upcoming.name} is already being set up. Cancel it first.`);
   const clean = name.split(/\s+/).join(" ").trim().slice(0, 40) || `Season ${seasons.length + 1}`;
   const now = Date.now();
   const rs = await client.execute({
@@ -264,8 +348,8 @@ export async function createSeason(name: string, actor: Actor): Promise<Season> 
     args: [clean, SEASON_WEEKS, actor.name, now, now],
   });
   const id = Number(rs.lastInsertRowid);
-  // Two staff creating at the same moment: keep the first season only.
-  const running = (await listSeasons()).filter((s) => OPEN_STATUSES.includes(s.status));
+  // Two staff creating at the same moment: keep the first upcoming season only.
+  const running = (await listSeasons()).filter((s) => UPCOMING_STATUSES.includes(s.status));
   if (running.some((s) => s.id < id)) {
     await client.execute({ sql: "DELETE FROM league_seasons WHERE id = ?", args: [id] });
     fail("Another season was just created.");
@@ -309,14 +393,19 @@ interface DrawnEntry extends Entry {
 }
 
 export interface DrawPlan {
-  divisions: { name: string; tier: number; teams: { teamId: string; name: string; tag: string; seedElo: number }[] }[];
+  divisions: {
+    name: string;
+    tier: number;
+    code: string;
+    teams: { teamId: string; name: string; tag: string; seedElo: number; access: string | null }[];
+  }[];
   notPlaced: { teamId: string; name: string; note: string }[];
 }
 
 /** Re-read every roster from its team, apply the rules and seed — nothing is written. */
 async function computeDraw(
   season: Season
-): Promise<{ eligible: DrawnEntry[]; ineligible: DrawnEntry[]; sizes: number[]; targets: Record<string, number> }> {
+): Promise<{ eligible: DrawnEntry[]; ineligible: DrawnEntry[]; access: Record<string, string> }> {
   const signed = await seasonEntries(season.id);
   const claimed = new Set<string>();
   const eligible: DrawnEntry[] = [];
@@ -350,24 +439,24 @@ async function computeDraw(
       for (const r of roster) claimed.add(r.discordId);
     }
   }
-  const sizes = divisionSizes(eligible.length);
-  return { eligible, ineligible, sizes, targets: await promotionTargets(eligible.map((e) => e.teamId), sizes.length) };
+  const access = Object.fromEntries(await teamAccessMap(eligible.map((e) => e.teamId)));
+  return { eligible, ineligible, access };
 }
 
-function planOf(
-  eligible: DrawnEntry[],
-  ineligible: DrawnEntry[],
-  sizes: number[],
-  targets: Record<string, number>
-): DrawPlan {
+function planOf(eligible: DrawnEntry[], ineligible: DrawnEntry[], access: Record<string, string>): DrawPlan {
   return {
-    divisions: assignDivisions(eligible, sizes, targets).map((teams, i) => {
-      return {
-        name: `Division ${i + 1}`,
-        tier: i + 1,
-        teams: teams.map((e) => ({ teamId: e.teamId, name: e.teamName, tag: e.teamTag, seedElo: e.seedElo ?? 0 })),
-      };
-    }),
+    divisions: planDivisions(eligible, access).map((d, i) => ({
+      name: d.name,
+      tier: i + 1,
+      code: d.code,
+      teams: d.teams.map((e) => ({
+        teamId: e.teamId,
+        name: e.teamName,
+        tag: e.teamTag,
+        seedElo: e.seedElo ?? 0,
+        access: access[e.teamId] ?? null,
+      })),
+    })),
     notPlaced: ineligible.map((e) => ({ teamId: e.teamId, name: e.teamName, note: e.note ?? "" })),
   };
 }
@@ -375,24 +464,28 @@ function planOf(
 export async function previewDraw(seasonId: number): Promise<DrawPlan> {
   const season = await seasonOrFail(seasonId);
   if (season.status !== "signup") fail(`${season.name} isn't taking sign-ups.`);
-  const { eligible, ineligible, sizes, targets } = await computeDraw(season);
-  return planOf(eligible, ineligible, sizes, targets);
+  const live = (await listSeasons()).find((s) => LIVE_STATUSES.includes(s.status) && s.id !== season.id);
+  if (live) fail(`Finish ${live.name} first: the next season's divisions are drawn after it ends.`);
+  const { eligible, ineligible, access } = await computeDraw(season);
+  return planOf(eligible, ineligible, access);
 }
 
 /** Close sign-ups: lock rosters, drop teams that break the rules, draw the divisions. */
 export async function closeSignups(seasonId: number, actor: Actor): Promise<DrawPlan> {
   const season = await seasonOrFail(seasonId);
   if (season.status !== "signup") fail(`${season.name} isn't taking sign-ups.`);
-  const { eligible, ineligible, sizes, targets } = await computeDraw(season); // throws before any write
+  const live = (await listSeasons()).find((s) => LIVE_STATUSES.includes(s.status) && s.id !== season.id);
+  if (live) fail(`Finish ${live.name} first: the next season's divisions are drawn after it ends.`);
+  const { eligible, ineligible, access } = await computeDraw(season);
+  const plan = planOf(eligible, ineligible, access); // throws before any write
   if (!(await claim(season.id, ["signup"], "drawn"))) fail("Sign-ups were already closed (from Discord or the website).");
-  const plan = planOf(eligible, ineligible, sizes, targets);
   try {
     await client.execute({ sql: "DELETE FROM league_divisions WHERE season_id = ?", args: [season.id] });
     const divisionOf = new Map<string, number>();
     for (const d of plan.divisions) {
       const rs = await client.execute({
-        sql: "INSERT INTO league_divisions (season_id, name, tier) VALUES (?, ?, ?)",
-        args: [season.id, d.name, d.tier],
+        sql: "INSERT INTO league_divisions (season_id, name, tier, code) VALUES (?, ?, ?, ?)",
+        args: [season.id, d.name, d.tier, d.code],
       });
       for (const t of d.teams) divisionOf.set(t.teamId, Number(rs.lastInsertRowid));
     }
@@ -551,18 +644,23 @@ export async function needsStaff(seasonId: number, now = Date.now()) {
 
 export async function adminView(seasonId: number | null, now = Date.now()) {
   const seasons = await listSeasons();
-  const season =
-    (seasonId ? seasons.find((s) => s.id === seasonId) : null) ??
-    seasons.find((s) => OPEN_STATUSES.includes(s.status)) ??
-    null;
+  const live = seasons.find((s) => LIVE_STATUSES.includes(s.status)) ?? null;
+  const upcoming = seasons.find((s) => UPCOMING_STATUSES.includes(s.status)) ?? null;
+  const season = (seasonId ? seasons.find((s) => s.id === seasonId) : null) ?? live ?? upcoming ?? null;
   const channelId = await getLeagueChannelId();
+  const running = {
+    live: live ? { id: live.id, name: live.name, status: live.status } : null,
+    upcoming: upcoming ? { id: upcoming.id, name: upcoming.name, status: upcoming.status } : null,
+  };
+  const accessRows = await teamAccessMap();
   if (!season) {
     return {
+      ...running,
       season: null,
       openRegular: 0,
       openPlayoffs: 0,
       playoffFinalsCreated: 0,
-      canCreate: true,
+      canCreate: !upcoming,
       entries: [],
       divisions: [],
       needsStaff: [],
@@ -581,8 +679,10 @@ export async function adminView(seasonId: number | null, now = Date.now()) {
     // Finals + third-place matches still to play (the season can't end until 0).
     openPlayoffs: matches.filter((m) => m.stage === "playoff" && !isDone(m)).length,
     playoffFinalsCreated: matches.filter((m) => m.playoffRound === "final").length,
-    canCreate: !seasons.some((s) => OPEN_STATUSES.includes(s.status)),
+    ...running,
+    canCreate: !upcoming,
     entries: entries.map((e) => ({
+      access: accessRows.get(e.teamId) ?? null,
       teamId: e.teamId,
       name: e.teamName,
       tag: e.teamTag,
@@ -597,6 +697,7 @@ export async function adminView(seasonId: number | null, now = Date.now()) {
       id: d.id,
       name: d.name,
       tier: d.tier,
+      code: d.code,
       teams: entries.filter((e) => e.divisionId === d.id && e.status === "active").length,
     })),
     needsStaff: await needsStaff(season.id, now),

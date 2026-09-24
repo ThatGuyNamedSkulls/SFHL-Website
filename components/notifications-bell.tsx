@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Bell, UserPlus, Users, Check, X, Swords, Headphones } from "lucide-react";
+import { Bell, UserPlus, Users, Check, X, Swords, Headphones, Trophy, MessageSquare } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
 
 interface NotificationView {
@@ -187,6 +187,10 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
                       <Swords className="w-4 h-4 text-hl-gold shrink-0 mt-0.5" />
                     ) : n.type === "party_voice" ? (
                       <Headphones className="w-4 h-4 text-[#57F287] shrink-0 mt-0.5" />
+                    ) : n.type === "league" ? (
+                      <Trophy className="w-4 h-4 text-[#ff5500] shrink-0 mt-0.5" />
+                    ) : n.type === "league_message" ? (
+                      <MessageSquare className="w-4 h-4 text-[#ff5500] shrink-0 mt-0.5" />
                     ) : (
                       <UserPlus className="w-4 h-4 text-hl-teal shrink-0 mt-0.5" />
                     )}
@@ -230,6 +234,19 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
                       >
                         Join voice
                       </a>
+                    </div>
+                  )}
+                  {(n.type === "league" || n.type === "league_message") && n.refId?.startsWith("/") && (
+                    <div className="flex gap-2 pl-6">
+                      <button
+                        onClick={() => {
+                          setOpen(false);
+                          router.push(n.refId!);
+                        }}
+                        className="text-xs font-bold px-4 py-1.5 rounded-md bg-gold-gradient text-hl-base hover:opacity-90"
+                      >
+                        Open
+                      </button>
                     </div>
                   )}
                   {n.type === "match_found" && (

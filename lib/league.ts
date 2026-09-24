@@ -42,6 +42,99 @@ export interface Season {
   signupClose: number | null;
   startDate: number | null;
   weeks: number;
+  /** Season page details Match Staff edit on the website. */
+  bannerUrl?: string | null;
+  description?: string | null;
+  rules?: string | null;
+  notice?: string | null;
+  createdAt?: number | null;
+}
+
+/** A live season (being played) and an upcoming one (sign-ups) can run side by side. */
+export const UPCOMING_STATUSES: SeasonStatus[] = ["draft", "signup"];
+export const LIVE_STATUSES: SeasonStatus[] = ["drawn", "regular", "playoffs"];
+
+// --- invite-only named divisions + Open skill bands (same as core/league.py) ---------------
+
+export const ACCESS_TIERS = [
+  ["pro", "Pro"],
+  ["advanced", "Advanced"],
+  ["main", "Main"],
+  ["intermediate", "Intermediate"],
+  ["entry", "Entry"],
+] as const;
+export type AccessCode = (typeof ACCESS_TIERS)[number][0];
+/** [code, name, min Elo]: star / S2-S3 / A2-S1 / D-A1 */
+export const OPEN_BANDS = [
+  ["open10", "Open 10", 2500],
+  ["open89", "Open 8-9", 1900],
+  ["open57", "Open 5-7", 1250],
+  ["open14", "Open 1-4", 0],
+] as const;
+export const DIVISION_ORDER: [string, string][] = [
+  ...ACCESS_TIERS.map(([c, n]) => [c, n] as [string, string]),
+  ...OPEN_BANDS.map(([c, n]) => [c, n] as [string, string]),
+];
+export const DIVISION_NAMES: Record<string, string> = Object.fromEntries(DIVISION_ORDER);
+export const ACCESS_CODES: string[] = ACCESS_TIERS.map(([c]) => c);
+
+/** The Open division code for a team's seed Elo. */
+export function openBand(elo: number | null | undefined): string {
+  for (const [code, , floor] of OPEN_BANDS) if ((elo ?? 0) >= floor) return code;
+  return OPEN_BANDS[OPEN_BANDS.length - 1][0];
+}
+
+/** "Main Access", or the team's Open band ("Open 5-7 Access") when it has none. */
+export function accessLabel(access: string | null | undefined, seedElo?: number | null): string {
+  const code = access && ACCESS_CODES.includes(access) ? access : openBand(seedElo);
+  return `${DIVISION_NAMES[code]} Access`;
+}
+
+/** team id → access code, for teams Match Staff gave a named division. */
+export async function teamAccessMap(teamIds?: string[]): Promise<Map<string, string>> {
+  await ensureLeagueSchema();
+  if (teamIds && teamIds.length === 0) return new Map();
+  const rs = await client.execute({
+    sql:
+      "SELECT team_id, access FROM league_team_access" +
+      (teamIds ? ` WHERE team_id IN (${teamIds.map(() => "?").join(",")})` : ""),
+    args: teamIds ?? [],
+  });
+  const out = new Map<string, string>();
+  for (const r of rs.rows) {
+    const access = String(r.access);
+    if (ACCESS_CODES.includes(access)) out.set(String(r.team_id), access);
+  }
+  return out;
+}
+
+/** A team's country: the most common country among its players (ties: first seen). */
+export async function teamCountries(rosters: Map<string, string[]>): Promise<Map<string, string | null>> {
+  const names = [...new Set([...rosters.values()].flat().filter(Boolean))];
+  const byName = new Map<string, string>();
+  if (names.length) {
+    const rs = await client
+      .execute({
+        sql: `SELECT LOWER(name) AS n, country FROM players WHERE LOWER(name) IN (${names.map(() => "?").join(",")})`,
+        args: names.map((n) => n.toLowerCase()),
+      })
+      .catch(() => ({ rows: [] as Record<string, unknown>[] }));
+    for (const r of rs.rows as Record<string, unknown>[]) {
+      if (r.country) byName.set(String(r.n), String(r.country));
+    }
+  }
+  const out = new Map<string, string | null>();
+  for (const [teamId, players] of rosters) {
+    const counts = new Map<string, number>();
+    for (const p of players) {
+      const c = byName.get(p.toLowerCase());
+      if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    let best: string | null = null;
+    for (const [c, n] of counts) if (best === null || n > (counts.get(best) ?? 0)) best = c;
+    out.set(teamId, best);
+  }
+  return out;
 }
 
 export interface RosterPlayer {
@@ -66,7 +159,7 @@ export interface Entry {
   signedUpAt: number;
   /** Set when the season ends: 1 = champion. */
   finalPlace?: number | null;
-  /** Promotion/relegation for next season. */
+  /** Unused since divisions became invite-only (kept for old seasons). */
   movement?: "up" | "down" | null;
   /** HL Coins paid to each rostered player. */
   prize?: number | null;
@@ -78,6 +171,8 @@ export interface Division {
   id: number;
   name: string;
   tier: number;
+  /** "main", "open57", merged "pro+advanced" (null on seasons drawn before invite-only divisions). */
+  code: string | null;
 }
 
 export interface LeagueMatch {
@@ -129,7 +224,16 @@ export function ensureLeagueSchema(): Promise<void> {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         season_id INTEGER NOT NULL,
         name TEXT NOT NULL,
-        tier INTEGER NOT NULL
+        tier INTEGER NOT NULL,
+        code TEXT
+      )`);
+      // Invite-only named divisions: Match Staff give a team access (kept between seasons).
+      await client.execute(`CREATE TABLE IF NOT EXISTS league_team_access (
+        team_id TEXT PRIMARY KEY,
+        access TEXT NOT NULL,
+        set_by TEXT,
+        set_by_id TEXT,
+        set_at INTEGER NOT NULL
       )`);
       await client.execute(`CREATE TABLE IF NOT EXISTS league_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -207,11 +311,97 @@ export function ensureLeagueSchema(): Promise<void> {
       ]) {
         if (!ehave.has(col)) await client.execute(`ALTER TABLE league_entries ADD COLUMN ${col} ${ddl}`);
       }
+      // Invite-only divisions + season page details (same lists as core/league.py).
+      const dcols = await client.execute("PRAGMA table_info(league_divisions)");
+      if (!dcols.rows.some((r) => String((r as Record<string, unknown>).name) === "code")) {
+        await client.execute("ALTER TABLE league_divisions ADD COLUMN code TEXT");
+      }
+      const scols = await client.execute("PRAGMA table_info(league_seasons)");
+      const shave = new Set(scols.rows.map((r) => String((r as Record<string, unknown>).name)));
+      for (const col of ["banner_url", "description", "rules", "notice"]) {
+        if (!shave.has(col)) await client.execute(`ALTER TABLE league_seasons ADD COLUMN ${col} TEXT`);
+      }
       // One semi/final/third-place match per division, even if both sides create it at once.
       await client.execute(
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_league_playoff_round
          ON league_matches (season_id, division_id, playoff_round) WHERE playoff_round IS NOT NULL`
       );
+      // Find Teammates board (lib/league-find.ts) — same DDL as core/league.py.
+      // roles/days/times/divisions are JSON arrays of codes (lib/league-find-rules.ts).
+      await client.execute(`CREATE TABLE IF NOT EXISTS league_team_posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        season_id INTEGER NOT NULL,
+        team_id TEXT NOT NULL,
+        author_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT,
+        roles TEXT NOT NULL DEFAULT '[]',
+        days TEXT NOT NULL DEFAULT '[]',
+        times TEXT NOT NULL DEFAULT '[]',
+        language TEXT,
+        min_elo INTEGER,
+        max_elo INTEGER,
+        open INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE (season_id, team_id)
+      )`);
+      await client.execute(`CREATE TABLE IF NOT EXISTS league_player_posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        season_id INTEGER NOT NULL,
+        discord_id TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT,
+        roles TEXT NOT NULL DEFAULT '[]',
+        days TEXT NOT NULL DEFAULT '[]',
+        times TEXT NOT NULL DEFAULT '[]',
+        language TEXT,
+        divisions TEXT NOT NULL DEFAULT '[]',
+        open INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE (season_id, discord_id)
+      )`);
+      await client.execute(`CREATE TABLE IF NOT EXISTS league_applications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        season_id INTEGER NOT NULL,
+        team_id TEXT NOT NULL,
+        discord_id TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        username TEXT,
+        avatar TEXT,
+        message TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at INTEGER NOT NULL,
+        decided_at INTEGER,
+        decided_by TEXT,
+        UNIQUE (season_id, team_id, discord_id)
+      )`);
+      // League Stats (lib/league-stats.ts): one row per player per map, entered by
+      // Match Staff — never mixed with ranked match_history. Same DDL as core/league.py.
+      await client.execute(`CREATE TABLE IF NOT EXISTS league_match_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        season_id INTEGER NOT NULL,
+        match_id INTEGER NOT NULL,
+        map_no INTEGER NOT NULL DEFAULT 1,
+        map_name TEXT,
+        team_id TEXT NOT NULL,
+        discord_id TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        kills INTEGER NOT NULL DEFAULT 0,
+        deaths INTEGER NOT NULL DEFAULT 0,
+        assists INTEGER NOT NULL DEFAULT 0,
+        mvps INTEGER NOT NULL DEFAULT 0,
+        score INTEGER NOT NULL DEFAULT 0,
+        hs REAL NOT NULL DEFAULT 0,
+        rounds_won INTEGER NOT NULL DEFAULT 0,
+        rounds_lost INTEGER NOT NULL DEFAULT 0,
+        entered_by TEXT,
+        entered_at INTEGER NOT NULL,
+        UNIQUE (match_id, map_no, discord_id)
+      )`);
+      await client.execute("CREATE INDEX IF NOT EXISTS idx_league_match_stats_season ON league_match_stats (season_id)");
     })().catch((e) => {
       schemaReady = null;
       throw e;
@@ -230,6 +420,11 @@ function toSeason(r: Record<string, unknown>): Season {
     signupClose: num(r.signup_close),
     startDate: num(r.start_date),
     weeks: Number(r.weeks ?? SEASON_WEEKS),
+    bannerUrl: r.banner_url == null ? null : String(r.banner_url),
+    description: r.description == null ? null : String(r.description),
+    rules: r.rules == null ? null : String(r.rules),
+    notice: r.notice == null ? null : String(r.notice),
+    createdAt: r.created_at == null ? null : Number(r.created_at),
   };
 }
 
@@ -291,7 +486,22 @@ export async function listSeasons(): Promise<Season[]> {
 /** The running season, else the newest finished one (null when there are none). */
 export async function currentSeason(): Promise<Season | null> {
   const seasons = await listSeasons();
-  return seasons.find((s) => s.status !== "finished") ?? seasons[0] ?? null;
+  return (
+    seasons.find((s) => LIVE_STATUSES.includes(s.status)) ??
+    seasons.find((s) => UPCOMING_STATUSES.includes(s.status)) ??
+    seasons[0] ??
+    null
+  );
+}
+
+/** The season being played (divisions drawn, regular season or playoffs). */
+export async function liveSeason(): Promise<Season | null> {
+  return (await listSeasons()).find((s) => LIVE_STATUSES.includes(s.status)) ?? null;
+}
+
+/** The next season (being set up or taking sign-ups). */
+export async function upcomingSeason(): Promise<Season | null> {
+  return (await listSeasons()).find((s) => UPCOMING_STATUSES.includes(s.status)) ?? null;
 }
 
 export async function getSeason(id: number): Promise<Season | null> {
@@ -313,10 +523,15 @@ export async function seasonEntries(seasonId: number): Promise<Entry[]> {
 export async function seasonDivisions(seasonId: number): Promise<Division[]> {
   await ensureLeagueSchema();
   const rs = await client.execute({
-    sql: "SELECT id, name, tier FROM league_divisions WHERE season_id = ? ORDER BY tier",
+    sql: "SELECT id, name, tier, code FROM league_divisions WHERE season_id = ? ORDER BY tier",
     args: [seasonId],
   });
-  return rows(rs).map((r) => ({ id: Number(r.id), name: String(r.name), tier: Number(r.tier) }));
+  return rows(rs).map((r) => ({
+    id: Number(r.id),
+    name: String(r.name),
+    tier: Number(r.tier),
+    code: r.code == null ? null : String(r.code),
+  }));
 }
 
 export async function seasonMatches(seasonId: number): Promise<LeagueMatch[]> {
@@ -386,7 +601,7 @@ function clashes(roster: RosterPlayer[], others: Entry[]): string[] {
 }
 
 export async function signUpTeam(teamId: string, captainId: string): Promise<Entry> {
-  const season = await currentSeason();
+  const season = await upcomingSeason();
   if (!season || season.status !== "signup") throw new Error("League sign-ups aren't open right now.");
   const team = await getTeam(teamId);
   if (!team) throw new Error("Team not found.");
@@ -420,7 +635,7 @@ export async function signUpTeam(teamId: string, captainId: string): Promise<Ent
 }
 
 export async function withdrawTeam(teamId: string, captainId: string): Promise<void> {
-  const season = await currentSeason();
+  const season = await upcomingSeason();
   if (!season || season.status !== "signup") {
     throw new Error("Teams can only withdraw while sign-ups are open. Ask Match Staff.");
   }
@@ -533,6 +748,10 @@ export interface CaptainTeamOption extends TeamBadge {
   problems: string[];
   seedElo: number | null;
   signedUp: boolean;
+  /** "Main Access" or the team's Open band ("Open 5-7 Access"). */
+  access: string;
+  /** Match Staff gave it an invite-only division. */
+  inviteOnly: boolean;
 }
 
 /** Everything the /league page shows for a season (read-only apart from sign-ups). */
@@ -540,7 +759,8 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
   const seasons = await listSeasons();
   const season =
     (seasonId ? seasons.find((s) => s.id === seasonId) : null) ??
-    seasons.find((s) => s.status !== "finished") ??
+    seasons.find((s) => LIVE_STATUSES.includes(s.status)) ??
+    seasons.find((s) => UPCOMING_STATUSES.includes(s.status)) ??
     seasons[0] ??
     null;
   const teams = await listTeams();
@@ -642,22 +862,26 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
   let captainTeams: CaptainTeamOption[] = [];
   if (viewerId) {
     const others = entries;
+    const mine = teams.filter((t) => t.captainId === viewerId);
+    const access = await teamAccessMap(mine.map((t) => t.id));
     captainTeams = await Promise.all(
-      teams
-        .filter((t) => t.captainId === viewerId)
-        .map(async (t) => {
-          const { roster, problems } = rosterFromTeam(t);
-          const signedUp = entryByTeam.has(t.id);
-          const taken = signedUp ? [] : clashes(roster, others);
-          if (taken.length) problems.push(`Already on another team this season: ${taken.join(", ")}.`);
-          return {
-            ...badge(t.id),
-            memberCount: roster.length,
-            problems,
-            seedElo: problems.length ? null : await seedElo(roster),
-            signedUp,
-          };
-        })
+      mine.map(async (t) => {
+        const { roster, problems } = rosterFromTeam(t);
+        const signedUp = entryByTeam.has(t.id);
+        const taken = signedUp ? [] : clashes(roster, others);
+        if (taken.length) problems.push(`Already on another team this season: ${taken.join(", ")}.`);
+        const elo = problems.length ? null : await seedElo(roster);
+        const code = access.get(t.id) ?? null;
+        return {
+          ...badge(t.id),
+          memberCount: roster.length,
+          problems,
+          seedElo: elo,
+          signedUp,
+          access: accessLabel(code, elo),
+          inviteOnly: code !== null,
+        };
+      })
     );
   }
 
@@ -720,4 +944,53 @@ export async function teamLeagueHistory(teamId: string) {
     });
   }
   return out;
+}
+
+/** When each staff step first happened in a season (for the timeline): kind → ms. */
+export async function seasonEventTimes(seasonId: number): Promise<Record<string, number>> {
+  await ensureLeagueSchema();
+  const rs = await client.execute({
+    sql: "SELECT kind, MIN(created_at) AS at FROM league_events WHERE season_id = ? GROUP BY kind",
+    args: [seasonId],
+  });
+  return Object.fromEntries(rows(rs).map((r) => [String(r.kind), Number(r.at)]));
+}
+
+export interface NextMatch {
+  id: number;
+  week: number;
+  round: PlayoffRound | null;
+  status: MatchStatus;
+  scheduledAt: number | null;
+  proposedTime: number | null;
+  mine: string;
+  opponent: string;
+  division: string | null;
+}
+
+/** The viewer's next unplayed match this season (their team's), or null. */
+export async function viewerNextMatch(seasonId: number, discordId: string): Promise<NextMatch | null> {
+  const entries = await seasonEntries(seasonId);
+  const mine = entries.find((e) => e.status === "active" && e.roster.some((p) => p.discordId === discordId));
+  if (!mine) return null;
+  const matches = (await seasonMatches(seasonId)).filter(
+    (m) => (m.teamA === mine.teamId || m.teamB === mine.teamId) && m.status !== "final" && m.status !== "forfeit"
+  );
+  if (!matches.length) return null;
+  matches.sort((a, b) => a.week - b.week || (a.scheduledAt ?? Infinity) - (b.scheduledAt ?? Infinity) || a.id - b.id);
+  const m = matches[0];
+  const other = m.teamA === mine.teamId ? m.teamB : m.teamA;
+  const proposed = await client.execute({ sql: "SELECT proposed_time FROM league_matches WHERE id = ?", args: [m.id] });
+  const division = m.divisionId ? (await seasonDivisions(seasonId)).find((d) => d.id === m.divisionId)?.name ?? null : null;
+  return {
+    id: m.id,
+    week: m.week,
+    round: m.playoffRound ?? null,
+    status: m.status,
+    scheduledAt: m.scheduledAt,
+    proposedTime: num(rows(proposed)[0]?.proposed_time),
+    mine: mine.teamName,
+    opponent: entries.find((e) => e.teamId === other)?.teamName ?? "TBD",
+    division,
+  };
 }

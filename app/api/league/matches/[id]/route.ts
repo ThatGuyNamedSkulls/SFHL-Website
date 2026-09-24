@@ -16,6 +16,7 @@ import {
   staffSetResult,
 } from "@/lib/league-matches";
 import { LeagueAdminError } from "@/lib/league-admin";
+import { StatsInputError, deleteMapStats, matchScoreboards, saveMapStats } from "@/lib/league-stats";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,11 +25,17 @@ function matchId(raw: string): number | null {
   return /^\d+$/.test(raw) ? Number(raw) : null;
 }
 
+/** The match page payload plus its saved map scoreboards (step 9 stats). */
+async function fullView(id: number, viewerId: string | null, staff: boolean) {
+  const view = await leagueMatchView(id, viewerId, staff);
+  return view ? { ...view, stats: await matchScoreboards(id, view.teamA.id) } : null;
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const id = matchId((await params).id);
   const session = await getSession();
   const staff = session ? await isMatchStaff(session.discordId).catch(() => false) : false;
-  const view = id === null ? null : await leagueMatchView(id, session?.discordId ?? null, staff);
+  const view = id === null ? null : await fullView(id, session?.discordId ?? null, staff);
   if (!view) return NextResponse.json({ error: "League match not found." }, { status: 404 });
   return NextResponse.json(view);
 }
@@ -37,6 +44,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
  * Captains: { action, ... }
  *   propose {time}, accept, decline, report {scoreA, scoreB}, confirm,
  *   dispute {reason}, claimForfeit, concede
+ * Match Staff: staffSetResult, staffReschedule, saveStats {mapNo, mapName, roundsA, roundsB, players},
+ *   deleteStats {mapNo}
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -45,7 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (id === null) return NextResponse.json({ error: "League match not found." }, { status: 404 });
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const me = session.discordId;
-  const staffAction = body.action === "staffSetResult" || body.action === "staffReschedule";
+  const staffAction = ["staffSetResult", "staffReschedule", "saveStats", "deleteStats"].includes(String(body.action));
   const staff = await isMatchStaff(me).catch(() => false);
   if (staffAction && !staff) return NextResponse.json({ error: "Match Staff only." }, { status: 403 });
   const actor = { discordId: me, name: session.playerName || session.username };
@@ -65,6 +74,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         break;
       case "staffReschedule":
         await staffReschedule(id, Number(body.time), actor);
+        break;
+      case "saveStats":
+        await saveMapStats(id, body, actor);
+        break;
+      case "deleteStats":
+        await deleteMapStats(id, Number(body.mapNo), actor);
         break;
       case "propose":
         await proposeTime(id, me, Number(body.time));
@@ -93,9 +108,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       default:
         return NextResponse.json({ error: "Unknown action." }, { status: 400 });
     }
-    return NextResponse.json(await leagueMatchView(id, me, staff));
+    return NextResponse.json(await fullView(id, me, staff));
   } catch (error) {
-    if (error instanceof LeagueActionError || error instanceof LeagueAdminError) {
+    if (error instanceof LeagueActionError || error instanceof LeagueAdminError || error instanceof StatsInputError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     console.error("league match POST", error);

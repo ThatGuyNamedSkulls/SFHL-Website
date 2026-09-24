@@ -13,7 +13,20 @@ import { AlertTriangle, History, Megaphone, Settings2, Trash2 } from "lucide-rea
 
 type SeasonStatus = "draft" | "signup" | "drawn" | "regular" | "playoffs" | "finished" | "cancelled";
 
+type SeasonRef = { id: number; name: string; status: SeasonStatus } | null;
+
+const ACCESS_OPTIONS: [string, string][] = [
+  ["open", "Open (by skill)"],
+  ["pro", "Pro Access"],
+  ["advanced", "Advanced Access"],
+  ["main", "Main Access"],
+  ["intermediate", "Intermediate Access"],
+  ["entry", "Entry Access"],
+];
+
 interface AdminData {
+  live: SeasonRef;
+  upcoming: SeasonRef;
   season: {
     id: number;
     name: string;
@@ -21,12 +34,17 @@ interface AdminData {
     signupClose: number | null;
     startDate: number | null;
     weeks: number;
+    bannerUrl?: string | null;
+    description?: string | null;
+    rules?: string | null;
+    notice?: string | null;
   } | null;
   canCreate: boolean;
   openRegular: number;
   openPlayoffs: number;
   playoffFinalsCreated: number;
   entries: {
+    access: string | null;
     teamId: string;
     name: string;
     tag: string;
@@ -49,7 +67,6 @@ interface DrawPlan {
 
 interface EndPlan {
   divisions: { divisionId: number; name: string; tier: number; places: string[]; champion: string }[];
-  movements: Record<string, "up" | "down">;
 }
 
 interface StartPlan {
@@ -94,8 +111,16 @@ function fmtDay(ts: number) {
   return new Date(ts).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 }
 
-export function LeagueManage({ onChanged }: { onChanged: () => void }) {
+export function LeagueManage({
+  onChanged,
+  initialSeasonId = null,
+}: {
+  onChanged?: () => void;
+  initialSeasonId?: number | null;
+}) {
   const [data, setData] = useState<AdminData | null>(null);
+  const [seasonPick, setSeasonPick] = useState<number | null>(initialSeasonId);
+  const [details, setDetails] = useState<{ name: string; bannerUrl: string; description: string; rules: string; notice: string } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -115,7 +140,7 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
 
   useEffect(() => {
     let alive = true;
-    apiGetJson<AdminData & { error?: string }>("/api/league/admin", { force: true })
+    apiGetJson<AdminData & { error?: string }>(`/api/league/admin${seasonPick ? `?season=${seasonPick}` : ""}`, { force: true })
       .then(({ ok, json }) => {
         if (!alive) return;
         if (ok && json) {
@@ -127,7 +152,7 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
     return () => {
       alive = false;
     };
-  }, [reload]);
+  }, [reload, seasonPick]);
 
   const post = async (action: string, extra: Record<string, unknown> = {}) => {
     setBusy(true);
@@ -159,7 +184,7 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
     setEndPlan(null);
     invalidateClientApi();
     setReload((n) => n + 1);
-    onChanged();
+    onChanged?.();
   };
 
   const loadChannels = async () => {
@@ -183,6 +208,29 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
     <div className="space-y-5">
       {error ? <p className="text-sm text-hl-red">{error}</p> : null}
       {notice ? <p className="text-sm text-hl-green">{notice}</p> : null}
+
+      {/* Live + upcoming seasons run side by side: pick which one to manage. */}
+      {data.live && data.upcoming ? (
+        <div className="flex flex-wrap gap-2">
+          {[data.live, data.upcoming].map((s) => (
+            <button
+              key={s!.id}
+              type="button"
+              onClick={() => {
+                setSeasonPick(s!.id);
+                setDetails(null);
+              }}
+              className={`rounded-full border px-3 py-1 text-xs font-bold ${
+                season?.id === s!.id
+                  ? "border-transparent bg-gold-gradient text-hl-base"
+                  : "border-hl-border text-hl-muted hover:text-white"
+              }`}
+            >
+              {s!.name} · {s === data.live ? "live" : "upcoming"}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {/* The next step for the season. */}
       <Card className="border-hl-gold/40 bg-hl-panel p-5">
@@ -368,7 +416,7 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
               <p className="mb-2 text-xs text-hl-muted">
                 {data.openPlayoffs > 0 || data.playoffFinalsCreated < data.divisions.length
                   ? "Ending the season unlocks once every final and third-place match has a result."
-                  : "Every playoff match is done. Ending the season sets the final places, awards the champion titles, pays the HL Coin prizes and records promotion/relegation."}
+                  : "Every playoff match is done. Ending the season sets the final places, awards the champion titles and pays the HL Coin prizes."}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -396,8 +444,6 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
                             </span>
                             <span className="text-hl-muted">
                               {i < 3 ? `${[5000, 2500, 1000][i].toLocaleString()} coins each` : ""}
-                              {endPlan.movements[teamId] === "up" ? " · ⬆ up" : ""}
-                              {endPlan.movements[teamId] === "down" ? " · ⬇ down" : ""}
                             </span>
                           </div>
                         ))}
@@ -479,6 +525,23 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
                     {e.roster.length} players{e.seedElo ? ` · ${e.seedElo} Elo` : ""}
                     {e.status === "ineligible" ? <span className="text-hl-red"> · not placed: {e.note}</span> : null}
                   </div>
+                  <div className="mt-1">
+                    <select
+                      value={e.access ?? "open"}
+                      disabled={busy}
+                      title="Division access (invite-only named divisions) — stays with the team between seasons"
+                      onChange={(ev) =>
+                        run("setAccess", { teamId: e.teamId, access: ev.target.value }, `${e.name}: league status updated.`)
+                      }
+                      className="h-7 rounded-md border border-hl-border bg-hl-base px-2 text-[11px] text-white"
+                    >
+                      {ACCESS_OPTIONS.map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {season.status === "drawn" && e.status === "active" ? (
@@ -520,6 +583,97 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
               </div>
             ))}
           </div>
+        </Card>
+      ) : null}
+
+      {/* Season page details (banner, description, rules, notice). */}
+      {season ? (
+        <Card className="border-hl-border bg-hl-panel p-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-black header-caps text-white">Season page</h2>
+            {!details ? (
+              <button
+                type="button"
+                className={secondary}
+                onClick={() =>
+                  setDetails({
+                    name: season.name,
+                    bannerUrl: season.bannerUrl ?? "",
+                    description: season.description ?? "",
+                    rules: season.rules ?? "",
+                    notice: season.notice ?? "",
+                  })
+                }
+              >
+                Edit
+              </button>
+            ) : null}
+          </div>
+          {details ? (
+            <div className="space-y-2">
+              <input
+                value={details.name}
+                onChange={(e) => setDetails({ ...details, name: e.target.value.slice(0, 40) })}
+                placeholder="Season name"
+                className={`${input} w-full`}
+              />
+              <input
+                value={details.bannerUrl}
+                onChange={(e) => setDetails({ ...details, bannerUrl: e.target.value.slice(0, 500) })}
+                placeholder="Banner image (https://…) — optional"
+                className={`${input} w-full`}
+              />
+              <input
+                value={details.notice}
+                onChange={(e) => setDetails({ ...details, notice: e.target.value.slice(0, 500) })}
+                placeholder="Notice shown on the overview (optional)"
+                className={`${input} w-full`}
+              />
+              <textarea
+                value={details.description}
+                onChange={(e) => setDetails({ ...details, description: e.target.value.slice(0, 4000) })}
+                placeholder="About this season"
+                rows={3}
+                className="w-full rounded-lg border border-hl-border bg-hl-base px-3 py-2 text-sm text-white placeholder:text-hl-muted"
+              />
+              <textarea
+                value={details.rules}
+                onChange={(e) => setDetails({ ...details, rules: e.target.value.slice(0, 20000) })}
+                placeholder="Rules (shown on the Rules tab): # Section title, - bullet"
+                rows={6}
+                className="w-full rounded-lg border border-hl-border bg-hl-base px-3 py-2 text-sm text-white placeholder:text-hl-muted"
+              />
+              <p className="text-[11px] text-hl-muted">
+                Easier with a live preview:{" "}
+                <Link href={`/league/${season.id}/rules`} className="font-bold text-hl-gold hover:underline">
+                  edit on the Rules tab
+                </Link>
+                .
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  className={primary}
+                  onClick={async () => {
+                    await run("updateDetails", details, "Season page saved.");
+                    setDetails(null);
+                  }}
+                >
+                  Save
+                </button>
+                <button type="button" className={secondary} onClick={() => setDetails(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-hl-muted">
+              {season.description ? "Description set. " : "No description yet. "}
+              {season.rules ? "Rules set. " : "No rules yet. "}
+              {season.bannerUrl ? "Custom banner." : "Default banner."}
+            </p>
+          )}
         </Card>
       ) : null}
 

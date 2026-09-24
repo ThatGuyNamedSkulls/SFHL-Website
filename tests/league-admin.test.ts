@@ -94,7 +94,7 @@ describe("running a season from the website", () => {
     await wipe();
     const season = await admin.createSeason("  Season   1 ", STAFF);
     assert.equal(season.name, "Season 1");
-    await assert.rejects(admin.createSeason("", STAFF), /already running/);
+    await assert.rejects(admin.createSeason("", STAFF), /already being set up/);
 
     await admin.openSignups(season.id, 7, STAFF);
     assert.equal((await league.getSeason(season.id))!.status, "signup");

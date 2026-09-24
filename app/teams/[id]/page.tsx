@@ -59,6 +59,9 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
   const [team, setTeam] = useState<Team | null>(null);
   const [titles, setTitles] = useState<TitleRow[]>([]);
   const [league, setLeague] = useState<LeagueRow[]>([]);
+  // Invite-only named divisions: "Main Access" etc. (null → plays in Open by skill).
+  const [leagueAccess, setLeagueAccess] = useState<{ code: string; label: string } | null>(null);
+  const [viewerStaff, setViewerStaff] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [inviteName, setInviteName] = useState("");
@@ -79,6 +82,8 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     setTeam(data.team);
     setTitles(Array.isArray(data.titles) ? data.titles : []);
     setLeague(Array.isArray(data.league) ? data.league : []);
+    setLeagueAccess(data.leagueAccess ?? null);
+    setViewerStaff(data.staff === true);
     setName(data.team.name);
     setTag(data.team.tag);
     setLogoUrl(data.team.logoUrl || "");
@@ -222,6 +227,49 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
+      <Card className="mt-6 flex flex-wrap items-center justify-between gap-3 border-hl-border bg-hl-panel p-4">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wide text-hl-muted">League status</div>
+          <div className="mt-0.5 text-sm font-black text-white">
+            {leagueAccess ? leagueAccess.label : "Open — placed by the team's skill"}
+          </div>
+          <div className="text-[11px] text-hl-muted">
+            Named divisions (Pro, Advanced, Main, Intermediate, Entry) are invite-only — Match Staff give access.
+          </div>
+        </div>
+        {viewerStaff ? (
+          <select
+            value={leagueAccess?.code ?? "open"}
+            disabled={busy}
+            onChange={async (e) => {
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await fetch("/api/league/admin", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "setAccess", teamId: id, access: e.target.value }),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) setError(json.error || "Couldn't change the league status.");
+                await load();
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="h-9 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white"
+            title="Match Staff: change this team's division access"
+          >
+            <option value="open">Open (by skill)</option>
+            <option value="pro">Pro Access</option>
+            <option value="advanced">Advanced Access</option>
+            <option value="main">Main Access</option>
+            <option value="intermediate">Intermediate Access</option>
+            <option value="entry">Entry Access</option>
+          </select>
+        ) : null}
+      </Card>
+
       <Card className="mt-6 border-hl-border bg-hl-panel p-4">
         <div className="mb-2 flex items-center gap-2 text-sm font-bold text-white">
           <Trophy className="h-4 w-4 text-hl-gold" /> Titles
@@ -256,7 +304,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
           <ul className="divide-y divide-hl-border">
             {league.map((s) => (
               <li key={s.seasonId} className="flex flex-wrap items-center justify-between gap-3 py-2">
-                <Link href="/league" className="text-sm font-semibold text-white hover:underline">
+                <Link href={`/league/${s.seasonId}`} className="text-sm font-semibold text-white hover:underline">
                   {s.season}
                   {s.division ? <span className="text-hl-muted"> · {s.division}</span> : null}
                 </Link>

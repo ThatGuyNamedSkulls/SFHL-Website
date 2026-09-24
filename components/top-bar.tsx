@@ -28,7 +28,7 @@ const PAGE_TITLE: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/settings", label: "Settings" },
   { test: (p) => p === "/clans" || p.startsWith("/clans/"), label: "Clans" },
   { test: (p) => p === "/tournaments" || p.startsWith("/tournaments/"), label: "Tournaments" },
-  { test: (p) => p === "/league", label: "League" },
+  { test: (p) => p === "/league" || p.startsWith("/league/"), label: "League" },
 ];
 
 /** Game + region on the left, MATCHMAKING / LEAGUE / TOURNAMENTS center, avatar right. */
@@ -42,7 +42,7 @@ export function TopBar() {
     pathname === "/leaderboards" ||
     pathname.startsWith("/match");
   const tournamentsOn = pathname === "/tournaments" || pathname.startsWith("/tournaments/");
-  const leagueOn = pathname === "/league";
+  const leagueOn = pathname === "/league" || pathname.startsWith("/league/");
   const onRank = pathname === "/leaderboards";
   const mobileTitle = PAGE_TITLE.find((t) => t.test(pathname))?.label ?? "HyperLeague";
 

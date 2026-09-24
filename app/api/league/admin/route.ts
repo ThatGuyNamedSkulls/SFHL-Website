@@ -13,7 +13,9 @@ import {
   previewStart,
   removeEntry,
   setLeagueChannel,
+  setTeamAccess,
   startSeason,
+  updateSeasonDetails,
   type Actor,
 } from "@/lib/league-admin";
 import { endSeason, previewEnd, startPlayoffs } from "@/lib/league-playoffs";
@@ -48,6 +50,7 @@ export async function GET(request: Request) {
  *   create {name} · openSignups {days} · previewDraw · closeSignups · moveTeam {teamId, divisionId}
  *   removeEntry {teamId} · previewStart {firstWeek} · start {firstWeek} · cancel {confirmName}
  *   setChannel {channelId, channelName} · startPlayoffs · previewEnd · endSeason {confirmName}
+ *   setAccess {teamId, access: "pro"…"entry" | "open"} · updateDetails {name, bannerUrl, description, rules, notice}
  */
 export async function POST(request: Request) {
   const actor = await staffActor();
@@ -92,6 +95,26 @@ export async function POST(request: Request) {
       }
       case "endSeason":
         await endSeason(seasonId, String(body.confirmName ?? ""), actor);
+        break;
+      case "setAccess":
+        await setTeamAccess(
+          String(body.teamId ?? ""),
+          body.access === null || body.access === "open" || body.access === "" ? null : String(body.access),
+          actor
+        );
+        break;
+      case "updateDetails":
+        await updateSeasonDetails(
+          seasonId,
+          {
+            name: body.name === undefined ? undefined : String(body.name),
+            bannerUrl: body.bannerUrl === undefined ? undefined : String(body.bannerUrl ?? ""),
+            description: body.description === undefined ? undefined : String(body.description ?? ""),
+            rules: body.rules === undefined ? undefined : String(body.rules ?? ""),
+            notice: body.notice === undefined ? undefined : String(body.notice ?? ""),
+          },
+          actor
+        );
         break;
       case "setChannel":
         await setLeagueChannel(String(body.channelId ?? ""), String(body.channelName ?? ""), actor);

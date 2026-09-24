@@ -7,7 +7,8 @@
  *   both semis are done the final and a third-place match are created.
  * - Season end: final places, a team title for each division champion, HL
  *   Coins for every rostered player of the top 3 (5,000 / 2,500 / 1,000) and
- *   promotion/relegation (champion up, last of the regular season down).
+ *   no promotion/relegation — named divisions are invite-only (Match Staff give
+ *   a team access by hand); everyone else plays in their Open skill band.
  */
 import { client } from "@/lib/db";
 import { claim, logEvent, LeagueAdminError, type Actor } from "@/lib/league-admin";
@@ -58,17 +59,6 @@ export function finalPlaces(
 ): string[] {
   const top = [final.winner!, loserOf(final), third.winner!, loserOf(third)];
   return [...top, ...standingIds.filter((t) => !top.includes(t))];
-}
-
-/** Champion of every division but the top goes up; last of the regular season but the bottom goes down. */
-export function movements(divisions: { tier: number; places: string[]; standings: string[] }[]): Record<string, "up" | "down"> {
-  const out: Record<string, "up" | "down"> = {};
-  if (divisions.length < 2) return out;
-  for (const d of divisions) {
-    if (d.tier > 1) out[d.places[0]] = "up";
-    if (d.tier < divisions.length) out[d.standings[d.standings.length - 1]] = "down";
-  }
-  return out;
 }
 
 export function weekOf(startDate: number, now: number): number {
@@ -183,7 +173,7 @@ export interface SeasonEndDivision {
 }
 
 /** What ending the season would do — nothing is written. */
-export async function previewEnd(seasonId: number): Promise<{ divisions: SeasonEndDivision[]; movements: Record<string, "up" | "down"> }> {
+export async function previewEnd(seasonId: number): Promise<{ divisions: SeasonEndDivision[] }> {
   const season = await seasonOrFail(seasonId);
   if (season.status !== "playoffs") fail("A season ends after its playoffs.");
   const matches = (await seasonMatches(season.id)).filter((m) => m.stage === "playoff");
@@ -196,10 +186,10 @@ export async function previewEnd(seasonId: number): Promise<{ divisions: SeasonE
     const places = finalPlaces(standings.get(d.id) ?? [], final!, third!);
     divisions.push({ divisionId: d.id, name: d.name, tier: d.tier, places, standings: standings.get(d.id) ?? [], champion: places[0] });
   }
-  return { divisions, movements: movements(divisions) };
+  return { divisions };
 }
 
-/** Final places, champion titles, prizes, promotion/relegation; the season is finished. */
+/** Final places, champion titles and prizes; the season is finished. */
 export async function endSeason(seasonId: number, confirmName: string, actor: Actor) {
   const season = await seasonOrFail(seasonId);
   if (confirmName.trim() !== season.name) fail(`Type the season name (${season.name}) to confirm.`);
@@ -210,8 +200,8 @@ export async function endSeason(seasonId: number, confirmName: string, actor: Ac
   await client.batch(
     plan.divisions.flatMap((d) =>
       d.places.map((teamId, i) => ({
-        sql: "UPDATE league_entries SET final_place = ?, movement = ?, prize = ? WHERE season_id = ? AND team_id = ?",
-        args: [i + 1, plan.movements[teamId] ?? null, PRIZES[i] ?? 0, season.id, teamId],
+        sql: "UPDATE league_entries SET final_place = ?, prize = ? WHERE season_id = ? AND team_id = ?",
+        args: [i + 1, PRIZES[i] ?? 0, season.id, teamId],
       }))
     ),
     "write"
