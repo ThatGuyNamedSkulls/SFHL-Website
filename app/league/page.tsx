@@ -8,9 +8,23 @@ import { ClubMark } from "@/components/club-identity";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
 import { LeagueManage } from "@/components/league-manage";
-import { CalendarDays, Check, Coins, Shield, Trophy, Users } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  Coins,
+  Shield,
+  Trophy,
+  Users,
+} from "lucide-react";
 
-type SeasonStatus = "draft" | "signup" | "drawn" | "regular" | "playoffs" | "finished" | "cancelled";
+type SeasonStatus =
+  | "draft"
+  | "signup"
+  | "drawn"
+  | "regular"
+  | "playoffs"
+  | "finished"
+  | "cancelled";
 
 interface TeamBadge {
   id: string;
@@ -42,6 +56,7 @@ interface MatchRow {
   teamA: TeamBadge;
   teamB: TeamBadge;
   mine: boolean;
+  round?: "semi1" | "semi2" | "final" | "third" | null;
 }
 
 interface WeekRow {
@@ -58,6 +73,102 @@ interface DivisionView {
   tier: number;
   standings: StandingRow[];
   weeks: WeekRow[];
+  playoffs: {
+    semi1: MatchRow | null;
+    semi2: MatchRow | null;
+    final: MatchRow | null;
+    third: MatchRow | null;
+  } | null;
+  places: {
+    place: number;
+    team: TeamBadge;
+    movement: "up" | "down" | null;
+    prize: number;
+  }[];
+}
+
+const ROUND_LABEL: Record<string, string> = {
+  semi1: "Semi-final 1",
+  semi2: "Semi-final 2",
+  final: "Final",
+  third: "Third place",
+};
+
+function PlayoffsPanel({ div }: { div: DivisionView }) {
+  const p = div.playoffs;
+  if (!p) return null;
+  const slot = (m: MatchRow | null, label: string, hint: string) => (
+    <div className="min-w-0">
+      <div className="mb-1 text-[10px] font-bold header-caps text-hl-muted">
+        {label}
+      </div>
+      {m ? (
+        <MatchLine m={m} />
+      ) : (
+        <div className="rounded-lg border border-dashed border-hl-border/60 px-3 py-3 text-center text-xs text-hl-muted">
+          {hint}
+        </div>
+      )}
+    </div>
+  );
+  return (
+    <Card className="border-hl-gold/30 bg-hl-panel p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-black header-caps text-white">Playoffs</h2>
+        <span className="text-[11px] text-hl-muted">Best of 3 · top 4</span>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-3">
+          {slot(p.semi1, "Semi-final · 1st v 4th", "")}
+          {slot(p.semi2, "Semi-final · 2nd v 3rd", "")}
+        </div>
+        <div className="space-y-3">
+          {slot(p.final, "Final", "Winners of the semi-finals")}
+          {slot(p.third, "Third place", "Losers of the semi-finals")}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PlacesPanel({ div }: { div: DivisionView }) {
+  if (!div.places.length) return null;
+  const medal = ["🥇", "🥈", "🥉"];
+  return (
+    <Card className="border-hl-gold/40 bg-hl-panel p-4">
+      <h2 className="mb-3 text-sm font-black header-caps text-white">
+        Final standings
+      </h2>
+      <div className="space-y-1.5">
+        {div.places.map((p) => (
+          <div
+            key={p.team.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-hl-base/50 px-3 py-2"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="w-6 text-center text-sm font-black text-hl-gold">
+                {medal[p.place - 1] ?? p.place}
+              </span>
+              <TeamName team={p.team} />
+            </div>
+            <span className="text-[11px] text-hl-muted">
+              {p.prize ? (
+                <span className="inline-flex items-center gap-1 text-hl-gold">
+                  <Coins className="h-3 w-3" /> {p.prize.toLocaleString()} each
+                </span>
+              ) : null}
+              {p.movement === "up" ? (
+                <span className="ml-2 text-hl-green">⬆ promoted</span>
+              ) : null}
+              {p.movement === "down" ? (
+                <span className="ml-2 text-hl-red">⬇ relegated</span>
+              ) : null}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
 }
 
 interface EntryRow {
@@ -116,7 +227,10 @@ const STATUS_TEXT: Record<SeasonStatus, string> = {
 };
 
 function fmtDate(ts: number) {
-  return new Date(ts).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return new Date(ts).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 function fmtDateTime(ts: number) {
@@ -131,10 +245,24 @@ function fmtDateTime(ts: number) {
 
 function TeamName({ team, mine }: { team: TeamBadge; mine?: boolean }) {
   return (
-    <Link href={`/teams/${team.id}`} className="flex min-w-0 items-center gap-2 hover:underline">
-      <ClubMark tag={team.tag} accentColor={team.accentColor} logoUrl={team.logoUrl} size={24} />
-      <span className={`truncate text-sm font-bold ${mine ? "text-hl-gold" : "text-white"}`}>{team.name}</span>
-      {team.tag ? <span className="shrink-0 text-[11px] text-hl-muted">[{team.tag}]</span> : null}
+    <Link
+      href={`/teams/${team.id}`}
+      className="flex min-w-0 items-center gap-2 hover:underline"
+    >
+      <ClubMark
+        tag={team.tag}
+        accentColor={team.accentColor}
+        logoUrl={team.logoUrl}
+        size={24}
+      />
+      <span
+        className={`truncate text-sm font-bold ${mine ? "text-hl-gold" : "text-white"}`}
+      >
+        {team.name}
+      </span>
+      {team.tag ? (
+        <span className="shrink-0 text-[11px] text-hl-muted">[{team.tag}]</span>
+      ) : null}
     </Link>
   );
 }
@@ -173,14 +301,24 @@ function MatchLine({ m }: { m: MatchRow }) {
   return (
     <div
       className={`grid grid-cols-[minmax(0,1fr)_72px_minmax(0,1fr)] items-center gap-2 rounded-lg px-3 py-2 ${
-        m.mine ? "bg-hl-gold/[0.07] border border-hl-gold/25" : "bg-hl-base/50 border border-hl-border/60"
+        m.mine
+          ? "bg-hl-gold/[0.07] border border-hl-gold/25"
+          : "bg-hl-base/50 border border-hl-border/60"
       }`}
     >
       <div className={`flex justify-end ${bWon ? "opacity-60" : ""}`}>
         <TeamName team={m.teamA} />
       </div>
-      <Link href={`/league/match/${m.id}`} className="rounded-md text-center hover:bg-white/[0.05]" title="Match page">
-        <div className={`text-sm font-black tabular-nums ${done ? "text-white" : "text-hl-muted"}`}>{middle}</div>
+      <Link
+        href={`/league/match/${m.id}`}
+        className="rounded-md text-center hover:bg-white/[0.05]"
+        title="Match page"
+      >
+        <div
+          className={`text-sm font-black tabular-nums ${done ? "text-white" : "text-hl-muted"}`}
+        >
+          {middle}
+        </div>
         <div className="text-[10px] text-hl-muted">
           {m.status === "live"
             ? "Live"
@@ -198,94 +336,127 @@ function MatchLine({ m }: { m: MatchRow }) {
   );
 }
 
-function DivisionPanel({ div, myTeamIds }: { div: DivisionView; myTeamIds: string[] }) {
+function DivisionPanel({
+  div,
+  myTeamIds,
+}: {
+  div: DivisionView;
+  myTeamIds: string[];
+}) {
   const playoffLine = 4;
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-      <Card className="border-hl-border bg-hl-panel p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-black header-caps text-white">Standings</h2>
-          <span className="text-[11px] text-hl-muted">Win 3 pts · top {playoffLine} make the playoffs</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[420px] text-sm">
-            <thead>
-              <tr className="text-left text-[11px] header-caps text-hl-muted">
-                <th className="w-8 py-2">#</th>
-                <th className="py-2">Team</th>
-                <th className="w-10 py-2 text-center">P</th>
-                <th className="w-10 py-2 text-center">W</th>
-                <th className="w-10 py-2 text-center">L</th>
-                <th className="w-12 py-2 text-center">RD</th>
-                <th className="w-12 py-2 text-right">Pts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {div.standings.map((row, i) => {
-                const mine = myTeamIds.includes(row.teamId);
-                return (
-                  <tr
-                    key={row.teamId}
-                    className={`border-t border-hl-border/60 ${i === playoffLine - 1 ? "border-b border-b-hl-gold/40" : ""} ${
-                      mine ? "bg-hl-gold/[0.06]" : ""
-                    }`}
-                  >
-                    <td className={`py-2 font-black tabular-nums ${i < playoffLine ? "text-hl-gold" : "text-hl-muted"}`}>
-                      {i + 1}
-                    </td>
-                    <td className="py-2 pr-2">
-                      <TeamName team={row.team} mine={mine} />
-                    </td>
-                    <td className="py-2 text-center tabular-nums text-white/80">{row.played}</td>
-                    <td className="py-2 text-center tabular-nums text-hl-green">{row.won}</td>
-                    <td className="py-2 text-center tabular-nums text-hl-red">{row.lost}</td>
-                    <td className="py-2 text-center tabular-nums text-white/80">
-                      {row.rd > 0 ? `+${row.rd}` : row.rd}
-                    </td>
-                    <td className="py-2 text-right font-black tabular-nums text-white">{row.points}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+    <div className="space-y-5">
+      <PlacesPanel div={div} />
+      <PlayoffsPanel div={div} />
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <Card className="border-hl-border bg-hl-panel p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-black header-caps text-white">
+              Standings
+            </h2>
+            <span className="text-[11px] text-hl-muted">
+              Win 3 pts · top {playoffLine} make the playoffs
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[420px] text-sm">
+              <thead>
+                <tr className="text-left text-[11px] header-caps text-hl-muted">
+                  <th className="w-8 py-2">#</th>
+                  <th className="py-2">Team</th>
+                  <th className="w-10 py-2 text-center">P</th>
+                  <th className="w-10 py-2 text-center">W</th>
+                  <th className="w-10 py-2 text-center">L</th>
+                  <th className="w-12 py-2 text-center">RD</th>
+                  <th className="w-12 py-2 text-right">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {div.standings.map((row, i) => {
+                  const mine = myTeamIds.includes(row.teamId);
+                  return (
+                    <tr
+                      key={row.teamId}
+                      className={`border-t border-hl-border/60 ${i === playoffLine - 1 ? "border-b border-b-hl-gold/40" : ""} ${
+                        mine ? "bg-hl-gold/[0.06]" : ""
+                      }`}
+                    >
+                      <td
+                        className={`py-2 font-black tabular-nums ${i < playoffLine ? "text-hl-gold" : "text-hl-muted"}`}
+                      >
+                        {i + 1}
+                      </td>
+                      <td className="py-2 pr-2">
+                        <TeamName team={row.team} mine={mine} />
+                      </td>
+                      <td className="py-2 text-center tabular-nums text-white/80">
+                        {row.played}
+                      </td>
+                      <td className="py-2 text-center tabular-nums text-hl-green">
+                        {row.won}
+                      </td>
+                      <td className="py-2 text-center tabular-nums text-hl-red">
+                        {row.lost}
+                      </td>
+                      <td className="py-2 text-center tabular-nums text-white/80">
+                        {row.rd > 0 ? `+${row.rd}` : row.rd}
+                      </td>
+                      <td className="py-2 text-right font-black tabular-nums text-white">
+                        {row.points}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
 
-      <Card className="border-hl-border bg-hl-panel p-4">
-        <h2 className="mb-3 text-sm font-black header-caps text-white">Schedule</h2>
-        {div.weeks.length === 0 ? (
-          <p className="py-6 text-center text-sm text-hl-muted">
-            The schedule is published when Match Staff start the season.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {div.weeks.map((w) => (
-              <div key={w.week}>
-                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="text-xs font-black header-caps text-white">
-                    Week {w.week}
-                    {w.start && w.end ? (
-                      <span className="ml-2 font-semibold normal-case tracking-normal text-hl-muted">
-                        {fmtDate(w.start)} – {fmtDate(w.end)}
+        <Card className="border-hl-border bg-hl-panel p-4">
+          <h2 className="mb-3 text-sm font-black header-caps text-white">
+            Schedule
+          </h2>
+          {div.weeks.length === 0 ? (
+            <p className="py-6 text-center text-sm text-hl-muted">
+              The schedule is published when Match Staff start the season.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {div.weeks.map((w) => (
+                <div key={w.week}>
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-xs font-black header-caps text-white">
+                      Week {w.week}
+                      {w.start && w.end ? (
+                        <span className="ml-2 font-semibold normal-case tracking-normal text-hl-muted">
+                          {fmtDate(w.start)} – {fmtDate(w.end)}
+                        </span>
+                      ) : null}
+                    </span>
+                    {w.defaultSlot ? (
+                      <span className="text-[10px] text-hl-muted">
+                        No agreed time → {fmtDateTime(w.defaultSlot)}
                       </span>
                     ) : null}
-                  </span>
-                  {w.defaultSlot ? (
-                    <span className="text-[10px] text-hl-muted">
-                      No agreed time → {fmtDateTime(w.defaultSlot)}
-                    </span>
-                  ) : null}
+                  </div>
+                  <div className="space-y-1.5">
+                    {w.matches.map((m) => (
+                      <div key={m.id}>
+                        {m.round ? (
+                          <div className="mb-0.5 text-[10px] font-bold header-caps text-hl-gold">
+                            {ROUND_LABEL[m.round]}
+                          </div>
+                        ) : null}
+                        <MatchLine m={m} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  {w.matches.map((m) => (
-                    <MatchLine key={m.id} m={m} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
@@ -313,15 +484,21 @@ function SignUpPanel({
   }
   return (
     <Card className="border-hl-border bg-hl-panel p-4">
-      <h2 className="mb-1 text-sm font-black header-caps text-white">Sign up your team</h2>
+      <h2 className="mb-1 text-sm font-black header-caps text-white">
+        Sign up your team
+      </h2>
       <p className="mb-3 text-xs text-hl-muted">
-        Captains only. Rosters need {data.roster.min}–{data.roster.max} accepted members, all linked to a player, and each player can
-        play for one team per season. Rosters lock when sign-ups close.
+        Captains only. Rosters need {data.roster.min}–{data.roster.max} accepted
+        members, all linked to a player, and each player can play for one team
+        per season. Rosters lock when sign-ups close.
       </p>
       {captainTeams.length === 0 ? (
         <p className="text-sm text-hl-muted">
           You don&apos;t captain a team yet.{" "}
-          <Link href="/teams" className="font-bold text-hl-gold hover:underline">
+          <Link
+            href="/teams"
+            className="font-bold text-hl-gold hover:underline"
+          >
             Create one
           </Link>{" "}
           and invite your players first.
@@ -337,7 +514,9 @@ function SignUpPanel({
                 <TeamName team={t} />
                 <div className="mt-1 text-[11px] text-hl-muted">
                   {t.memberCount} members
-                  {t.seedElo ? ` · ${t.seedElo.toLocaleString()} avg Elo (top 5)` : ""}
+                  {t.seedElo
+                    ? ` · ${t.seedElo.toLocaleString()} avg Elo (top 5)`
+                    : ""}
                 </div>
                 {!t.signedUp && t.problems.length > 0 ? (
                   <ul className="mt-1 space-y-0.5 text-[11px] text-hl-red">
@@ -396,7 +575,10 @@ function EntryList({ entries, title }: { entries: EntryRow[]; title: string }) {
               className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-hl-base/50 px-3 py-2"
             >
               <TeamName team={e.team} />
-              <span className="text-[11px] text-hl-muted" title={e.roster.join(", ")}>
+              <span
+                className="text-[11px] text-hl-muted"
+                title={e.roster.join(", ")}
+              >
                 {e.status === "ineligible" ? (
                   <span className="text-hl-red">{e.note}</span>
                 ) : (
@@ -462,13 +644,23 @@ export default function LeaguePage() {
   const season = data?.season ?? null;
   const myTeamIds = data?.viewer?.myTeamIds ?? [];
   const divisions = data?.divisions ?? [];
-  const myDivision = divisions.find((d) => d.standings.some((r) => myTeamIds.includes(r.teamId)));
-  const activeDiv = divisions.find((d) => d.id === divTab) ?? myDivision ?? divisions[0] ?? null;
+  const myDivision = divisions.find((d) =>
+    d.standings.some((r) => myTeamIds.includes(r.teamId)),
+  );
+  const activeDiv =
+    divisions.find((d) => d.id === divTab) ??
+    myDivision ??
+    divisions[0] ??
+    null;
   const signupPhase = season?.status === "draft" || season?.status === "signup";
-  const ineligible = (data?.entries ?? []).filter((e) => e.status === "ineligible");
+  const ineligible = (data?.entries ?? []).filter(
+    (e) => e.status === "ineligible",
+  );
   const nextMatch =
     divisions
-      .flatMap((d) => d.weeks.flatMap((w) => w.matches.map((m) => ({ ...m, week: w.week }))))
+      .flatMap((d) =>
+        d.weeks.flatMap((w) => w.matches.map((m) => ({ ...m, week: w.week }))),
+      )
       .filter((m) => m.mine && m.status !== "final" && m.status !== "forfeit")
       .sort((a, b) => a.week - b.week || a.id - b.id)[0] ?? null;
 
@@ -506,7 +698,9 @@ export default function LeaguePage() {
               type="button"
               onClick={() => setTab(t)}
               className={`-mb-px border-b-2 pb-2.5 text-sm font-bold header-caps ${
-                tab === t ? "border-hl-gold text-hl-gold" : "border-transparent text-hl-muted hover:text-white"
+                tab === t
+                  ? "border-hl-gold text-hl-gold"
+                  : "border-transparent text-hl-muted hover:text-white"
               }`}
             >
               {t === "league" ? "League" : "Manage (staff)"}
@@ -515,11 +709,17 @@ export default function LeaguePage() {
         </div>
       ) : null}
 
-      {data?.staff && tab === "manage" ? <LeagueManage onChanged={() => setReload((n) => n + 1)} /> : null}
+      {data?.staff && tab === "manage" ? (
+        <LeagueManage onChanged={() => setReload((n) => n + 1)} />
+      ) : null}
 
-      {!data && !failed ? <div className="py-16 text-center text-sm text-hl-muted">Loading…</div> : null}
+      {!data && !failed ? (
+        <div className="py-16 text-center text-sm text-hl-muted">Loading…</div>
+      ) : null}
       {failed && !data ? (
-        <div className="py-16 text-center text-sm text-hl-muted">Couldn&apos;t load the league. Try again soon.</div>
+        <div className="py-16 text-center text-sm text-hl-muted">
+          Couldn&apos;t load the league. Try again soon.
+        </div>
       ) : null}
 
       {data && !season && !(data.staff && tab === "manage") ? (
@@ -527,7 +727,9 @@ export default function LeaguePage() {
           <Trophy className="mx-auto mb-3 h-8 w-8 text-hl-gold" />
           <h2 className="text-lg font-black text-white">No season yet</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-hl-muted">
-            Match Staff announce sign-ups on Discord and here. Get ready by creating a team and inviting {data.roster.min}–{data.roster.max} players.
+            Match Staff announce sign-ups on Discord and here. Get ready by
+            creating a team and inviting {data.roster.min}–{data.roster.max}{" "}
+            players.
           </p>
           <Link
             href="/teams"
@@ -544,21 +746,32 @@ export default function LeaguePage() {
             <div className="absolute inset-0 bg-hero-radial opacity-60 pointer-events-none" />
             <div className="relative flex flex-wrap items-start justify-between gap-4">
               <div>
-                <div className="text-[11px] font-bold header-caps text-hl-gold">{STATUS_TEXT[season.status]}</div>
-                <h2 className="mt-1 text-2xl font-black text-white">{season.name}</h2>
+                <div className="text-[11px] font-bold header-caps text-hl-gold">
+                  {STATUS_TEXT[season.status]}
+                </div>
+                <h2 className="mt-1 text-2xl font-black text-white">
+                  {season.name}
+                </h2>
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-hl-muted">
                   {season.status === "signup" && season.signupClose ? (
                     <span className="inline-flex items-center gap-1">
-                      <CalendarDays className="h-3.5 w-3.5" /> Sign-ups close {fmtDateTime(season.signupClose)}
+                      <CalendarDays className="h-3.5 w-3.5" /> Sign-ups close{" "}
+                      {fmtDateTime(season.signupClose)}
                     </span>
                   ) : null}
                   {season.startDate ? (
                     <span className="inline-flex items-center gap-1">
-                      <CalendarDays className="h-3.5 w-3.5" /> Week 1: {fmtDate(season.startDate)}
+                      <CalendarDays className="h-3.5 w-3.5" /> Week 1:{" "}
+                      {fmtDate(season.startDate)}
                     </span>
                   ) : null}
                   <span className="inline-flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5" /> {data.entries.filter((e) => e.status !== "ineligible").length} teams
+                    <Users className="h-3.5 w-3.5" />{" "}
+                    {
+                      data.entries.filter((e) => e.status !== "ineligible")
+                        .length
+                    }{" "}
+                    teams
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <Shield className="h-3.5 w-3.5" /> Free entry
@@ -566,11 +779,18 @@ export default function LeaguePage() {
                 </div>
               </div>
               <div className="rounded-lg border border-hl-border bg-hl-base/60 px-3 py-2">
-                <div className="mb-1 text-[10px] header-caps text-hl-muted">Prizes per player · each division</div>
+                <div className="mb-1 text-[10px] header-caps text-hl-muted">
+                  Prizes per player · each division
+                </div>
                 <div className="flex gap-3 text-sm font-black">
                   {data.prizes.map((p, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 text-hl-gold">
-                      <span className="text-white/70">{["1st", "2nd", "3rd"][i]}</span>
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 text-hl-gold"
+                    >
+                      <span className="text-white/70">
+                        {["1st", "2nd", "3rd"][i]}
+                      </span>
                       <Coins className="h-3.5 w-3.5" />
                       {p.toLocaleString()}
                     </span>
@@ -595,7 +815,9 @@ export default function LeaguePage() {
               {nextMatch ? (
                 <Card className="flex flex-wrap items-center justify-between gap-3 border-hl-gold/40 bg-hl-panel p-4">
                   <div className="min-w-0">
-                    <div className="text-[11px] font-bold header-caps text-hl-gold">Your next match · Week {nextMatch.week}</div>
+                    <div className="text-[11px] font-bold header-caps text-hl-gold">
+                      Your next match · Week {nextMatch.week}
+                    </div>
                     <div className="mt-1 truncate text-sm font-black text-white">
                       {nextMatch.teamA.name} vs {nextMatch.teamB.name}
                     </div>
@@ -634,8 +856,12 @@ export default function LeaguePage() {
                   ))}
                 </div>
               ) : null}
-              {activeDiv ? <DivisionPanel div={activeDiv} myTeamIds={myTeamIds} /> : null}
-              {ineligible.length > 0 ? <EntryList entries={ineligible} title="Not placed" /> : null}
+              {activeDiv ? (
+                <DivisionPanel div={activeDiv} myTeamIds={myTeamIds} />
+              ) : null}
+              {ineligible.length > 0 ? (
+                <EntryList entries={ineligible} title="Not placed" />
+              ) : null}
             </>
           )}
         </div>

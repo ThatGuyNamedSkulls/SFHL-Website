@@ -35,6 +35,7 @@ interface MatchView {
     resultKind: string | null;
     note: string | null;
     roomOpen: boolean;
+    playoffRound?: string | null;
   };
   season: { id: number; name: string; status: string };
   window: { start: number; end: number; defaultSlot: number; fridayDeadline: number } | null;
@@ -191,7 +192,14 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
         <div className="relative">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="font-bold header-caps text-hl-muted">
-              Week {match.week} · BO{match.bo} · {match.stage === "playoff" ? "Playoffs" : "Regular season"}
+              Week {match.week} · BO{match.bo} ·{" "}
+              {match.stage === "playoff"
+                ? `Playoffs · ${
+                    { semi1: "Semi-final", semi2: "Semi-final", final: "Final", third: "Third place" }[
+                      match.playoffRound ?? ""
+                    ] ?? ""
+                  }`
+                : "Regular season"}
             </span>
             <span className={`font-black header-caps ${status.tone}`}>{status.text}</span>
           </div>
@@ -330,7 +338,11 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
 
               {canReport && !toConfirm ? (
                 <div className="mb-3">
-                  <p className="mb-2 text-xs text-hl-muted">Rounds won by each team (BO{match.bo}).</p>
+                  <p className="mb-2 text-xs text-hl-muted">
+                    {match.bo > 1
+                      ? `Maps won by each team — best of ${match.bo}, e.g. 2–0 or 2–1.`
+                      : "Rounds won by each team (BO1)."}
+                  </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="flex items-center gap-2 text-xs text-white">
                       {teamA.tag || teamA.name}

@@ -23,6 +23,9 @@ interface AdminData {
     weeks: number;
   } | null;
   canCreate: boolean;
+  openRegular: number;
+  openPlayoffs: number;
+  playoffFinalsCreated: number;
   entries: {
     teamId: string;
     name: string;
@@ -44,6 +47,11 @@ interface DrawPlan {
   notPlaced: { teamId: string; name: string; note: string }[];
 }
 
+interface EndPlan {
+  divisions: { divisionId: number; name: string; tier: number; places: string[]; champion: string }[];
+  movements: Record<string, "up" | "down">;
+}
+
 interface StartPlan {
   firstWeek: number;
   ok: boolean;
@@ -52,6 +60,8 @@ interface StartPlan {
 
 const EVENT_TEXT: Record<string, string> = {
   season_created: "created the season",
+  playoffs_started: "started the playoffs",
+  season_finished: "ended the season (titles + prizes)",
   signups_opened: "opened sign-ups",
   divisions_drawn: "closed sign-ups and drew the divisions",
   team_moved: "moved a team",
@@ -98,6 +108,8 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
   const [drawPlan, setDrawPlan] = useState<DrawPlan | null>(null);
   const [startPlan, setStartPlan] = useState<StartPlan | null>(null);
   const [confirmName, setConfirmName] = useState("");
+  const [endPlan, setEndPlan] = useState<EndPlan | null>(null);
+  const [endConfirm, setEndConfirm] = useState("");
   const [channels, setChannels] = useState<{ id: string; name: string }[] | null>(null);
   const [channelPick, setChannelPick] = useState("");
 
@@ -144,6 +156,7 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
     setNotice(done);
     setDrawPlan(null);
     setStartPlan(null);
+    setEndPlan(null);
     invalidateClientApi();
     setReload((n) => n + 1);
     onChanged();
@@ -163,6 +176,7 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
 
   const season = data.season;
   const placed = data.entries.filter((e) => e.status === "active");
+  const nameOf = (teamId: string) => data.entries.find((e) => e.teamId === teamId)?.name ?? teamId;
   const channelName = channels?.find((c) => c.id === data.channelId)?.name;
 
   return (
@@ -320,12 +334,100 @@ export function LeagueManage({ onChanged }: { onChanged: () => void }) {
           </div>
         ) : null}
 
-        {season?.status === "regular" || season?.status === "playoffs" ? (
-          <p className="text-sm text-white">
-            The {season.status === "regular" ? "regular season" : "playoffs"} is running. The bot opens match rooms,
-            sends reminders and sets default slots on its own — you only need to handle what shows up under
-            &ldquo;Needs staff&rdquo;.
-          </p>
+        {season?.status === "regular" ? (
+          <div className="space-y-3">
+            <p className="text-sm text-white">
+              The regular season is running. The bot opens match rooms, sends reminders and sets default slots on its
+              own — you only need to handle what shows up under &ldquo;Needs staff&rdquo;.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 border-t border-hl-border/60 pt-3">
+              <button
+                type="button"
+                disabled={busy || data.openRegular > 0}
+                className={primary}
+                onClick={() => run("startPlayoffs", {}, "Playoffs started — semi-finals are set.")}
+              >
+                Start playoffs
+              </button>
+              <span className="text-xs text-hl-muted">
+                {data.openRegular > 0
+                  ? `${data.openRegular} regular-season match${data.openRegular === 1 ? "" : "es"} still need a result.`
+                  : "Top 4 of each division: semi-finals 1 v 4 and 2 v 3, best of 3."}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
+        {season?.status === "playoffs" ? (
+          <div className="space-y-3">
+            <p className="text-sm text-white">
+              Playoffs are running (best of 3). The final and third-place match appear on their own once both
+              semi-finals are done.
+            </p>
+            <div className="border-t border-hl-border/60 pt-3">
+              <p className="mb-2 text-xs text-hl-muted">
+                {data.openPlayoffs > 0 || data.playoffFinalsCreated < data.divisions.length
+                  ? "Ending the season unlocks once every final and third-place match has a result."
+                  : "Every playoff match is done. Ending the season sets the final places, awards the champion titles, pays the HL Coin prizes and records promotion/relegation."}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={busy || data.openPlayoffs > 0 || data.playoffFinalsCreated < data.divisions.length}
+                  className={secondary}
+                  onClick={async () => {
+                    const json = await post("previewEnd");
+                    if (json) setEndPlan(json.preview as EndPlan);
+                  }}
+                >
+                  Preview the season end
+                </button>
+              </div>
+              {endPlan ? (
+                <div className="mt-3 space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {endPlan.divisions.map((d) => (
+                      <div key={d.divisionId} className="rounded-lg border border-hl-border/60 bg-hl-base/50 p-3 text-xs">
+                        <div className="mb-1 font-black header-caps text-white">{d.name}</div>
+                        {d.places.map((teamId, i) => (
+                          <div key={teamId} className="flex justify-between text-white/85">
+                            <span>
+                              {i + 1}. {nameOf(teamId)}
+                            </span>
+                            <span className="text-hl-muted">
+                              {i < 3 ? `${[5000, 2500, 1000][i].toLocaleString()} coins each` : ""}
+                              {endPlan.movements[teamId] === "up" ? " · ⬆ up" : ""}
+                              {endPlan.movements[teamId] === "down" ? " · ⬇ down" : ""}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={endConfirm}
+                      onChange={(e) => setEndConfirm(e.target.value)}
+                      placeholder={`Type ${season.name} to confirm`}
+                      className={input}
+                    />
+                    <button
+                      type="button"
+                      disabled={busy || endConfirm.trim() !== season.name}
+                      className={primary}
+                      onClick={() => run("endSeason", { confirmName: endConfirm }, `${season.name} is finished.`)}
+                    >
+                      End season &amp; pay prizes
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {season?.status === "finished" ? (
+          <p className="text-sm text-white">{season.name} is finished. Create the next season when you&apos;re ready.</p>
         ) : null}
       </Card>
 

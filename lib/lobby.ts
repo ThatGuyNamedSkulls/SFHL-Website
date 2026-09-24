@@ -59,6 +59,8 @@ export interface LobbyView {
   voiceChannelUrl: string | null;
   map: string | null;
   selectedMap: string | null;
+  /** BO3 league rooms: the three maps left after the veto, in play order. */
+  seriesMaps: string[] | null;
   status: string;
   side: { name: string; team: number } | null;
   sidePick: SidePickState | null;
@@ -89,6 +91,9 @@ interface RawLobby {
   voiceChannels?: Record<string, { id?: string; name?: string } | string>;
   map?: string | null;
   selectedMap?: string | null;
+  /** Maps left when the veto ends (1 = BO1, 3 = BO3 league playoffs). */
+  vetoKeep?: number;
+  seriesMaps?: string[] | null;
   status?: string;
   side?: {
     name: string;
@@ -273,6 +278,7 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
     voiceChannelUrl: voiceChannelId ? discordAppUrl(raw.guildId, voiceChannelId) : null,
     map: selected,
     selectedMap: selected,
+    seriesMaps: Array.isArray(raw.seriesMaps) && raw.seriesMaps.length > 1 ? raw.seriesMaps.map(String) : null,
     status: raw.status || "veto",
     side: raw.side ?? null,
     sidePick: normalizeSidePick(raw),
@@ -423,7 +429,9 @@ export async function applyWebsiteMapBan(
 
   const remaining = veto.remainingMaps.filter((m) => m !== mapName);
   const history = [...veto.history, { map: mapName, bannedByCaptainId: discordId }];
-  const complete = remaining.length === 1;
+  // BO1 ends at one map; BO3 league rooms ban until three remain (played in that order).
+  const keep = Math.max(1, Number(data.vetoKeep) || 1);
+  const complete = remaining.length <= keep;
   const otherCaptain =
     data.captains?.team1 === discordId ? data.captains?.team2 ?? null : data.captains?.team1 ?? null;
 
@@ -444,6 +452,7 @@ export async function applyWebsiteMapBan(
     veto: nextVeto,
     selectedMap: chosen,
     map: chosen,
+    ...(complete && keep > 1 ? { seriesMaps: remaining } : {}),
     status: complete ? (picker ? "side_selection" : "ready_to_play") : "veto",
     ...(complete && picker
       ? {

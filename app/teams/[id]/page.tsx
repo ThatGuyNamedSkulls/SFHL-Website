@@ -38,12 +38,27 @@ interface TitleRow {
   awardedAt: number;
 }
 
+interface LeagueRow {
+  seasonId: number;
+  season: string;
+  seasonStatus: string;
+  division: string | null;
+  played: number;
+  won: number;
+  lost: number;
+  finalPlace: number | null;
+  movement: string | null;
+  prize: number | null;
+  placed: boolean;
+}
+
 export default function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { session } = useSession();
   const [team, setTeam] = useState<Team | null>(null);
   const [titles, setTitles] = useState<TitleRow[]>([]);
+  const [league, setLeague] = useState<LeagueRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [inviteName, setInviteName] = useState("");
@@ -63,6 +78,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     }
     setTeam(data.team);
     setTitles(Array.isArray(data.titles) ? data.titles : []);
+    setLeague(Array.isArray(data.league) ? data.league : []);
     setName(data.team.name);
     setTag(data.team.tag);
     setLogoUrl(data.team.logoUrl || "");
@@ -212,7 +228,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
         </div>
         {titles.length === 0 ? (
           <p className="text-xs text-hl-muted">
-            No titles yet. Match Staff award titles for tournament wins.
+            No titles yet. League champions get one automatically; Match Staff award titles for tournament wins.
           </p>
         ) : (
           <ul className="divide-y divide-hl-border">
@@ -231,6 +247,38 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
           </ul>
         )}
       </Card>
+
+      {league.length ? (
+        <Card className="mt-6 border-hl-border bg-hl-panel p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-white">
+            <Trophy className="h-4 w-4 text-hl-gold" /> League
+          </div>
+          <ul className="divide-y divide-hl-border">
+            {league.map((s) => (
+              <li key={s.seasonId} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                <Link href="/league" className="text-sm font-semibold text-white hover:underline">
+                  {s.season}
+                  {s.division ? <span className="text-hl-muted"> · {s.division}</span> : null}
+                </Link>
+                <span className="text-xs text-hl-muted">
+                  {!s.placed
+                    ? "Signed up"
+                    : `${s.won}W · ${s.lost}L`}
+                  {s.finalPlace ? (
+                    <span className="ml-2 font-bold text-hl-gold">
+                      {s.finalPlace === 1 ? "🥇 Champions" : s.finalPlace === 2 ? "🥈 2nd" : s.finalPlace === 3 ? "🥉 3rd" : `${s.finalPlace}th`}
+                    </span>
+                  ) : s.seasonStatus !== "finished" && s.placed ? (
+                    <span className="ml-2">in progress</span>
+                  ) : null}
+                  {s.movement === "up" ? <span className="ml-2 text-hl-green">⬆ promoted</span> : null}
+                  {s.movement === "down" ? <span className="ml-2 text-hl-red">⬇ relegated</span> : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       {editing && captain ? (
         <Card className="mt-6 space-y-3 border-hl-border bg-hl-panel p-4">

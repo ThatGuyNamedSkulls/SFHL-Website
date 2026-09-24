@@ -54,6 +54,7 @@ export interface LiveLobby {
   queueMode?: string | null;
   leagueMatchId?: number | null;
   teamNames?: { team1: string; team2: string } | null;
+  seriesMaps?: string[] | null;
   messages?: ChatLine[];
 }
 
@@ -414,6 +415,11 @@ export function LiveMatchRoom({
                 <div className="rounded-lg bg-[#1c1c1c] border border-white/[0.06] p-3 text-center">
                   <MapThumb map={mapName} className="w-full h-16 mx-auto" />
                   <div className="text-sm font-bold text-white mt-2">{prettyMap(mapName)}</div>
+                  {lobby.seriesMaps?.length ? (
+                    <div className="text-[11px] text-[#8a8a8a] mt-1">
+                      Best of 3: {lobby.seriesMaps.map((m, i) => `${i + 1}. ${prettyMap(m)}`).join(" → ")}
+                    </div>
+                  ) : null}
                   {lobby.side && (
                     <div className="text-[11px] text-[#8a8a8a] mt-1">
                       Team {lobby.side.team} starts {lobby.side.name}

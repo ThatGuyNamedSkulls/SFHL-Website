@@ -64,7 +64,15 @@ export interface Entry {
   status: EntryStatus;
   note: string | null;
   signedUpAt: number;
+  /** Set when the season ends: 1 = champion. */
+  finalPlace?: number | null;
+  /** Promotion/relegation for next season. */
+  movement?: "up" | "down" | null;
+  /** HL Coins paid to each rostered player. */
+  prize?: number | null;
 }
+
+export type PlayoffRound = "semi1" | "semi2" | "final" | "third";
 
 export interface Division {
   id: number;
@@ -85,6 +93,7 @@ export interface LeagueMatch {
   scoreA: number | null;
   scoreB: number | null;
   winner: string | null;
+  playoffRound?: PlayoffRound | null;
 }
 
 export interface StandingRow {
@@ -184,9 +193,25 @@ export function ensureLeagueSchema(): Promise<void> {
         ["result_kind", "TEXT"],
         ["reminded", "INTEGER NOT NULL DEFAULT 0"],
         ["note", "TEXT"],
+        ["playoff_round", "TEXT"],
       ]) {
         if (!have.has(col)) await client.execute(`ALTER TABLE league_matches ADD COLUMN ${col} ${ddl}`);
       }
+      // Phase 4 (season end) columns on entries — same list as core/league.py.
+      const ecols = await client.execute("PRAGMA table_info(league_entries)");
+      const ehave = new Set(ecols.rows.map((r) => String((r as Record<string, unknown>).name)));
+      for (const [col, ddl] of [
+        ["final_place", "INTEGER"],
+        ["movement", "TEXT"],
+        ["prize", "INTEGER"],
+      ]) {
+        if (!ehave.has(col)) await client.execute(`ALTER TABLE league_entries ADD COLUMN ${col} ${ddl}`);
+      }
+      // One semi/final/third-place match per division, even if both sides create it at once.
+      await client.execute(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_league_playoff_round
+         ON league_matches (season_id, division_id, playoff_round) WHERE playoff_round IS NOT NULL`
+      );
     })().catch((e) => {
       schemaReady = null;
       throw e;
@@ -228,6 +253,9 @@ function toEntry(r: Record<string, unknown>): Entry {
     status: String(r.status) as EntryStatus,
     note: r.note == null ? null : String(r.note),
     signedUpAt: Number(r.signed_up_at),
+    finalPlace: num(r.final_place),
+    movement: r.movement == null ? null : (String(r.movement) as "up" | "down"),
+    prize: num(r.prize),
   };
 }
 
@@ -245,6 +273,7 @@ function toMatch(r: Record<string, unknown>): LeagueMatch {
     scoreA: num(r.score_a),
     scoreB: num(r.score_b),
     winner: r.winner == null ? null : String(r.winner),
+    playoffRound: r.playoff_round == null ? null : (String(r.playoff_round) as PlayoffRound),
   };
 }
 
@@ -482,7 +511,7 @@ export function computeStandings(teamIds: string[], matches: LeagueMatch[]): Sta
         (h2h.get(y.teamId) ?? 0) - (h2h.get(x.teamId) ?? 0) ||
         y.rd - x.rd ||
         y.roundsFor - x.roundsFor ||
-        x.teamId.localeCompare(y.teamId)
+        (x.teamId < y.teamId ? -1 : x.teamId > y.teamId ? 1 : 0)
     );
     out.push(...group);
   }
@@ -555,11 +584,44 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
       .map((e) => e.teamId);
     const divMatches = matches.filter((m) => m.divisionId === d.id);
     const weeks = [...new Set(divMatches.map((m) => m.week))].sort((a, b) => a - b);
+    const summary = (m: LeagueMatch) => ({
+      id: m.id,
+      bo: m.bo,
+      status: m.status,
+      scheduledAt: m.scheduledAt,
+      scoreA: m.scoreA,
+      scoreB: m.scoreB,
+      winner: m.winner,
+      round: m.playoffRound ?? null,
+      teamA: badge(m.teamA, entryByTeam.get(m.teamA)),
+      teamB: badge(m.teamB, entryByTeam.get(m.teamB)),
+      mine: myTeamIds.includes(m.teamA) || myTeamIds.includes(m.teamB),
+    });
+    const round = (r: PlayoffRound) => {
+      const m = divMatches.find((x) => x.playoffRound === r);
+      return m ? summary(m) : null;
+    };
+    const placed = entries
+      .filter((e) => e.divisionId === d.id && e.finalPlace)
+      .sort((x, y) => (x.finalPlace ?? 0) - (y.finalPlace ?? 0));
     return {
       id: d.id,
       name: d.name,
       tier: d.tier,
-      standings: computeStandings(teamIds, divMatches).map((row) => ({
+      playoffs: divMatches.some((m) => m.playoffRound)
+        ? { semi1: round("semi1"), semi2: round("semi2"), final: round("final"), third: round("third") }
+        : null,
+      places: placed.map((e) => ({
+        place: e.finalPlace!,
+        team: badge(e.teamId, e),
+        movement: e.movement ?? null,
+        prize: e.prize ?? 0,
+      })),
+      // Standings are the regular season only; the playoffs decide the final places.
+      standings: computeStandings(
+        teamIds,
+        divMatches.filter((m) => m.stage === "regular")
+      ).map((row) => ({
         ...row,
         team: badge(row.teamId, entryByTeam.get(row.teamId)),
         seedElo: entryByTeam.get(row.teamId)?.seedElo ?? null,
@@ -572,20 +634,7 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
               defaultSlot: defaultSlot(season.startDate, week),
             }
           : { start: null, end: null, defaultSlot: null }),
-        matches: divMatches
-          .filter((m) => m.week === week)
-          .map((m) => ({
-            id: m.id,
-            bo: m.bo,
-            status: m.status,
-            scheduledAt: m.scheduledAt,
-            scoreA: m.scoreA,
-            scoreB: m.scoreB,
-            winner: m.winner,
-            teamA: badge(m.teamA, entryByTeam.get(m.teamA)),
-            teamB: badge(m.teamB, entryByTeam.get(m.teamB)),
-            mine: myTeamIds.includes(m.teamA) || myTeamIds.includes(m.teamB),
-          })),
+        matches: divMatches.filter((m) => m.week === week).map(summary),
       })),
     };
   });
@@ -634,3 +683,41 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
 }
 
 export type LeagueView = Awaited<ReturnType<typeof leagueView>>;
+
+/** A team's league seasons for its team page: division, record, final place, prize. */
+export async function teamLeagueHistory(teamId: string) {
+  await ensureLeagueSchema();
+  const rs = await client.execute({
+    sql: `SELECT e.season_id, s.name AS season_name, s.status AS season_status, d.name AS division, d.tier,
+                 e.final_place, e.movement, e.prize, e.status
+          FROM league_entries e
+          JOIN league_seasons s ON s.id = e.season_id
+          LEFT JOIN league_divisions d ON d.id = e.division_id
+          WHERE e.team_id = ? AND s.status != 'cancelled'
+          ORDER BY e.season_id DESC`,
+    args: [teamId],
+  });
+  const out = [];
+  for (const r of rows(rs)) {
+    const seasonId = Number(r.season_id);
+    const matches = (await seasonMatches(seasonId)).filter(
+      (m) => (m.teamA === teamId || m.teamB === teamId) && (m.status === "final" || m.status === "forfeit") && m.winner
+    );
+    const won = matches.filter((m) => m.winner === teamId).length;
+    out.push({
+      seasonId,
+      season: String(r.season_name),
+      seasonStatus: String(r.season_status) as SeasonStatus,
+      division: r.division == null ? null : String(r.division),
+      tier: r.tier == null ? null : Number(r.tier),
+      played: matches.length,
+      won,
+      lost: matches.length - won,
+      finalPlace: num(r.final_place),
+      movement: r.movement == null ? null : String(r.movement),
+      prize: num(r.prize),
+      placed: String(r.status) === "active",
+    });
+  }
+  return out;
+}

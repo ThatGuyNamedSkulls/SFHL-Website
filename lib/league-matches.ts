@@ -9,6 +9,7 @@ import { client } from "@/lib/db";
 import { defaultSlot, ensureLeagueSchema, getSeason, weekWindow, type Season } from "@/lib/league";
 import { ensureSocialSchema } from "@/lib/social";
 import { logEvent, type Actor } from "@/lib/league-admin";
+import { afterResult } from "@/lib/league-playoffs";
 import { getTeam } from "@/lib/teams";
 
 const MINUTE = 60_000;
@@ -44,6 +45,7 @@ export interface MatchRow {
   resultKind: string | null;
   confirmedBy: string | null;
   note: string | null;
+  playoffRound: string | null;
 }
 
 const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
@@ -72,6 +74,7 @@ function toMatch(r: Record<string, unknown>): MatchRow {
     resultKind: s(r.result_kind),
     confirmedBy: s(r.confirmed_by),
     note: s(r.note),
+    playoffRound: s(r.playoff_round),
   };
 }
 
@@ -230,22 +233,31 @@ export async function declineTime(matchId: number, discordId: string) {
 
 // --- results ---------------------------------------------------------------------------------
 
-function checkScores(a: number, b: number) {
+/** BO1: rounds won (no draws). BO3 (playoffs): maps won — 2-0 or 2-1. Same as core/league_matches.py. */
+export function checkScores(a: number, b: number, bo = 1) {
   for (const x of [a, b]) {
     if (!Number.isInteger(x) || x < 0 || x > MAX_SCORE) fail(`Scores must be whole numbers from 0 to ${MAX_SCORE}.`);
   }
   if (a === b) fail("League matches can't end in a draw — report the winner's score.");
+  if (bo > 1) {
+    const need = Math.floor(bo / 2) + 1;
+    if (Math.max(a, b) !== need || Math.min(a, b) >= need) {
+      fail(`This is a best of ${bo}: report maps won, e.g. ${need}-0 or ${need}-${need - 1}.`);
+    }
+  }
 }
 
 /** Scores are team A – team B. */
 export async function reportScore(matchId: number, discordId: string, scoreA: number, scoreB: number, now = Date.now()) {
   const ctx = await captainCtx(matchId, discordId);
   const { match } = ctx;
-  checkScores(scoreA, scoreB);
+  checkScores(scoreA, scoreB, match.bo);
   if (match.status === "reported" && match.reportedBy !== ctx.team) {
     const same = match.resultKind === "score" && match.scoreA === scoreA && match.scoreB === scoreB;
-    if (same) await update(match.id, { status: "final", confirmed_by: discordId });
-    else {
+    if (same) {
+      await update(match.id, { status: "final", confirmed_by: discordId });
+      await afterResult(match);
+    } else {
       await update(match.id, {
         status: "disputed",
         note: `Scores don't match: ${match.scoreA}-${match.scoreB} vs ${scoreA}-${scoreB}`,
@@ -313,6 +325,7 @@ export async function concede(matchId: number, discordId: string) {
     confirmed_by: discordId,
     note: `Conceded by ${ctx.team}`,
   });
+  await afterResult(ctx.match);
 }
 
 export async function confirmResult(matchId: number, discordId: string) {
@@ -323,6 +336,7 @@ export async function confirmResult(matchId: number, discordId: string) {
     status: ctx.match.resultKind === "forfeit" ? "forfeit" : "final",
     confirmed_by: discordId,
   });
+  await afterResult(ctx.match);
 }
 
 export async function disputeResult(matchId: number, discordId: string, reason: string) {
@@ -352,7 +366,7 @@ export async function staffSetResult(
     const a = Number(input.scoreA);
     const b = Number(input.scoreB);
     if (input.scoreA == null || input.scoreB == null) fail("Give both scores, or mark it as a forfeit.");
-    checkScores(a, b);
+    checkScores(a, b, m.bo);
     if (a > b !== (input.winner === m.teamA)) fail("The winner must have the higher score.");
     cols = { status: "final", score_a: a, score_b: b, result_kind: "score" };
   }
@@ -362,6 +376,7 @@ export async function staffSetResult(
     ? `${label(input.winner === ta.id ? ta : tb)} win by forfeit`
     : `${label(ta)} ${input.scoreA} – ${input.scoreB} ${label(tb)}`;
   await logEvent(m.seasonId, "result_set", actor, line, m.id);
+  await afterResult(m);
 }
 
 /** Move a match that hasn't started (Match Staff); both rosters get a DM. */

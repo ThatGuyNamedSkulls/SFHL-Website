@@ -16,6 +16,8 @@ import {
   startSeason,
   type Actor,
 } from "@/lib/league-admin";
+import { endSeason, previewEnd, startPlayoffs } from "@/lib/league-playoffs";
+import { getSeason } from "@/lib/league";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -45,7 +47,7 @@ export async function GET(request: Request) {
  * Match Staff: { action, seasonId, ... }
  *   create {name} · openSignups {days} · previewDraw · closeSignups · moveTeam {teamId, divisionId}
  *   removeEntry {teamId} · previewStart {firstWeek} · start {firstWeek} · cancel {confirmName}
- *   setChannel {channelId, channelName}
+ *   setChannel {channelId, channelName} · startPlayoffs · previewEnd · endSeason {confirmName}
  */
 export async function POST(request: Request) {
   const actor = await staffActor();
@@ -79,6 +81,17 @@ export async function POST(request: Request) {
         break;
       case "cancel":
         await cancelSeason(seasonId, String(body.confirmName ?? ""), actor);
+        break;
+      case "startPlayoffs":
+        result = { week: await startPlayoffs(seasonId, actor) };
+        break;
+      case "previewEnd": {
+        const plan = await previewEnd(seasonId);
+        const season = await getSeason(seasonId);
+        return NextResponse.json({ preview: plan, seasonName: season?.name ?? "" });
+      }
+      case "endSeason":
+        await endSeason(seasonId, String(body.confirmName ?? ""), actor);
         break;
       case "setChannel":
         await setLeagueChannel(String(body.channelId ?? ""), String(body.channelName ?? ""), actor);
