@@ -728,7 +728,29 @@ function ProfileContent() {
                   }
                 />
 
-                {/* Own-ladder gamemodes are retired — 5v5 only. */}
+                {/* Pro Matchmaking rating (its own ladder), when the player has one. */}
+                {(() => {
+                  const pro = player.modes?.find((m) => m.mode === "pro" && m.placementDone);
+                  if (!pro) return null;
+                  const losses = Math.max(0, pro.matchesPlayed - pro.matchesWon);
+                  return (
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-[#a855f7]/30 bg-[#a855f7]/[0.06] px-4 py-3">
+                      <span className="text-[12px] font-black uppercase tracking-wide text-[#d8b4fe]">
+                        Pro Matchmaking
+                      </span>
+                      <span className="text-sm text-white">
+                        <b className="stat-number">{pro.elo.toLocaleString()}</b>{" "}
+                        <span className="text-[#8a8a8a]">Pro Elo</span>
+                      </span>
+                      <span className="text-sm text-[#bdbdbd] stat-number">
+                        {pro.matchesWon}W · {losses}L
+                      </span>
+                      <span className="text-[12px] text-[#8a8a8a]">
+                        Peak {pro.peakElo.toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 {/* Recent performance */}
                 <RecentPerformance

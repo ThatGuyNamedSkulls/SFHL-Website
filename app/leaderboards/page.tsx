@@ -78,6 +78,8 @@ function FilterSelect({
 export default function LeaderboardsPage() {
   const [players, setPlayers] = useState<ApiPlayer[]>([]);
   const [loading, setLoading] = useState(true);
+  // "main" = the 5v5 ladder; "pro" = Pro Matchmaking (public, S2+ players).
+  const [ladder, setLadder] = useState<"main" | "pro">("main");
   const { session } = useSession();
   const loggedIn = !!session;
   const myPlayer = session?.playerName || session?.username || null;
@@ -85,13 +87,19 @@ export default function LeaderboardsPage() {
   const { region, setRegion, meta } = useLeaderboardRegion();
 
   useEffect(() => {
-    apiGetJson<ApiPlayer[]>("/api/players")
+    apiGetJson<ApiPlayer[]>(ladder === "pro" ? "/api/players?mode=pro" : "/api/players")
       .then(({ ok, json }) => {
         setPlayers(ok && Array.isArray(json) ? json : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [ladder]);
+
+  const pickLadder = (next: "main" | "pro") => {
+    if (next === ladder) return;
+    setLoading(true);
+    setLadder(next);
+  };
 
   useEffect(() => {
     const onCountry = (event: Event) => {
@@ -209,7 +217,34 @@ export default function LeaderboardsPage() {
       )}
 
       <div className="flex flex-wrap items-center gap-3 mb-3">
-        <h2 className="text-sm font-bold text-white">{meta.short} Rankings</h2>
+        <div className="inline-flex rounded-lg border border-white/10 p-0.5" role="tablist" aria-label="Ladder">
+          {(
+            [
+              ["main", "5v5"],
+              ["pro", "Pro"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={ladder === id}
+              onClick={() => pickLadder(id)}
+              className={`h-7 rounded-md px-3 text-[12px] font-bold ${
+                ladder === id
+                  ? id === "pro"
+                    ? "bg-[#a855f7]/20 text-[#d8b4fe]"
+                    : "bg-white/10 text-white"
+                  : "text-[#8a8a8a] hover:text-white"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <h2 className="text-sm font-bold text-white">
+          {meta.short} {ladder === "pro" ? "Pro " : ""}Rankings
+        </h2>
         {!isGlobalRegion(region) && unsetCountryCount > 0 ? (
           <button
             type="button"
@@ -256,11 +291,13 @@ export default function LeaderboardsPage() {
         ) : filteredPlayers.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="No players found"
+            title={ladder === "pro" && players.length === 0 ? "No Pro ratings yet" : "No players found"}
             hint={
-              isGlobalRegion(region)
-                ? "No players match your filters."
-                : "No players from this region yet. Set your country in Settings to appear on the matching board."
+              ladder === "pro" && players.length === 0
+                ? "S2+ players (1900+ Elo) get a Pro rating after their first Pro Matchmaking game."
+                : isGlobalRegion(region)
+                  ? "No players match your filters."
+                  : "No players from this region yet. Set your country in Settings to appear on the matching board."
             }
           />
         ) : (

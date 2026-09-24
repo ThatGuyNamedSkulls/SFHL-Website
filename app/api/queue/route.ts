@@ -21,7 +21,10 @@ import {
   SUPER_ELO_RANGE,
   eloRangeOk,
   parseQueueMode,
+  queueModeLabel,
+  QUEUE_MODE_PRO,
 } from "@/lib/queue-modes";
+import { PRO_KEEP_ELO, PRO_MIN_ELO, hasProAccess, proAccessByDiscordId } from "@/lib/pro";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -40,12 +43,13 @@ export async function GET(request: Request) {
     const regionParam = (searchParams.get("region") || "").toUpperCase();
     const region = isQueueRegion(regionParam) ? regionParam : undefined;
     const session = await getSession();
-    const [queue, teamSize, gate, me, tags] = await Promise.all([
+    const [queue, teamSize, gate, me, tags, proEligible] = await Promise.all([
       getWebQueue(region),
       getQueueTeamSize(),
       getQueueGate(),
       session ? getWebQueueSpot(session.discordId) : Promise.resolve(null),
       clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
+      session ? hasProAccess(session.discordId).catch(() => false) : Promise.resolve(false),
     ]);
     return queueJson({
       queue: queue.map((entry) => ({
@@ -63,6 +67,8 @@ export async function GET(request: Request) {
       openRegions: gate.openRegions,
       openModes: gate.openModes,
       me,
+      // Pro Matchmaking is only shown to players who can join it (S2+).
+      proEligible,
     });
   } catch (error) {
     console.error("Error fetching queue:", error);
@@ -75,6 +81,7 @@ export async function GET(request: Request) {
       openRegions: [],
       openModes: {},
       me: null,
+      proEligible: false,
     });
   }
 }
@@ -118,7 +125,7 @@ export async function POST(request: Request) {
   }
   const regionModes = gate.openModes[requested] ?? ["standard", "super"];
   if (!regionModes.includes(mode)) {
-    const label = mode === QUEUE_MODE_SUPER ? "Super Match" : "Standard Match";
+    const label = queueModeLabel(mode);
     return NextResponse.json(
       { error: `${label} is closed in ${requested}. Wait for Match Staff to reopen that queue.` },
       { status: 403 }
@@ -157,7 +164,7 @@ export async function POST(request: Request) {
     const already = await getWebQueueSpot(session.discordId);
     if (already) {
       const where =
-        already.mode === QUEUE_MODE_SUPER ? `${already.region} Super Match` : `${already.region} queue`;
+        already.mode === "standard" ? `${already.region} queue` : `${already.region} ${queueModeLabel(already.mode)}`;
       return NextResponse.json(
         {
           error:
@@ -221,6 +228,22 @@ export async function POST(request: Request) {
       }
     }
 
+    if (mode === QUEUE_MODE_PRO) {
+      const group = party?.members ?? [{ discordId: session.discordId, playerName: session.playerName, username: session.username }];
+      const access = await proAccessByDiscordId(group.map((m) => String(m.discordId)));
+      const blocked = group.filter((m) => !access.get(String(m.discordId)));
+      if (blocked.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Pro Matchmaking is for S2+ players (${PRO_MIN_ELO}+ Elo; access is kept until you drop below ${PRO_KEEP_ELO}). Not eligible: ${blocked
+              .map((m) => m.playerName || m.username)
+              .join(", ")}`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     if (mode === QUEUE_MODE_SUPER) {
       const group = party?.members ?? [
         { playerName: session.playerName, username: session.username, elo: 0 },
@@ -274,7 +297,7 @@ export async function POST(request: Request) {
       const other = await getWebQueueSpot(m.discordId);
       if (other && (other.region !== requested || other.mode !== mode)) {
         const where =
-          other.mode === QUEUE_MODE_SUPER ? `${other.region} Super Match` : `${other.region} queue`;
+          other.mode === "standard" ? `${other.region} queue` : `${other.region} ${queueModeLabel(other.mode)}`;
         return NextResponse.json(
           {
             error: `${m.playerName || m.username} is already in the ${where}. Leave that one first.`,

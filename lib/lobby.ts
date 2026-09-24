@@ -71,6 +71,8 @@ export interface LobbyView {
   winChance: { team1: number; team2: number } | null;
   server: { url: string } | null;
   matchNumber: number | null;
+  /** Which queue made this match: "standard" | "super" | "pro". */
+  queueMode: string | null;
   messages: ChatMessage[];
 }
 
@@ -99,6 +101,7 @@ interface RawLobby {
   members: { discordId: string; name: string; team: number; left?: boolean; sub?: boolean }[];
   server?: { url?: string } | null;
   matchNumber?: number | null;
+  queueMode?: string | null;
 }
 
 function discordUrl(guildId: string, channelId: string) {
@@ -285,6 +288,7 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
             String(raw.channelName || "").match(/^queue-game-(\d+)$/i)?.[1] || "",
             10
           ) || null,
+    queueMode: typeof raw.queueMode === "string" ? raw.queueMode : null,
     messages,
   };
 }

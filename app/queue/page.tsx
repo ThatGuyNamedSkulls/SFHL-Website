@@ -21,11 +21,19 @@ import {
   Server,
   Zap,
   UserPlus,
+  Gem,
 } from "lucide-react";
 import { usePlayRegion, setQueueLocked } from "@/components/use-play-region";
 import { QUEUE_REGIONS, regionQueueLabel, isQueueRegion } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
-import { QUEUE_MODE_SUPER, SUPER_PARTY_MAX, SUPER_ELO_RANGE, parseQueueMode } from "@/lib/queue-modes";
+import {
+  QUEUE_MODE_PRO,
+  QUEUE_MODE_SUPER,
+  SUPER_PARTY_MAX,
+  SUPER_ELO_RANGE,
+  parseQueueMode,
+  queueModeLabel,
+} from "@/lib/queue-modes";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
 import { ClubTaggedName } from "@/components/club-identity";
@@ -88,6 +96,8 @@ const MATCH_TYPES: {
   id: string;
   label: string;
   green?: boolean;
+  /** Pro Matchmaking card (purple, shown only to S2+ players). */
+  pro?: boolean;
   icon: typeof Swords;
   features: MatchTypeFeature[];
 }[] = [
@@ -111,6 +121,18 @@ const MATCH_TYPES: {
       { icon: Users, text: "Solo, duo, trio" },
       { icon: ShieldCheck, text: "Verified Matching", star: true },
       { icon: Activity, text: `${SUPER_ELO_RANGE} Elo range` },
+      { icon: Medal, text: "5v5 Strike Force" },
+    ],
+  },
+  {
+    id: "pro",
+    label: "Pro Matchmaking",
+    pro: true,
+    icon: Gem,
+    features: [
+      { icon: Users, text: "Party of 5" },
+      { icon: ShieldCheck, text: "S2+ only (1900+ Elo)", star: true },
+      { icon: Activity, text: "Own Pro Elo & leaderboard" },
       { icon: Medal, text: "5v5 Strike Force" },
     ],
   },
@@ -143,6 +165,8 @@ export default function QueuePage() {
   const [queueOpen, setQueueOpen] = useState(false);
   const [openRegions, setOpenRegions] = useState<string[]>([]);
   const [openModes, setOpenModes] = useState<Record<string, string[]>>({});
+  // Pro Matchmaking is only visible to players who can join it (S2+).
+  const [proEligible, setProEligible] = useState(false);
   const [queuedSpot, setQueuedSpot] = useState<{ region: string; mode: string } | null>(null);
   // Open substitute slots (live matches missing a player), for the CTA strip.
   const [subCount, setSubCount] = useState(0);
@@ -167,6 +191,7 @@ export default function QueuePage() {
             region?: string;
             openModes?: Record<string, string[]>;
             me?: { region?: string; mode?: string } | null;
+            proEligible?: boolean;
           }>(`/api/queue?region=${encodeURIComponent(region)}&_=${Date.now()}`, { force: true }),
           apiGetJson<{ parties?: PartyLite[] }>("/api/parties?mine=1"),
           apiGetJson<{ count?: number }>("/api/subs"),
@@ -181,6 +206,7 @@ export default function QueuePage() {
             : [];
         setOpenRegions(regions);
         setQueueOpen(regions.length > 0);
+        setProEligible(qData.proEligible === true);
         if (qData.openModes && typeof qData.openModes === "object") {
           setOpenModes(qData.openModes as Record<string, string[]>);
         }
@@ -376,7 +402,7 @@ export default function QueuePage() {
           : !regionOk
             ? `Open now: ${openRegions.join(", ")}. Switch to one of those regions in Servers to find a match.`
             : !modeOk
-              ? `${matchType === QUEUE_MODE_SUPER ? "Super Match" : "Standard Match"} is closed in ${region}.`
+              ? `${queueModeLabel(matchType)} is closed in ${region}.`
             : null;
 
   // Header banner state: placement progress until ranked, tier ladder after.
@@ -609,7 +635,7 @@ export default function QueuePage() {
         </div>
         {playTab === "type" ? (
         <div className="grid md:grid-cols-2 max-w-4xl gap-4 items-start">
-          {MATCH_TYPES.map((mt) => {
+          {MATCH_TYPES.filter((mt) => !mt.pro || proEligible || matchType === QUEUE_MODE_PRO).map((mt) => {
             const active = matchType === mt.id;
             const TypeIcon = mt.icon;
             const superLocked = mt.id === QUEUE_MODE_SUPER && superPlacementBlocked;
@@ -630,10 +656,17 @@ export default function QueuePage() {
                 {mt.green && (
                   <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-hl-green/15 to-transparent pointer-events-none" />
                 )}
+                {mt.pro && (
+                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#a855f7]/15 to-transparent pointer-events-none" />
+                )}
                 <div className="relative flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <TypeIcon className={`w-4 h-4 shrink-0 ${mt.green ? "text-hl-green" : "text-white"}`} />
-                    <span className={`text-sm font-bold truncate ${mt.green ? "text-hl-green" : "text-white"}`}>
+                    <TypeIcon
+                      className={`w-4 h-4 shrink-0 ${mt.green ? "text-hl-green" : mt.pro ? "text-[#c084fc]" : "text-white"}`}
+                    />
+                    <span
+                      className={`text-sm font-bold truncate ${mt.green ? "text-hl-green" : mt.pro ? "text-[#c084fc]" : "text-white"}`}
+                    >
                       {mt.label}
                     </span>
                     <span className="text-xs text-hl-muted shrink-0">· {modeLabel}</span>

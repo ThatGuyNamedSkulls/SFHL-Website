@@ -17,6 +17,7 @@ import {
   ArrowUpRight,
   Zap,
   UserPlus,
+  Gem,
 } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
 
@@ -67,6 +68,8 @@ export function Dashboard({ session }: DashboardProps) {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [matches, setMatches] = useState<RecentMatch[]>([]);
   const [liveLobby, setLiveLobby] = useState<LiveLobbyHint | null>(null);
+  // Pro Matchmaking is only shown to players who can join it (S2+).
+  const [proEligible, setProEligible] = useState(false);
 
   const displayName = session.playerName || session.username;
 
@@ -94,6 +97,9 @@ export function Dashboard({ session }: DashboardProps) {
     apiGetJson<{ announcements?: Announcement[] }>("/api/discord/announcements")
       .then(({ json: d }) => setAnnouncement(d.announcements?.[0] ?? null))
       .catch(() => {});
+    apiGetJson<{ proEligible?: boolean }>("/api/queue")
+      .then(({ json: d }) => setProEligible(d?.proEligible === true))
+      .catch(() => {});
     apiGetJson<RecentMatch[]>("/api/matches")
       .then(({ json: d }) => setMatches(Array.isArray(d) ? d.slice(0, 4) : []))
       .catch(() => {});
@@ -118,6 +124,18 @@ export function Dashboard({ session }: DashboardProps) {
       glow: "from-hl-gold/35",
       soon: false,
     },
+    ...(proEligible
+      ? [
+          {
+            href: "/queue",
+            title: "Pro Matchmaking",
+            desc: "S2+ only · Pro Elo",
+            icon: Gem,
+            glow: "from-purple-500/30",
+            soon: false,
+          },
+        ]
+      : []),
     {
       href: "#",
       title: "League",
@@ -193,7 +211,7 @@ export function Dashboard({ session }: DashboardProps) {
       <div className="grid lg:grid-cols-[1fr_300px] gap-5">
         {/* Left: mode cards stacked like FACEIT */}
         <div className="space-y-5">
-          <div className="grid sm:grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${modeCards.length > 3 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
             {modeCards.map((c) => {
               const Icon = c.icon;
               const inner = (

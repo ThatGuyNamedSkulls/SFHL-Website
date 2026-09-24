@@ -8,6 +8,7 @@ import { MapThumb } from "@/components/map-thumb";
 import { RankTierLetter } from "@/types";
 import { prettyMap } from "@/lib/format";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
+import { queueModeLabel } from "@/lib/queue-modes";
 import { ExternalLink, Mic, Crown, Calendar, Send, Gamepad2 } from "lucide-react";
 import { SubRolePill } from "@/components/sub-role-pill";
 import { WinChanceBar } from "@/components/win-chance-bar";
@@ -50,6 +51,7 @@ export interface LiveLobby {
   createdAt?: number;
   server?: { url: string } | null;
   matchNumber?: number | null;
+  queueMode?: string | null;
   messages?: ChatLine[];
 }
 
@@ -289,7 +291,7 @@ export function LiveMatchRoom({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#8a8a8a] mb-4">
-          <span>Matchmaking / {MATCH_MODE_LABEL} / Standard Match</span>
+          <span>Matchmaking / {MATCH_MODE_LABEL} / {queueModeLabel(lobby.queueMode)}</span>
           <div className="flex items-center gap-2">
             {lobby.server?.url && (
               <a

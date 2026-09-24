@@ -2,20 +2,31 @@ import { PARTY_MAX_SIZE } from "@/lib/match-mode";
 
 export const QUEUE_MODE_STANDARD = "standard";
 export const QUEUE_MODE_SUPER = "super";
-export const QUEUE_MODES = [QUEUE_MODE_STANDARD, QUEUE_MODE_SUPER] as const;
+/** Pro Matchmaking: S2+ only (see lib/pro.ts), its own rating ladder. */
+export const QUEUE_MODE_PRO = "pro";
+export const QUEUE_MODES = [QUEUE_MODE_STANDARD, QUEUE_MODE_SUPER, QUEUE_MODE_PRO] as const;
 export type QueueModeId = (typeof QUEUE_MODES)[number];
 
 export const SUPER_PARTY_MAX = 3;
 export const SUPER_ELO_RANGE = 400;
 
 export function isQueueMode(value: string): value is QueueModeId {
-  return value === QUEUE_MODE_STANDARD || value === QUEUE_MODE_SUPER;
+  return (QUEUE_MODES as readonly string[]).includes(value);
+}
+
+/** "Standard Match" / "Super Match" / "Pro Matchmaking". */
+export function queueModeLabel(mode: string | null | undefined): string {
+  const m = parseQueueMode(mode);
+  if (m === QUEUE_MODE_SUPER) return "Super Match";
+  if (m === QUEUE_MODE_PRO) return "Pro Matchmaking";
+  return "Standard Match";
 }
 
 export function parseQueueMode(value: unknown): QueueModeId {
   if (typeof value === "string") {
     const raw = value.trim().toLowerCase();
     if (raw === "super" || raw === "super match") return QUEUE_MODE_SUPER;
+    if (raw === "pro" || raw === "pro matchmaking") return QUEUE_MODE_PRO;
     if (raw === "standard") return QUEUE_MODE_STANDARD;
   }
   return QUEUE_MODE_STANDARD;
