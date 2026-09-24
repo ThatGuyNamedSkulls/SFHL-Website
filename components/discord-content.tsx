@@ -35,8 +35,7 @@ export function DiscordContent({
               <a
                 key={i}
                 href={s.url}
-                target="_blank"
-                rel="noreferrer"
+                title="Opens in the Discord app"
                 className={`${pill} text-[#c9cdfb] bg-[#5865f2]/30 hover:bg-[#5865f2]/50`}
               >
                 {s.text}

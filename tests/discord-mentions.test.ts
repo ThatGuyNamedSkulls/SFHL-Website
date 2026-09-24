@@ -29,6 +29,11 @@ describe("discord mentions", () => {
     assert.ok(channel && channel.type === "channel");
     assert.equal(
       channel.url,
+      "discord://-/channels/973987866336190484/1280464713557344391",
+      "opens the Discord app, like the party voice button"
+    );
+    assert.equal(
+      channel.webUrl,
       "https://discord.com/channels/973987866336190484/1280464713557344391"
     );
   });
@@ -47,7 +52,10 @@ describe("discord mentions", () => {
     const text = segmentsToText(parseMentions("<@&999> <#888> <@777>", lookup));
     assert.equal(text, "@unknown-role #unknown-channel @unknown-user");
     const channel = parseMentions("<#888>", lookup)[0];
-    assert.ok(channel.type === "channel" && channel.url === null, "no link to a channel we can't name");
+    assert.ok(
+      channel.type === "channel" && channel.url === null && channel.webUrl === null,
+      "no link to a channel we can't name"
+    );
   });
 
   it("renders Discord timestamps as dates", () => {

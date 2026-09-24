@@ -1,7 +1,7 @@
 /**
  * Turn Discord message markup into readable pieces for the website:
  *   <@&roleId>  -> @Role Name (with the role's colour)
- *   <#channelId> -> #channel-name (links to the channel in Discord)
+ *   <#channelId> -> #channel-name (opens the channel in the Discord app)
  *   <@userId> / <@!userId> -> @Display Name
  *   <:emoji:id> / <a:emoji:id> -> :emoji:
  *   <t:unix> / <t:unix:style> -> a readable date
@@ -12,7 +12,14 @@
 export type MentionSegment =
   | { type: "text"; text: string }
   | { type: "role"; text: string; color: string | null }
-  | { type: "channel"; text: string; url: string | null }
+  | {
+      type: "channel";
+      text: string;
+      /** discord:// link — opens the desktop/mobile app, like party voice. */
+      url: string | null;
+      /** Browser fallback for people without the app. */
+      webUrl: string | null;
+    }
   | { type: "user"; text: string }
   | { type: "everyone"; text: string };
 
@@ -87,10 +94,12 @@ export function parseMentions(content: string, lookup: MentionLookup): MentionSe
       });
     } else if (channelId) {
       const name = lookup.channels.get(channelId);
+      const path = name && lookup.guildId ? `/channels/${lookup.guildId}/${channelId}` : null;
       out.push({
         type: "channel",
         text: `#${name ?? "unknown-channel"}`,
-        url: name && lookup.guildId ? `https://discord.com/channels/${lookup.guildId}/${channelId}` : null,
+        url: path ? `discord://-${path}` : null,
+        webUrl: path ? `https://discord.com${path}` : null,
       });
     } else if (userId) {
       out.push({ type: "user", text: `@${lookup.users.get(userId) ?? "unknown-user"}` });
