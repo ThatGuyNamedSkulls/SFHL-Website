@@ -134,12 +134,12 @@ export function Dashboard({ session }: DashboardProps) {
       lockedHint: "Reach S2 (1900 Elo) to unlock Pro Matchmaking",
     },
     {
-      href: "#",
+      href: "/league",
       title: "League",
-      desc: "Coming soon",
+      desc: "Team seasons · divisions",
       icon: Trophy,
       glow: "from-orange-500/25",
-      soon: true,
+      soon: false,
     },
     {
       href: "/tournaments",

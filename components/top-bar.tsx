@@ -10,7 +10,7 @@ import { QUEUE_REGIONS, isQueueRegion } from "@/lib/regions";
 
 const CENTER_TABS = [
   { id: "matchmaking", label: "Matchmaking", href: "/queue" as const },
-  { id: "league", label: "League", soon: true },
+  { id: "league", label: "League", href: "/league" as const },
   { id: "tournaments", label: "Tournaments", href: "/tournaments" as const },
 ] as const;
 
@@ -28,6 +28,7 @@ const PAGE_TITLE: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/settings", label: "Settings" },
   { test: (p) => p === "/clans" || p.startsWith("/clans/"), label: "Clans" },
   { test: (p) => p === "/tournaments" || p.startsWith("/tournaments/"), label: "Tournaments" },
+  { test: (p) => p === "/league", label: "League" },
 ];
 
 /** Game + region on the left, MATCHMAKING / LEAGUE / TOURNAMENTS center, avatar right. */
@@ -41,6 +42,7 @@ export function TopBar() {
     pathname === "/leaderboards" ||
     pathname.startsWith("/match");
   const tournamentsOn = pathname === "/tournaments" || pathname.startsWith("/tournaments/");
+  const leagueOn = pathname === "/league";
   const onRank = pathname === "/leaderboards";
   const mobileTitle = PAGE_TITLE.find((t) => t.test(pathname))?.label ?? "HyperLeague";
 
@@ -106,20 +108,10 @@ export function TopBar() {
           ? ([{ id: "matchmaking", label: "Matchmaking", href: "/leaderboards" as const }] as const)
           : CENTER_TABS
         ).map((tab) => {
-          if (!("href" in tab)) {
-            return (
-              <span
-                key={tab.id}
-                title="Coming soon"
-                className="pointer-events-auto h-full flex items-center text-[14px] font-bold header-caps text-[#6a6a6a] cursor-default"
-              >
-                {tab.label}
-              </span>
-            );
-          }
           const active =
             (tab.id === "matchmaking" && matchmakingOn) ||
-            (tab.id === "tournaments" && tournamentsOn);
+            (tab.id === "tournaments" && tournamentsOn) ||
+            (tab.id === "league" && leagueOn);
           return (
             <Link
               key={tab.id}
