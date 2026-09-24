@@ -270,7 +270,7 @@ export function LiveMatchRoom({
       <div className="flex-1 min-w-0 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
         <div className="flex items-center justify-between gap-3 mb-4">
           <h1 className="text-xl md:text-2xl font-bold text-white">
-            Matchroom{lobby.matchNumber ? ` · #{lobby.matchNumber}` : ""}
+            Matchroom{lobby.matchNumber ? ` · #${lobby.matchNumber}` : ""}
           </h1>
           <div className="flex items-center gap-5">
             {(["overview", "stats"] as const).map((t) => (
