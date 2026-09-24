@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Log in to join a club." }, { status: 401 });
+    return NextResponse.json({ error: "Log in to join a clan." }, { status: 401 });
   }
   const { id } = await ctx.params;
   const body = await request.json().catch(() => ({} as { invite?: string }));

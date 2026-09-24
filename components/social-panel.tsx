@@ -624,7 +624,7 @@ function ChatList({
           <Hash className="w-4 h-4" />
         ),
         c.name,
-        `Club · [${c.tag}]${last ? ` · ${new Date(last).toLocaleDateString([], { day: "numeric", month: "short" })}` : ""}`,
+        `Clan · [${c.tag}]${last ? ` · ${new Date(last).toLocaleDateString([], { day: "numeric", month: "short" })}` : ""}`,
         () => onOpen({ kind: "club", id: c.id, name: c.name, tag: c.tag })
       )
     );
@@ -636,7 +636,7 @@ function ChatList({
         <ul>{items}</ul>
       ) : (
         <p className="px-4 py-6 text-sm text-[#8a8a8a]">
-          No chats yet. Join a party, a club or a match to start one.
+          No chats yet. Join a party, a clan or a match to start one.
         </p>
       )}
       <p className="px-4 pt-3 text-[11px] text-[#6a6a6a]">

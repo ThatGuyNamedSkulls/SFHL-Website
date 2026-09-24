@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { ClubColorPicker, ClubMark } from "@/components/club-identity";
 import { useSession } from "@/components/session-provider";
 import { QUEUE_REGIONS } from "@/lib/regions";
-import { Shield, Users } from "lucide-react";
+import { Shield, Trophy, Users } from "lucide-react";
 
 interface TeamRow {
   id: string;
@@ -20,6 +20,7 @@ interface TeamRow {
   captainName: string;
   memberCount: number;
   maxMembers: number;
+  titles?: number;
   mine: boolean;
   pendingInvite: boolean;
 }
@@ -95,7 +96,7 @@ export default function TeamsPage() {
       <PageHeader
         icon={Shield}
         title="Teams"
-        subtitle="Build a roster and enter club tournaments together."
+        subtitle="Build a roster. Only team captains can enter tournaments."
         actions={
           session ? (
             <button
@@ -210,9 +211,18 @@ export default function TeamsPage() {
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between text-xs text-hl-muted">
-                <span className="inline-flex items-center gap-1">
-                  <Users className="h-3.5 w-3.5" />
-                  {team.memberCount}/{team.maxMembers}
+                <span className="inline-flex items-center gap-3">
+                  <span className="inline-flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5" />
+                    {team.memberCount}/{team.maxMembers}
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 ${team.titles ? "font-bold text-hl-gold" : ""}`}
+                    title="Titles"
+                  >
+                    <Trophy className="h-3.5 w-3.5" />
+                    {team.titles ?? 0}
+                  </span>
                 </span>
                 {team.pendingInvite ? (
                   <span className="font-bold text-hl-gold">Invite pending</span>

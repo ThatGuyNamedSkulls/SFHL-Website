@@ -153,7 +153,7 @@ function ClubLink({ club, lines }: { club: SidebarClub; lines: string[] }) {
       onMouseLeave={() => setBox(null)}
     >
       <Link
-        href={`/clubs/${club.id}`}
+        href={`/clans/${club.id}`}
         className="hl-nav-item flex items-center gap-3 h-12 w-full px-[18px] text-white"
       >
         <span className="relative shrink-0">
@@ -218,15 +218,15 @@ function ClubRail() {
   return (
     <>
       <NavRow
-        item={{ href: "/clubs", label: "Clubs", icon: Building2, owns: true }}
-        active={pathname === "/clubs" || pathname.startsWith("/clubs/")}
+        item={{ href: "/clans", label: "Clans", icon: Building2, owns: true }}
+        active={pathname === "/clans" || pathname.startsWith("/clans/")}
         onSearch={() => undefined}
       />
       {clubs.map((club) => (
         <ClubLink key={club.id} club={club} lines={news[club.id] ?? []} />
       ))}
       <NavRow
-        item={{ href: "/clubs?create=1", label: "Create a Club", icon: Plus, create: true, owns: false }}
+        item={{ href: "/clans?create=1", label: "Create a Clan", icon: Plus, create: true, owns: false }}
         active={false}
         onSearch={() => undefined}
       />

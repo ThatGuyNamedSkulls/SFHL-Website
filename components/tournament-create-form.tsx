@@ -158,7 +158,7 @@ export function TournamentCreateForm({
           onClick={() => void submit()}
           className="flex-1 h-10 rounded-lg bg-gold-gradient text-sm font-black text-hl-base disabled:opacity-40"
         >
-          {busy ? "Creating…" : kind === "community" ? "Create club cup" : "Create cup"}
+          {busy ? "Creating…" : kind === "community" ? "Create clan cup" : "Create cup"}
         </button>
       </div>
     </div>

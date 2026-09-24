@@ -21,6 +21,9 @@ export interface RosterMember {
 
 export interface TournamentTeam {
   id: string;
+  /** The saved team (web_teams) that entered. Missing on entries made before
+   *  entering required owning a team. */
+  teamId?: string | null;
   name: string;
   captainId: string;
   paidAmount: number;
@@ -33,6 +36,8 @@ export interface TournamentTeam {
 
 export interface JoinRequest {
   id: string;
+  /** The saved team (web_teams) the captain is entering. */
+  teamId?: string | null;
   teamName: string;
   captainId: string;
   captainName: string;

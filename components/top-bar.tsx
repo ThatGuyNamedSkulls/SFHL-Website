@@ -26,7 +26,7 @@ const PAGE_TITLE: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/track", label: "Track" },
   { test: (p) => p === "/feed", label: "Feed" },
   { test: (p) => p === "/settings", label: "Settings" },
-  { test: (p) => p === "/clubs" || p.startsWith("/clubs/"), label: "Clubs" },
+  { test: (p) => p === "/clans" || p.startsWith("/clans/"), label: "Clans" },
   { test: (p) => p === "/tournaments" || p.startsWith("/tournaments/"), label: "Tournaments" },
 ];
 

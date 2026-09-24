@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 async function ok(id: string, viewerId: string) {
   const club = await getClub(id);
-  if (!club) return NextResponse.json({ error: "Club not found." }, { status: 404 });
+  if (!club) return NextResponse.json({ error: "Clan not found." }, { status: 404 });
   const leaderboard = await clubLeaderboard(club);
   return NextResponse.json({ club: clubForClient(club, viewerId), leaderboard });
 }

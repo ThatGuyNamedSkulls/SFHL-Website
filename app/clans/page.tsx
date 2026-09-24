@@ -91,7 +91,7 @@ export default function ClubsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Could not create club");
+        setError(data.error || "Could not create clan");
         return;
       }
       setName("");
@@ -105,7 +105,7 @@ export default function ClubsPage() {
       invalidateClientApi("/api/auth/me");
       await Promise.all([load(), refresh({ force: true })]);
     } catch {
-      setError("Could not create club");
+      setError("Could not create clan");
     } finally {
       setBusy(false);
     }
@@ -131,7 +131,7 @@ export default function ClubsPage() {
     <div className="hl-page">
       <PageHeader
         icon={Building2}
-        title="Clubs"
+        title="Clans"
         subtitle="Open communities with their own identity, rules, and member board."
       />
 
@@ -141,7 +141,7 @@ export default function ClubsPage() {
             <Link href="/login" className="text-hl-gold font-bold hover:underline">
               Log in
             </Link>{" "}
-            to create or join a club.
+            to create or join a clan.
           </p>
         ) : !creating ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -151,7 +151,7 @@ export default function ClubsPage() {
               disabled={ownedCount >= maxOwned}
               className="find-match-btn h-10 rounded-xl px-5 text-sm font-black header-caps text-hl-base disabled:opacity-50"
             >
-              Create Club
+              Create Clan
             </button>
             <span className="text-xs text-hl-muted flex items-center gap-1">
               <Coins className="w-3.5 h-3.5 text-hl-gold" />
@@ -161,7 +161,7 @@ export default function ClubsPage() {
         ) : (
           <Card className="bg-hl-panel border-hl-border p-4 md:p-5">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-xs header-caps text-hl-muted">Create a club</div>
+              <div className="text-xs header-caps text-hl-muted">Create a clan</div>
               <button
                 type="button"
                 onClick={() => {
@@ -178,7 +178,7 @@ export default function ClubsPage() {
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value.slice(0, 40))}
-                  placeholder="Club name"
+                  placeholder="Clan name"
                   className="h-10 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
                 />
                 <input
@@ -211,7 +211,7 @@ export default function ClubsPage() {
                 value={rules}
                 onChange={(e) => setRules(e.target.value.slice(0, 2000))}
                 rows={3}
-                placeholder="Club rules (optional)"
+                placeholder="Clan rules (optional)"
                 className="w-full rounded-lg border border-hl-border bg-hl-base px-3 py-2 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
               />
               <input
@@ -291,14 +291,14 @@ export default function ClubsPage() {
       {mine.length === 0 && rest.length === 0 ? (
         <EmptyState
           icon={Building2}
-          title={clubs.length === 0 ? "No clubs yet" : "No matching clubs"}
+          title={clubs.length === 0 ? "No clans yet" : "No matching clans"}
           hint={clubs.length === 0 ? "Be the first to start one." : "Try a different name, tag, or region."}
         />
       ) : (
         <div className="space-y-6">
           {mine.length > 0 ? (
             <section>
-              <div className="mb-3 text-[11px] font-bold header-caps text-hl-gold">My clubs</div>
+              <div className="mb-3 text-[11px] font-bold header-caps text-hl-gold">My clans</div>
               <div className="grid gap-3 md:grid-cols-2">
                 {mine.map((club) => (
                   <ClubCard key={club.id} club={club} />
@@ -309,7 +309,7 @@ export default function ClubsPage() {
           {rest.length > 0 ? (
             <section>
               {mine.length > 0 ? (
-                <div className="mb-3 text-[11px] font-bold header-caps text-hl-muted">All clubs</div>
+                <div className="mb-3 text-[11px] font-bold header-caps text-hl-muted">All clans</div>
               ) : null}
               <div className="grid gap-3 md:grid-cols-2">
                 {rest.map((club) => (
@@ -327,7 +327,7 @@ export default function ClubsPage() {
 function ClubCard({ club }: { club: ClubRow }) {
   return (
     <Link
-      href={`/clubs/${club.id}`}
+      href={`/clans/${club.id}`}
       className="block rounded-xl border border-hl-border bg-hl-panel p-4 hover:border-hl-gold/40 transition-colors"
     >
       <div className="flex items-start gap-3">

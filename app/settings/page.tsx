@@ -123,7 +123,7 @@ export default function SettingsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setTagError(typeof data.error === "string" ? data.error : "Could not save club tag");
+        setTagError(typeof data.error === "string" ? data.error : "Could not save clan tag");
         return;
       }
       setActiveClubId(typeof data.activeClubId === "string" ? data.activeClubId : null);
@@ -302,10 +302,10 @@ export default function SettingsPage() {
       {tagClubs.length > 0 && (
         <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
           <h2 className="text-sm font-bold text-white header-caps mb-4 flex items-center gap-2">
-            <Tag className="w-4 h-4 text-hl-gold" /> Club tag
+            <Tag className="w-4 h-4 text-hl-gold" /> Clan tag
           </h2>
           <p className="text-xs text-hl-muted mb-4">
-            Choose which club tag shows in front of your name. You can also hide it.
+            Choose which clan tag shows in front of your name. You can also hide it.
           </p>
           <div className="flex items-center gap-2 mb-4 text-sm text-white">
             <span className="text-hl-muted">Showing</span>
@@ -326,7 +326,7 @@ export default function SettingsPage() {
                   : "border-hl-border text-white hover:border-hl-gold/40"
               } disabled:opacity-50`}
             >
-              <span>Auto (owned club first)</span>
+              <span>Auto (owned clan first)</span>
               {!activeClubId ? <span className="text-xs font-bold text-hl-gold">Using</span> : null}
             </button>
             {tagClubs.map((club) => {
@@ -369,7 +369,7 @@ export default function SettingsPage() {
                   : "border-hl-border text-white hover:border-hl-gold/40"
               } disabled:opacity-50`}
             >
-              <span>Hide club tag</span>
+              <span>Hide clan tag</span>
               {activeClubId === "none" ? (
                 <span className="text-xs font-bold text-hl-gold">Using</span>
               ) : null}

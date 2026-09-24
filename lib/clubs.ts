@@ -227,7 +227,7 @@ export function normalizeClubTag(raw: string): string {
 export function assertClubTag(raw: string): string {
   const tag = normalizeClubTag(raw);
   if (!TAG_RE.test(tag)) {
-    throw new Error("Club tag must be 2–5 letters or numbers (A–Z, 0–9).");
+    throw new Error("Clan tag must be 2–5 letters or numbers (A–Z, 0–9).");
   }
   return tag;
 }
@@ -239,7 +239,7 @@ export function isClubAccentColor(value: string | null | undefined): value is st
 function assertAccent(raw: string | undefined): string {
   const color = (raw ?? "").trim() || DEFAULT_ACCENT;
   if (!isClubAccentColor(color)) {
-    throw new Error("Pick a club color from the default palette.");
+    throw new Error("Pick a clan color from the default palette.");
   }
   return color;
 }
@@ -261,7 +261,7 @@ function assertLogoUrl(raw: string | null | undefined): string | null {
 function fallbackTag(name: string): string {
   const fromName = normalizeClubTag(name);
   if (fromName.length >= 2) return fromName.slice(0, 5);
-  return (fromName + "CLUB").slice(0, 4);
+  return (fromName + "CLAN").slice(0, 4);
 }
 
 function slugRole(name: string): string {
@@ -433,11 +433,11 @@ export async function createClub(input: {
   owner: Omit<ClubMember, "role" | "joinedAt">;
 }): Promise<Club> {
   const name = input.name.trim().slice(0, 40);
-  if (name.length < 3) throw new Error("Club name must be at least 3 characters.");
+  if (name.length < 3) throw new Error("Clan name must be at least 3 characters.");
   const tag = assertClubTag(input.tag?.trim() ? input.tag : fallbackTag(name));
-  if (await tagTaken(tag)) throw new Error("That club tag is already in use.");
+  if (await tagTaken(tag)) throw new Error("That clan tag is already in use.");
   if ((await ownedClubCount(input.owner.discordId)) >= MAX_OWNED_CLUBS) {
-    throw new Error(`You can own at most ${MAX_OWNED_CLUBS} clubs.`);
+    throw new Error(`You can own at most ${MAX_OWNED_CLUBS} clans.`);
   }
   const accentColor = assertAccent(input.accentColor);
   const logoUrl = assertLogoUrl(input.logoUrl);
@@ -469,15 +469,15 @@ export async function createClub(input: {
 
 export async function updateClub(id: string, discordId: string, patch: ClubPatch): Promise<Club> {
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
+  if (!club) throw new Error("Clan not found.");
   if (!actorCan(club, discordId, "canEdit") && club.ownerId !== discordId) {
-    throw new Error("You cannot edit this club.");
+    throw new Error("You cannot edit this clan.");
   }
   const ownerOnly = club.ownerId === discordId;
   if (typeof patch.name === "string") {
-    if (!ownerOnly) throw new Error("Only the owner can change the club name.");
+    if (!ownerOnly) throw new Error("Only the owner can change the clan name.");
     const name = patch.name.trim().slice(0, 40);
-    if (name.length < 3) throw new Error("Club name must be at least 3 characters.");
+    if (name.length < 3) throw new Error("Clan name must be at least 3 characters.");
     club.name = name;
   }
   if (typeof patch.description === "string") {
@@ -487,10 +487,10 @@ export async function updateClub(id: string, discordId: string, patch: ClubPatch
     club.rules = patch.rules.trim().slice(0, 2000);
   }
   if (typeof patch.tag === "string") {
-    if (!ownerOnly) throw new Error("Only the owner can change the club tag.");
+    if (!ownerOnly) throw new Error("Only the owner can change the clan tag.");
     const tag = assertClubTag(patch.tag);
     if (tag !== club.tag && (await tagTaken(tag, club.id))) {
-      throw new Error("That club tag is already in use.");
+      throw new Error("That clan tag is already in use.");
     }
     club.tag = tag;
   }
@@ -501,7 +501,7 @@ export async function updateClub(id: string, discordId: string, patch: ClubPatch
     club.logoUrl = assertLogoUrl(patch.logoUrl);
   }
   if (typeof patch.private === "boolean") {
-    if (!ownerOnly) throw new Error("Only the owner can change club privacy.");
+    if (!ownerOnly) throw new Error("Only the owner can change clan privacy.");
     club.private = patch.private;
   }
   return writeClub(club);
@@ -513,12 +513,12 @@ export async function joinClub(
   inviteToken?: string
 ): Promise<Club> {
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
+  if (!club) throw new Error("Clan not found.");
   if (club.members.some((existing) => existing.discordId === member.discordId)) return club;
   if (club.private) {
     const token = (inviteToken || "").trim();
     if (!token || !club.invites.some((inv) => inv.token === token)) {
-      throw new Error("This club is invite-only.");
+      throw new Error("This clan is invite-only.");
     }
   }
   club.members.push({ ...member, role: MEMBER_ROLE_ID, joinedAt: Date.now() });
@@ -527,9 +527,9 @@ export async function joinClub(
 
 export async function leaveClub(id: string, discordId: string): Promise<Club | null> {
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
+  if (!club) throw new Error("Clan not found.");
   if (club.ownerId === discordId) {
-    throw new Error("The owner cannot leave. Transfer the club or delete it.");
+    throw new Error("The owner cannot leave. Transfer the clan or delete it.");
   }
   club.members = club.members.filter((m) => m.discordId !== discordId);
   await clearClubTagPrefIf(discordId, club.id);
@@ -538,8 +538,8 @@ export async function leaveClub(id: string, discordId: string): Promise<Club | n
 
 export async function deleteClub(id: string, discordId: string): Promise<void> {
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
-  if (club.ownerId !== discordId) throw new Error("Only the owner can delete this club.");
+  if (!club) throw new Error("Clan not found.");
+  if (club.ownerId !== discordId) throw new Error("Only the owner can delete this clan.");
   await ensureSchema();
   await client.execute({ sql: "DELETE FROM web_clubs WHERE id = ?", args: [id] });
   for (const member of club.members) {
@@ -550,7 +550,7 @@ export async function deleteClub(id: string, discordId: string): Promise<void> {
 
 export async function createInvite(id: string, discordId: string): Promise<Club> {
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
+  if (!club) throw new Error("Clan not found.");
   if (!actorCan(club, discordId, "canInvite")) throw new Error("You cannot invite players.");
   club.invites = [
     { token: randomUUID().replace(/-/g, "").slice(0, 10), createdBy: discordId, createdAt: Date.now() },
@@ -561,11 +561,11 @@ export async function createInvite(id: string, discordId: string): Promise<Club>
 
 export async function kickMember(id: string, actorId: string, targetId: string): Promise<Club> {
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
-  if (actorId === targetId) throw new Error("Leave the club instead of kicking yourself.");
+  if (!club) throw new Error("Clan not found.");
+  if (actorId === targetId) throw new Error("Leave the clan instead of kicking yourself.");
   if (!actorCan(club, actorId, "canKick")) throw new Error("You cannot kick members.");
   const target = memberOf(club, targetId);
-  if (!target) throw new Error("They are not in this club.");
+  if (!target) throw new Error("They are not in this clan.");
   if (target.role === OWNER_ROLE_ID || targetId === club.ownerId) {
     throw new Error("The owner cannot be kicked.");
   }
@@ -587,10 +587,10 @@ export async function setMemberRole(
   roleId: string
 ): Promise<Club> {
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
+  if (!club) throw new Error("Clan not found.");
   if (!actorCan(club, actorId, "canPromote")) throw new Error("You cannot change member roles.");
   const target = memberOf(club, targetId);
-  if (!target) throw new Error("They are not in this club.");
+  if (!target) throw new Error("They are not in this clan.");
   if (targetId === club.ownerId || target.role === OWNER_ROLE_ID) {
     throw new Error("The owner's role cannot be changed.");
   }
@@ -613,14 +613,14 @@ export async function transferOwnership(
   actorId: string,
   targetId: string
 ): Promise<Club> {
-  if (actorId === targetId) throw new Error("You already own this club.");
+  if (actorId === targetId) throw new Error("You already own this clan.");
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
-  if (club.ownerId !== actorId) throw new Error("Only the owner can transfer the club.");
+  if (!club) throw new Error("Clan not found.");
+  if (club.ownerId !== actorId) throw new Error("Only the owner can transfer the clan.");
   const target = memberOf(club, targetId);
-  if (!target) throw new Error("They must be a member of the club first.");
+  if (!target) throw new Error("They must be a member of the clan first.");
   if ((await ownedClubCount(targetId)) >= MAX_OWNED_CLUBS) {
-    throw new Error(`That player already owns ${MAX_OWNED_CLUBS} clubs.`);
+    throw new Error(`That player already owns ${MAX_OWNED_CLUBS} clans.`);
   }
   const prev = memberOf(club, actorId);
   if (prev) prev.role = MEMBER_ROLE_ID;
@@ -636,10 +636,10 @@ export async function addClubRole(
   input: { name: string } & ClubRolePatch
 ): Promise<Club> {
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
+  if (!club) throw new Error("Clan not found.");
   if (club.ownerId !== actorId) throw new Error("Only the owner can create roles.");
   if (club.roles.length >= MAX_CLUB_ROLES) {
-    throw new Error(`A club can have at most ${MAX_CLUB_ROLES} roles.`);
+    throw new Error(`A clan can have at most ${MAX_CLUB_ROLES} roles.`);
   }
   const name = input.name.trim().slice(0, ROLE_NAME_MAX);
   if (name.length < 2) throw new Error("Role name must be at least 2 characters.");
@@ -669,7 +669,7 @@ export async function updateClubRole(
   patch: ClubRolePatch
 ): Promise<Club> {
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
+  if (!club) throw new Error("Clan not found.");
   if (club.ownerId !== actorId) throw new Error("Only the owner can edit roles.");
   if (roleId === OWNER_ROLE_ID || roleId === MEMBER_ROLE_ID) {
     throw new Error("Default roles cannot be edited.");
@@ -691,7 +691,7 @@ export async function updateClubRole(
 
 export async function deleteClubRole(id: string, actorId: string, roleId: string): Promise<Club> {
   const club = await getClub(id);
-  if (!club) throw new Error("Club not found.");
+  if (!club) throw new Error("Clan not found.");
   if (club.ownerId !== actorId) throw new Error("Only the owner can delete roles.");
   if (roleId === OWNER_ROLE_ID || roleId === MEMBER_ROLE_ID) {
     throw new Error("Default roles cannot be deleted.");

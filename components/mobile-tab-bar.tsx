@@ -46,7 +46,7 @@ const MORE_LINKS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/friends", label: "Friends", icon: UserPlus },
   { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/match/live", label: "Match room", icon: Swords },
-  { href: "/clubs", label: "Clubs", icon: Building2 },
+  { href: "/clans", label: "Clans", icon: Building2 },
   { href: "/party-finder?create=1", label: "Create party", icon: Plus },
 ];
 

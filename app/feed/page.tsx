@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Rss } from "lucide-react";
+import { DiscordContent } from "@/components/discord-content";
+import type { MentionSegment } from "@/lib/discord-mentions";
 
 interface Announcement {
   id: string;
   author: string;
   avatar: string | null;
   content: string;
+  segments?: MentionSegment[];
   timestamp: string;
   attachments: string[];
 }
@@ -59,7 +62,9 @@ export default function FeedPage() {
                       {new Date(p.timestamp).toLocaleString()}
                     </span>
                   </div>
-                  <p className="text-sm text-hl-muted mt-2 whitespace-pre-wrap">{p.content || "(no text)"}</p>
+                  <p className="text-sm text-hl-muted mt-2 whitespace-pre-wrap">
+                    <DiscordContent content={p.content} segments={p.segments} />
+                  </p>
                   {p.attachments.map((url) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img

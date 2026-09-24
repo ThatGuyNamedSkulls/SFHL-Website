@@ -76,7 +76,7 @@ export async function GET() {
 
     return NextResponse.json({ clubs: ranked.slice(0, 3) });
   } catch (error) {
-    console.error("clubs sidebar", error);
+    console.error("clans sidebar", error);
     return NextResponse.json({ clubs: [] });
   }
 }

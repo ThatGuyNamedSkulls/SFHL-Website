@@ -75,13 +75,18 @@ export async function POST(
     let t: Tournament;
     switch (action) {
       case "request":
-        t = await requestJoin(id, me, String(body.teamName ?? ""));
+        t = await requestJoin(id, me, String(body.teamId ?? ""));
         break;
       case "review":
         t = await reviewRequest(id, me, String(body.requestId ?? ""), !!body.accept);
         break;
       case "assignCaptain":
-        t = await assignCaptain(id, me, String(body.playerName ?? ""), String(body.teamName ?? ""));
+        t = await assignCaptain(
+          id,
+          me,
+          String(body.playerName ?? ""),
+          String(body.teamRef ?? body.teamName ?? "")
+        );
         break;
       case "invite":
         t = await invitePlayer(id, me, String(body.teamId ?? ""), String(body.playerName ?? ""));

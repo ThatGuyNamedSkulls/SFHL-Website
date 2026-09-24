@@ -43,7 +43,7 @@ export function ClubTournaments({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-bold text-white">Club tournaments</h2>
+        <h2 className="text-sm font-bold text-white">Clan tournaments</h2>
         {owner ? (
           <button
             type="button"
@@ -68,7 +68,7 @@ export function ClubTournaments({
       ) : null}
       <CupFacts region={region} rules={rules} />
       {cups.length === 0 ? (
-        <p className="text-sm text-hl-muted">This club has not created a tournament yet.</p>
+        <p className="text-sm text-hl-muted">This clan has not created a tournament yet.</p>
       ) : (
         <div className="space-y-3">
           {cups.map((cup) => (

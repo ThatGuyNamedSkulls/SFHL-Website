@@ -160,7 +160,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
         applyPayload(data);
         if (closeEdit) setEditing(false);
       } else if (data.ok) {
-        router.push("/clubs");
+        router.push("/clans");
       }
     } catch {
       setError("Failed");
@@ -179,19 +179,19 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
   }, [club, owner, myRole]);
 
   if (!club) {
-    return <div className="hl-page text-sm text-hl-muted">Loading club…</div>;
+    return <div className="hl-page text-sm text-hl-muted">Loading clan…</div>;
   }
 
   const inviteToken = club.invites[0]?.token;
   const inviteLink =
     typeof window !== "undefined" && inviteToken
-      ? `${window.location.origin}/clubs/${club.id}?invite=${inviteToken}`
+      ? `${window.location.origin}/clans/${club.id}?invite=${inviteToken}`
       : "";
 
   return (
     <div className="hl-page">
-      <Link href="/clubs" className="text-xs font-bold text-hl-gold hover:underline">
-        ← All clubs
+      <Link href="/clans" className="text-xs font-bold text-hl-gold hover:underline">
+        ← All clans
       </Link>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[240px_1fr] items-start">
@@ -224,7 +224,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                     onClick={() => act(`/api/clubs/${id}/join`, "POST", { invite: inviteFromUrl })}
                     className="find-match-btn h-9 rounded-xl px-4 text-sm font-black header-caps text-hl-base disabled:opacity-50"
                   >
-                    Join club
+                    Join clan
                   </button>
                 )
               ) : null}
@@ -276,7 +276,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                   onClick={() => setEditing((v) => !v)}
                   className="h-9 rounded-xl border border-hl-border px-4 text-sm font-bold text-white hover:border-hl-gold/40"
                 >
-                  {editing ? "Cancel" : "Edit club"}
+                  {editing ? "Cancel" : "Edit clan"}
                 </button>
               ) : null}
               {owner ? (
@@ -284,13 +284,13 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                   type="button"
                   disabled={busy}
                   onClick={() => {
-                    if (window.confirm("Delete this club for everyone?")) {
+                    if (window.confirm("Delete this clan for everyone?")) {
                       act(`/api/clubs/${id}`, "DELETE");
                     }
                   }}
                   className="h-9 rounded-xl border border-hl-red/40 px-4 text-sm font-bold text-hl-red disabled:opacity-50"
                 >
-                  Delete club
+                  Delete clan
                 </button>
               ) : null}
               {!session ? (
@@ -329,12 +329,6 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                 {label}
               </button>
             ))}
-            <Link
-              href="/teams"
-              className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-semibold text-[#a0a0a0] hover:bg-white/5 hover:text-white"
-            >
-              Teams
-            </Link>
             {section === "chat" ? (
               <button
                 type="button"
@@ -343,12 +337,6 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                 General
               </button>
             ) : null}
-            <Link
-              href="/queue"
-              className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-semibold text-[#a0a0a0] hover:bg-white/5 hover:text-white"
-            >
-              Club queue
-            </Link>
           </nav>
         </div>
 
@@ -359,7 +347,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
             <input
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 40))}
-              placeholder="Club name"
+              placeholder="Clan name"
               className="h-10 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
             />
             <input
@@ -381,7 +369,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
             value={rules}
             onChange={(e) => setRules(e.target.value.slice(0, 2000))}
             rows={5}
-            placeholder="Club rules"
+            placeholder="Clan rules"
             className="w-full rounded-lg border border-hl-border bg-hl-base px-3 py-2 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
           />
           <input
@@ -703,7 +691,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                         onClick={() => {
                           if (
                             window.confirm(
-                              `Transfer ownership of this club to ${label}? You will become a member.`
+                              `Transfer ownership of this clan to ${label}? You will become a member.`
                             )
                           ) {
                             act(`/api/clubs/${id}/transfer`, "POST", { discordId: row.discordId });
@@ -892,11 +880,11 @@ function ClubChat({
     <Card className="bg-hl-panel border-hl-border overflow-hidden p-0 flex flex-col min-h-[320px] max-h-[480px]">
       <div className="border-b border-hl-border px-4 py-3 text-sm font-bold text-white flex items-center gap-2">
         <MessageSquare className="w-4 h-4 text-hl-gold" />
-        Club chat
+        Clan chat
       </div>
       {!member ? (
         <div className="flex-1 px-4 py-8 text-sm text-hl-muted text-center">
-          Join the club to read and send messages.
+          Join the clan to read and send messages.
         </div>
       ) : (
         <>
@@ -960,7 +948,7 @@ function ClubChat({
             <input
               value={text}
               onChange={(e) => setText(e.target.value.slice(0, 250))}
-              placeholder="Message the club…"
+              placeholder="Message the clan…"
               className="h-9 flex-1 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
             />
             <button

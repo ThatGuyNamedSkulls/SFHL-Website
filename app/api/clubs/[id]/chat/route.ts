@@ -12,20 +12,20 @@ export const revalidate = 0;
 export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Log in to view club chat." }, { status: 401 });
+    return NextResponse.json({ error: "Log in to view clan chat." }, { status: 401 });
   }
   const { id } = await ctx.params;
   const club = await getClub(id);
-  if (!club) return NextResponse.json({ error: "Club not found." }, { status: 404 });
+  if (!club) return NextResponse.json({ error: "Clan not found." }, { status: 404 });
   if (!memberOf(club, session.discordId)) {
-    return NextResponse.json({ error: "Join the club to view chat." }, { status: 403 });
+    return NextResponse.json({ error: "Join the clan to view chat." }, { status: 403 });
   }
   try {
     const limit = parseChatLimit(new URL(request.url).searchParams.get("limit"), MAX_CHAT_FETCH);
     const messages = await listClubChat(id, limit);
     return NextResponse.json({ messages });
   } catch (error) {
-    console.error("club chat GET", error);
+    console.error("clan chat GET", error);
     return NextResponse.json({ messages: [] });
   }
 }

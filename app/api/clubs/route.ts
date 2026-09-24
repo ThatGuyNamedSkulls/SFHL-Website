@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       })),
     });
   } catch (error) {
-    console.error("clubs GET", error);
+    console.error("clans GET", error);
     return NextResponse.json({ count: 0, clubs: [] });
   }
 }
@@ -40,11 +40,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Log in to create a club." }, { status: 401 });
+    return NextResponse.json({ error: "Log in to create a clan." }, { status: 401 });
   }
   if (!session.playerName) {
     return NextResponse.json(
-      { error: "Link a HyperLeague player to spend coins and create a club." },
+      { error: "Link a HyperLeague player to spend coins and create a clan." },
       { status: 400 }
     );
   }
@@ -55,20 +55,20 @@ export async function POST(request: Request) {
   const rules = String(body.rules ?? "");
   if (containsProfanity(`${name} ${tag} ${description} ${rules}`)) {
     return NextResponse.json(
-      { error: "Club name, tag, description, or rules contain language that is not allowed." },
+      { error: "Clan name, tag, description, or rules contain language that is not allowed." },
       { status: 400 }
     );
   }
   if ((await ownedClubCount(session.discordId)) >= MAX_OWNED_CLUBS) {
     return NextResponse.json(
-      { error: `You can own at most ${MAX_OWNED_CLUBS} clubs.` },
+      { error: `You can own at most ${MAX_OWNED_CLUBS} clans.` },
       { status: 400 }
     );
   }
   const spend = await spendPlayerCoins(session.playerName, CLUB_CREATE_COST);
   if (!spend.ok) {
     return NextResponse.json(
-      { error: `Creating a club costs ${CLUB_CREATE_COST.toLocaleString()} HL Coins.`, coins: spend.coins },
+      { error: `Creating a clan costs ${CLUB_CREATE_COST.toLocaleString()} HL Coins.`, coins: spend.coins },
       { status: 400 }
     );
   }
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
   } catch (error) {
     await refundPlayerCoins(session.playerName, CLUB_CREATE_COST).catch(() => {});
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create club." },
+      { error: error instanceof Error ? error.message : "Failed to create clan." },
       { status: 400 }
     );
   }

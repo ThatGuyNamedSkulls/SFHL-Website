@@ -148,7 +148,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
     !onRoster &&
     !viewer.pendingRequest &&
     !viewer.inviteTeamId;
-  const reviewer = tournament.kind === "official" ? "Match Staff" : "the club owner";
+  const reviewer = tournament.kind === "official" ? "Match Staff" : "the clan owner";
   const pendingRequests = tournament.requests.filter((r) => r.status === "pending");
   const statusPill =
     tournament.status === "live"
@@ -176,11 +176,11 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                   {tournament.status}
                 </span>
                 <span className="rounded-full border border-hl-border bg-hl-base px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl-muted">
-                  {tournament.kind === "official" ? "Official" : "Club cup"}
+                  {tournament.kind === "official" ? "Official" : "Clan cup"}
                 </span>
                 {tournament.clubId && clubName ? (
                   <Link
-                    href={`/clubs/${tournament.clubId}`}
+                    href={`/clans/${tournament.clubId}`}
                     className="rounded-full border border-hl-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl-gold hover:border-hl-gold/40"
                   >
                     {clubName}
@@ -254,12 +254,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       {showPrivateBlock ? (
         <Card className="bg-hl-panel border-hl-border p-4 mb-5">
           <div className="text-sm font-bold text-white">Private cup</div>
-          <p className="mt-1 text-sm text-hl-muted">You need to be in the club to join.</p>
+          <p className="mt-1 text-sm text-hl-muted">You need to be in the clan to join.</p>
           {!session ? (
-            <p className="mt-2 text-xs text-hl-muted">Log in if you are already in this club.</p>
+            <p className="mt-2 text-xs text-hl-muted">Log in if you are already in this clan.</p>
           ) : null}
           {tournament.clubId && clubName ? (
-            <Link href={`/clubs/${tournament.clubId}`} className="mt-3 inline-block text-xs font-bold text-hl-gold hover:underline">
+            <Link href={`/clans/${tournament.clubId}`} className="mt-3 inline-block text-xs font-bold text-hl-gold hover:underline">
               Open {clubName}
             </Link>
           ) : null}
@@ -279,59 +279,49 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               : `${reviewer} accept or deny. This cup has no entry fee.`}
           </p>
           {myTeams.length > 0 ? (
-            <div className="mb-3">
-              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-hl-muted">
-                Use one of your teams
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex-1 min-w-[12rem]">
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-hl-muted">
+                  Entering team
+                </span>
+                <select
+                  value={selectedTeamId || myTeams[0].id}
+                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  className={`${field} w-full`}
+                >
+                  {myTeams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} [{t.tag}]
+                    </option>
+                  ))}
+                </select>
               </label>
-              <select
-                value={selectedTeamId}
-                onChange={(e) => {
-                  const idSel = e.target.value;
-                  setSelectedTeamId(idSel);
-                  const picked = myTeams.find((t) => t.id === idSel);
-                  if (picked) setTeamName(picked.name);
-                }}
-                className={`${field} w-full`}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void act({ action: "request", teamId: selectedTeamId || myTeams[0].id })}
+                className="h-10 rounded-lg bg-gold-gradient px-4 text-sm font-black text-hl-base disabled:opacity-40"
               >
-                <option value="">Type a new name…</option>
-                {myTeams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} [{t.tag}]
-                  </option>
-                ))}
-              </select>
-              <Link href="/teams" className="mt-1 inline-block text-[11px] font-bold text-hl-gold hover:underline">
+                {tournament.entryFee > 0 ? `Pay ${tournament.entryFee.toLocaleString()} & request` : "Request"}
+              </button>
+              <Link href="/teams" className="basis-full text-[11px] font-bold text-hl-gold hover:underline">
                 Manage teams
               </Link>
             </div>
           ) : (
-            <p className="mb-3 text-xs text-hl-muted">
-              Prefer a saved roster?{" "}
-              <Link href="/teams?create=1" className="font-bold text-hl-gold hover:underline">
+            <div className="rounded-lg border border-hl-border bg-hl-base px-3 py-3">
+              <p className="text-sm font-semibold text-white">You need to own a team to join tournaments.</p>
+              <p className="mt-1 text-xs text-hl-muted">
+                Only team captains can enter. Create a team, invite your roster, then come back.
+              </p>
+              <Link
+                href="/teams?create=1"
+                className="mt-3 inline-flex h-9 items-center rounded-lg bg-gold-gradient px-4 text-xs font-black text-hl-base"
+              >
                 Create a team
-              </Link>{" "}
-              first, then come back.
-            </p>
+              </Link>
+            </div>
           )}
-          <div className="flex flex-wrap gap-2">
-            <input
-              value={teamName}
-              onChange={(e) => {
-                setTeamName(e.target.value.slice(0, 24));
-                setSelectedTeamId("");
-              }}
-              placeholder="Team name"
-              className={`${field} flex-1 min-w-[12rem]`}
-            />
-            <button
-              type="button"
-              disabled={busy || teamName.trim().length < 2}
-              onClick={() => void act({ action: "request", teamName })}
-              className="h-10 rounded-lg bg-gold-gradient px-4 text-sm font-black text-hl-base disabled:opacity-40"
-            >
-              {tournament.entryFee > 0 ? `Pay ${tournament.entryFee.toLocaleString()} & request` : "Request"}
-            </button>
-          </div>
         </Card>
       ) : null}
       {viewer.pendingRequest ? (
@@ -379,26 +369,26 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         <Card className="bg-hl-panel border-hl-border p-4 mb-5">
           <div className="text-sm font-bold text-white mb-2">Add a team captain</div>
           <p className="text-xs text-hl-muted mb-3">
-            Pick a club member. Their entry fee is charged now, then they invite the rest of the roster.
-            Members can also request a team themselves.
+            Pick a clan member who captains a team — their team enters. Their entry fee is charged
+            now, then they invite the rest of the roster. Members can also request to join themselves.
           </p>
           <div className="flex flex-wrap gap-2 items-start">
             <PlayerSearch
               className="flex-1 min-w-[14rem]"
-              placeholder="Search a club member"
+              placeholder="Search a clan member"
               onPick={setCaptainName}
               onQueryChange={setCaptainName}
             />
             <input
               value={teamName}
-              onChange={(e) => setTeamName(e.target.value.slice(0, 24))}
-              placeholder="Team name"
+              onChange={(e) => setTeamName(e.target.value.slice(0, 32))}
+              placeholder="Their team (if they captain more than one)"
               className={`${field} flex-1 min-w-[10rem]`}
             />
             <button
               type="button"
-              disabled={busy || captainName.trim().length < 2 || teamName.trim().length < 2}
-              onClick={() => void act({ action: "assignCaptain", playerName: captainName, teamName })}
+              disabled={busy || captainName.trim().length < 2}
+              onClick={() => void act({ action: "assignCaptain", playerName: captainName, teamRef: teamName })}
               className="h-10 rounded-lg bg-gold-gradient px-4 text-sm font-black text-hl-base disabled:opacity-40"
             >
               Make captain

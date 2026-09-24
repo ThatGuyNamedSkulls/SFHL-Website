@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { titlesForTeam } from "@/lib/team-titles";
 import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
 import { client } from "@/lib/db";
@@ -43,7 +44,8 @@ export async function GET(
   const { id } = await params;
   const team = await getTeam(id);
   if (!team) return NextResponse.json({ error: "Team not found." }, { status: 404 });
-  return NextResponse.json({ team });
+  const titles = await titlesForTeam(id).catch(() => []);
+  return NextResponse.json({ team, titles });
 }
 
 export async function POST(

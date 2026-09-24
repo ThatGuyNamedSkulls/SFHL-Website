@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Trophy } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { ClubColorPicker, ClubMark } from "@/components/club-identity";
@@ -30,11 +31,19 @@ interface Team {
   members: Member[];
 }
 
+interface TitleRow {
+  id: number;
+  title: string;
+  awardedBy: string | null;
+  awardedAt: number;
+}
+
 export default function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { session } = useSession();
   const [team, setTeam] = useState<Team | null>(null);
+  const [titles, setTitles] = useState<TitleRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [inviteName, setInviteName] = useState("");
@@ -53,6 +62,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
       return;
     }
     setTeam(data.team);
+    setTitles(Array.isArray(data.titles) ? data.titles : []);
     setName(data.team.name);
     setTag(data.team.tag);
     setLogoUrl(data.team.logoUrl || "");
@@ -182,7 +192,45 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
           </div>
           {error ? <p className="mt-2 text-sm text-hl-red">{error}</p> : null}
         </div>
+        <div
+          className="shrink-0 rounded-xl border border-hl-gold/30 bg-hl-panel px-5 py-3 text-center"
+          title="Titles awarded by Match Staff"
+        >
+          <div className="flex items-center justify-center gap-1.5 text-hl-gold">
+            <Trophy className="h-4 w-4" />
+            <span className="text-2xl font-black tabular-nums">{titles.length}</span>
+          </div>
+          <div className="text-[11px] font-bold uppercase tracking-wide text-hl-muted">
+            {titles.length === 1 ? "Title" : "Titles"}
+          </div>
+        </div>
       </div>
+
+      <Card className="mt-6 border-hl-border bg-hl-panel p-4">
+        <div className="mb-2 flex items-center gap-2 text-sm font-bold text-white">
+          <Trophy className="h-4 w-4 text-hl-gold" /> Titles
+        </div>
+        {titles.length === 0 ? (
+          <p className="text-xs text-hl-muted">
+            No titles yet. Match Staff award titles for tournament wins.
+          </p>
+        ) : (
+          <ul className="divide-y divide-hl-border">
+            {titles.map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-3 py-2">
+                <span className="text-sm font-semibold text-white">{t.title}</span>
+                <span className="shrink-0 text-xs text-hl-muted">
+                  {new Date(t.awardedAt).toLocaleDateString([], {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {editing && captain ? (
         <Card className="mt-6 space-y-3 border-hl-border bg-hl-panel p-4">

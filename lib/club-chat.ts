@@ -87,8 +87,8 @@ export async function postClubChat(
   message: string
 ): Promise<ClubChatMessage> {
   const club = await getClub(clubId);
-  if (!club) throw new Error("Club not found.");
-  if (!memberOf(club, author.discordId)) throw new Error("Join the club to chat.");
+  if (!club) throw new Error("Clan not found.");
+  if (!memberOf(club, author.discordId)) throw new Error("Join the clan to chat.");
   const text = message.trim();
   if (text.length < 1 || text.length > CLUB_CHAT_MAX_LENGTH) {
     throw new Error(`Message must be 1–${CLUB_CHAT_MAX_LENGTH} characters.`);
@@ -128,7 +128,7 @@ export async function deleteClubChat(
   messageId: number
 ): Promise<void> {
   const club = await getClub(clubId);
-  if (!club) throw new Error("Club not found.");
+  if (!club) throw new Error("Clan not found.");
   await ensureSchema();
   const rs = await client.execute({
     sql: "SELECT discord_id FROM web_club_chat WHERE id = ? AND club_id = ?",

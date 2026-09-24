@@ -9,6 +9,7 @@ import { getClub } from "@/lib/clubs";
 import { containsProfanity } from "@/lib/content-moderation";
 import { client, ensurePlayerCoinsColumn, getPlayer, refundPlayerCoins, spendPlayerCoins } from "@/lib/db";
 import { isQueueRegion } from "@/lib/regions";
+import { getTeam, teamsCaptainedBy, type Team } from "@/lib/teams";
 import {
   applyResult,
   bracketFinished,
@@ -192,7 +193,7 @@ async function assertOrganizer(t: Tournament, actor: TournamentActor) {
     throw new Error(
       t.kind === "official"
         ? "Only Match Staff can manage this cup."
-        : "Only the club owner can manage this cup."
+        : "Only the clan owner can manage this cup."
     );
   }
 }
@@ -245,8 +246,8 @@ function assertOpen(t: Tournament) {
 
 function cleanTeamName(t: Tournament, raw: string): string {
   const name = raw.trim().replace(/\s+/g, " ");
-  if (name.length < 2 || name.length > 24) {
-    throw new Error("Team name must be 2–24 characters.");
+  if (name.length < 2 || name.length > 32) {
+    throw new Error("Team name must be 2–32 characters.");
   }
   if (containsProfanity(name)) throw new Error("That team name is not allowed.");
   const key = name.toLowerCase();
@@ -257,6 +258,47 @@ function cleanTeamName(t: Tournament, raw: string): string {
     throw new Error("That team name is already requested.");
   }
   return name;
+}
+
+/**
+ * Entering a tournament requires owning a team: the captain's saved team
+ * (web_teams) is what enters. `teamRef` is a team id or name; it may be left
+ * empty when the player captains exactly one team.
+ */
+async function captainedTeam(
+  t: Tournament,
+  captainId: string,
+  teamRef: string,
+  self: boolean
+): Promise<{ team: Team; name: string }> {
+  const owned = await teamsCaptainedBy(captainId);
+  if (owned.length === 0) {
+    throw new Error(
+      self
+        ? "Only team captains can join tournaments. Create a team first."
+        : "That player doesn't captain a team. Only team captains can enter tournaments."
+    );
+  }
+  const ref = teamRef.trim().toLowerCase();
+  const team = ref
+    ? owned.find((x) => x.id.toLowerCase() === ref || x.name.toLowerCase() === ref)
+    : owned.length === 1
+      ? owned[0]
+      : undefined;
+  if (!team) {
+    throw new Error(
+      ref
+        ? self
+          ? "You don't captain that team."
+          : "That player doesn't captain a team with that name."
+        : "Pick which team is entering."
+    );
+  }
+  const entered =
+    t.teams.some((x) => x.teamId === team.id) ||
+    t.requests.some((r) => r.status === "pending" && r.teamId === team.id);
+  if (entered) throw new Error("That team is already entered in this cup.");
+  return { team, name: cleanTeamName(t, team.name) };
 }
 
 function onTeam(t: Tournament, discordId: string) {
@@ -300,9 +342,11 @@ function makeTeam(input: {
   playerName: string;
   avatar: string | null;
   fee: number;
+  teamId?: string | null;
 }): TournamentTeam {
   return {
     id: randomUUID(),
+    teamId: input.teamId ?? null,
     name: input.name,
     captainId: input.captainId,
     paidAmount: input.fee,
@@ -373,11 +417,11 @@ export async function createTournament(
     if (!actor.staff) throw new Error("Only Match Staff can create an official cup.");
   } else {
     clubId = (input.clubId || "").trim();
-    if (!clubId) throw new Error("Community cups belong to a club.");
+    if (!clubId) throw new Error("Community cups belong to a clan.");
     const club = await getClub(clubId);
-    if (!club) throw new Error("Club not found.");
+    if (!club) throw new Error("Clan not found.");
     if (club.ownerId !== actor.discordId) {
-      throw new Error("Only the club owner can create a community cup.");
+      throw new Error("Only the clan owner can create a community cup.");
     }
   }
 
@@ -410,7 +454,7 @@ export async function createTournament(
 export async function requestJoin(
   id: string,
   actor: TournamentActor,
-  teamNameRaw: string
+  teamId: string
 ): Promise<Tournament> {
   const t = await mustGet(id);
   assertOpen(t);
@@ -420,20 +464,21 @@ export async function requestJoin(
     throw new Error("Your linked player does not match this Discord account.");
   }
   if (t.kind === "community") {
-    if (!t.clubId) throw new Error("This cup is not attached to a club.");
+    if (!t.clubId) throw new Error("This cup is not attached to a clan.");
     const club = await getClub(t.clubId);
     if (!club || !club.members.some((m) => m.discordId === actor.discordId)) {
-      throw new Error("You need to be in the club to join.");
+      throw new Error("You need to be in the clan to join.");
     }
   }
   if (t.teams.length >= t.size) throw new Error("This cup is full.");
   const pending = t.requests.filter((r) => r.status === "pending").length;
   if (t.teams.length + pending >= t.size) throw new Error("This cup has no open slots.");
   assertFree(t, actor.discordId);
-  const teamName = cleanTeamName(t, teamNameRaw);
+  const { team, name: teamName } = await captainedTeam(t, actor.discordId, teamId, true);
   await takeFee(player.playerName, t.entryFee);
   const request: JoinRequest = {
     id: randomUUID(),
+    teamId: team.id,
     teamName,
     captainId: actor.discordId,
     captainName: player.username,
@@ -482,10 +527,16 @@ export async function reviewRequest(
   if (player.discordId !== request.captainId) {
     throw new Error("That Discord account no longer matches this request.");
   }
+  if (request.teamId) {
+    const team = await getTeam(request.teamId);
+    if (!team || team.captainId !== request.captainId) {
+      throw new Error("That team no longer exists or has a new captain. Deny the request instead.");
+    }
+  }
   if (t.kind === "community" && t.clubId) {
     const club = await getClub(t.clubId);
     if (!club || !club.members.some((m) => m.discordId === player.discordId)) {
-      throw new Error("That player is not in the club.");
+      throw new Error("That player is not in the clan.");
     }
   }
   const alreadyPaid = request.paidAmount != null;
@@ -496,6 +547,7 @@ export async function reviewRequest(
     t.teams.push(
       makeTeam({
         name: request.teamName,
+        teamId: request.teamId ?? null,
         captainId: player.discordId,
         username: player.username,
         playerName: player.playerName,
@@ -515,28 +567,29 @@ export async function assignCaptain(
   id: string,
   actor: TournamentActor,
   playerName: string,
-  teamNameRaw: string
+  teamRef: string
 ): Promise<Tournament> {
   const t = await mustGet(id);
   assertOpen(t);
   if (t.kind !== "community" || !t.clubId) {
-    throw new Error("Captains are assigned only for club cups.");
+    throw new Error("Captains are assigned only for clan cups.");
   }
   await assertOrganizer(t, actor);
   if (t.teams.length >= t.size) throw new Error("This cup is full.");
   const player = await resolvePlayer(playerName);
   const club = await getClub(t.clubId);
   if (!club || !club.members.some((m) => m.discordId === player.discordId)) {
-    throw new Error("That player is not in this club.");
+    throw new Error("That player is not in this clan.");
   }
   assertFree(t, player.discordId);
-  const teamName = cleanTeamName(t, teamNameRaw);
+  const { team, name: teamName } = await captainedTeam(t, player.discordId, teamRef, false);
   await takeFee(player.playerName, t.entryFee);
   try {
     t.pot += t.entryFee;
     t.teams.push(
       makeTeam({
         name: teamName,
+        teamId: team.id,
         captainId: player.discordId,
         username: player.username,
         playerName: player.playerName,
@@ -582,7 +635,7 @@ export async function invitePlayer(
   if (t.kind === "community" && t.clubId) {
     const club = await getClub(t.clubId);
     if (!club || !club.members.some((m) => m.discordId === player.discordId)) {
-      throw new Error("Community cups can only invite club members.");
+      throw new Error("Community cups can only invite clan members.");
     }
   }
   let role: RosterRole = "starter";

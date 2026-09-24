@@ -73,7 +73,7 @@ function FeaturedCard({ cup }: { cup: CupCard }) {
       <div className="relative z-10 flex h-full flex-col justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-white/70">
-            {cup.kind === "official" ? "Official" : "Club cup"} · {statusLabel(cup.status)}
+            {cup.kind === "official" ? "Official" : "Clan cup"} · {statusLabel(cup.status)}
           </div>
           <h3 className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white">{cup.name}</h3>
           <p className="mt-1 text-xs text-white/60">Organized by {cup.organizer}</p>
@@ -273,8 +273,8 @@ export default function TournamentsPage() {
               <p className="font-bold text-white">Create a cup</p>
               <p>
                 Official cups are opened by Match Staff. Club owners can create club cups from their{" "}
-                <Link href="/clubs" className="font-bold text-hl-gold hover:underline">
-                  club page
+                <Link href="/clans" className="font-bold text-hl-gold hover:underline">
+                  clan page
                 </Link>
                 .
               </p>
@@ -360,7 +360,7 @@ export default function TournamentsPage() {
                   [
                     ["all", "All"],
                     ["official", "Official"],
-                    ["community", "Club"],
+                    ["community", "Clan"],
                   ] as const
                 ).map(([id, label]) => (
                   <button
@@ -424,7 +424,7 @@ export default function TournamentsPage() {
           <p className="mt-1 text-sm text-[#8a8a8a]">
             {tab === "mine"
               ? "Join an open cup or create a team and request a slot."
-              : "When Match Staff or a club owner opens one, it shows up here."}
+              : "When Match Staff or a clan owner opens one, it shows up here."}
           </p>
         </div>
       ) : (

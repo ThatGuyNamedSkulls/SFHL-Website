@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Log in to choose a club tag." }, { status: 401 });
+    return NextResponse.json({ error: "Log in to choose a clan tag." }, { status: 401 });
   }
   const clubs = await clubsForMember(session.discordId);
   const pref = await getClubTagPref(session.discordId);
@@ -31,7 +31,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Log in to choose a club tag." }, { status: 401 });
+    return NextResponse.json({ error: "Log in to choose a clan tag." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => ({} as { clubId?: unknown }));
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const club = await getClub(clubId);
     if (!club || !club.members.some((m) => m.discordId === session.discordId)) {
       return NextResponse.json(
-        { error: "Join that club before using its tag." },
+        { error: "Join that clan before using its tag." },
         { status: 400 }
       );
     }

@@ -9,6 +9,7 @@ import {
   teamsForMember,
   ownedTeamCount,
 } from "@/lib/teams";
+import { titleCounts } from "@/lib/team-titles";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -21,11 +22,13 @@ export async function GET(request: Request) {
       ? await teamsForMember(session.discordId)
       : await listTeams();
     const mineId = session?.discordId ?? null;
+    const titles = await titleCounts(teams.map((t) => t.id)).catch(() => new Map<string, number>());
     return NextResponse.json({
       maxOwned: MAX_OWNED_TEAMS,
       ownedCount: mineId ? await ownedTeamCount(mineId) : 0,
       teams: teams.map((team) => ({
         ...summarizeTeam(team),
+        titles: titles.get(team.id) ?? 0,
         mine: mineId ? team.members.some((m) => m.discordId === mineId && m.status === "accepted") : false,
         captain: mineId ? team.captainId === mineId : false,
         pendingInvite: mineId

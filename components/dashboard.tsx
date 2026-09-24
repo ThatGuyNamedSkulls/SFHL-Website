@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DiscordContent } from "@/components/discord-content";
+import type { MentionSegment } from "@/lib/discord-mentions";
 import { GameSkillBar } from "@/components/game-skill-bar";
 import { RankTierLetter, UserSession } from "@/types";
 import {
@@ -33,6 +35,7 @@ interface Announcement {
   author: string;
   avatar: string | null;
   content: string;
+  segments?: MentionSegment[];
   timestamp: string;
   attachments: string[];
 }
@@ -252,7 +255,7 @@ export function Dashboard({ session }: DashboardProps) {
                     </span>
                   </div>
                   <p className="text-sm text-hl-muted mt-1 whitespace-pre-wrap line-clamp-4">
-                    {announcement.content || "(no text)"}
+                    <DiscordContent content={announcement.content} segments={announcement.segments} />
                   </p>
                   {announcement.attachments[0] && (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -361,15 +364,19 @@ export function Dashboard({ session }: DashboardProps) {
 
           <Card className="bg-hl-panel border-hl-border p-4">
             <h2 className="text-sm font-black text-white header-caps flex items-center gap-2 mb-3">
-              <Trophy className="w-4 h-4 text-hl-gold" /> Clubs
-              <span className="text-[10px] font-bold text-hl-muted bg-hl-base border border-hl-border rounded px-1.5 py-0.5">
-                Soon
-              </span>
+              <Trophy className="w-4 h-4 text-hl-gold" /> Clans
             </h2>
             <p className="text-xs text-hl-muted mb-3">
-              Community clubs with their own queues and leaderboards are planned — not available yet.
+              Join a clan to chat, climb its leaderboard and play in clan cups.
             </p>
             <div className="space-y-1.5">
+              <Link
+                href="/clans"
+                className="flex items-center justify-between p-2.5 rounded-md bg-hl-panel-light/40 hover:bg-hl-panel-light transition-colors group"
+              >
+                <span className="text-sm text-white">Browse clans</span>
+                <ChevronRight className="w-4 h-4 text-hl-muted group-hover:text-hl-gold" />
+              </Link>
               <Link
                 href="/leaderboards"
                 className="flex items-center justify-between p-2.5 rounded-md bg-hl-panel-light/40 hover:bg-hl-panel-light transition-colors group"

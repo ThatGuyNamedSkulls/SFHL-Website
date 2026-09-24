@@ -21,7 +21,7 @@ async function payload(clubId: string, viewerId?: string | null) {
   try {
     leaderboard = await clubLeaderboard(club);
   } catch (error) {
-    console.error("club leaderboard", error);
+    console.error("clan leaderboard", error);
   }
   const tags = await clubTagIndex();
   const clientClub = clubForClient(club, viewerId);
@@ -44,7 +44,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params;
   const session = await getSession();
   const data = await payload(id, session?.discordId);
-  if (!data) return NextResponse.json({ error: "Club not found." }, { status: 404 });
+  if (!data) return NextResponse.json({ error: "Clan not found." }, { status: 404 });
   return NextResponse.json(data);
 }
 
@@ -83,7 +83,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update club." },
+      { error: error instanceof Error ? error.message : "Failed to update clan." },
       { status: 400 }
     );
   }
@@ -100,7 +100,7 @@ export async function DELETE(_request: Request, ctx: { params: Promise<{ id: str
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete club." },
+      { error: error instanceof Error ? error.message : "Failed to delete clan." },
       { status: 400 }
     );
   }

@@ -630,7 +630,7 @@ function ProfileContent() {
               { id: "friends", label: "Friends" },
               { id: "guestbook", label: "Guestbook" },
               { id: "inventory", label: "Inventory" },
-              { id: "clubs", label: "Clubs" },
+              { id: "clubs", label: "Clans" },
               { id: "teams", label: "Teams" },
             ] as { id: MainTab; label: string }[]
           ).map((t) => (
@@ -1119,17 +1119,17 @@ function ProfileClubsPanel({ playerName }: { playerName: string }) {
   }, [playerName]);
 
   if (!loaded) {
-    return <p className="text-sm text-hl-muted">Loading clubs…</p>;
+    return <p className="text-sm text-hl-muted">Loading clans…</p>;
   }
   if (clubs.length === 0) {
     return (
       <EmptyState
         icon={Building2}
-        title="No clubs"
-        hint="This player hasn't joined a club yet."
+        title="No clans"
+        hint="This player hasn't joined a clan yet."
       >
-        <Link href="/clubs" className="text-sm font-bold text-hl-gold hover:underline">
-          Browse clubs
+        <Link href="/clans" className="text-sm font-bold text-hl-gold hover:underline">
+          Browse clans
         </Link>
       </EmptyState>
     );
@@ -1139,7 +1139,7 @@ function ProfileClubsPanel({ playerName }: { playerName: string }) {
       {clubs.map((club) => (
         <Link
           key={club.id}
-          href={`/clubs/${club.id}`}
+          href={`/clans/${club.id}`}
           className="block rounded-xl border border-hl-border bg-hl-panel px-4 py-3 hover:border-hl-gold/40 transition-colors"
         >
           <div className="flex items-center gap-3">

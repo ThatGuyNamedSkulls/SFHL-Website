@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       staff: !!me?.staff,
       tournaments: rows.map((t) => ({
         ...summarizeTournament(t),
-        organizer: t.kind === "official" ? "HyperLeague" : clubNames.get(t.clubId || "") || "Club",
+        organizer: t.kind === "official" ? "HyperLeague" : clubNames.get(t.clubId || "") || "Clan",
         mine: viewerInTournament(t, me?.discordId),
       })),
     });
