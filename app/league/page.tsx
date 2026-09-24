@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { ClubMark } from "@/components/club-identity";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
+import { LeagueManage } from "@/components/league-manage";
 import { CalendarDays, Check, Coins, Shield, Trophy, Users } from "lucide-react";
 
 type SeasonStatus = "draft" | "signup" | "drawn" | "regular" | "playoffs" | "finished" | "cancelled";
@@ -78,6 +79,8 @@ interface CaptainTeam extends TeamBadge {
 }
 
 interface LeagueData {
+  /** Match Staff see the Manage tab. */
+  staff?: boolean;
   seasons: { id: number; name: string; status: SeasonStatus }[];
   season: {
     id: number;
@@ -417,6 +420,7 @@ export default function LeaguePage() {
   const [data, setData] = useState<LeagueData | null>(null);
   const [failed, setFailed] = useState(false);
   const [divTab, setDivTab] = useState<number | null>(null);
+  const [tab, setTab] = useState<"league" | "manage">("league");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -494,17 +498,36 @@ export default function LeaguePage() {
         }
       />
 
+      {data?.staff ? (
+        <div className="mb-5 flex gap-6 border-b border-hl-border">
+          {(["league", "manage"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`-mb-px border-b-2 pb-2.5 text-sm font-bold header-caps ${
+                tab === t ? "border-hl-gold text-hl-gold" : "border-transparent text-hl-muted hover:text-white"
+              }`}
+            >
+              {t === "league" ? "League" : "Manage (staff)"}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {data?.staff && tab === "manage" ? <LeagueManage onChanged={() => setReload((n) => n + 1)} /> : null}
+
       {!data && !failed ? <div className="py-16 text-center text-sm text-hl-muted">Loading…</div> : null}
       {failed && !data ? (
         <div className="py-16 text-center text-sm text-hl-muted">Couldn&apos;t load the league. Try again soon.</div>
       ) : null}
 
-      {data && !season ? (
+      {data && !season && !(data.staff && tab === "manage") ? (
         <Card className="border-hl-border bg-hl-panel p-8 text-center">
           <Trophy className="mx-auto mb-3 h-8 w-8 text-hl-gold" />
           <h2 className="text-lg font-black text-white">No season yet</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-hl-muted">
-            Match Staff announce sign-ups in Discord. Get ready by creating a team and inviting {data.roster.min}–{data.roster.max} players.
+            Match Staff announce sign-ups on Discord and here. Get ready by creating a team and inviting {data.roster.min}–{data.roster.max} players.
           </p>
           <Link
             href="/teams"
@@ -515,7 +538,7 @@ export default function LeaguePage() {
         </Card>
       ) : null}
 
-      {data && season ? (
+      {data && season && !(data.staff && tab === "manage") ? (
         <div className="space-y-5">
           <Card className="relative overflow-hidden border-hl-border bg-hl-panel p-5">
             <div className="absolute inset-0 bg-hero-radial opacity-60 pointer-events-none" />

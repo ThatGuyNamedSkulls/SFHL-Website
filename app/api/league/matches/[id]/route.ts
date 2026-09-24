@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { isMatchStaff } from "@/lib/discord-party-voice";
 import {
   LeagueActionError,
   acceptTime,
@@ -11,7 +12,10 @@ import {
   leagueMatchView,
   proposeTime,
   reportScore,
+  staffReschedule,
+  staffSetResult,
 } from "@/lib/league-matches";
+import { LeagueAdminError } from "@/lib/league-admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -23,7 +27,8 @@ function matchId(raw: string): number | null {
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const id = matchId((await params).id);
   const session = await getSession();
-  const view = id === null ? null : await leagueMatchView(id, session?.discordId ?? null);
+  const staff = session ? await isMatchStaff(session.discordId).catch(() => false) : false;
+  const view = id === null ? null : await leagueMatchView(id, session?.discordId ?? null, staff);
   if (!view) return NextResponse.json({ error: "League match not found." }, { status: 404 });
   return NextResponse.json(view);
 }
@@ -40,8 +45,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (id === null) return NextResponse.json({ error: "League match not found." }, { status: 404 });
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const me = session.discordId;
+  const staffAction = body.action === "staffSetResult" || body.action === "staffReschedule";
+  const staff = await isMatchStaff(me).catch(() => false);
+  if (staffAction && !staff) return NextResponse.json({ error: "Match Staff only." }, { status: 403 });
+  const actor = { discordId: me, name: session.playerName || session.username };
   try {
     switch (body.action) {
+      case "staffSetResult":
+        await staffSetResult(
+          id,
+          {
+            winner: String(body.winner ?? ""),
+            scoreA: body.scoreA == null || body.scoreA === "" ? null : Number(body.scoreA),
+            scoreB: body.scoreB == null || body.scoreB === "" ? null : Number(body.scoreB),
+            forfeit: body.forfeit === true,
+          },
+          actor
+        );
+        break;
+      case "staffReschedule":
+        await staffReschedule(id, Number(body.time), actor);
+        break;
       case "propose":
         await proposeTime(id, me, Number(body.time));
         break;
@@ -69,9 +93,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       default:
         return NextResponse.json({ error: "Unknown action." }, { status: 400 });
     }
-    return NextResponse.json(await leagueMatchView(id, me));
+    return NextResponse.json(await leagueMatchView(id, me, staff));
   } catch (error) {
-    if (error instanceof LeagueActionError) {
+    if (error instanceof LeagueActionError || error instanceof LeagueAdminError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     console.error("league match POST", error);

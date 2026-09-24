@@ -55,6 +55,17 @@ async function matchStaffRoleId(): Promise<string | null> {
   return staffRoleId;
 }
 
+/** The league server's text + announcement channels, in sidebar order (empty without a bot token). */
+export async function listGuildTextChannels(): Promise<{ id: string; name: string }[]> {
+  const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/channels`);
+  if (!res?.ok) return [];
+  const channels = (await res.json()) as { id: string; name: string; type: number; position?: number }[];
+  return channels
+    .filter((c) => c.type === 0 || c.type === 5)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((c) => ({ id: c.id, name: c.name }));
+}
+
 /** True when this Discord user has the Match Staff role in the league server. */
 export async function isMatchStaff(userId: string): Promise<boolean> {
   const roleId = await matchStaffRoleId();

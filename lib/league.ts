@@ -31,6 +31,7 @@ export type MatchStatus =
   | "scheduled"
   | "live"
   | "reported"
+  | "disputed"
   | "final"
   | "forfeit";
 
@@ -161,6 +162,19 @@ export function ensureLeagueSchema(): Promise<void> {
         result_kind TEXT,
         reminded INTEGER NOT NULL DEFAULT 0,
         note TEXT
+      )`);
+      // Staff audit log; season steps in ANNOUNCED kinds get posted by the bot.
+      await client.execute(`CREATE TABLE IF NOT EXISTS league_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        season_id INTEGER,
+        match_id INTEGER,
+        kind TEXT NOT NULL,
+        actor_id TEXT,
+        actor_name TEXT,
+        source TEXT,
+        detail TEXT,
+        announced INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
       )`);
       // Phase 3 columns on tables created before them (same list as core/league.py).
       const cols = await client.execute("PRAGMA table_info(league_matches)");

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { ClubMark } from "@/components/club-identity";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
-import { ArrowLeft, CalendarDays, Crown, Flag, Swords } from "lucide-react";
+import { ArrowLeft, CalendarDays, Crown, Flag, ShieldCheck, Swords } from "lucide-react";
 
 interface TeamView {
   id: string;
@@ -40,7 +40,7 @@ interface MatchView {
   window: { start: number; end: number; defaultSlot: number; fridayDeadline: number } | null;
   teamA: TeamView;
   teamB: TeamView;
-  viewer: { captainOf: string | null; onRoster: string | null } | null;
+  viewer: { captainOf: string | null; onRoster: string | null; staff?: boolean } | null;
   rules: { proposeMinLeadMs: number; forfeitClaimAfterMs: number; confirmWindowMs: number };
 }
 
@@ -99,6 +99,12 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
   const [reason, setReason] = useState("");
   const [concedeArmed, setConcedeArmed] = useState(false);
   const [now, setNow] = useState(0);
+  // Match Staff panel.
+  const [staffWinner, setStaffWinner] = useState<"a" | "b">("a");
+  const [staffA, setStaffA] = useState("");
+  const [staffB, setStaffB] = useState("");
+  const [staffForfeit, setStaffForfeit] = useState(false);
+  const [moveWhen, setMoveWhen] = useState("");
 
   useEffect(() => {
     const tick = () => setNow(Date.now());
@@ -381,6 +387,95 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
             </Card>
           ) : null}
         </div>
+      ) : null}
+
+      {viewer?.staff ? (
+        <Card className="border-hl-gold/40 bg-hl-panel p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-hl-gold" />
+            <h2 className="text-sm font-black header-caps text-white">Match Staff</h2>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <div className="mb-2 text-xs font-bold text-white">
+                {done ? "Override the result" : "Set the result"}
+                {match.status === "disputed" && match.note ? (
+                  <span className="ml-1 font-normal text-hl-red">— {match.note}</span>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={staffWinner}
+                  onChange={(e) => setStaffWinner(e.target.value as "a" | "b")}
+                  className="h-9 rounded-lg border border-hl-border bg-hl-base px-2 text-sm text-white"
+                >
+                  <option value="a">{teamA.name} won</option>
+                  <option value="b">{teamB.name} won</option>
+                </select>
+                <label className="flex items-center gap-1.5 text-xs text-hl-muted">
+                  <input type="checkbox" checked={staffForfeit} onChange={(e) => setStaffForfeit(e.target.checked)} />
+                  by forfeit
+                </label>
+                {!staffForfeit ? (
+                  <>
+                    <input
+                      inputMode="numeric"
+                      placeholder={teamA.tag || "A"}
+                      value={staffA}
+                      onChange={(e) => setStaffA(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                      className="h-9 w-14 rounded-lg border border-hl-border bg-hl-base px-2 text-center text-sm text-white placeholder:text-hl-muted"
+                    />
+                    <span className="text-hl-muted">–</span>
+                    <input
+                      inputMode="numeric"
+                      placeholder={teamB.tag || "B"}
+                      value={staffB}
+                      onChange={(e) => setStaffB(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                      className="h-9 w-14 rounded-lg border border-hl-border bg-hl-base px-2 text-center text-sm text-white placeholder:text-hl-muted"
+                    />
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={busy || (!staffForfeit && (staffA === "" || staffB === ""))}
+                  onClick={() =>
+                    act("staffSetResult", {
+                      winner: staffWinner === "a" ? teamA.id : teamB.id,
+                      forfeit: staffForfeit,
+                      scoreA: staffForfeit ? null : Number(staffA),
+                      scoreB: staffForfeit ? null : Number(staffB),
+                    })
+                  }
+                  className="find-match-btn h-9 rounded-lg px-3 text-xs font-black header-caps text-hl-base disabled:opacity-40"
+                >
+                  Save result
+                </button>
+              </div>
+            </div>
+            {["unscheduled", "proposed", "scheduled"].includes(match.status) ? (
+              <div>
+                <div className="mb-2 text-xs font-bold text-white">Move the match (any time, your time zone)</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="datetime-local"
+                    value={moveWhen}
+                    onChange={(e) => setMoveWhen(e.target.value)}
+                    className="h-9 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white [color-scheme:dark]"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || !moveWhen}
+                    onClick={() => act("staffReschedule", { time: new Date(moveWhen).getTime() })}
+                    className="h-9 rounded-lg border border-hl-gold/50 px-3 text-xs font-black header-caps text-hl-gold hover:bg-hl-gold/10 disabled:opacity-40"
+                  >
+                    Move match
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-hl-muted">Both rosters get a DM with the new time.</p>
+              </div>
+            ) : null}
+          </div>
+        </Card>
       ) : null}
 
       <div className="grid gap-5 md:grid-cols-2">

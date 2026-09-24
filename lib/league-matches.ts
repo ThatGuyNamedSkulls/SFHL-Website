@@ -8,6 +8,7 @@
 import { client } from "@/lib/db";
 import { defaultSlot, ensureLeagueSchema, getSeason, weekWindow, type Season } from "@/lib/league";
 import { ensureSocialSchema } from "@/lib/social";
+import { logEvent, type Actor } from "@/lib/league-admin";
 import { getTeam } from "@/lib/teams";
 
 const MINUTE = 60_000;
@@ -332,9 +333,64 @@ export async function disputeResult(matchId: number, discordId: string, reason: 
   await update(ctx.match.id, { status: "disputed", note });
 }
 
+// --- Match Staff ---------------------------------------------------------------------------
+
+/** Set or override any result (Match Staff). */
+export async function staffSetResult(
+  matchId: number,
+  input: { winner: string; scoreA?: number | null; scoreB?: number | null; forfeit?: boolean },
+  actor: Actor
+) {
+  const match = await getLeagueMatch(matchId);
+  if (!match) fail("League match not found.");
+  const m = match!;
+  if (input.winner !== m.teamA && input.winner !== m.teamB) fail("The winner must be one of the two teams.");
+  let cols: Record<string, string | number | null>;
+  if (input.forfeit) {
+    cols = { status: "forfeit", score_a: null, score_b: null, result_kind: "forfeit" };
+  } else {
+    const a = Number(input.scoreA);
+    const b = Number(input.scoreB);
+    if (input.scoreA == null || input.scoreB == null) fail("Give both scores, or mark it as a forfeit.");
+    checkScores(a, b);
+    if (a > b !== (input.winner === m.teamA)) fail("The winner must have the higher score.");
+    cols = { status: "final", score_a: a, score_b: b, result_kind: "score" };
+  }
+  await update(m.id, { ...cols, winner: input.winner, confirmed_by: `staff:${actor.discordId}`, note: null });
+  const [ta, tb] = [await matchTeam(m.seasonId, m.teamA), await matchTeam(m.seasonId, m.teamB)];
+  const line = input.forfeit
+    ? `${label(input.winner === ta.id ? ta : tb)} win by forfeit`
+    : `${label(ta)} ${input.scoreA} – ${input.scoreB} ${label(tb)}`;
+  await logEvent(m.seasonId, "result_set", actor, line, m.id);
+}
+
+/** Move a match that hasn't started (Match Staff); both rosters get a DM. */
+export async function staffReschedule(matchId: number, when: number, actor: Actor, now = Date.now()) {
+  const match = await getLeagueMatch(matchId);
+  if (!match) fail("League match not found.");
+  const m = match!;
+  if (!["unscheduled", "proposed", "scheduled"].includes(m.status)) {
+    fail("Only matches that haven't started can be moved.");
+  }
+  if (!Number.isFinite(when) || when < now) fail("That time is in the past.");
+  await update(m.id, {
+    status: "scheduled",
+    scheduled_at: Math.round(when),
+    proposed_time: null,
+    proposed_by: null,
+    reminded: when - now <= DAY ? REMIND_24H : 0,
+  });
+  const [ta, tb] = [await matchTeam(m.seasonId, m.teamA), await matchTeam(m.seasonId, m.teamB)];
+  await dm(
+    [...ta.roster, ...tb.roster].map((p) => p.discordId),
+    `🗓️ Match Staff moved your league match **${label(ta)} vs ${label(tb)}** (week ${m.week}) to ${ts(when)}.`
+  );
+  await logEvent(m.seasonId, "match_rescheduled", actor, `${label(ta)} vs ${label(tb)} → ${new Date(when).toISOString().slice(0, 16).replace("T", " ")} UTC`, m.id);
+}
+
 // --- page payload ----------------------------------------------------------------------------
 
-export async function leagueMatchView(matchId: number, viewerId: string | null) {
+export async function leagueMatchView(matchId: number, viewerId: string | null, staff = false) {
   const match = await getLeagueMatch(matchId);
   if (!match) return null;
   const season = await getSeason(match.seasonId);
@@ -377,7 +433,7 @@ export async function leagueMatchView(matchId: number, viewerId: string | null) 
     window,
     teamA: teamView(a),
     teamB: teamView(b),
-    viewer: viewerId ? { captainOf, onRoster } : null,
+    viewer: viewerId ? { captainOf, onRoster, staff } : null,
     rules: {
       proposeMinLeadMs: PROPOSE_MIN_LEAD_MS,
       forfeitClaimAfterMs: FORFEIT_CLAIM_AFTER_MS,

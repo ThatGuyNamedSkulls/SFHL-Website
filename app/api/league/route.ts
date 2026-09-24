@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { isMatchStaff } from "@/lib/discord-party-voice";
 import { leagueView, signUpTeam, withdrawTeam } from "@/lib/league";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,11 @@ export async function GET(request: Request) {
     const session = await getSession();
     const raw = new URL(request.url).searchParams.get("season");
     const seasonId = raw && /^\d+$/.test(raw) ? Number(raw) : null;
-    return NextResponse.json(await leagueView(seasonId, session?.discordId ?? null));
+    const [view, staff] = await Promise.all([
+      leagueView(seasonId, session?.discordId ?? null),
+      session ? isMatchStaff(session.discordId).catch(() => false) : Promise.resolve(false),
+    ]);
+    return NextResponse.json({ ...view, staff });
   } catch (error) {
     console.error("league GET", error);
     return NextResponse.json({ error: "Failed to load the league." }, { status: 500 });
