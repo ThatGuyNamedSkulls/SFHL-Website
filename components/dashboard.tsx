@@ -68,7 +68,7 @@ export function Dashboard({ session }: DashboardProps) {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [matches, setMatches] = useState<RecentMatch[]>([]);
   const [liveLobby, setLiveLobby] = useState<LiveLobbyHint | null>(null);
-  // Pro Matchmaking is only shown to players who can join it (S2+).
+  // Pro Matchmaking is shown to everyone; below S2 the card is locked.
   const [proEligible, setProEligible] = useState(false);
 
   const displayName = session.playerName || session.username;
@@ -124,18 +124,15 @@ export function Dashboard({ session }: DashboardProps) {
       glow: "from-hl-gold/35",
       soon: false,
     },
-    ...(proEligible
-      ? [
-          {
-            href: "/queue",
-            title: "Pro Matchmaking",
-            desc: "S2+ only · Pro Elo",
-            icon: Gem,
-            glow: "from-purple-500/30",
-            soon: false,
-          },
-        ]
-      : []),
+    {
+      href: "/queue",
+      title: "Pro Matchmaking",
+      desc: proEligible ? "S2+ only · Pro Elo" : "Locked · reach S2 (1900 Elo)",
+      icon: Gem,
+      glow: "from-purple-500/30",
+      soon: !proEligible,
+      lockedHint: "Reach S2 (1900 Elo) to unlock Pro Matchmaking",
+    },
     {
       href: "#",
       title: "League",
@@ -211,7 +208,7 @@ export function Dashboard({ session }: DashboardProps) {
       <div className="grid lg:grid-cols-[1fr_300px] gap-5">
         {/* Left: mode cards stacked like FACEIT */}
         <div className="space-y-5">
-          <div className={`grid gap-3 ${modeCards.length > 3 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {modeCards.map((c) => {
               const Icon = c.icon;
               const inner = (
@@ -234,7 +231,7 @@ export function Dashboard({ session }: DashboardProps) {
               );
               if (c.soon) {
                 return (
-                  <div key={c.title} className="block h-full" title="Coming soon">
+                  <div key={c.title} className="block h-full" title={"lockedHint" in c ? c.lockedHint : "Coming soon"}>
                     {inner}
                   </div>
                 );

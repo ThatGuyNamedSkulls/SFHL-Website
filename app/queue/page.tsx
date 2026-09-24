@@ -22,6 +22,7 @@ import {
   Zap,
   UserPlus,
   Gem,
+  Lock,
 } from "lucide-react";
 import { usePlayRegion, setQueueLocked } from "@/components/use-play-region";
 import { QUEUE_REGIONS, regionQueueLabel, isQueueRegion } from "@/lib/regions";
@@ -96,7 +97,7 @@ const MATCH_TYPES: {
   id: string;
   label: string;
   green?: boolean;
-  /** Pro Matchmaking card (purple, shown only to S2+ players). */
+  /** Pro Matchmaking card (purple; shown to everyone, locked below S2). */
   pro?: boolean;
   icon: typeof Swords;
   features: MatchTypeFeature[];
@@ -130,10 +131,8 @@ const MATCH_TYPES: {
     pro: true,
     icon: Gem,
     features: [
-      { icon: Users, text: "Party of 5" },
       { icon: ShieldCheck, text: "S2+ only (1900+ Elo)", star: true },
-      { icon: Activity, text: "Own Pro Elo & leaderboard" },
-      { icon: Medal, text: "5v5 Strike Force" },
+      { icon: Activity, text: "Separate Pro Elo & leaderboard" },
     ],
   },
 ];
@@ -165,7 +164,7 @@ export default function QueuePage() {
   const [queueOpen, setQueueOpen] = useState(false);
   const [openRegions, setOpenRegions] = useState<string[]>([]);
   const [openModes, setOpenModes] = useState<Record<string, string[]>>({});
-  // Pro Matchmaking is only visible to players who can join it (S2+).
+  // Pro Matchmaking is shown to everyone but only S2+ players can pick it.
   const [proEligible, setProEligible] = useState(false);
   const [queuedSpot, setQueuedSpot] = useState<{ region: string; mode: string } | null>(null);
   // Open substitute slots (live matches missing a player), for the CTA strip.
@@ -634,22 +633,25 @@ export default function QueuePage() {
           </div>
         </div>
         {playTab === "type" ? (
-        <div className="grid md:grid-cols-2 max-w-4xl gap-4 items-start">
-          {MATCH_TYPES.filter((mt) => !mt.pro || proEligible || matchType === QUEUE_MODE_PRO).map((mt) => {
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 max-w-6xl gap-4">
+          {MATCH_TYPES.map((mt) => {
             const active = matchType === mt.id;
             const TypeIcon = mt.icon;
             const superLocked = mt.id === QUEUE_MODE_SUPER && superPlacementBlocked;
-            const typeDisabled = (selectionLocked && mt.id !== matchType) || superLocked;
+            // Everyone sees Pro; below S2 it stays locked (the API refuses too).
+            const proLocked = mt.id === QUEUE_MODE_PRO && !proEligible && matchType !== QUEUE_MODE_PRO;
+            const typeDisabled = (selectionLocked && mt.id !== matchType) || superLocked || proLocked;
             return (
               <button
                 key={mt.id}
                 type="button"
                 disabled={typeDisabled}
+                title={proLocked ? "Reach S2 (1900 Elo) to unlock Pro Matchmaking" : undefined}
                 onClick={() => {
                   if (typeDisabled) return;
                   setMatchType(mt.id);
                 }}
-                className={`relative w-full text-left p-4 rounded-xl border overflow-hidden bg-hl-panel ${
+                className={`relative w-full h-full text-left p-4 rounded-xl border overflow-hidden bg-hl-panel ${
                   active ? "border-white/60" : "border-hl-border hover:border-hl-gold/40"
                 } ${typeDisabled ? "opacity-40 cursor-not-allowed hover:border-hl-border" : "transition-colors"}`}
               >
@@ -671,9 +673,15 @@ export default function QueuePage() {
                     </span>
                     <span className="text-xs text-hl-muted shrink-0">· {modeLabel}</span>
                   </div>
-                  <Info className="w-4 h-4 text-hl-muted shrink-0" />
+                  {proLocked ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-hl-muted shrink-0">
+                      <Lock className="w-3.5 h-3.5" /> S2 required
+                    </span>
+                  ) : (
+                    <Info className="w-4 h-4 text-hl-muted shrink-0" />
+                  )}
                 </div>
-                <div className="relative grid grid-cols-2 gap-2">
+                <div className={`relative grid gap-2 ${mt.features.length > 2 ? "grid-cols-2" : "grid-cols-1"}`}>
                   {mt.features.map(({ icon: FeatIcon, text, star }) => (
                     <div
                       key={text}
