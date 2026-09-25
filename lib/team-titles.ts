@@ -17,19 +17,21 @@ let schemaReady: Promise<void> | null = null;
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
-      await client.execute(
-        `CREATE TABLE IF NOT EXISTS team_titles (
-           id INTEGER PRIMARY KEY AUTOINCREMENT,
-           team_id TEXT NOT NULL,
-           title TEXT NOT NULL,
-           awarded_by TEXT,
-           awarded_by_id TEXT,
-           awarded_at INTEGER NOT NULL
-         )`
+      // One round trip (Turso is remote).
+      await client.batch(
+        [
+          `CREATE TABLE IF NOT EXISTS team_titles (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             team_id TEXT NOT NULL,
+             title TEXT NOT NULL,
+             awarded_by TEXT,
+             awarded_by_id TEXT,
+             awarded_at INTEGER NOT NULL
+           )`,
+          "CREATE INDEX IF NOT EXISTS idx_team_titles_team ON team_titles (team_id)",
+        ],
+        "write"
       );
-      await client
-        .execute("CREATE INDEX IF NOT EXISTS idx_team_titles_team ON team_titles (team_id)")
-        .catch(() => undefined);
     })().catch((e) => {
       schemaReady = null;
       throw e;

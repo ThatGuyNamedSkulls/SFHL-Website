@@ -3,6 +3,7 @@
  * Separate from clubs (communities) and parties (queue lobbies).
  */
 
+import { cache } from "react";
 import { randomUUID } from "crypto";
 import { client } from "@/lib/db";
 import { isQueueRegion, type QueueRegionId } from "@/lib/regions";
@@ -50,16 +51,18 @@ let schemaReady: Promise<void> | null = null;
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
-      await client.execute(
-        `CREATE TABLE IF NOT EXISTS web_teams (
-           id TEXT PRIMARY KEY,
-           data TEXT NOT NULL,
-           updated_at INTEGER NOT NULL
-         )`
+      // One round trip (Turso is remote).
+      await client.batch(
+        [
+          `CREATE TABLE IF NOT EXISTS web_teams (
+             id TEXT PRIMARY KEY,
+             data TEXT NOT NULL,
+             updated_at INTEGER NOT NULL
+           )`,
+          "CREATE INDEX IF NOT EXISTS idx_web_teams_updated ON web_teams (updated_at)",
+        ],
+        "write"
       );
-      await client
-        .execute("CREATE INDEX IF NOT EXISTS idx_web_teams_updated ON web_teams (updated_at)")
-        .catch(() => undefined);
     })();
   }
   return schemaReady;
@@ -123,10 +126,10 @@ export async function getTeam(id: string): Promise<Team | null> {
   }
 }
 
-export async function listTeams(): Promise<Team[]> {
+export const listTeams = cache(async function listTeams(): Promise<Team[]> {
   const teams = await loadAll();
   return teams.sort((a, b) => b.updatedAt - a.updatedAt);
-}
+});
 
 export async function teamsForMember(discordId: string): Promise<Team[]> {
   const teams = await loadAll();

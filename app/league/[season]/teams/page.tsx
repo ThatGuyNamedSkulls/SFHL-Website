@@ -35,8 +35,7 @@ export default async function SeasonTeamsPage({
   const query = await searchParams;
   const session = await getSession();
 
-  const all = await leagueTeams(season.id, session?.discordId ?? null);
-  const divisions = await seasonDivisions(season.id);
+  const [all, divisions] = await Promise.all([leagueTeams(season.id, session?.discordId ?? null), seasonDivisions(season.id)]);
   const groups = conferenceGroups(divisions);
   const filter = parseDivisionFilter(query.division, groups);
   const status = parseTeamsFilter(query.status);

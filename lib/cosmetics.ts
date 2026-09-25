@@ -77,31 +77,36 @@ function ensureCosmeticsSchema(): Promise<void> {
         `CREATE INDEX IF NOT EXISTS idx_cosmetic_inventory_player
            ON cosmetic_inventory(player_name)`,
       ]);
+      // Two round trips on a cold start (Turso is remote): the column checks, then
+      // the missing columns + index + default backgrounds in one batch.
+      const [items, inventory] = await client.batch(
+        ["PRAGMA table_info(cosmetic_items)", "PRAGMA table_info(cosmetic_inventory)"],
+        "read"
+      );
+      const has = (rs: typeof items, col: string) => rs.rows.some((r) => String((r as Record<string, unknown>).name) === col);
+      const stmts: (string | { sql: string; args: (string | number)[] })[] = [];
       // Back-fill the shop price column on DBs created before it existed.
-      await client
-        .execute("ALTER TABLE cosmetic_items ADD COLUMN price INTEGER DEFAULT 0")
-        .catch(() => undefined); // already exists — fine
+      if (!has(items, "price")) stmts.push("ALTER TABLE cosmetic_items ADD COLUMN price INTEGER DEFAULT 0");
       // player_id (Phase 1 of the players(name) -> players(id) FK migration;
       // see docs/DATABASE_PK_FK_RELATIONSHIPS.docx). cosmetic_inventory's real
       // primary key is its own surrogate `id`, not (player_name, item_id) — so
       // unlike friendships/mode_ratings, preferring player_id in WHERE clauses
       // below carries no addressing risk.
-      await client
-        .execute("ALTER TABLE cosmetic_inventory ADD COLUMN player_id INTEGER")
-        .catch(() => undefined);
-      await client
-        .execute("CREATE INDEX IF NOT EXISTS idx_cosmetic_inventory_player_id ON cosmetic_inventory(player_id)")
-        .catch(() => undefined);
-      await seedDefaultBackgrounds();
-    })();
+      if (!has(inventory, "player_id")) stmts.push("ALTER TABLE cosmetic_inventory ADD COLUMN player_id INTEGER");
+      stmts.push("CREATE INDEX IF NOT EXISTS idx_cosmetic_inventory_player_id ON cosmetic_inventory(player_id)");
+      await client.batch([...stmts, ...defaultBackgroundStatements()], "write");
+    })().catch((e) => {
+      schemaReady = null;
+      throw e;
+    });
   }
   return schemaReady;
 }
 
-async function seedDefaultBackgrounds(): Promise<void> {
+/** Insert/refresh the default profile backgrounds (run with the schema batch). */
+function defaultBackgroundStatements() {
   const now = Date.now();
-  await client.batch(
-    DEFAULT_PROFILE_BACKGROUNDS.flatMap((bg) => [
+  return DEFAULT_PROFILE_BACKGROUNDS.flatMap((bg) => [
       {
         sql: `INSERT OR IGNORE INTO cosmetic_items
               (slug, type, name, description, asset, category, season, rarity, created_at, price)
@@ -113,8 +118,7 @@ async function seedDefaultBackgrounds(): Promise<void> {
               WHERE slug = ?`,
         args: [bg.name, bg.color, bg.slug],
       },
-    ])
-  );
+  ]);
 }
 
 /** Give a player (or every player) the 10 default page backgrounds. Idempotent. */

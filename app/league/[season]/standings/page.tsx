@@ -39,8 +39,7 @@ export default async function SeasonStandingsPage({
 }) {
   const { season: raw } = await params;
   if (!/^\d+$/.test(raw)) notFound();
-  const query = await searchParams;
-  const session = await getSession();
+  const [query, session] = await Promise.all([searchParams, getSession()]);
   const view = await leagueView(Number(raw), session?.discordId ?? null);
   if (!view.season || view.season.id !== Number(raw)) notFound();
   const season = view.season;
@@ -63,7 +62,12 @@ export default async function SeasonStandingsPage({
     view.divisions.find((d) => d.standings.some((r) => myTeamIds.includes(r.teamId))) ??
     view.divisions[0];
 
-  const events = await seasonEventTimes(season.id);
+  const rosters = new Map(
+    view.entries.filter((e) => e.divisionId === div.id).map((e) => [e.teamId, e.roster])
+  );
+  const [events, countryMap] = await Promise.all([seasonEventTimes(season.id), teamCountries(rosters)]);
+  const countries: Countries = Object.fromEntries(countryMap);
+
   const playoffMatches = Object.values(div.playoffs ?? {}).flatMap((m) =>
     m ? [{ round: m.round, status: m.status }] : []
   );
@@ -71,11 +75,6 @@ export default async function SeasonStandingsPage({
   const asked = parseStage(query.stage);
   const stage: StageKey = asked ?? defaultStage(stages);
   const stageState = stages.find((s) => s.key === stage)!.state;
-
-  const rosters = new Map(
-    view.entries.filter((e) => e.divisionId === div.id).map((e) => [e.teamId, e.roster])
-  );
-  const countries: Countries = Object.fromEntries(await teamCountries(rosters));
 
   const myDivisionIds = new Set(
     view.divisions.filter((d) => d.standings.some((r) => myTeamIds.includes(r.teamId))).map((d) => d.id)

@@ -190,17 +190,20 @@ export default async function TeamPage({
   const q = await searchParams;
   const session = await getSession();
   const viewerId = session?.discordId ?? null;
-  const data = await teamPageData(id, viewerId);
+  const [data, staff, access] = await Promise.all([
+    teamPageData(id, viewerId),
+    viewerId ? isMatchStaff(viewerId).catch(() => false) : Promise.resolve(false),
+    teamAccessMap([id]).catch(() => new Map<string, string>()),
+  ]);
   if (!data) notFound();
   const { team, roster, summary } = data;
-  const staff = viewerId ? await isMatchStaff(viewerId).catch(() => false) : false;
   const captain = viewerId === team.captainId;
   const me = team.members.find((m) => m.discordId === viewerId);
   const canSettings = captain || staff;
   const asked = typeof q.tab === "string" ? (q.tab as Tab) : "overview";
   const tab: Tab = TABS.some((t) => t.key === asked) && (asked !== "settings" || canSettings) ? asked : "overview";
   const base = `/teams/${team.id}`;
-  const statusCode = (await teamAccessMap([team.id]).catch(() => new Map<string, string>())).get(team.id) ?? null;
+  const statusCode = access.get(team.id) ?? null;
   // The latest season it played (placed in a division); a season it only signed up for comes second.
   const latest = data.seasons.find((s) => s.placed) ?? data.seasons[0] ?? null;
 

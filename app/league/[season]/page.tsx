@@ -145,8 +145,11 @@ export default async function SeasonOverviewPage({ params }: { params: Promise<{
     );
   }
 
-  const next = session ? await viewerNextMatch(season.id, session.discordId) : null;
-  const [divisions, entries] = [await seasonDivisions(season.id), await seasonEntries(season.id)];
+  const [next, divisions, entries] = await Promise.all([
+    session ? viewerNextMatch(season.id, session.discordId) : Promise.resolve(null),
+    seasonDivisions(season.id),
+    seasonEntries(season.id),
+  ]);
   const base = `/league/${season.id}`;
 
   return (

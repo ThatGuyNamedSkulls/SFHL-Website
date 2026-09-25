@@ -44,8 +44,7 @@ export default async function SeasonStatsPage({
   const { season: raw } = await params;
   const season = /^\d+$/.test(raw) ? await getSeason(Number(raw)) : null;
   if (!season) notFound();
-  const q = await searchParams;
-  const divisions = await statsDivisions(season.id);
+  const [q, divisions, session] = await Promise.all([searchParams, statsDivisions(season.id), getSession()]);
   const groups = conferenceGroups(divisions);
   const filter = parseDivisionFilter(q.division, groups);
   const sort = parseSort(q.sort);
@@ -56,7 +55,6 @@ export default async function SeasonStatsPage({
     const n = ids.reduce((sum, id) => sum + (matchCount.get(id) ?? 0), 0);
     return ` · ${n} match${n === 1 ? "" : "es"}`;
   };
-  const session = await getSession();
   const base = `/league/${season.id}/stats`;
   const href = (patch: { sort?: SortKey; asc?: boolean }) => {
     const p = new URLSearchParams();

@@ -34,11 +34,11 @@ export default async function FindTeammatesPage({
   const filters = parseFindFilters(await searchParams);
   const session = await getSession();
   const viewerId = session?.discordId ?? null;
-  const [teamPosts, playerPosts, registered] = [
-    await listTeamPosts(season.id, viewerId),
-    await listPlayerPosts(season.id, viewerId),
-    (await leagueTeams(season.id, viewerId)).filter((t) => t.status !== "ineligible"),
-  ];
+  const [teamPosts, playerPosts, registered] = await Promise.all([
+    listTeamPosts(season.id, viewerId),
+    listPlayerPosts(season.id, viewerId),
+    leagueTeams(season.id, viewerId).then((all) => all.filter((t) => t.status !== "ineligible")),
+  ]);
   const mine = session
     ? await myRecruiting(
         season.id,

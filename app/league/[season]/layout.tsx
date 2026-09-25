@@ -19,9 +19,8 @@ export default async function SeasonLayout({
 }) {
   const { season: raw } = await params;
   if (!/^\d+$/.test(raw)) notFound();
-  const shell = await leagueShell(Number(raw));
+  const [shell, session] = await Promise.all([leagueShell(Number(raw)), getSession()]);
   if (!shell) notFound();
-  const session = await getSession();
   const staff = session ? await isMatchStaff(session.discordId).catch(() => false) : false;
 
   return (

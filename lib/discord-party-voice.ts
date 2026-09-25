@@ -4,7 +4,9 @@
  * connect permission and a DM with the join link.
  */
 
+import { cache } from "react";
 import { DISCORD_CONFIG } from "@/lib/auth";
+import { remember } from "@/lib/server-cache";
 import { addNotification, enqueueDM } from "@/lib/social";
 
 const VIEW_CHANNEL = 1 << 10;
@@ -41,18 +43,14 @@ async function discordApi(path: string, init?: RequestInit): Promise<Response | 
   }
 }
 
-let staffRoleId: string | null | undefined;
-
+/** The "[MS] Match Staff" role id (10 min; a failed lookup is retried, not kept forever). */
 async function matchStaffRoleId(): Promise<string | null> {
-  if (staffRoleId !== undefined) return staffRoleId;
-  const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/roles`);
-  if (!res?.ok) {
-    staffRoleId = null;
-    return null;
-  }
-  const roles = (await res.json()) as { id: string; name: string }[];
-  staffRoleId = roles.find((r) => r.name === "[MS] Match Staff")?.id ?? null;
-  return staffRoleId;
+  return remember("match-staff-role", 10 * 60_000, async () => {
+    const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/roles`);
+    if (!res?.ok) throw new Error("Discord roles lookup failed");
+    const roles = (await res.json()) as { id: string; name: string }[];
+    return roles.find((r) => r.name === "[MS] Match Staff")?.id ?? null;
+  }).catch(() => null);
 }
 
 /** The league server's text + announcement channels, in sidebar order (empty without a bot token). */
@@ -66,15 +64,22 @@ export async function listGuildTextChannels(): Promise<{ id: string; name: strin
     .map((c) => ({ id: c.id, name: c.name }));
 }
 
-/** True when this Discord user has the Match Staff role in the league server. */
-export async function isMatchStaff(userId: string): Promise<boolean> {
+/**
+ * True when this Discord user has the Match Staff role in the league server.
+ * One Discord call per user per minute (pages ask on every load: layout + page),
+ * shared within a render by React's cache().
+ */
+export const isMatchStaff = cache(async function isMatchStaff(userId: string): Promise<boolean> {
+  if (!userId) return false;
   const roleId = await matchStaffRoleId();
-  if (!roleId || !userId) return false;
-  const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/members/${userId}`);
-  if (!res?.ok) return false;
-  const member = (await res.json()) as { roles?: string[] };
-  return (member.roles ?? []).includes(roleId);
-}
+  if (!roleId) return false;
+  return remember(`match-staff:${userId}`, 60_000, async () => {
+    const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/members/${userId}`);
+    if (!res?.ok) return false;
+    const member = (await res.json()) as { roles?: string[] };
+    return (member.roles ?? []).includes(roleId);
+  });
+});
 
 function channelUrl(channelId: string) {
   return `discord://-/channels/${DISCORD_CONFIG.guildId}/${channelId}`;

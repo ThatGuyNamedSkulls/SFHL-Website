@@ -158,18 +158,21 @@ const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 /** Every league match of a team (all seasons, newest first) and its scoreboard lines. */
 export async function teamLeagueMatches(teamId: string): Promise<{ matches: TeamMatch[]; lines: StatLine[] }> {
   await ensureLeagueSchema();
-  const rs = await client.execute({
+  const [rs, statRs, teamList] = await Promise.all([
+    client.execute({
     sql: `SELECT m.*, s.name AS season_name, s.start_date AS season_start, d.name AS division_name
           FROM league_matches m
           JOIN league_seasons s ON s.id = m.season_id
           LEFT JOIN league_divisions d ON d.id = m.division_id
           WHERE (m.team_a = ? OR m.team_b = ?) AND s.status != 'cancelled'`,
     args: [teamId, teamId],
-  });
-  const statRs = await client.execute({
-    sql: "SELECT * FROM league_match_stats WHERE team_id = ? ORDER BY match_id, map_no",
-    args: [teamId],
-  });
+    }),
+    client.execute({
+      sql: "SELECT * FROM league_match_stats WHERE team_id = ? ORDER BY match_id, map_no",
+      args: [teamId],
+    }),
+    listTeams(),
+  ]);
   const lines: StatLine[] = (statRs.rows as Row[]).map((r) => ({
     matchId: Number(r.match_id),
     mapNo: Number(r.map_no),
@@ -188,7 +191,7 @@ export async function teamLeagueMatches(teamId: string): Promise<{ matches: Team
     if (l.map && list.length < l.mapNo) list[l.mapNo - 1] = l.map;
     mapsOf.set(l.matchId, list);
   }
-  const teams = new Map((await listTeams()).map((t) => [t.id, t]));
+  const teams = new Map(teamList.map((t) => [t.id, t]));
   const matches = (rs.rows as Row[]).map((r): TeamMatch => {
     const home = String(r.team_a) === teamId;
     const otherId = String(home ? r.team_b : r.team_a);

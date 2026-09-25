@@ -84,14 +84,19 @@ export async function leagueShell(seasonId: number): Promise<LeagueShell | null>
   if (!pinnedSeasons.some((s) => s.id === season.id)) pinnedSeasons.unshift(season);
   const pinnedIds = new Set(pinnedSeasons.map((s) => s.id));
 
-  const entries = await seasonEntries(season.id);
+  const played = !UPCOMING_STATUSES.includes(season.status);
+  // In parallel: each is a round trip to the database.
+  const [entries, divisions, finds] = await Promise.all([
+    seasonEntries(season.id),
+    seasonDivisions(season.id),
+    played ? Promise.resolve(0) : findCount(season.id),
+  ]);
   const teams = entries.filter((e) => e.status !== "ineligible").length;
   const base = `/league/${season.id}`;
   // Tabs appear as each page is built (docs/LEAGUE_UI_PLAN.md steps 3–8).
-  const played = !UPCOMING_STATUSES.includes(season.status);
   const tabs: LeagueTab[] = [
     { key: "overview", label: "Overview", href: base },
-    ...(played ? [] : [{ key: "find", label: "Find Teammates", href: `${base}/find`, count: await findCount(season.id) }]),
+    ...(played ? [] : [{ key: "find", label: "Find Teammates", href: `${base}/find`, count: finds }]),
     ...(played ? [{ key: "standings", label: "Standings", href: `${base}/standings` }] : []),
     // Every entry, like the tab's "All" filter (not-placed teams included).
     { key: "teams", label: "Teams", href: `${base}/teams`, count: entries.length },
@@ -105,7 +110,7 @@ export async function leagueShell(seasonId: number): Promise<LeagueShell | null>
     tabs,
     facts: {
       teams,
-      divisions: (await seasonDivisions(season.id)).length,
+      divisions: divisions.length,
       prizePerPlayer: PRIZES[0],
     },
   };

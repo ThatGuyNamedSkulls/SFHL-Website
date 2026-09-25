@@ -7,6 +7,7 @@
  * and schedule. Same tables as core/league.py — keep both DDLs in sync.
  * League games never touch ranked Elo; standings are computed here.
  */
+import { cache } from "react";
 import { client } from "@/lib/db";
 import { getTeam, listTeams, type Team } from "@/lib/teams";
 import { swissStandings } from "@/lib/league-swiss";
@@ -215,13 +216,19 @@ export interface StandingRow {
   points: number;
 }
 
+// The loaders below are wrapped in React's cache(): during one page render the layout,
+// tabs and page share one query each; outside a render (API routes, tests) they run as before.
+
 let schemaReady: Promise<void> | null = null;
 
 /** Same tables as core/league.py, so a fresh DB works whichever side runs first. */
 export function ensureLeagueSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_seasons (
+      // One round trip per step (Turso is remote): every CREATE in a batch, then the
+      // column checks in a batch, then only the missing columns.
+      const ddl: string[] = [];
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_seasons (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'draft',
@@ -232,7 +239,7 @@ export function ensureLeagueSchema(): Promise<void> {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )`);
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_divisions (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_divisions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         season_id INTEGER NOT NULL,
         name TEXT NOT NULL,
@@ -240,14 +247,14 @@ export function ensureLeagueSchema(): Promise<void> {
         code TEXT
       )`);
       // Invite-only named divisions: Match Staff give a team access (kept between seasons).
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_team_access (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_team_access (
         team_id TEXT PRIMARY KEY,
         access TEXT NOT NULL,
         set_by TEXT,
         set_by_id TEXT,
         set_at INTEGER NOT NULL
       )`);
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_entries (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         season_id INTEGER NOT NULL,
         team_id TEXT NOT NULL,
@@ -262,7 +269,7 @@ export function ensureLeagueSchema(): Promise<void> {
         signed_up_at INTEGER NOT NULL,
         UNIQUE (season_id, team_id)
       )`);
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_matches (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_matches (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         season_id INTEGER NOT NULL,
         division_id INTEGER,
@@ -289,7 +296,7 @@ export function ensureLeagueSchema(): Promise<void> {
         note TEXT
       )`);
       // Staff audit log; season steps in ANNOUNCED kinds get posted by the bot.
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_events (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         season_id INTEGER,
         match_id INTEGER,
@@ -301,49 +308,9 @@ export function ensureLeagueSchema(): Promise<void> {
         announced INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL
       )`);
-      // Phase 3 columns on tables created before them (same list as core/league.py).
-      const cols = await client.execute("PRAGMA table_info(league_matches)");
-      const have = new Set(cols.rows.map((r) => String((r as Record<string, unknown>).name)));
-      for (const [col, ddl] of [
-        ["reported_at", "INTEGER"],
-        ["result_kind", "TEXT"],
-        ["reminded", "INTEGER NOT NULL DEFAULT 0"],
-        ["note", "TEXT"],
-        ["playoff_round", "TEXT"],
-      ]) {
-        if (!have.has(col)) await client.execute(`ALTER TABLE league_matches ADD COLUMN ${col} ${ddl}`);
-      }
-      // Phase 4 (season end) columns on entries — same list as core/league.py.
-      const ecols = await client.execute("PRAGMA table_info(league_entries)");
-      const ehave = new Set(ecols.rows.map((r) => String((r as Record<string, unknown>).name)));
-      for (const [col, ddl] of [
-        ["final_place", "INTEGER"],
-        ["movement", "TEXT"],
-        ["prize", "INTEGER"],
-        ["moved_to", "TEXT"],
-      ]) {
-        if (!ehave.has(col)) await client.execute(`ALTER TABLE league_entries ADD COLUMN ${col} ${ddl}`);
-      }
-      // Invite-only divisions + season page details (same lists as core/league.py).
-      // Same list as DIVISION_EXTRA_COLUMNS in core/league.py.
-      const dcols = await client.execute("PRAGMA table_info(league_divisions)");
-      const dhave = new Set(dcols.rows.map((r) => String((r as Record<string, unknown>).name)));
-      for (const col of ["code", "format"]) {
-        if (!dhave.has(col)) await client.execute(`ALTER TABLE league_divisions ADD COLUMN ${col} TEXT`);
-      }
-      const scols = await client.execute("PRAGMA table_info(league_seasons)");
-      const shave = new Set(scols.rows.map((r) => String((r as Record<string, unknown>).name)));
-      for (const col of ["banner_url", "description", "rules", "notice"]) {
-        if (!shave.has(col)) await client.execute(`ALTER TABLE league_seasons ADD COLUMN ${col} TEXT`);
-      }
-      // One semi/final/third-place match per division, even if both sides create it at once.
-      await client.execute(
-        `CREATE UNIQUE INDEX IF NOT EXISTS idx_league_playoff_round
-         ON league_matches (season_id, division_id, playoff_round) WHERE playoff_round IS NOT NULL`
-      );
       // Find Teammates board (lib/league-find.ts) — same DDL as core/league.py.
       // roles/days/times/divisions are JSON arrays of codes (lib/league-find-rules.ts).
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_team_posts (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_team_posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         season_id INTEGER NOT NULL,
         team_id TEXT NOT NULL,
@@ -361,7 +328,7 @@ export function ensureLeagueSchema(): Promise<void> {
         updated_at INTEGER NOT NULL,
         UNIQUE (season_id, team_id)
       )`);
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_player_posts (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_player_posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         season_id INTEGER NOT NULL,
         discord_id TEXT NOT NULL,
@@ -378,7 +345,7 @@ export function ensureLeagueSchema(): Promise<void> {
         updated_at INTEGER NOT NULL,
         UNIQUE (season_id, discord_id)
       )`);
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_applications (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_applications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         season_id INTEGER NOT NULL,
         team_id TEXT NOT NULL,
@@ -395,7 +362,7 @@ export function ensureLeagueSchema(): Promise<void> {
       )`);
       // League Stats (lib/league-stats.ts): one row per player per map, entered by
       // Match Staff — never mixed with ranked match_history. Same DDL as core/league.py.
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_match_stats (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_match_stats (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         season_id INTEGER NOT NULL,
         match_id INTEGER NOT NULL,
@@ -416,9 +383,9 @@ export function ensureLeagueSchema(): Promise<void> {
         entered_at INTEGER NOT NULL,
         UNIQUE (match_id, map_no, discord_id)
       )`);
-      await client.execute("CREATE INDEX IF NOT EXISTS idx_league_match_stats_season ON league_match_stats (season_id)");
+      ddl.push("CREATE INDEX IF NOT EXISTS idx_league_match_stats_season ON league_match_stats (season_id)");
       // Swiss byes (lib/league-swiss.ts): the team that sits out a week, which counts as a win.
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_byes (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_byes (
         season_id INTEGER NOT NULL,
         division_id INTEGER NOT NULL,
         week INTEGER NOT NULL,
@@ -427,7 +394,7 @@ export function ensureLeagueSchema(): Promise<void> {
       )`);
       // Pro ladder from league matches: each player's Pro Elo before/after every
       // counted match. Rebuilt by the bot (core/pro_league.py); read here. Same DDL.
-      await client.execute(`CREATE TABLE IF NOT EXISTS league_pro_elo (
+      ddl.push(`CREATE TABLE IF NOT EXISTS league_pro_elo (
         match_id INTEGER NOT NULL,
         season_id INTEGER NOT NULL,
         player_name TEXT NOT NULL,
@@ -437,6 +404,47 @@ export function ensureLeagueSchema(): Promise<void> {
         weight REAL NOT NULL,
         PRIMARY KEY (match_id, player_name)
       )`);
+      await client.batch(ddl, "write");
+
+      // Columns added after the tables were first created (same lists as core/league.py):
+      // phase 3 + playoffs on matches, phase 4 + moves on entries, invite-only
+      // divisions + formats (DIVISION_EXTRA_COLUMNS), season page details.
+      const extra: [string, [string, string][]][] = [
+        ["league_matches", [
+          ["reported_at", "INTEGER"],
+          ["result_kind", "TEXT"],
+          ["reminded", "INTEGER NOT NULL DEFAULT 0"],
+          ["note", "TEXT"],
+          ["playoff_round", "TEXT"],
+        ]],
+        ["league_entries", [
+          ["final_place", "INTEGER"],
+          ["movement", "TEXT"],
+          ["prize", "INTEGER"],
+          ["moved_to", "TEXT"],
+        ]],
+        ["league_divisions", [
+          ["code", "TEXT"],
+          ["format", "TEXT"],
+        ]],
+        ["league_seasons", [
+          ["banner_url", "TEXT"],
+          ["description", "TEXT"],
+          ["rules", "TEXT"],
+          ["notice", "TEXT"],
+        ]],
+      ];
+      const info = await client.batch(extra.map(([table]) => `PRAGMA table_info(${table})`), "read");
+      const alters = extra.flatMap(([table, cols], i) => {
+        const have = new Set(info[i].rows.map((r) => String((r as Record<string, unknown>).name)));
+        return cols.filter(([col]) => !have.has(col)).map(([col, type]) => `ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+      });
+      // One semi/final/third-place match per division, even if both sides create it at once.
+      alters.push(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_league_playoff_round
+         ON league_matches (season_id, division_id, playoff_round) WHERE playoff_round IS NOT NULL`
+      );
+      await client.batch(alters, "write");
     })().catch((e) => {
       schemaReady = null;
       throw e;
@@ -511,13 +519,13 @@ function toMatch(r: Record<string, unknown>): LeagueMatch {
 type Row = Record<string, unknown>;
 const rows = (rs: { rows: unknown[] }) => rs.rows as Row[];
 
-export async function listSeasons(): Promise<Season[]> {
+export const listSeasons = cache(async function listSeasons(): Promise<Season[]> {
   await ensureLeagueSchema();
   const rs = await client.execute(
     "SELECT * FROM league_seasons WHERE status != 'cancelled' ORDER BY id DESC"
   );
   return rows(rs).map(toSeason);
-}
+});
 
 /** The running season, else the newest finished one (null when there are none). */
 export async function currentSeason(): Promise<Season | null> {
@@ -540,23 +548,23 @@ export async function upcomingSeason(): Promise<Season | null> {
   return (await listSeasons()).find((s) => UPCOMING_STATUSES.includes(s.status)) ?? null;
 }
 
-export async function getSeason(id: number): Promise<Season | null> {
+export const getSeason = cache(async function getSeason(id: number): Promise<Season | null> {
   await ensureLeagueSchema();
   const rs = await client.execute({ sql: "SELECT * FROM league_seasons WHERE id = ?", args: [id] });
   const r = rows(rs)[0];
   return r ? toSeason(r) : null;
-}
+});
 
-export async function seasonEntries(seasonId: number): Promise<Entry[]> {
+export const seasonEntries = cache(async function seasonEntries(seasonId: number): Promise<Entry[]> {
   await ensureLeagueSchema();
   const rs = await client.execute({
     sql: "SELECT * FROM league_entries WHERE season_id = ? ORDER BY signed_up_at, id",
     args: [seasonId],
   });
   return rows(rs).map(toEntry);
-}
+});
 
-export async function seasonDivisions(seasonId: number): Promise<Division[]> {
+export const seasonDivisions = cache(async function seasonDivisions(seasonId: number): Promise<Division[]> {
   await ensureLeagueSchema();
   const rs = await client.execute({
     sql: "SELECT id, name, tier, code, format FROM league_divisions WHERE season_id = ? ORDER BY tier",
@@ -569,7 +577,7 @@ export async function seasonDivisions(seasonId: number): Promise<Division[]> {
     code: r.code == null ? null : String(r.code),
     format: r.format === "swiss" ? "swiss" : r.format === "rr" ? "rr" : null,
   }));
-}
+});
 
 export interface Bye {
   divisionId: number;
@@ -578,14 +586,14 @@ export interface Bye {
 }
 
 /** Swiss byes of a season (the team that sat out a week — counts as a win). */
-export async function seasonByes(seasonId: number): Promise<Bye[]> {
+export const seasonByes = cache(async function seasonByes(seasonId: number): Promise<Bye[]> {
   await ensureLeagueSchema();
   const rs = await client.execute({
     sql: "SELECT division_id, week, team_id FROM league_byes WHERE season_id = ? ORDER BY week",
     args: [seasonId],
   });
   return rows(rs).map((r) => ({ divisionId: Number(r.division_id), week: Number(r.week), teamId: String(r.team_id) }));
-}
+});
 
 /** A division's regular-season standings: head-to-head for round-robin, Buchholz (with byes) for Swiss. */
 export function divisionStandingRows(
@@ -598,14 +606,14 @@ export function divisionStandingRows(
   return computeStandings(teamIds, matches);
 }
 
-export async function seasonMatches(seasonId: number): Promise<LeagueMatch[]> {
+export const seasonMatches = cache(async function seasonMatches(seasonId: number): Promise<LeagueMatch[]> {
   await ensureLeagueSchema();
   const rs = await client.execute({
     sql: "SELECT * FROM league_matches WHERE season_id = ? ORDER BY week, id",
     args: [seasonId],
   });
   return rows(rs).map(toMatch);
-}
+});
 
 // --- rosters & sign-ups ------------------------------------------------------------------
 
@@ -820,14 +828,13 @@ export interface CaptainTeamOption extends TeamBadge {
 
 /** Everything the /league page shows for a season (read-only apart from sign-ups). */
 export async function leagueView(seasonId: number | null, viewerId: string | null) {
-  const seasons = await listSeasons();
+  const [seasons, teams] = await Promise.all([listSeasons(), listTeams()]);
   const season =
     (seasonId ? seasons.find((s) => s.id === seasonId) : null) ??
     seasons.find((s) => LIVE_STATUSES.includes(s.status)) ??
     seasons.find((s) => UPCOMING_STATUSES.includes(s.status)) ??
     seasons[0] ??
     null;
-  const teams = await listTeams();
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const badge = (id: string, fallback?: Entry): TeamBadge => {
     const t = teamById.get(id);
@@ -852,11 +859,13 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
     };
   }
 
-  const entries = await seasonEntries(season.id);
+  const [entries, divisions, matches, byes] = await Promise.all([
+    seasonEntries(season.id),
+    seasonDivisions(season.id),
+    seasonMatches(season.id),
+    seasonByes(season.id),
+  ]);
   const entryByTeam = new Map(entries.map((e) => [e.teamId, e]));
-  const divisions = await seasonDivisions(season.id);
-  const matches = await seasonMatches(season.id);
-  const byes = await seasonByes(season.id);
   const myTeamIds = viewerId
     ? entries
         .filter((e) => e.status !== "ineligible" && e.roster.some((p) => p.discordId === viewerId))
@@ -995,10 +1004,12 @@ export async function teamLeagueHistory(teamId: string) {
           ORDER BY e.season_id DESC`,
     args: [teamId],
   });
+  // Every season's matches in parallel (one round trip each, not one after another).
+  const all = await Promise.all(rows(rs).map((r) => seasonMatches(Number(r.season_id))));
   const out = [];
-  for (const r of rows(rs)) {
+  for (const [i, r] of rows(rs).entries()) {
     const seasonId = Number(r.season_id);
-    const matches = (await seasonMatches(seasonId)).filter(
+    const matches = all[i].filter(
       (m) => (m.teamA === teamId || m.teamB === teamId) && (m.status === "final" || m.status === "forfeit") && m.winner
     );
     const won = matches.filter((m) => m.winner === teamId).length;

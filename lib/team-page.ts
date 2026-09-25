@@ -23,17 +23,24 @@ export async function teamPageData(teamId: string, viewerId: string | null) {
   const team = await getTeam(teamId);
   if (!team) return null;
   const names = team.members.map((m) => m.playerName).filter((n): n is string => !!n);
+  // Everything below is independent: one parallel wave of round trips.
+  const [players, art, titles, seasons, status, games] = await Promise.all([
+    names.length
+      ? client
+          .execute({
+            sql: `SELECT * FROM players WHERE LOWER(name) IN (${names.map(() => "?").join(",")})`,
+            args: names.map((n) => n.toLowerCase()),
+          })
+          .catch(() => ({ rows: [] as Record<string, unknown>[] }))
+      : Promise.resolve({ rows: [] as Record<string, unknown>[] }),
+    getEquippedVisualsMap().catch(() => new Map<string, { card: string | null }>()),
+    titlesForTeam(team.id).catch(() => []),
+    teamLeagueHistory(team.id).catch(() => []),
+    teamLeagueStatus(team).catch(() => null),
+    teamLeagueMatches(team.id).catch(() => ({ matches: [], lines: [] })),
+  ]);
   const rows = new Map<string, Record<string, unknown>>();
-  if (names.length) {
-    const rs = await client
-      .execute({
-        sql: `SELECT * FROM players WHERE LOWER(name) IN (${names.map(() => "?").join(",")})`,
-        args: names.map((n) => n.toLowerCase()),
-      })
-      .catch(() => ({ rows: [] as Record<string, unknown>[] }));
-    for (const r of rs.rows as Record<string, unknown>[]) rows.set(String(r.name).toLowerCase(), r);
-  }
-  const art = await getEquippedVisualsMap().catch(() => new Map<string, { card: string | null }>());
+  for (const r of players.rows as Record<string, unknown>[]) rows.set(String(r.name).toLowerCase(), r);
   const members: MemberCard[] = team.members.map((m) => ({
     ...cardFromMember(m, {
       row: m.playerName ? rows.get(m.playerName.toLowerCase()) : undefined,
@@ -54,13 +61,6 @@ export async function teamPageData(teamId: string, viewerId: string | null) {
   for (const m of accepted) if (m.country) counts.set(m.country, (counts.get(m.country) ?? 0) + 1);
   let country: string | null = null;
   for (const [c, n] of counts) if (country === null || n > (counts.get(country) ?? 0)) country = c;
-
-  const [titles, seasons, status, games] = await Promise.all([
-    titlesForTeam(team.id).catch(() => []),
-    teamLeagueHistory(team.id).catch(() => []),
-    teamLeagueStatus(team).catch(() => null),
-    teamLeagueMatches(team.id).catch(() => ({ matches: [], lines: [] })),
-  ]);
 
   return {
     team,
