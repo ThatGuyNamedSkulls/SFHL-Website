@@ -211,7 +211,7 @@ export function TeamSettings({
               </label>
               <label>
                 <span className={label}>Banner URL</span>
-                <input value={f.bannerUrl} maxLength={500} onChange={(e) => setF({ ...f, bannerUrl: e.target.value })} placeholder="https://… (wide image)" className={field} />
+                <input value={f.bannerUrl} maxLength={500} onChange={(e) => setF({ ...f, bannerUrl: e.target.value })} placeholder="https://… (1050×300, 7:2)" className={field} />
               </label>
             </div>
             <label className="mt-3 block">

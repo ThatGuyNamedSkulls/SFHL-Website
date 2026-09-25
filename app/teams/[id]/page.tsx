@@ -218,7 +218,8 @@ export default async function TeamPage({
 
       {/* Header: banner, logo, NAME (TAG) + flag, badges, actions, tabs. */}
       <section className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d0d0d]">
-        <div className="relative h-36 overflow-hidden sm:h-52">
+        {/* Always 7:2, so a 1050×300 banner fits exactly at any width (no cropping). */}
+        <div className="relative aspect-[7/2] w-full overflow-hidden">
           {team.bannerUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- captain-provided banner URL
             <img src={team.bannerUrl} alt="" className="h-full w-full object-cover" />
@@ -236,7 +237,12 @@ export default async function TeamPage({
               </span>
             </div>
           )}
-          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#0d0d0d] to-transparent" />
+          {/* A captain's banner stays nearly untouched: only a light fade under the logo row. */}
+          <div
+            className={`absolute inset-x-0 bottom-0 bg-gradient-to-t to-transparent ${
+              team.bannerUrl ? "h-1/4 from-[#0d0d0d]/70" : "h-1/2 from-[#0d0d0d]"
+            }`}
+          />
         </div>
         {/* Phones: logo, then name and badges, then the buttons (stacked, so the name isn't cut). */}
         <div className="relative -mt-12 flex flex-col gap-3 px-4 pb-4 sm:-mt-14 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4 sm:px-7">
