@@ -16,7 +16,7 @@ import {
   staffSetResult,
 } from "@/lib/league-matches";
 import { LeagueAdminError } from "@/lib/league-admin";
-import { StatsInputError, deleteMapStats, matchScoreboards, saveMapStats } from "@/lib/league-stats";
+import { StatsInputError, deleteMapStats, matchProElo, matchScoreboards, saveMapStats } from "@/lib/league-stats";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,10 +25,15 @@ function matchId(raw: string): number | null {
   return /^\d+$/.test(raw) ? Number(raw) : null;
 }
 
-/** The match page payload plus its saved map scoreboards (step 9 stats). */
+/** The match page payload plus its saved map scoreboards (step 9) and Pro ladder changes. */
 async function fullView(id: number, viewerId: string | null, staff: boolean) {
   const view = await leagueMatchView(id, viewerId, staff);
-  return view ? { ...view, stats: await matchScoreboards(id, view.teamA.id) } : null;
+  if (!view) return null;
+  return {
+    ...view,
+    stats: await matchScoreboards(id, view.teamA.id),
+    proElo: await matchProElo(id, view.match.divisionId ?? null),
+  };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -7,6 +7,7 @@
  */
 import { useState } from "react";
 import { ClipboardPaste, Trash2 } from "lucide-react";
+import type { MatchProElo } from "@/lib/league-stats";
 import {
   matchRosterName,
   parseOcrPaste,
@@ -65,11 +66,64 @@ function TeamTable({ team, rows, won }: { team: Team; rows: StatLine[]; won: boo
 }
 
 /** Everyone: the saved scoreboards, one card per map. */
-export function LeagueScoreboards({ maps, teamA, teamB }: { maps: MapScoreboard[]; teamA: Team; teamB: Team }) {
+/** Pro ladder changes from this match (docs/LEAGUE_V2_PLAN.md, Part A); the bot rebuilds them. */
+function ProLadderStrip({ proElo, teamA, teamB }: { proElo: MatchProElo; teamA: Team; teamB: Team }) {
+  if (proElo.weight === null) {
+    return <p className="text-xs text-white/45">This division doesn&apos;t count for the Pro ladder (only Open10 and above do).</p>;
+  }
+  return (
+    <div className="rounded-xl border border-[#a855f7]/30 bg-[#a855f7]/[0.06] px-4 py-3">
+      <div className="text-[11px] font-black uppercase tracking-wide text-[#d8b4fe]">
+        Pro ladder · ×{proElo.weight.toFixed(1)}
+      </div>
+      {proElo.deltas.length === 0 ? (
+        <p className="mt-1 text-xs text-white/60">Pro Elo updates within a minute of the scoreboard being saved.</p>
+      ) : (
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          {[teamA, teamB].map((t) => (
+            <div key={t.id} className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs font-bold text-white/70">{t.name}</span>
+              {proElo.deltas
+                .filter((d) => d.teamId === t.id)
+                .map((d) => {
+                  const diff = d.after - d.before;
+                  return (
+                    <span
+                      key={d.playerName}
+                      title={`${d.before.toLocaleString()} → ${d.after.toLocaleString()} Pro Elo`}
+                      className="rounded-md bg-black/30 px-2 py-0.5 text-[11px] font-bold text-white/85"
+                    >
+                      {d.playerName}{" "}
+                      <span className={diff > 0 ? "text-hl-green" : diff < 0 ? "text-hl-red" : "text-white/45"}>
+                        {diff > 0 ? `+${diff}` : diff < 0 ? `−${-diff}` : "±0"}
+                      </span>
+                    </span>
+                  );
+                })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function LeagueScoreboards({
+  maps,
+  teamA,
+  teamB,
+  proElo,
+}: {
+  maps: MapScoreboard[];
+  teamA: Team;
+  teamB: Team;
+  proElo?: MatchProElo;
+}) {
   if (!maps.length) return null;
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-black text-white">Scoreboard</h2>
+      {proElo ? <ProLadderStrip proElo={proElo} teamA={teamA} teamB={teamB} /> : null}
       {maps.map((m) => (
         <div key={m.mapNo} className="rounded-xl border border-white/[0.08] bg-[#121212] p-4">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">

@@ -7,22 +7,29 @@
  *   both semis are done the final and a third-place match are created.
  * - Season end: final places, a team title for each division champion, HL
  *   Coins for every rostered player of the top 3 (5,000 / 2,500 / 1,000) and
- *   no promotion/relegation — named divisions are invite-only (Match Staff give
- *   a team access by hand); everyone else plays in their Open skill band.
+ *   promotion/relegation (league v2, lib/league-swiss.ts seasonMoves): each
+ *   conference's top k move up the ladder, its bottom k down; a team's status
+ *   is kept in league_team_access. Swiss conferences rank by Buchholz (byes).
  */
 import { client } from "@/lib/db";
 import { claim, logEvent, LeagueAdminError, type Actor } from "@/lib/league-admin";
 import {
-  computeStandings,
+  DIVISION_NAMES,
+  divisionStandingRows,
   ensureLeagueSchema,
   getSeason,
+  openBand,
+  seasonByes,
   seasonDivisions,
   seasonEntries,
   seasonMatches,
+  teamAccessMap,
   type LeagueMatch,
   type PlayoffRound,
   type Season,
 } from "@/lib/league";
+import { seasonMoves, type Move } from "@/lib/league-swiss";
+import { ensureSocialSchema } from "@/lib/social";
 
 export const PLAYOFF_TEAMS = 4;
 export const PRIZES = [5000, 2500, 1000];
@@ -80,16 +87,35 @@ async function seasonOrFail(seasonId: number): Promise<Season> {
   return season!;
 }
 
-/** Regular-season standings per division id (team ids, 1st first). */
+/** Regular-season standings per division id (team ids, 1st first): head-to-head or Swiss (with byes). */
 export async function divisionStandings(seasonId: number): Promise<Map<number, string[]>> {
   const matches = (await seasonMatches(seasonId)).filter((m) => m.stage === "regular");
   const entries = await seasonEntries(seasonId);
+  const byes = await seasonByes(seasonId);
   const out = new Map<number, string[]>();
   for (const d of await seasonDivisions(seasonId)) {
     const teams = entries.filter((e) => e.divisionId === d.id && e.status === "active").map((e) => e.teamId);
-    out.set(d.id, computeStandings(teams, matches.filter((m) => m.divisionId === d.id)).map((r) => r.teamId));
+    const rows = divisionStandingRows(
+      d.format,
+      teams,
+      matches.filter((m) => m.divisionId === d.id),
+      byes.filter((b) => b.divisionId === d.id)
+    );
+    out.set(d.id, rows.map((r) => r.teamId));
   }
   return out;
+}
+
+/** Each placed team's own level: its status, else the Open band of its seed Elo (same as the bot). */
+export async function ownCodes(seasonId: number): Promise<Record<string, string>> {
+  const placed = (await seasonEntries(seasonId)).filter((e) => e.status === "active");
+  const access = await teamAccessMap(placed.map((e) => e.teamId));
+  return Object.fromEntries(placed.map((e) => [e.teamId, access.get(e.teamId) ?? openBand(e.seedElo)]));
+}
+
+/** "main" → "Main"; "" → back to the Open skill band. */
+export function moveLabel(to: string): string {
+  return to ? DIVISION_NAMES[to] ?? to : "its Open skill band";
 }
 
 function insertPlayoff(season: Season, divisionId: number, week: number, round: PlayoffRound, a: string, b: string) {
@@ -170,6 +196,8 @@ export interface SeasonEndDivision {
   places: string[];
   standings: string[];
   champion: string;
+  /** Promotion/relegation of this conference (league v2). */
+  moves: Move[];
 }
 
 /** What ending the season would do — nothing is written. */
@@ -178,18 +206,27 @@ export async function previewEnd(seasonId: number): Promise<{ divisions: SeasonE
   if (season.status !== "playoffs") fail("A season ends after its playoffs.");
   const matches = (await seasonMatches(season.id)).filter((m) => m.stage === "playoff");
   const standings = await divisionStandings(season.id);
+  const codes = await ownCodes(season.id);
   const divisions: SeasonEndDivision[] = [];
   for (const d of await seasonDivisions(season.id)) {
     const final = matches.find((m) => m.divisionId === d.id && m.playoffRound === "final");
     const third = matches.find((m) => m.divisionId === d.id && m.playoffRound === "third");
     if (!final || !third || !done(final) || !done(third)) fail(`${d.name}'s final and third-place match need results first.`);
     const places = finalPlaces(standings.get(d.id) ?? [], final!, third!);
-    divisions.push({ divisionId: d.id, name: d.name, tier: d.tier, places, standings: standings.get(d.id) ?? [], champion: places[0] });
+    divisions.push({
+      divisionId: d.id,
+      name: d.name,
+      tier: d.tier,
+      places,
+      standings: standings.get(d.id) ?? [],
+      champion: places[0],
+      moves: seasonMoves(places, codes),
+    });
   }
   return { divisions };
 }
 
-/** Final places, champion titles and prizes; the season is finished. */
+/** Final places, champion titles, prizes and promotion/relegation; the season is finished. */
 export async function endSeason(seasonId: number, confirmName: string, actor: Actor) {
   const season = await seasonOrFail(seasonId);
   if (confirmName.trim() !== season.name) fail(`Type the season name (${season.name}) to confirm.`);
@@ -230,6 +267,44 @@ export async function endSeason(seasonId: number, confirmName: string, actor: Ac
       : [];
   });
   if (grants.length) await client.batch(grants, "write");
+  await applyMoves(season, plan.divisions, entries);
   await logEvent(season.id, "season_finished", actor, plan.divisions.map((d) => d.name).join(", "));
   return plan;
+}
+
+/** Write each move: the team's new status, the entry's movement, and a DM to its captain (same as the bot). */
+async function applyMoves(season: Season, divisions: SeasonEndDivision[], entries: Awaited<ReturnType<typeof seasonEntries>>) {
+  await ensureSocialSchema(); // discord_dm_outbox
+  const now = Date.now();
+  const byTeam = new Map(entries.map((e) => [e.teamId, e]));
+  const stmts = divisions.flatMap((d) =>
+    d.moves.flatMap((mv) => {
+      const e = byTeam.get(mv.teamId);
+      const verb = mv.direction === "up" ? "is promoted to" : "moves down to";
+      return [
+        mv.to
+          ? {
+              sql: `INSERT OR REPLACE INTO league_team_access (team_id, access, set_by, set_by_id, set_at)
+                    VALUES (?, ?, 'League', NULL, ?)`,
+              args: [mv.teamId, mv.to, now],
+            }
+          : { sql: "DELETE FROM league_team_access WHERE team_id = ?", args: [mv.teamId] },
+        {
+          sql: "UPDATE league_entries SET movement = ?, moved_to = ? WHERE season_id = ? AND team_id = ?",
+          args: [mv.direction, mv.to, season.id, mv.teamId],
+        },
+        ...(e?.captainId
+          ? [{
+              sql: "INSERT INTO discord_dm_outbox (discord_id, message, sent, created_at) VALUES (?, ?, 0, ?)",
+              args: [
+                e.captainId,
+                `🏆 **${season.name}** is over — **${e.teamName}** ${verb} **${moveLabel(mv.to)}** for the next season.`,
+                now,
+              ],
+            }]
+          : []),
+      ];
+    })
+  );
+  if (stmts.length) await client.batch(stmts, "write");
 }

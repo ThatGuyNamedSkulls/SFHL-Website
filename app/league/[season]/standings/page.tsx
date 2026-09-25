@@ -1,23 +1,34 @@
 import { notFound } from "next/navigation";
-import { LeagueDivisionSelect } from "@/components/league-division-select";
+import { LeagueDivisionPicker } from "@/components/league-division-select";
 import {
   FinalResults,
   PlayoffBracket,
   RegularSchedule,
   RegularTable,
+  StageOutcomes,
   StageStepper,
   type Countries,
 } from "@/components/league-standings";
 import { getSession } from "@/lib/auth";
 import { leagueView, seasonEventTimes, teamCountries } from "@/lib/league";
-import { defaultStage, parseStage, standingsStages, type StageKey } from "@/lib/league-standings";
+import {
+  conferenceGroups,
+  defaultStage,
+  parseStage,
+  shownMoves,
+  stageOutcomes,
+  standingsPicker,
+  standingsStages,
+  type StageKey,
+} from "@/lib/league-standings";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Standings (docs/LEAGUE_UI_PLAN.md step 4): a division filter and the stage
- * stepper — Regular season (table + matches) → Playoffs (bracket) → Final
- * results (places + prizes). ?division= and ?stage=regular|playoffs|final.
+ * Standings (docs/LEAGUE_UI_PLAN.md step 4): a division filter (+ conference,
+ * league v2) and the stage stepper — Regular season (table + matches) →
+ * Playoffs (bracket) → Final results (places + prizes + moves). Each stage
+ * starts with its outcome cards. ?division=<id> and ?stage=regular|playoffs|final.
  */
 export default async function SeasonStandingsPage({
   params,
@@ -70,20 +81,16 @@ export default async function SeasonStandingsPage({
     view.divisions.filter((d) => d.standings.some((r) => myTeamIds.includes(r.teamId))).map((d) => d.id)
   );
   const hrefFor = (key: StageKey) => `${base}?${new URLSearchParams({ division: String(div.id), stage: key })}`;
+  const groups = conferenceGroups(view.divisions);
+  const picker = standingsPicker(groups, div.id, myDivisionIds);
+  const moves = shownMoves(div.code, div.standings.length, div.places);
+  const outcomes = stageOutcomes(stage, moves, div.standings.length, view.prizes);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         {view.divisions.length > 1 ? (
-          <LeagueDivisionSelect
-            base={base}
-            keep={{ stage: asked }}
-            value={String(div.id)}
-            options={view.divisions.map((d) => ({
-              value: String(d.id),
-              label: `${d.name}${myDivisionIds.has(d.id) ? " · your team" : ""}`,
-            }))}
-          />
+          <LeagueDivisionPicker base={base} keep={{ stage: asked }} picker={picker} />
         ) : (
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">Division</div>
@@ -93,9 +100,11 @@ export default async function SeasonStandingsPage({
         <StageStepper stages={stages} active={stage} hrefFor={hrefFor} />
       </div>
 
+      {stage === "playoffs" && stageState === "none" ? null : <StageOutcomes outcomes={outcomes} />}
+
       {stage === "regular" ? (
         <>
-          <RegularTable div={div} countries={countries} myTeamIds={myTeamIds} />
+          <RegularTable div={div} countries={countries} myTeamIds={myTeamIds} moves={moves} />
           <RegularSchedule div={div} />
         </>
       ) : stage === "playoffs" ? (

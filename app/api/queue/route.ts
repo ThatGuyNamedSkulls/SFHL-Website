@@ -23,6 +23,7 @@ import {
   parseQueueMode,
   queueModeLabel,
   QUEUE_MODE_PRO,
+  PRO_QUEUE_ENABLED,
 } from "@/lib/queue-modes";
 import { PRO_KEEP_ELO, PRO_MIN_ELO, hasProAccess, proAccessByDiscordId } from "@/lib/pro";
 
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
       openModes: gate.openModes,
       me,
       // Pro Matchmaking is only shown to players who can join it (S2+).
-      proEligible,
+      proEligible: PRO_QUEUE_ENABLED && proEligible,
     });
   } catch (error) {
     console.error("Error fetching queue:", error);
@@ -228,6 +229,15 @@ export async function POST(request: Request) {
       }
     }
 
+    if (mode === QUEUE_MODE_PRO && !PRO_QUEUE_ENABLED) {
+      return NextResponse.json(
+        {
+          error:
+            "Pro Matchmaking has moved to the League: league matches in Open10 and above give Pro ladder Elo. Sign your team up on the League tab.",
+        },
+        { status: 403 }
+      );
+    }
     if (mode === QUEUE_MODE_PRO) {
       const group = party?.members ?? [{ discordId: session.discordId, playerName: session.playerName, username: session.username }];
       const access = await proAccessByDiscordId(group.map((m) => String(m.discordId)));

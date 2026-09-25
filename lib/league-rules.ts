@@ -43,19 +43,21 @@ export function defaultRules({ weeks, rosterMin, rosterMax, prizes }: RulesConst
     [
       "Divisions",
       [
-        "Pro, Advanced, Main, Intermediate and Entry are invite-only: a team plays there only after Match Staff give it access.",
-        "Every other team plays in the Open division of its skill (the average Elo of its best 5 players): Open 10 (★), Open 8-9 (S2–S3), Open 5-7 (A2–S1), Open 1-4 (D–A1).",
-        "A division with fewer than 4 teams plays together with the next one down; big divisions are split into groups of about 6.",
+        "A new team starts in the Open division of its skill (the average Elo of its best 5 players): Open 10 (★), Open 8-9 (S2–S3), Open 5-7 (A2–S1), Open 1-4 (D–A1).",
+        "Entry, Intermediate, Main, Advanced and Pro are earned: every season the top of each division moves up and the bottom moves down — Open 8-9 → Open 10 → Entry → Intermediate → Main → Advanced → Pro. Open 5-7 and Open 1-4 are just for fun (no promotion).",
+        "Up to 4 teams go up and 4 go down in each conference (fewer in small divisions: 1 with 4–5 teams, 2 with 6–9, 3 with 10–13). The bottom of Open 10 goes back to its skill band. A team keeps its status between seasons; Match Staff can change it.",
+        "A division with fewer than 4 teams plays together with the next one down; a division with more than 32 teams is split into conferences (A, B, …).",
       ],
     ],
     [
       "Season format",
       [
-        `${weeks} weeks of regular season: a round-robin inside your division, best of 1.`,
-        "Win = 3 points. Ties are broken by head-to-head, then round difference, then rounds won.",
+        `${weeks} weeks of regular season, best of 1. Up to 7 teams play everyone once (a round-robin); bigger divisions play Swiss — each week you meet a team with the same record you haven't played yet. An odd team out gets a bye, which counts as a win.`,
+        "Win = 3 points. Round-robin ties: head-to-head, then round difference, then rounds won. Swiss ties: opponents' points (Buchholz), then round difference, then rounds won.",
         "The top 4 of each division play best-of-3 playoffs (1st v 4th, 2nd v 3rd), then a final and a third-place match.",
         "Best of 3: captains ban maps until three remain; they're played in that order.",
         "League matches never change ranked Elo.",
+        "Matches in Open10 and above give Pro ladder Elo to the players on the saved scoreboard: Open10 ×1.0, Entry ×1.1, Intermediate ×1.2, Main ×1.3, Advanced ×1.4, Pro ×1.5. Everyone starts at 0.",
       ],
     ],
     [

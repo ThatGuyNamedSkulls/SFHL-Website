@@ -1,30 +1,45 @@
 /**
  * Standings tab pieces (docs/LEAGUE_UI_PLAN.md step 4, ESEA-style): the stage
- * stepper, the regular-season table with its playoff zone, the playoff
- * bracket and the final results. Server-safe (no hooks); times go through
- * <LocalTime> so they show in the viewer's time zone.
+ * stepper, the stage outcome cards, the regular-season table with its
+ * promotion/playoff/relegation zones, the playoff bracket and the final
+ * results. Server-safe (no hooks); times go through <LocalTime> so they show
+ * in the viewer's time zone.
  */
 import Link from "next/link";
-import { Check, Clock, Coins, Minus, Trophy } from "lucide-react";
+import { Check, ChevronsDown, ChevronsUp, Clock, Coins, Info, Minus, Trophy } from "lucide-react";
 import { ClubMark } from "@/components/club-identity";
 import { Flag } from "@/components/flag";
 import { LocalTime } from "@/components/local-time";
+import { MovePill } from "@/components/league-move-pill";
 import { countryName, flagPath } from "@/lib/countries";
 import type { LeagueView } from "@/lib/league";
-import { PLAYOFF_LINE, stageNote, tiebrokenTeams, type Stage, type StageKey } from "@/lib/league-standings";
+import {
+  PLAYOFF_LINE,
+  downText,
+  lowerFirst,
+  ordinal,
+  regularZone,
+  stageNote,
+  tiebrokenTeams,
+  upText,
+  type DivisionMoves,
+  type Outcome,
+  type Stage,
+  type StageKey,
+  type Zone,
+} from "@/lib/league-standings";
 
+export { MovePill, ordinal };
 export type DivisionView = LeagueView["divisions"][number];
 type MatchSummary = DivisionView["weeks"][number]["matches"][number];
 type TeamBadge = MatchSummary["teamA"];
 export type Countries = Record<string, string | null>;
 
-const ORANGE = "#ff5500";
-
-export function ordinal(n: number) {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
-}
+const ZONE_BAR: Record<Exclude<Zone, null>, string> = {
+  promotion: "bg-hl-green",
+  playoffs: "bg-[#ff5500]",
+  relegation: "bg-hl-red",
+};
 
 /** Match weeks run Monday–Sunday in UTC, so their dates are shown in UTC too. */
 function utcDay(ts: number) {
@@ -148,22 +163,100 @@ export function StageStepper({
   );
 }
 
+// --- stage outcomes (league v2) ----------------------------------------------------------------
+
+const OUTCOME_TONE: Record<Outcome["tone"], { box: string; icon: string }> = {
+  green: { box: "border-hl-green/30 bg-hl-green/[0.06]", icon: "bg-hl-green/15 text-hl-green" },
+  red: { box: "border-hl-red/30 bg-hl-red/[0.06]", icon: "bg-hl-red/15 text-hl-red" },
+  orange: { box: "border-[#ff5500]/30 bg-[#ff5500]/[0.06]", icon: "bg-[#ff5500]/15 text-[#ff5500]" },
+  gold: { box: "border-hl-gold/25 bg-hl-gold/[0.05]", icon: "bg-hl-gold/15 text-hl-gold" },
+  neutral: { box: "border-white/[0.1] bg-[#121212]", icon: "bg-white/[0.06] text-white/60" },
+};
+
+function OutcomeIcon({ kind }: { kind: Outcome["kind"] }) {
+  const cls = "h-4 w-4";
+  if (kind === "up") return <ChevronsUp className={cls} />;
+  if (kind === "down") return <ChevronsDown className={cls} />;
+  if (kind === "prize") return <Coins className={cls} />;
+  if (kind === "info") return <Info className={cls} />;
+  return <Trophy className={cls} />;
+}
+
+/** FACEIT-style "stage outcomes": what each place gets, above the stage's table or bracket. */
+export function StageOutcomes({ outcomes }: { outcomes: Outcome[] }) {
+  if (!outcomes.length) return null;
+  return (
+    <section aria-label="Stage outcomes" className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+      {outcomes.map((o) => {
+        const tone = OUTCOME_TONE[o.tone];
+        return (
+          <div key={o.kind} className={`flex items-start gap-3 rounded-xl border px-3.5 py-3 ${tone.box}`}>
+            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tone.icon}`}>
+              <OutcomeIcon kind={o.kind} />
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-black leading-tight text-white">{o.title}</div>
+              <div className="mt-0.5 text-xs font-bold text-white/70">{o.places}</div>
+              {o.note ? <div className="mt-0.5 text-[11px] leading-snug text-white/50">{o.note}</div> : null}
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 // --- regular season --------------------------------------------------------------------------
+
+/** A full-width strip over a zone of the table ("PROMOTIONS", "RELEGATIONS"). */
+function ZoneBand({ zone, moves, cols }: { zone: Exclude<Zone, null>; moves: DivisionMoves; cols: number }) {
+  const [label, aside, cls] =
+    zone === "promotion"
+      ? [
+          "Promotions",
+          moves.up >= PLAYOFF_LINE
+            ? `${upText(moves).short} · via the playoffs`
+            : `${moves.up === 1 ? "Playoff champion" : `Top ${moves.up} after the playoffs`} · ${lowerFirst(upText(moves).short)}`,
+          "bg-hl-green/[0.08] text-hl-green",
+        ]
+      : zone === "relegation"
+        ? ["Relegations", downText(moves).short, "bg-hl-red/[0.08] text-hl-red"]
+        : ["Playoffs", `Top ${PLAYOFF_LINE} · best of 3`, "bg-[#ff5500]/[0.07] text-[#ff5500]"];
+  return (
+    <tr className="border-t border-white/[0.06] first:border-t-0">
+      <td colSpan={cols} className={`px-4 py-1.5 sm:px-5 ${cls}`}>
+        <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em]">
+          <span className="inline-flex items-center gap-1.5">
+            {zone === "promotion" ? <ChevronsUp className="h-3.5 w-3.5" /> : zone === "relegation" ? <ChevronsDown className="h-3.5 w-3.5" /> : <Trophy className="h-3 w-3" />}
+            {label}
+          </span>
+          <span className="truncate text-right font-bold normal-case tracking-normal opacity-80">{aside}</span>
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 export function RegularTable({
   div,
   countries,
   myTeamIds,
+  moves,
 }: {
   div: DivisionView;
   countries: Countries;
   myTeamIds: string[];
+  moves: DivisionMoves;
 }) {
   const tied = tiebrokenTeams(div.standings);
+  const n = div.standings.length;
+  const zones = div.standings.map((_, i) => regularZone(i, n, moves));
   const th = "px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50";
   return (
     <section>
-      <SectionTitle aside={`${div.standings.length} teams · win = 3 pts`}>Regular season</SectionTitle>
+      <SectionTitle aside={`${div.standings.length} teams · ${div.format === "swiss" ? "Swiss · " : ""}win = 3 pts`}>
+        Regular season
+      </SectionTitle>
       <div className="overflow-x-auto rounded-xl border border-white/[0.08] bg-[#121212]">
         <table className="w-full text-sm sm:min-w-[640px]">
           <thead>
@@ -181,8 +274,10 @@ export function RegularTable({
           <tbody>
             {div.standings.map((row, i) => {
               const mine = myTeamIds.includes(row.teamId);
-              const zone = i < PLAYOFF_LINE;
-              return (
+              const zone = zones[i];
+              const band = zone && zone !== zones[i - 1] ? <ZoneBand key={`band-${zone}`} zone={zone} moves={moves} cols={8} /> : null;
+              return [
+                band,
                 <tr
                   key={row.teamId}
                   className={`border-t border-white/[0.05] first:border-t-0 ${mine ? "bg-[#ff5500]/[0.07]" : "hover:bg-white/[0.02]"}`}
@@ -190,9 +285,9 @@ export function RegularTable({
                   <td className="relative py-2.5 pl-5 pr-3">
                     <span
                       aria-hidden
-                      className={`absolute inset-y-1 left-0 w-[3px] rounded-r ${zone ? "bg-[#ff5500]" : "bg-white/10"}`}
+                      className={`absolute inset-y-1 left-0 w-[3px] rounded-r ${zone ? ZONE_BAR[zone] : "bg-white/10"}`}
                     />
-                    <span className={`font-black tabular-nums ${zone ? "text-white" : "text-white/55"}`}>{i + 1}</span>
+                    <span className={`font-black tabular-nums ${zone && zone !== "relegation" ? "text-white" : "text-white/55"}`}>{i + 1}</span>
                   </td>
                   <td className="w-full max-w-0 px-2 py-2.5 sm:w-auto sm:max-w-none sm:px-3">
                     <div className="flex min-w-0 items-center gap-2">
@@ -221,19 +316,18 @@ export function RegularTable({
                     {row.rd > 0 ? `+${row.rd}` : row.rd}
                   </td>
                   <td className="py-2.5 pl-2 pr-4 text-right sm:pl-3 sm:pr-5 font-black tabular-nums text-white">{row.points}</td>
-                </tr>
-              );
+                </tr>,
+              ];
             })}
           </tbody>
         </table>
       </div>
       <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-white/55">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: ORANGE }} /> Playoffs · 1st–{ordinal(PLAYOFF_LINE)}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
           <span className="rounded border border-white/15 px-1 text-[9px] font-black leading-[14px] text-white/60">TB</span>
-          Placed by tiebreak (head-to-head → round difference → rounds won)
+          {div.format === "swiss"
+            ? "Placed by tiebreak (opponents' points → round difference → rounds won)"
+            : "Placed by tiebreak (head-to-head → round difference → rounds won)"}
         </span>
       </div>
     </section>
@@ -274,8 +368,8 @@ function ScheduleLine({ m }: { m: MatchSummary }) {
 
 export function RegularSchedule({ div }: { div: DivisionView }) {
   const weeks = div.weeks
-    .map((w) => ({ ...w, matches: w.matches.filter((m) => !m.round) }))
-    .filter((w) => w.matches.length);
+    .map((w) => ({ ...w, matches: w.matches.filter((m) => !m.round), byes: div.byes.filter((b) => b.week === w.week) }))
+    .filter((w) => w.matches.length || w.byes.length);
   return (
     <section>
       <SectionTitle>Matches</SectionTitle>
@@ -303,6 +397,15 @@ export function RegularSchedule({ div }: { div: DivisionView }) {
               <div className="space-y-1.5">
                 {w.matches.map((m) => (
                   <ScheduleLine key={m.id} m={m} />
+                ))}
+                {w.byes.map((b) => (
+                  <div
+                    key={b.team.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-white/[0.1] px-3 py-2"
+                  >
+                    <TeamCell team={b.team} size={22} />
+                    <span className="shrink-0 text-[11px] font-bold text-white/50">Bye · counts as a win</span>
+                  </div>
                 ))}
               </div>
             </div>
@@ -545,7 +648,7 @@ export function FinalResults({
               <th className={`${th} w-16 pl-5`}>Place</th>
               <th className={th}>Team</th>
               <th className={`${th} hidden w-28 sm:table-cell`}>Country</th>
-              <th className={`${th} pr-5 text-right sm:w-44`}>Reward</th>
+              <th className={`${th} pr-5 text-right`}>Reward</th>
             </tr>
           </thead>
           {groups.map((g) => (
@@ -559,7 +662,13 @@ export function FinalResults({
                 const mine = myTeamIds.includes(p.team.id);
                 return (
                   <tr key={p.team.id} className={`border-t border-white/[0.05] ${mine ? "bg-[#ff5500]/[0.07]" : ""}`}>
-                    <td className="py-2.5 pl-5 pr-3 font-black tabular-nums" style={{ color: PODIUM[p.place - 1] ?? "rgba(255,255,255,.6)" }}>
+                    <td className="relative py-2.5 pl-5 pr-3 font-black tabular-nums" style={{ color: PODIUM[p.place - 1] ?? "rgba(255,255,255,.6)" }}>
+                      {p.movement ? (
+                        <span
+                          aria-hidden
+                          className={`absolute inset-y-1 left-0 w-[3px] rounded-r ${p.movement === "up" ? "bg-hl-green" : "bg-hl-red"}`}
+                        />
+                      ) : null}
                       {ordinal(p.place)}
                     </td>
                     <td className="px-3 py-2.5">
@@ -569,13 +678,16 @@ export function FinalResults({
                       <CountryCell code={countries[p.team.id]} />
                     </td>
                     <td className="py-2.5 pl-3 pr-5 text-right">
-                      {p.prize ? (
-                        <span className="inline-flex items-center gap-1 font-bold text-hl-gold">
-                          <Coins className="h-3.5 w-3.5" /> {p.prize.toLocaleString()}
-                        </span>
-                      ) : (
-                        <span className="text-white/35">—</span>
-                      )}
+                      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                        {p.movement ? <MovePill movement={p.movement} to={p.movedTo ?? ""} /> : null}
+                        {p.prize ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-hl-gold">
+                            <Coins className="h-3.5 w-3.5" /> {p.prize.toLocaleString()}
+                          </span>
+                        ) : !p.movement ? (
+                          <span className="text-white/35">—</span>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 );

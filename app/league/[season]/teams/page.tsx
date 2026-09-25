@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Lock } from "lucide-react";
-import { LeagueDivisionSelect } from "@/components/league-division-select";
+import { LeagueDivisionPicker } from "@/components/league-division-select";
 import { CountryCell, Empty, TeamCell, ordinal } from "@/components/league-standings";
 import { getSession } from "@/lib/auth";
 import { UPCOMING_STATUSES, getSeason, seasonDivisions } from "@/lib/league";
+import { conferenceGroups, filterPicker, parseDivisionFilter } from "@/lib/league-standings";
 import { STATUS_LABEL, leagueTeams, parseTeamsFilter, statusCounts, type TeamsFilter } from "@/lib/league-teams";
 import type { EntryStatus } from "@/lib/league";
 
@@ -18,7 +19,8 @@ const STATUS_STYLE: Record<EntryStatus, string> = {
 
 /**
  * Teams (docs/LEAGUE_UI_PLAN.md step 5): every team in the season with its
- * country, league status, division and entry status. ?division= and ?status=.
+ * country, league status, division and entry status. ?division= (an id, or a
+ * split division's code for all its conferences) and ?status=.
  */
 export default async function SeasonTeamsPage({
   params,
@@ -35,12 +37,10 @@ export default async function SeasonTeamsPage({
 
   const all = await leagueTeams(season.id, session?.discordId ?? null);
   const divisions = await seasonDivisions(season.id);
-  const division =
-    typeof query.division === "string" && divisions.some((d) => String(d.id) === query.division)
-      ? Number(query.division)
-      : null;
+  const groups = conferenceGroups(divisions);
+  const filter = parseDivisionFilter(query.division, groups);
   const status = parseTeamsFilter(query.status);
-  const inDivision = division ? all.filter((r) => r.division?.id === division) : all;
+  const inDivision = filter.ids ? all.filter((r) => r.division && filter.ids!.includes(r.division.id)) : all;
   const rows = status === "all" ? inDivision : inDivision.filter((r) => r.status === status);
   const counts = statusCounts(inDivision);
   const finished = season.status === "finished";
@@ -48,7 +48,7 @@ export default async function SeasonTeamsPage({
   const base = `/league/${season.id}/teams`;
   const href = (s: TeamsFilter) => {
     const q = new URLSearchParams();
-    if (division) q.set("division", String(division));
+    if (filter.value) q.set("division", filter.value);
     if (s !== "all") q.set("status", s);
     return q.size ? `${base}?${q}` : base;
   };
@@ -61,14 +61,10 @@ export default async function SeasonTeamsPage({
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         {divisions.length ? (
-          <LeagueDivisionSelect
+          <LeagueDivisionPicker
             base={base}
             keep={{ status: status === "all" ? null : status }}
-            value={division ? String(division) : ""}
-            options={[
-              { value: "", label: "All divisions" },
-              ...divisions.map((d) => ({ value: String(d.id), label: d.name })),
-            ]}
+            picker={filterPicker(groups, filter)}
           />
         ) : (
           <div />
@@ -147,7 +143,7 @@ export default async function SeasonTeamsPage({
                   <td className="hidden px-3 py-2.5 sm:table-cell">
                     <span
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-white/85"
-                      title={r.inviteOnly ? "Invite-only division, given by Match Staff" : "Placed by the team's skill (top-5 average Elo)"}
+                      title={r.inviteOnly ? "Earned status (promotion/relegation), or set by Match Staff" : "Placed by the team's skill (top-5 average Elo)"}
                     >
                       {r.inviteOnly ? <Lock className="h-3 w-3 text-[#ff5500]" /> : null}
                       {r.access}

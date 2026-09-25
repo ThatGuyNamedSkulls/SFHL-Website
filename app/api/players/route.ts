@@ -7,6 +7,7 @@ import { countryToPlayRegion } from "@/lib/country-regions";
 import { regionMeta } from "@/lib/regions";
 import { remember } from "@/lib/server-cache";
 import { clubTagIndex, lookupClubTag } from "@/lib/clubs";
+import { proLeagueInfo, type ProLeagueView } from "@/lib/pro-ladder";
 
 export async function GET(request: Request) {
   try {
@@ -18,10 +19,14 @@ export async function GET(request: Request) {
     const modeParam = searchParams.get("mode");
     if (modeParam && modeParam !== "5v5") {
       const mappedModes = await remember(`players:mode:${modeParam}`, 8000, async () => {
-        const [rows, cards, tags] = await Promise.all([
+        const [rows, cards, tags, league] = await Promise.all([
           getModeLeaderboard(modeParam),
           getEquippedVisualsMap().catch(() => new Map<string, EquippedVisuals>()),
           clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
+          // The Pro ladder is earned in league matches: where and how many (league v2 C6).
+          modeParam === "pro"
+            ? proLeagueInfo().catch(() => new Map<string, ProLeagueView>())
+            : Promise.resolve(new Map<string, ProLeagueView>()),
         ]);
         return rows.map((r, idx) => {
           const hasCountry = isValidCountry(r.country);
@@ -57,6 +62,7 @@ export async function GET(request: Request) {
             clubTag: lookupClubTag(tags, r.player_name, r.discord_id != null ? String(r.discord_id) : null),
             placementDone: rating.placementDone,
             placementGamesPlayed: r.placement_games_played,
+            league: league.get(String(r.player_name).toLowerCase()) ?? null,
           };
         });
       });

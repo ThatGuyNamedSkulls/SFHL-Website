@@ -7,6 +7,7 @@ import { client } from "@/lib/db";
 import { logEvent, type Actor } from "@/lib/league-admin";
 import { ensureLeagueSchema, seasonDivisions, seasonEntries, seasonMatches, teamCountries, type TeamBadge } from "@/lib/league";
 import { getLeagueMatch, matchTeam, type MatchTeam } from "@/lib/league-matches";
+import { proDivisionWeight } from "@/lib/pro-league";
 import { listTeams } from "@/lib/teams";
 import {
   StatsInputError,
@@ -85,6 +86,37 @@ export async function deleteMapStats(matchId: number, mapNo: number, actor: Acto
   await logEvent(match.seasonId, "stats_removed", actor, `${a.name} vs ${b.name} · map ${mapNo}`, matchId);
 }
 
+export interface MatchProElo {
+  /** Division weight, or null when this division doesn't feed the Pro ladder. */
+  weight: number | null;
+  /** Each player's Pro Elo before/after this match (empty until the bot rebuilds the ladder). */
+  deltas: { playerName: string; teamId: string; before: number; after: number }[];
+}
+
+/** Pro ladder info for the match page (docs/LEAGUE_V2_PLAN.md, Part A). */
+export async function matchProElo(matchId: number, divisionId: number | null): Promise<MatchProElo> {
+  await ensureLeagueSchema();
+  let weight: number | null = null;
+  if (divisionId !== null) {
+    const d = await client.execute({ sql: "SELECT code FROM league_divisions WHERE id = ?", args: [divisionId] });
+    weight = proDivisionWeight(d.rows[0]?.code == null ? null : String(d.rows[0].code));
+  }
+  if (weight === null) return { weight, deltas: [] };
+  const rs = await client.execute({
+    sql: "SELECT player_name, team_id, elo_before, elo_after FROM league_pro_elo WHERE match_id = ? ORDER BY elo_after - elo_before DESC",
+    args: [matchId],
+  });
+  return {
+    weight,
+    deltas: (rs.rows as Row[]).map((r) => ({
+      playerName: String(r.player_name),
+      teamId: String(r.team_id),
+      before: Number(r.elo_before),
+      after: Number(r.elo_after),
+    })),
+  };
+}
+
 /** The match page: every saved map scoreboard, in map order. */
 export async function matchScoreboards(matchId: number, teamA: string): Promise<MapScoreboard[]> {
   await ensureLeagueSchema();
@@ -131,9 +163,10 @@ export interface StatsTableRow extends PlayerTotals {
 }
 
 /** The Stats tab: per-player totals for a season, one division or all. */
-export async function seasonStats(seasonId: number, divisionId: number | null): Promise<StatsTableRow[]> {
+export async function seasonStats(seasonId: number, division: number | number[] | null): Promise<StatsTableRow[]> {
   await ensureLeagueSchema();
-  const matches = (await seasonMatches(seasonId)).filter((m) => divisionId === null || m.divisionId === divisionId);
+  const only = division === null ? null : new Set(Array.isArray(division) ? division : [division]);
+  const matches = (await seasonMatches(seasonId)).filter((m) => only === null || (m.divisionId !== null && only.has(m.divisionId)));
   const ids = new Set(matches.map((m) => m.id));
   if (!ids.size) return [];
   const rs = await client.execute({ sql: "SELECT * FROM league_match_stats WHERE season_id = ? ORDER BY match_id, map_no", args: [seasonId] });
@@ -185,5 +218,5 @@ export async function statsDivisions(seasonId: number) {
     args: [seasonId],
   });
   const counts = new Map((rs.rows as Row[]).map((r) => [Number(r.d), Number(r.n)]));
-  return divisions.map((d) => ({ id: d.id, name: d.name, matches: counts.get(d.id) ?? 0 }));
+  return divisions.map((d) => ({ id: d.id, name: d.name, code: d.code, matches: counts.get(d.id) ?? 0 }));
 }

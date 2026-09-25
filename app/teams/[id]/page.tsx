@@ -7,7 +7,9 @@ import { Trophy } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { ClubColorPicker, ClubMark } from "@/components/club-identity";
+import { TeamLeague } from "@/components/team-league";
 import { useSession } from "@/components/session-provider";
+import type { TeamLeagueSeason, TeamLeagueStatus } from "@/lib/league";
 import { QUEUE_REGIONS, regionMeta } from "@/lib/regions";
 
 interface Member {
@@ -38,27 +40,14 @@ interface TitleRow {
   awardedAt: number;
 }
 
-interface LeagueRow {
-  seasonId: number;
-  season: string;
-  seasonStatus: string;
-  division: string | null;
-  played: number;
-  won: number;
-  lost: number;
-  finalPlace: number | null;
-  movement: string | null;
-  prize: number | null;
-  placed: boolean;
-}
-
 export default function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { session } = useSession();
   const [team, setTeam] = useState<Team | null>(null);
   const [titles, setTitles] = useState<TitleRow[]>([]);
-  const [league, setLeague] = useState<LeagueRow[]>([]);
+  const [league, setLeague] = useState<TeamLeagueSeason[]>([]);
+  const [leagueStatus, setLeagueStatus] = useState<TeamLeagueStatus | null>(null);
   // Invite-only named divisions: "Main Access" etc. (null → plays in Open by skill).
   const [leagueAccess, setLeagueAccess] = useState<{ code: string; label: string } | null>(null);
   const [viewerStaff, setViewerStaff] = useState(false);
@@ -83,6 +72,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     setTitles(Array.isArray(data.titles) ? data.titles : []);
     setLeague(Array.isArray(data.league) ? data.league : []);
     setLeagueAccess(data.leagueAccess ?? null);
+    setLeagueStatus(data.leagueStatus ?? null);
     setViewerStaff(data.staff === true);
     setName(data.team.name);
     setTag(data.team.tag);
@@ -227,48 +217,46 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <Card className="mt-6 flex flex-wrap items-center justify-between gap-3 border-hl-border bg-hl-panel p-4">
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-wide text-hl-muted">League status</div>
-          <div className="mt-0.5 text-sm font-black text-white">
-            {leagueAccess ? leagueAccess.label : "Open — placed by the team's skill"}
-          </div>
-          <div className="text-[11px] text-hl-muted">
-            Named divisions (Pro, Advanced, Main, Intermediate, Entry) are invite-only — Match Staff give access.
-          </div>
-        </div>
-        {viewerStaff ? (
-          <select
-            value={leagueAccess?.code ?? "open"}
-            disabled={busy}
-            onChange={async (e) => {
-              setBusy(true);
-              setError(null);
-              try {
-                const res = await fetch("/api/league/admin", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ action: "setAccess", teamId: id, access: e.target.value }),
-                });
-                const json = await res.json().catch(() => ({}));
-                if (!res.ok) setError(json.error || "Couldn't change the league status.");
-                await load();
-              } finally {
-                setBusy(false);
-              }
-            }}
-            className="h-9 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white"
-            title="Match Staff: change this team's division access"
-          >
-            <option value="open">Open (by skill)</option>
-            <option value="pro">Pro Access</option>
-            <option value="advanced">Advanced Access</option>
-            <option value="main">Main Access</option>
-            <option value="intermediate">Intermediate Access</option>
-            <option value="entry">Entry Access</option>
-          </select>
-        ) : null}
-      </Card>
+      <div className="mt-6">
+        <TeamLeague
+          status={leagueStatus}
+          seasons={league}
+          staffControl={
+            viewerStaff ? (
+              <select
+                value={leagueAccess?.code ?? "open"}
+                disabled={busy}
+                onChange={async (e) => {
+                  setBusy(true);
+                  setError(null);
+                  try {
+                    const res = await fetch("/api/league/admin", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "setAccess", teamId: id, access: e.target.value }),
+                    });
+                    const json = await res.json().catch(() => ({}));
+                    if (!res.ok) setError(json.error || "Couldn't change the league status.");
+                    await load();
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="h-9 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white"
+                title="Match Staff: change this team's division access"
+              >
+                <option value="open">Open (by skill)</option>
+                <option value="pro">Pro Access</option>
+                <option value="advanced">Advanced Access</option>
+                <option value="main">Main Access</option>
+                <option value="intermediate">Intermediate Access</option>
+                <option value="entry">Entry Access</option>
+                <option value="open10">Open 10 Access (earned)</option>
+              </select>
+            ) : null
+          }
+        />
+      </div>
 
       <Card className="mt-6 border-hl-border bg-hl-panel p-4">
         <div className="mb-2 flex items-center gap-2 text-sm font-bold text-white">
@@ -295,38 +283,6 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
           </ul>
         )}
       </Card>
-
-      {league.length ? (
-        <Card className="mt-6 border-hl-border bg-hl-panel p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-white">
-            <Trophy className="h-4 w-4 text-hl-gold" /> League
-          </div>
-          <ul className="divide-y divide-hl-border">
-            {league.map((s) => (
-              <li key={s.seasonId} className="flex flex-wrap items-center justify-between gap-3 py-2">
-                <Link href={`/league/${s.seasonId}`} className="text-sm font-semibold text-white hover:underline">
-                  {s.season}
-                  {s.division ? <span className="text-hl-muted"> · {s.division}</span> : null}
-                </Link>
-                <span className="text-xs text-hl-muted">
-                  {!s.placed
-                    ? "Signed up"
-                    : `${s.won}W · ${s.lost}L`}
-                  {s.finalPlace ? (
-                    <span className="ml-2 font-bold text-hl-gold">
-                      {s.finalPlace === 1 ? "🥇 Champions" : s.finalPlace === 2 ? "🥈 2nd" : s.finalPlace === 3 ? "🥉 3rd" : `${s.finalPlace}th`}
-                    </span>
-                  ) : s.seasonStatus !== "finished" && s.placed ? (
-                    <span className="ml-2">in progress</span>
-                  ) : null}
-                  {s.movement === "up" ? <span className="ml-2 text-hl-green">⬆ promoted</span> : null}
-                  {s.movement === "down" ? <span className="ml-2 text-hl-red">⬇ relegated</span> : null}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
 
       {editing && captain ? (
         <Card className="mt-6 space-y-3 border-hl-border bg-hl-panel p-4">

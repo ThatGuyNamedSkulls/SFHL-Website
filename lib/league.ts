@@ -9,6 +9,7 @@
  */
 import { client } from "@/lib/db";
 import { getTeam, listTeams, type Team } from "@/lib/teams";
+import { swissStandings } from "@/lib/league-swiss";
 
 /** TESTING: 1 so small teams can try the league. The real rule is 5 — change it
  * back here and in core/league.py before a real season. */
@@ -77,6 +78,12 @@ export const DIVISION_ORDER: [string, string][] = [
 ];
 export const DIVISION_NAMES: Record<string, string> = Object.fromEntries(DIVISION_ORDER);
 export const ACCESS_CODES: string[] = ACCESS_TIERS.map(([c]) => c);
+/**
+ * A team's stored status (league_team_access): a named tier, or Open10 once it
+ * was promoted there from Open 8-9 (league v2). No status = its Open skill band.
+ * Same as STATUS_CODES in core/league.py.
+ */
+export const STATUS_CODES: string[] = [...ACCESS_CODES, "open10"];
 
 /** The Open division code for a team's seed Elo. */
 export function openBand(elo: number | null | undefined): string {
@@ -86,7 +93,7 @@ export function openBand(elo: number | null | undefined): string {
 
 /** "Main Access", or the team's Open band ("Open 5-7 Access") when it has none. */
 export function accessLabel(access: string | null | undefined, seedElo?: number | null): string {
-  const code = access && ACCESS_CODES.includes(access) ? access : openBand(seedElo);
+  const code = access && STATUS_CODES.includes(access) ? access : openBand(seedElo);
   return `${DIVISION_NAMES[code]} Access`;
 }
 
@@ -103,7 +110,7 @@ export async function teamAccessMap(teamIds?: string[]): Promise<Map<string, str
   const out = new Map<string, string>();
   for (const r of rs.rows) {
     const access = String(r.access);
-    if (ACCESS_CODES.includes(access)) out.set(String(r.team_id), access);
+    if (STATUS_CODES.includes(access)) out.set(String(r.team_id), access);
   }
   return out;
 }
@@ -159,8 +166,10 @@ export interface Entry {
   signedUpAt: number;
   /** Set when the season ends: 1 = champion. */
   finalPlace?: number | null;
-  /** Unused since divisions became invite-only (kept for old seasons). */
+  /** Promotion/relegation at season end (league v2). */
   movement?: "up" | "down" | null;
+  /** The status it moved to ("" = back to its Open skill band). */
+  movedTo?: string | null;
   /** HL Coins paid to each rostered player. */
   prize?: number | null;
 }
@@ -173,6 +182,8 @@ export interface Division {
   tier: number;
   /** "main", "open57", merged "pro+advanced" (null on seasons drawn before invite-only divisions). */
   code: string | null;
+  /** "rr" round-robin (up to 7 teams) | "swiss" (league v2); null on older seasons = round-robin. */
+  format: "rr" | "swiss" | null;
 }
 
 export interface LeagueMatch {
@@ -308,13 +319,16 @@ export function ensureLeagueSchema(): Promise<void> {
         ["final_place", "INTEGER"],
         ["movement", "TEXT"],
         ["prize", "INTEGER"],
+        ["moved_to", "TEXT"],
       ]) {
         if (!ehave.has(col)) await client.execute(`ALTER TABLE league_entries ADD COLUMN ${col} ${ddl}`);
       }
       // Invite-only divisions + season page details (same lists as core/league.py).
+      // Same list as DIVISION_EXTRA_COLUMNS in core/league.py.
       const dcols = await client.execute("PRAGMA table_info(league_divisions)");
-      if (!dcols.rows.some((r) => String((r as Record<string, unknown>).name) === "code")) {
-        await client.execute("ALTER TABLE league_divisions ADD COLUMN code TEXT");
+      const dhave = new Set(dcols.rows.map((r) => String((r as Record<string, unknown>).name)));
+      for (const col of ["code", "format"]) {
+        if (!dhave.has(col)) await client.execute(`ALTER TABLE league_divisions ADD COLUMN ${col} TEXT`);
       }
       const scols = await client.execute("PRAGMA table_info(league_seasons)");
       const shave = new Set(scols.rows.map((r) => String((r as Record<string, unknown>).name)));
@@ -402,6 +416,26 @@ export function ensureLeagueSchema(): Promise<void> {
         UNIQUE (match_id, map_no, discord_id)
       )`);
       await client.execute("CREATE INDEX IF NOT EXISTS idx_league_match_stats_season ON league_match_stats (season_id)");
+      // Swiss byes (lib/league-swiss.ts): the team that sits out a week, which counts as a win.
+      await client.execute(`CREATE TABLE IF NOT EXISTS league_byes (
+        season_id INTEGER NOT NULL,
+        division_id INTEGER NOT NULL,
+        week INTEGER NOT NULL,
+        team_id TEXT NOT NULL,
+        PRIMARY KEY (division_id, week)
+      )`);
+      // Pro ladder from league matches: each player's Pro Elo before/after every
+      // counted match. Rebuilt by the bot (core/pro_league.py); read here. Same DDL.
+      await client.execute(`CREATE TABLE IF NOT EXISTS league_pro_elo (
+        match_id INTEGER NOT NULL,
+        season_id INTEGER NOT NULL,
+        player_name TEXT NOT NULL,
+        team_id TEXT NOT NULL,
+        elo_before INTEGER NOT NULL,
+        elo_after INTEGER NOT NULL,
+        weight REAL NOT NULL,
+        PRIMARY KEY (match_id, player_name)
+      )`);
     })().catch((e) => {
       schemaReady = null;
       throw e;
@@ -450,6 +484,7 @@ function toEntry(r: Record<string, unknown>): Entry {
     signedUpAt: Number(r.signed_up_at),
     finalPlace: num(r.final_place),
     movement: r.movement == null ? null : (String(r.movement) as "up" | "down"),
+    movedTo: r.moved_to == null ? null : String(r.moved_to),
     prize: num(r.prize),
   };
 }
@@ -523,7 +558,7 @@ export async function seasonEntries(seasonId: number): Promise<Entry[]> {
 export async function seasonDivisions(seasonId: number): Promise<Division[]> {
   await ensureLeagueSchema();
   const rs = await client.execute({
-    sql: "SELECT id, name, tier, code FROM league_divisions WHERE season_id = ? ORDER BY tier",
+    sql: "SELECT id, name, tier, code, format FROM league_divisions WHERE season_id = ? ORDER BY tier",
     args: [seasonId],
   });
   return rows(rs).map((r) => ({
@@ -531,7 +566,35 @@ export async function seasonDivisions(seasonId: number): Promise<Division[]> {
     name: String(r.name),
     tier: Number(r.tier),
     code: r.code == null ? null : String(r.code),
+    format: r.format === "swiss" ? "swiss" : r.format === "rr" ? "rr" : null,
   }));
+}
+
+export interface Bye {
+  divisionId: number;
+  week: number;
+  teamId: string;
+}
+
+/** Swiss byes of a season (the team that sat out a week — counts as a win). */
+export async function seasonByes(seasonId: number): Promise<Bye[]> {
+  await ensureLeagueSchema();
+  const rs = await client.execute({
+    sql: "SELECT division_id, week, team_id FROM league_byes WHERE season_id = ? ORDER BY week",
+    args: [seasonId],
+  });
+  return rows(rs).map((r) => ({ divisionId: Number(r.division_id), week: Number(r.week), teamId: String(r.team_id) }));
+}
+
+/** A division's regular-season standings: head-to-head for round-robin, Buchholz (with byes) for Swiss. */
+export function divisionStandingRows(
+  format: Division["format"],
+  teamIds: string[],
+  matches: LeagueMatch[],
+  byes: Bye[]
+): (StandingRow & { buchholz?: number })[] {
+  if (format === "swiss") return swissStandings(teamIds, matches, byes);
+  return computeStandings(teamIds, matches);
 }
 
 export async function seasonMatches(seasonId: number): Promise<LeagueMatch[]> {
@@ -792,6 +855,7 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
   const entryByTeam = new Map(entries.map((e) => [e.teamId, e]));
   const divisions = await seasonDivisions(season.id);
   const matches = await seasonMatches(season.id);
+  const byes = await seasonByes(season.id);
   const myTeamIds = viewerId
     ? entries
         .filter((e) => e.status !== "ineligible" && e.roster.some((p) => p.discordId === viewerId))
@@ -824,10 +888,14 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
     const placed = entries
       .filter((e) => e.divisionId === d.id && e.finalPlace)
       .sort((x, y) => (x.finalPlace ?? 0) - (y.finalPlace ?? 0));
+    const divByes = byes.filter((b) => b.divisionId === d.id);
     return {
       id: d.id,
       name: d.name,
       tier: d.tier,
+      code: d.code,
+      format: d.format ?? "rr",
+      byes: divByes.map((b) => ({ week: b.week, team: badge(b.teamId, entryByTeam.get(b.teamId)) })),
       playoffs: divMatches.some((m) => m.playoffRound)
         ? { semi1: round("semi1"), semi2: round("semi2"), final: round("final"), third: round("third") }
         : null,
@@ -835,12 +903,15 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
         place: e.finalPlace!,
         team: badge(e.teamId, e),
         movement: e.movement ?? null,
+        movedTo: e.movedTo ?? null,
         prize: e.prize ?? 0,
       })),
       // Standings are the regular season only; the playoffs decide the final places.
-      standings: computeStandings(
+      standings: divisionStandingRows(
+        d.format,
         teamIds,
-        divMatches.filter((m) => m.stage === "regular")
+        divMatches.filter((m) => m.stage === "regular"),
+        divByes
       ).map((row) => ({
         ...row,
         team: badge(row.teamId, entryByTeam.get(row.teamId)),
@@ -908,12 +979,14 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
 
 export type LeagueView = Awaited<ReturnType<typeof leagueView>>;
 
-/** A team's league seasons for its team page: division, record, final place, prize. */
+/** A team's league seasons for its team page: division, record, final place, move, prize. */
 export async function teamLeagueHistory(teamId: string) {
   await ensureLeagueSchema();
   const rs = await client.execute({
     sql: `SELECT e.season_id, s.name AS season_name, s.status AS season_status, d.name AS division, d.tier,
-                 e.final_place, e.movement, e.prize, e.status
+                 d.id AS division_id, d.code AS division_code,
+                 (SELECT COUNT(*) FROM league_entries x WHERE x.division_id = e.division_id AND x.status = 'active') AS teams,
+                 e.final_place, e.movement, e.moved_to, e.prize, e.status
           FROM league_entries e
           JOIN league_seasons s ON s.id = e.season_id
           LEFT JOIN league_divisions d ON d.id = e.division_id
@@ -933,17 +1006,52 @@ export async function teamLeagueHistory(teamId: string) {
       season: String(r.season_name),
       seasonStatus: String(r.season_status) as SeasonStatus,
       division: r.division == null ? null : String(r.division),
+      divisionId: num(r.division_id),
+      divisionCode: r.division_code == null ? null : String(r.division_code),
       tier: r.tier == null ? null : Number(r.tier),
+      /** Teams placed in that division (conference). */
+      teams: Number(r.teams ?? 0),
       played: matches.length,
       won,
       lost: matches.length - won,
       finalPlace: num(r.final_place),
-      movement: r.movement == null ? null : String(r.movement),
+      movement: r.movement === "up" || r.movement === "down" ? (r.movement as "up" | "down") : null,
+      /** Where it moved ("" = back to its Open skill band). */
+      movedTo: r.moved_to == null ? null : String(r.moved_to),
       prize: num(r.prize),
       placed: String(r.status) === "active",
     });
   }
   return out;
+}
+
+export type TeamLeagueSeason = Awaited<ReturnType<typeof teamLeagueHistory>>[number];
+
+export interface TeamLeagueStatus {
+  /** "intermediate", or the Open band ("open57") when it has no status. */
+  code: string;
+  name: string;
+  /** No stored status: it plays in the Open band of its roster's Elo. */
+  bySkill: boolean;
+  /** The status came from a promotion/relegation (not Match Staff). */
+  earned: boolean;
+  /** The roster's seed Elo (only worked out when `bySkill`). */
+  seedElo: number | null;
+}
+
+/** Where a team plays next season: its stored status, else its Open band by skill. */
+export async function teamLeagueStatus(team: Team): Promise<TeamLeagueStatus> {
+  await ensureLeagueSchema();
+  const rs = await client.execute({ sql: "SELECT access, set_by FROM league_team_access WHERE team_id = ?", args: [team.id] });
+  const r = rows(rs)[0];
+  const code = r ? String(r.access) : null;
+  if (code && STATUS_CODES.includes(code)) {
+    return { code, name: DIVISION_NAMES[code], bySkill: false, earned: String(r.set_by ?? "") === "League", seedElo: null };
+  }
+  const { roster } = rosterFromTeam(team);
+  const elo = await seedElo(roster).catch(() => null);
+  const band = openBand(elo);
+  return { code: band, name: DIVISION_NAMES[band], bySkill: true, earned: false, seedElo: elo };
 }
 
 /** When each staff step first happened in a season (for the timeline): kind → ms. */

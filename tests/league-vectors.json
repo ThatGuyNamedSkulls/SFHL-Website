@@ -464,6 +464,7 @@
     {
      "name": "Open 5-7",
      "code": "open57",
+     "format": "rr",
      "teams": [
       "x0",
       "x1",
@@ -528,23 +529,18 @@
    "access": {},
    "expected": [
     {
-     "name": "Open 10/Open 8-9/Open 5-7 A",
+     "name": "Open 10/Open 8-9/Open 5-7",
      "code": "open10+open89+open57",
+     "format": "swiss",
      "teams": [
       "x0",
-      "x3",
-      "x4",
-      "x7"
-     ]
-    },
-    {
-     "name": "Open 10/Open 8-9/Open 5-7 B",
-     "code": "open10+open89+open57",
-     "teams": [
       "x1",
       "x2",
+      "x3",
+      "x4",
       "x5",
-      "x6"
+      "x6",
+      "x7"
      ]
     }
    ]
@@ -594,6 +590,7 @@
     {
      "name": "Open 8-9/Open 1-4",
      "code": "open89+open14",
+     "format": "rr",
      "teams": [
       "x0",
       "x1",
@@ -667,6 +664,7 @@
     {
      "name": "Main",
      "code": "main",
+     "format": "rr",
      "teams": [
       "x2",
       "x3",
@@ -677,6 +675,7 @@
     {
      "name": "Open 8-9",
      "code": "open89",
+     "format": "rr",
      "teams": [
       "x4",
       "x5",
@@ -736,6 +735,7 @@
     {
      "name": "Pro/Advanced/Open 5-7/Open 1-4",
      "code": "pro+advanced+open57+open14",
+     "format": "rr",
      "teams": [
       "x4",
       "x2",
@@ -748,7 +748,7 @@
    ]
   },
   {
-   "label": "big band splits into snake groups",
+   "label": "13 teams stay together and play Swiss",
    "entries": [
     {
      "teamId": "x0",
@@ -832,34 +832,420 @@
    "access": {},
    "expected": [
     {
-     "name": "Open 8-9 A",
+     "name": "Open 8-9",
      "code": "open89",
+     "format": "swiss",
      "teams": [
       "x0",
+      "x1",
+      "x2",
+      "x3",
+      "x4",
       "x5",
       "x6",
+      "x7",
+      "x8",
+      "x9",
+      "x10",
       "x11",
       "x12"
      ]
+    }
+   ]
+  },
+  {
+   "label": "over 32 splits into snake conferences",
+   "entries": [
+    {
+     "teamId": "x0",
+     "seedElo": 1300,
+     "signedUpAt": 0,
+     "id": 0
     },
     {
-     "name": "Open 8-9 B",
-     "code": "open89",
+     "teamId": "x1",
+     "seedElo": 1310,
+     "signedUpAt": 1,
+     "id": 1
+    },
+    {
+     "teamId": "x2",
+     "seedElo": 1320,
+     "signedUpAt": 2,
+     "id": 2
+    },
+    {
+     "teamId": "x3",
+     "seedElo": 1330,
+     "signedUpAt": 3,
+     "id": 3
+    },
+    {
+     "teamId": "x4",
+     "seedElo": 1340,
+     "signedUpAt": 4,
+     "id": 4
+    },
+    {
+     "teamId": "x5",
+     "seedElo": 1350,
+     "signedUpAt": 5,
+     "id": 5
+    },
+    {
+     "teamId": "x6",
+     "seedElo": 1360,
+     "signedUpAt": 6,
+     "id": 6
+    },
+    {
+     "teamId": "x7",
+     "seedElo": 1370,
+     "signedUpAt": 7,
+     "id": 7
+    },
+    {
+     "teamId": "x8",
+     "seedElo": 1380,
+     "signedUpAt": 8,
+     "id": 8
+    },
+    {
+     "teamId": "x9",
+     "seedElo": 1390,
+     "signedUpAt": 9,
+     "id": 9
+    },
+    {
+     "teamId": "x10",
+     "seedElo": 1400,
+     "signedUpAt": 10,
+     "id": 10
+    },
+    {
+     "teamId": "x11",
+     "seedElo": 1410,
+     "signedUpAt": 11,
+     "id": 11
+    },
+    {
+     "teamId": "x12",
+     "seedElo": 1420,
+     "signedUpAt": 12,
+     "id": 12
+    },
+    {
+     "teamId": "x13",
+     "seedElo": 1430,
+     "signedUpAt": 13,
+     "id": 13
+    },
+    {
+     "teamId": "x14",
+     "seedElo": 1440,
+     "signedUpAt": 14,
+     "id": 14
+    },
+    {
+     "teamId": "x15",
+     "seedElo": 1450,
+     "signedUpAt": 15,
+     "id": 15
+    },
+    {
+     "teamId": "x16",
+     "seedElo": 1460,
+     "signedUpAt": 16,
+     "id": 16
+    },
+    {
+     "teamId": "x17",
+     "seedElo": 1470,
+     "signedUpAt": 17,
+     "id": 17
+    },
+    {
+     "teamId": "x18",
+     "seedElo": 1480,
+     "signedUpAt": 18,
+     "id": 18
+    },
+    {
+     "teamId": "x19",
+     "seedElo": 1490,
+     "signedUpAt": 19,
+     "id": 19
+    },
+    {
+     "teamId": "x20",
+     "seedElo": 1500,
+     "signedUpAt": 20,
+     "id": 20
+    },
+    {
+     "teamId": "x21",
+     "seedElo": 1510,
+     "signedUpAt": 21,
+     "id": 21
+    },
+    {
+     "teamId": "x22",
+     "seedElo": 1520,
+     "signedUpAt": 22,
+     "id": 22
+    },
+    {
+     "teamId": "x23",
+     "seedElo": 1530,
+     "signedUpAt": 23,
+     "id": 23
+    },
+    {
+     "teamId": "x24",
+     "seedElo": 1540,
+     "signedUpAt": 24,
+     "id": 24
+    },
+    {
+     "teamId": "x25",
+     "seedElo": 1550,
+     "signedUpAt": 25,
+     "id": 25
+    },
+    {
+     "teamId": "x26",
+     "seedElo": 1560,
+     "signedUpAt": 26,
+     "id": 26
+    },
+    {
+     "teamId": "x27",
+     "seedElo": 1570,
+     "signedUpAt": 27,
+     "id": 27
+    },
+    {
+     "teamId": "x28",
+     "seedElo": 1580,
+     "signedUpAt": 28,
+     "id": 28
+    },
+    {
+     "teamId": "x29",
+     "seedElo": 1590,
+     "signedUpAt": 29,
+     "id": 29
+    },
+    {
+     "teamId": "x30",
+     "seedElo": 1600,
+     "signedUpAt": 30,
+     "id": 30
+    },
+    {
+     "teamId": "x31",
+     "seedElo": 1610,
+     "signedUpAt": 31,
+     "id": 31
+    },
+    {
+     "teamId": "x32",
+     "seedElo": 1620,
+     "signedUpAt": 32,
+     "id": 32
+    },
+    {
+     "teamId": "x33",
+     "seedElo": 1630,
+     "signedUpAt": 33,
+     "id": 33
+    },
+    {
+     "teamId": "x34",
+     "seedElo": 1640,
+     "signedUpAt": 34,
+     "id": 34
+    },
+    {
+     "teamId": "x35",
+     "seedElo": 1650,
+     "signedUpAt": 35,
+     "id": 35
+    },
+    {
+     "teamId": "x36",
+     "seedElo": 1660,
+     "signedUpAt": 36,
+     "id": 36
+    },
+    {
+     "teamId": "x37",
+     "seedElo": 1670,
+     "signedUpAt": 37,
+     "id": 37
+    },
+    {
+     "teamId": "x38",
+     "seedElo": 1680,
+     "signedUpAt": 38,
+     "id": 38
+    },
+    {
+     "teamId": "x39",
+     "seedElo": 1690,
+     "signedUpAt": 39,
+     "id": 39
+    }
+   ],
+   "access": {},
+   "expected": [
+    {
+     "name": "Open 5-7 A",
+     "code": "open57",
+     "format": "swiss",
      "teams": [
-      "x1",
-      "x4",
+      "x39",
+      "x36",
+      "x35",
+      "x32",
+      "x31",
+      "x28",
+      "x27",
+      "x24",
+      "x23",
+      "x20",
+      "x19",
+      "x16",
+      "x15",
+      "x12",
+      "x11",
+      "x8",
       "x7",
-      "x10"
+      "x4",
+      "x3",
+      "x0"
      ]
     },
     {
-     "name": "Open 8-9 C",
-     "code": "open89",
+     "name": "Open 5-7 B",
+     "code": "open57",
+     "format": "swiss",
+     "teams": [
+      "x38",
+      "x37",
+      "x34",
+      "x33",
+      "x30",
+      "x29",
+      "x26",
+      "x25",
+      "x22",
+      "x21",
+      "x18",
+      "x17",
+      "x14",
+      "x13",
+      "x10",
+      "x9",
+      "x6",
+      "x5",
+      "x2",
+      "x1"
+     ]
+    }
+   ]
+  },
+  {
+   "label": "earned Open10 status beats skill",
+   "entries": [
+    {
+     "teamId": "x0",
+     "seedElo": 1500,
+     "signedUpAt": 0,
+     "id": 0
+    },
+    {
+     "teamId": "x1",
+     "seedElo": 1400,
+     "signedUpAt": 1,
+     "id": 1
+    },
+    {
+     "teamId": "x2",
+     "seedElo": 1300,
+     "signedUpAt": 2,
+     "id": 2
+    },
+    {
+     "teamId": "x3",
+     "seedElo": 1260,
+     "signedUpAt": 3,
+     "id": 3
+    },
+    {
+     "teamId": "x4",
+     "seedElo": 2600,
+     "signedUpAt": 4,
+     "id": 4
+    },
+    {
+     "teamId": "x5",
+     "seedElo": 2550,
+     "signedUpAt": 5,
+     "id": 5
+    },
+    {
+     "teamId": "x6",
+     "seedElo": 2520,
+     "signedUpAt": 6,
+     "id": 6
+    },
+    {
+     "teamId": "x7",
+     "seedElo": 1280,
+     "signedUpAt": 7,
+     "id": 7
+    },
+    {
+     "teamId": "x8",
+     "seedElo": 1270,
+     "signedUpAt": 8,
+     "id": 8
+    },
+    {
+     "teamId": "x9",
+     "seedElo": 1290,
+     "signedUpAt": 9,
+     "id": 9
+    }
+   ],
+   "access": {
+    "x0": "open10",
+    "x1": "open10"
+   },
+   "expected": [
+    {
+     "name": "Open 10",
+     "code": "open10",
+     "format": "rr",
+     "teams": [
+      "x4",
+      "x5",
+      "x6",
+      "x0",
+      "x1"
+     ]
+    },
+    {
+     "name": "Open 5-7",
+     "code": "open57",
+     "format": "rr",
      "teams": [
       "x2",
-      "x3",
+      "x9",
+      "x7",
       "x8",
-      "x9"
+      "x3"
      ]
     }
    ]
@@ -903,6 +1289,7 @@
     {
      "name": "Open 5-7",
      "code": "open57",
+     "format": "rr",
      "teams": [
       "x0",
       "x1",
@@ -1046,153 +1433,745 @@
    "ok": false
   }
  ],
- "divisionSizes": {
+ "conferenceSizes": {
   "4": [
    4
-  ],
-  "5": [
-   5
-  ],
-  "6": [
-   6
   ],
   "7": [
    7
   ],
   "8": [
-   4,
-   4
+   8
   ],
-  "9": [
-   5,
-   4
+  "31": [
+   31
   ],
-  "10": [
-   5,
-   5
+  "32": [
+   32
   ],
-  "11": [
-   6,
-   5
+  "33": [
+   17,
+   16
   ],
-  "12": [
-   6,
-   6
+  "40": [
+   20,
+   20
   ],
-  "13": [
-   5,
-   4,
-   4
+  "64": [
+   32,
+   32
   ],
-  "14": [
-   5,
-   5,
-   4
+  "65": [
+   22,
+   22,
+   21
   ],
-  "15": [
-   5,
-   5,
-   5
+  "97": [
+   25,
+   24,
+   24,
+   24
   ],
-  "16": [
-   6,
-   5,
-   5
-  ],
-  "17": [
-   6,
-   6,
-   5
-  ],
-  "18": [
-   6,
-   6,
-   6
-  ],
-  "19": [
-   5,
-   5,
-   5,
-   4
-  ],
-  "20": [
-   5,
-   5,
-   5,
-   5
-  ],
-  "21": [
-   6,
-   5,
-   5,
-   5
-  ],
-  "22": [
-   6,
-   6,
-   5,
-   5
-  ],
-  "23": [
-   6,
-   6,
-   6,
-   5
-  ],
-  "24": [
-   6,
-   6,
-   6,
-   6
-  ],
-  "25": [
-   5,
-   5,
-   5,
-   5,
-   5
-  ],
-  "26": [
-   6,
-   5,
-   5,
-   5,
-   5
-  ],
-  "27": [
-   6,
-   6,
-   5,
-   5,
-   5
-  ],
-  "28": [
-   6,
-   6,
-   6,
-   5,
-   5
-  ],
-  "29": [
-   6,
-   6,
-   6,
-   6,
-   5
-  ],
-  "30": [
-   6,
-   6,
-   6,
-   6,
-   6
+  "130": [
+   26,
+   26,
+   26,
+   26,
+   26
   ]
  },
- "divisionSizesTooFew": [
-  0,
-  1,
-  2,
-  3
+ "swissFirstRound": [
+  {
+   "teams": [
+    "s0",
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s5",
+    "s6",
+    "s7"
+   ],
+   "pairs": [
+    [
+     "s0",
+     "s4"
+    ],
+    [
+     "s1",
+     "s5"
+    ],
+    [
+     "s2",
+     "s6"
+    ],
+    [
+     "s3",
+     "s7"
+    ]
+   ],
+   "bye": null
+  },
+  {
+   "teams": [
+    "s0",
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s5",
+    "s6",
+    "s7",
+    "s8"
+   ],
+   "pairs": [
+    [
+     "s0",
+     "s4"
+    ],
+    [
+     "s1",
+     "s5"
+    ],
+    [
+     "s2",
+     "s6"
+    ],
+    [
+     "s3",
+     "s7"
+    ]
+   ],
+   "bye": "s8"
+  },
+  {
+   "teams": [
+    "s0",
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s5",
+    "s6",
+    "s7",
+    "s8",
+    "s9",
+    "s10",
+    "s11"
+   ],
+   "pairs": [
+    [
+     "s0",
+     "s6"
+    ],
+    [
+     "s1",
+     "s7"
+    ],
+    [
+     "s2",
+     "s8"
+    ],
+    [
+     "s3",
+     "s9"
+    ],
+    [
+     "s4",
+     "s10"
+    ],
+    [
+     "s5",
+     "s11"
+    ]
+   ],
+   "bye": null
+  },
+  {
+   "teams": [
+    "s0",
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s5",
+    "s6",
+    "s7",
+    "s8",
+    "s9",
+    "s10",
+    "s11",
+    "s12"
+   ],
+   "pairs": [
+    [
+     "s0",
+     "s6"
+    ],
+    [
+     "s1",
+     "s7"
+    ],
+    [
+     "s2",
+     "s8"
+    ],
+    [
+     "s3",
+     "s9"
+    ],
+    [
+     "s4",
+     "s10"
+    ],
+    [
+     "s5",
+     "s11"
+    ]
+   ],
+   "bye": "s12"
+  }
+ ],
+ "swissStandings": [
+  {
+   "teams": [
+    "s0",
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s5",
+    "s6",
+    "s7",
+    "s8"
+   ],
+   "matches": [
+    {
+     "team_a": "s0",
+     "team_b": "s4",
+     "status": "final",
+     "winner": "s0",
+     "score_a": 13,
+     "score_b": 5
+    },
+    {
+     "team_a": "s1",
+     "team_b": "s5",
+     "status": "final",
+     "winner": "s1",
+     "score_a": 13,
+     "score_b": 9
+    },
+    {
+     "team_a": "s2",
+     "team_b": "s6",
+     "status": "final",
+     "winner": "s6",
+     "score_a": 7,
+     "score_b": 13
+    },
+    {
+     "team_a": "s3",
+     "team_b": "s7",
+     "status": "forfeit",
+     "winner": "s3",
+     "score_a": null,
+     "score_b": null
+    },
+    {
+     "team_a": "s0",
+     "team_b": "s1",
+     "status": "final",
+     "winner": "s0",
+     "score_a": 13,
+     "score_b": 11
+    },
+    {
+     "team_a": "s6",
+     "team_b": "s3",
+     "status": "final",
+     "winner": "s3",
+     "score_a": 10,
+     "score_b": 13
+    },
+    {
+     "team_a": "s4",
+     "team_b": "s5",
+     "status": "final",
+     "winner": "s4",
+     "score_a": 13,
+     "score_b": 2
+    },
+    {
+     "team_a": "s7",
+     "team_b": "s2",
+     "status": "final",
+     "winner": "s7",
+     "score_a": 13,
+     "score_b": 12
+    },
+    {
+     "team_a": "s8",
+     "team_b": "s0",
+     "status": "reported",
+     "winner": "s0",
+     "score_a": 1,
+     "score_b": 13
+    }
+   ],
+   "byes": [
+    {
+     "team_id": "s8"
+    },
+    {
+     "team_id": "s5"
+    }
+   ],
+   "expected": [
+    {
+     "teamId": "s0",
+     "played": 2,
+     "won": 2,
+     "lost": 0,
+     "roundsFor": 26,
+     "roundsAgainst": 16,
+     "rd": 10,
+     "points": 6,
+     "buchholz": 6
+    },
+    {
+     "teamId": "s3",
+     "played": 2,
+     "won": 2,
+     "lost": 0,
+     "roundsFor": 13,
+     "roundsAgainst": 10,
+     "rd": 3,
+     "points": 6,
+     "buchholz": 6
+    },
+    {
+     "teamId": "s4",
+     "played": 2,
+     "won": 1,
+     "lost": 1,
+     "roundsFor": 18,
+     "roundsAgainst": 15,
+     "rd": 3,
+     "points": 3,
+     "buchholz": 9
+    },
+    {
+     "teamId": "s1",
+     "played": 2,
+     "won": 1,
+     "lost": 1,
+     "roundsFor": 24,
+     "roundsAgainst": 22,
+     "rd": 2,
+     "points": 3,
+     "buchholz": 9
+    },
+    {
+     "teamId": "s6",
+     "played": 2,
+     "won": 1,
+     "lost": 1,
+     "roundsFor": 23,
+     "roundsAgainst": 20,
+     "rd": 3,
+     "points": 3,
+     "buchholz": 6
+    },
+    {
+     "teamId": "s7",
+     "played": 2,
+     "won": 1,
+     "lost": 1,
+     "roundsFor": 13,
+     "roundsAgainst": 12,
+     "rd": 0,
+     "points": 3,
+     "buchholz": 6
+    },
+    {
+     "teamId": "s5",
+     "played": 3,
+     "won": 1,
+     "lost": 2,
+     "roundsFor": 11,
+     "roundsAgainst": 26,
+     "rd": -15,
+     "points": 3,
+     "buchholz": 6
+    },
+    {
+     "teamId": "s8",
+     "played": 1,
+     "won": 1,
+     "lost": 0,
+     "roundsFor": 0,
+     "roundsAgainst": 0,
+     "rd": 0,
+     "points": 3,
+     "buchholz": 0
+    },
+    {
+     "teamId": "s2",
+     "played": 2,
+     "won": 0,
+     "lost": 2,
+     "roundsFor": 19,
+     "roundsAgainst": 26,
+     "rd": -7,
+     "points": 0,
+     "buchholz": 6
+    }
+   ]
+  },
+  {
+   "teams": [
+    "s0",
+    "s1",
+    "s2",
+    "s3"
+   ],
+   "matches": [
+    {
+     "team_a": "s0",
+     "team_b": "s4",
+     "status": "final",
+     "winner": "s0",
+     "score_a": 13,
+     "score_b": 5
+    }
+   ],
+   "byes": [],
+   "expected": [
+    {
+     "teamId": "s0",
+     "played": 0,
+     "won": 0,
+     "lost": 0,
+     "roundsFor": 0,
+     "roundsAgainst": 0,
+     "rd": 0,
+     "points": 0,
+     "buchholz": 0
+    },
+    {
+     "teamId": "s1",
+     "played": 0,
+     "won": 0,
+     "lost": 0,
+     "roundsFor": 0,
+     "roundsAgainst": 0,
+     "rd": 0,
+     "points": 0,
+     "buchholz": 0
+    },
+    {
+     "teamId": "s2",
+     "played": 0,
+     "won": 0,
+     "lost": 0,
+     "roundsFor": 0,
+     "roundsAgainst": 0,
+     "rd": 0,
+     "points": 0,
+     "buchholz": 0
+    },
+    {
+     "teamId": "s3",
+     "played": 0,
+     "won": 0,
+     "lost": 0,
+     "roundsFor": 0,
+     "roundsAgainst": 0,
+     "rd": 0,
+     "points": 0,
+     "buchholz": 0
+    }
+   ]
+  }
+ ],
+ "movesCount": {
+  "4": 1,
+  "5": 1,
+  "6": 2,
+  "7": 2,
+  "8": 2,
+  "9": 2,
+  "10": 3,
+  "13": 3,
+  "14": 4,
+  "16": 4,
+  "32": 4
+ },
+ "seasonMoves": [
+  {
+   "label": "big Main conference",
+   "places": [
+    "m0",
+    "m1",
+    "m2",
+    "m3",
+    "m4",
+    "m5",
+    "m6",
+    "m7",
+    "m8",
+    "m9",
+    "m10",
+    "m11",
+    "m12",
+    "m13",
+    "m14",
+    "m15"
+   ],
+   "codes": {
+    "m0": "main",
+    "m1": "main",
+    "m2": "main",
+    "m3": "main",
+    "m4": "main",
+    "m5": "main",
+    "m6": "main",
+    "m7": "main",
+    "m8": "main",
+    "m9": "main",
+    "m10": "main",
+    "m11": "main",
+    "m12": "main",
+    "m13": "main",
+    "m14": "main",
+    "m15": "main"
+   },
+   "expected": [
+    {
+     "teamId": "m0",
+     "direction": "up",
+     "from": "main",
+     "to": "advanced"
+    },
+    {
+     "teamId": "m1",
+     "direction": "up",
+     "from": "main",
+     "to": "advanced"
+    },
+    {
+     "teamId": "m2",
+     "direction": "up",
+     "from": "main",
+     "to": "advanced"
+    },
+    {
+     "teamId": "m3",
+     "direction": "up",
+     "from": "main",
+     "to": "advanced"
+    },
+    {
+     "teamId": "m12",
+     "direction": "down",
+     "from": "main",
+     "to": "intermediate"
+    },
+    {
+     "teamId": "m13",
+     "direction": "down",
+     "from": "main",
+     "to": "intermediate"
+    },
+    {
+     "teamId": "m14",
+     "direction": "down",
+     "from": "main",
+     "to": "intermediate"
+    },
+    {
+     "teamId": "m15",
+     "direction": "down",
+     "from": "main",
+     "to": "intermediate"
+    }
+   ]
+  },
+  {
+   "label": "small Pro: champion stays, bottom goes down",
+   "places": [
+    "p0",
+    "p1",
+    "p2",
+    "p3"
+   ],
+   "codes": {
+    "p0": "pro",
+    "p1": "pro",
+    "p2": "pro",
+    "p3": "pro"
+   },
+   "expected": [
+    {
+     "teamId": "p3",
+     "direction": "down",
+     "from": "pro",
+     "to": "advanced"
+    }
+   ]
+  },
+  {
+   "label": "Open10 bottom loses its status",
+   "places": [
+    "o0",
+    "o1",
+    "o2",
+    "o3",
+    "o4",
+    "o5"
+   ],
+   "codes": {
+    "o0": "open10",
+    "o1": "open10",
+    "o2": "open10",
+    "o3": "open10",
+    "o4": "open10",
+    "o5": "open10"
+   },
+   "expected": [
+    {
+     "teamId": "o0",
+     "direction": "up",
+     "from": "open10",
+     "to": "entry"
+    },
+    {
+     "teamId": "o1",
+     "direction": "up",
+     "from": "open10",
+     "to": "entry"
+    },
+    {
+     "teamId": "o4",
+     "direction": "down",
+     "from": "open10",
+     "to": ""
+    },
+    {
+     "teamId": "o5",
+     "direction": "down",
+     "from": "open10",
+     "to": ""
+    }
+   ]
+  },
+  {
+   "label": "Open 8-9 goes up, never down",
+   "places": [
+    "e0",
+    "e1",
+    "e2",
+    "e3",
+    "e4",
+    "e5",
+    "e6",
+    "e7"
+   ],
+   "codes": {
+    "e0": "open89",
+    "e1": "open89",
+    "e2": "open89",
+    "e3": "open89",
+    "e4": "open89",
+    "e5": "open89",
+    "e6": "open89",
+    "e7": "open89"
+   },
+   "expected": [
+    {
+     "teamId": "e0",
+     "direction": "up",
+     "from": "open89",
+     "to": "open10"
+    },
+    {
+     "teamId": "e1",
+     "direction": "up",
+     "from": "open89",
+     "to": "open10"
+    }
+   ]
+  },
+  {
+   "label": "Open 5-7 never moves",
+   "places": [
+    "f0",
+    "f1",
+    "f2",
+    "f3",
+    "f4",
+    "f5",
+    "f6",
+    "f7"
+   ],
+   "codes": {
+    "f0": "open57",
+    "f1": "open57",
+    "f2": "open57",
+    "f3": "open57",
+    "f4": "open57",
+    "f5": "open57",
+    "f6": "open57",
+    "f7": "open57"
+   },
+   "expected": []
+  },
+  {
+   "label": "merged division: each team from its own level",
+   "places": [
+    "a0",
+    "b0",
+    "a1",
+    "b1",
+    "a2",
+    "b2"
+   ],
+   "codes": {
+    "a0": "entry",
+    "a1": "entry",
+    "a2": "entry",
+    "b0": "open10",
+    "b1": "open10",
+    "b2": "open10"
+   },
+   "expected": [
+    {
+     "teamId": "a0",
+     "direction": "up",
+     "from": "entry",
+     "to": "intermediate"
+    },
+    {
+     "teamId": "b0",
+     "direction": "up",
+     "from": "open10",
+     "to": "entry"
+    },
+    {
+     "teamId": "a2",
+     "direction": "down",
+     "from": "entry",
+     "to": "open10"
+    },
+    {
+     "teamId": "b2",
+     "direction": "down",
+     "from": "open10",
+     "to": ""
+    }
+   ]
+  }
  ],
  "schedules": {
   "4": [

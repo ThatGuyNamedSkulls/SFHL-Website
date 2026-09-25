@@ -1,18 +1,33 @@
 /**
  * League UI step 4 (docs/LEAGUE_UI_PLAN.md): the Standings stage stepper
- * (Regular season → Playoffs → Final results) and the tiebreak badge. Pure — no DB.
+ * (Regular season → Playoffs → Final results) and the tiebreak badge; league v2
+ * (docs/LEAGUE_V2_PLAN.md C2/C3): outcome cards, promotion/relegation zones
+ * (checked against seasonMoves) and the conference filters. Pure — no DB.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  NO_MOVES,
+  PLAYOFF_LINE,
+  conferenceGroups,
   defaultStage,
+  divisionMoves,
+  downText,
+  filterPicker,
+  parseDivisionFilter,
   parseStage,
+  regularZone,
   shortSpan,
+  shownMoves,
   stageNote,
+  stageOutcomes,
+  standingsPicker,
   standingsStages,
   tiebrokenTeams,
+  upText,
   type StageInput,
 } from "@/lib/league-standings";
+import { seasonMoves } from "@/lib/league-swiss";
 
 const DAY = 86_400_000;
 const START = Date.UTC(2026, 8, 7); // a Monday
@@ -122,5 +137,187 @@ describe("standings helpers", () => {
       { teamId: "f", points: 0, played: 0 },
     ];
     assert.deepEqual([...tiebrokenTeams(rows)].sort(), ["b", "c"]);
+  });
+});
+
+describe("promotion / relegation on the Standings tab (league v2 C2)", () => {
+  const PRIZES = [5000, 2500, 1000];
+
+  it("divisionMoves: where each level goes and how many move", () => {
+    assert.deepEqual(divisionMoves("main", 8), {
+      levels: ["main"],
+      up: 2,
+      down: 2,
+      upTo: [["main", "advanced"]],
+      downTo: [["main", "intermediate"]],
+    });
+    assert.deepEqual([divisionMoves("pro", 16).up, divisionMoves("pro", 16).down], [0, 4]);
+    assert.deepEqual([divisionMoves("open89", 9).up, divisionMoves("open89", 9).down], [2, 0]);
+    assert.deepEqual([divisionMoves("open57", 9).up, divisionMoves("open57", 9).down], [0, 0]);
+    assert.deepEqual(divisionMoves(null, 8), NO_MOVES);
+  });
+
+  it("the zones match seasonMoves for every level and size", () => {
+    for (const code of ["pro", "advanced", "main", "intermediate", "entry", "open10", "open89", "open57", "open14"]) {
+      for (let n = 4; n <= 32; n++) {
+        const places = Array.from({ length: n }, (_, i) => `t${i}`);
+        const moved = seasonMoves(places, Object.fromEntries(places.map((t) => [t, code])));
+        const moves = divisionMoves(code, n);
+        const ups = moved.filter((m) => m.direction === "up").map((m) => places.indexOf(m.teamId));
+        const downs = moved.filter((m) => m.direction === "down").map((m) => places.indexOf(m.teamId));
+        assert.deepEqual(ups, Array.from({ length: moves.up }, (_, i) => i), `${code} ${n} up`);
+        assert.deepEqual(downs, Array.from({ length: moves.down }, (_, i) => n - moves.down + i), `${code} ${n} down`);
+        // The red zone of the regular table is exactly the relegated places (when the table decides them).
+        const red = places.map((_, i) => regularZone(i, n, moves)).flatMap((z, i) => (z === "relegation" ? [i] : []));
+        assert.deepEqual(red, n - moves.down >= PLAYOFF_LINE ? downs : [], `${code} ${n} red zone`);
+      }
+    }
+  });
+
+  it("regular table zones: promotion playoffs on top, relegations at the bottom", () => {
+    const main8 = divisionMoves("main", 8);
+    assert.deepEqual(
+      Array.from({ length: 8 }, (_, i) => regularZone(i, 8, main8)),
+      ["promotion", "promotion", "promotion", "promotion", null, null, "relegation", "relegation"]
+    );
+    // Open 5-7: plain playoffs, nobody moves.
+    const open57 = divisionMoves("open57", 6);
+    assert.deepEqual(Array.from({ length: 6 }, (_, i) => regularZone(i, 6, open57)), [
+      "playoffs", "playoffs", "playoffs", "playoffs", null, null,
+    ]);
+    // 4 teams: the 4th place after the playoffs goes down, so no red rows in the table.
+    const entry4 = divisionMoves("entry", 4);
+    assert.deepEqual(Array.from({ length: 4 }, (_, i) => regularZone(i, 4, entry4)), [
+      "promotion", "promotion", "promotion", "promotion",
+    ]);
+  });
+
+  it("outcome texts: single level, merged levels and Open 10", () => {
+    assert.deepEqual(upText(divisionMoves("main", 8)), { title: "Promoted to Advanced status", short: "Up to Advanced", note: null });
+    assert.deepEqual(downText(divisionMoves("main", 8)), { title: "Relegated to Intermediate status", short: "Down to Intermediate", note: null });
+    const top = divisionMoves("pro+advanced", 6);
+    assert.deepEqual(upText(top), { title: "Promoted to Pro status", short: "Up to Pro", note: "Advanced teams" });
+    assert.deepEqual(downText(top), {
+      title: "Relegated one level",
+      short: "One level down",
+      note: "Pro → Advanced · Advanced → Main",
+    });
+    assert.deepEqual(downText(divisionMoves("open10", 12)), {
+      title: "Lose Open 10 status",
+      short: "Lose Open 10",
+      note: "Back to their Open skill band",
+    });
+    assert.equal(upText(divisionMoves("open89", 9)).title, "Promoted to Open 10 status");
+    assert.equal(downText(divisionMoves("open10+open89", 6)).note, "Open 10 teams · Back to their Open skill band");
+  });
+
+  it("stage outcome cards", () => {
+    const main8 = divisionMoves("main", 8);
+    const cards = (stage: "regular" | "playoffs" | "final", moves = main8, n = 8) =>
+      stageOutcomes(stage, moves, n, PRIZES).map((o) => [o.kind, o.tone, o.title, o.places]);
+    assert.deepEqual(cards("regular"), [
+      ["playoffs", "green", "Qualify for the playoffs", "1st–4th"],
+      ["down", "red", "Relegated to Intermediate status", "7th–8th"],
+    ]);
+    assert.equal(stageOutcomes("regular", main8, 8, PRIZES)[0].note, "The top 2 after the playoffs go up to Advanced");
+    assert.deepEqual(cards("playoffs"), [
+      ["up", "green", "Promoted to Advanced status", "1st–2nd"],
+      ["prize", "gold", "5,000 · 2,500 · 1,000 HL Coins", "1st–3rd"],
+    ]);
+    assert.deepEqual(cards("final"), [
+      ["up", "green", "Promoted to Advanced status", "1st–2nd"],
+      ["down", "red", "Relegated to Intermediate status", "7th–8th"],
+      ["prize", "gold", "5,000 · 2,500 · 1,000 HL Coins", "1st–3rd"],
+    ]);
+    // Pro/Advanced, 5 teams: one goes up, and only an Advanced team can.
+    assert.equal(
+      stageOutcomes("regular", divisionMoves("pro+advanced", 5), 5, PRIZES)[0].note,
+      "The playoff champion goes up to Pro · Advanced teams"
+    );
+    // 16 teams: all 4 playoff teams go up.
+    assert.equal(stageOutcomes("regular", divisionMoves("main", 16), 16, PRIZES)[0].note, "All 4 go up to Advanced · the playoffs decide the champion");
+    // 4 teams: the playoffs decide the relegated place.
+    assert.deepEqual(cards("regular", divisionMoves("entry", 4), 4), [["playoffs", "green", "Qualify for the playoffs", "1st–4th"]]);
+    assert.deepEqual(cards("playoffs", divisionMoves("entry", 4), 4).map((c) => [c[0], c[3]]), [
+      ["up", "1st"],
+      ["down", "4th"],
+      ["prize", "1st–3rd"],
+    ]);
+    // Open 5-7: played for fun.
+    assert.deepEqual(cards("regular", divisionMoves("open57", 6), 6), [
+      ["playoffs", "orange", "Qualify for the playoffs", "1st–4th"],
+      ["info", "neutral", "No promotion or relegation", "Every place"],
+    ]);
+  });
+
+  it("a season that ended before promotion existed shows no moves", () => {
+    assert.deepEqual(shownMoves("main", 8, [{ movement: null }, { movement: null }]), NO_MOVES);
+    assert.equal(shownMoves("main", 8, [{ movement: "up" }, { movement: null }]).up, 2);
+    assert.equal(shownMoves("main", 8, []).up, 2);
+  });
+});
+
+describe("conferences (league v2 C3)", () => {
+  const divisions = [
+    { id: 1, name: "Pro/Advanced", code: "pro+advanced" },
+    { id: 2, name: "Open 10 A", code: "open10" },
+    { id: 3, name: "Open 10 B", code: "open10" },
+    { id: 4, name: "Open 5-7", code: "open57" },
+    { id: 5, name: "Group B", code: null },
+  ];
+  const groups = conferenceGroups(divisions);
+
+  it("groups a split division's conferences", () => {
+    assert.deepEqual(groups, [
+      { name: "Pro/Advanced", code: "pro+advanced", conferences: [{ id: 1, letter: null }] },
+      { name: "Open 10", code: "open10", conferences: [{ id: 2, letter: "A" }, { id: 3, letter: "B" }] },
+      { name: "Open 5-7", code: "open57", conferences: [{ id: 4, letter: null }] },
+      { name: "Group B", code: null, conferences: [{ id: 5, letter: null }] },
+    ]);
+  });
+
+  it("Standings: the division opens your conference; the conference select lists A, B", () => {
+    const picker = standingsPicker(groups, 3, new Set([2]));
+    assert.deepEqual(picker.division, {
+      value: "2",
+      options: [
+        { value: "1", label: "Pro/Advanced" },
+        { value: "2", label: "Open 10 · your team" },
+        { value: "4", label: "Open 5-7" },
+        { value: "5", label: "Group B" },
+      ],
+    });
+    assert.deepEqual(picker.conference, {
+      value: "3",
+      options: [
+        { value: "2", label: "Conference A · your team" },
+        { value: "3", label: "Conference B" },
+      ],
+    });
+    assert.equal(standingsPicker(groups, 4).conference, null);
+  });
+
+  it("Teams / Stats: one conference, all of a division's conferences, or everything", () => {
+    assert.deepEqual(parseDivisionFilter("3", groups).ids, [3]);
+    assert.deepEqual(parseDivisionFilter("open10", groups).ids, [2, 3]);
+    assert.deepEqual(parseDivisionFilter("open57", groups), { ids: null, group: null, value: "" });
+    assert.deepEqual(parseDivisionFilter("99", groups).ids, null);
+    assert.deepEqual(parseDivisionFilter(undefined, groups).ids, null);
+
+    const all = filterPicker(groups, parseDivisionFilter(undefined, groups));
+    assert.deepEqual(all.division.options.map((o) => o.value), ["", "1", "open10", "4", "5"]);
+    assert.equal(all.conference, null);
+
+    const split = filterPicker(groups, parseDivisionFilter("open10", groups), (ids) => ` · ${ids.length}`);
+    assert.equal(split.division.value, "open10");
+    assert.deepEqual(split.conference, {
+      value: "open10",
+      options: [
+        { value: "open10", label: "All conferences · 2" },
+        { value: "2", label: "Conference A · 1" },
+        { value: "3", label: "Conference B · 1" },
+      ],
+    });
+    assert.equal(filterPicker(groups, parseDivisionFilter("3", groups)).conference?.value, "3");
   });
 });

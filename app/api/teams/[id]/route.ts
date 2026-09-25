@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { titlesForTeam } from "@/lib/team-titles";
-import { accessLabel, teamAccessMap, teamLeagueHistory } from "@/lib/league";
+import { accessLabel, teamAccessMap, teamLeagueHistory, teamLeagueStatus } from "@/lib/league";
 import { isMatchStaff } from "@/lib/discord-party-voice";
 import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
@@ -49,6 +49,7 @@ export async function GET(
   const titles = await titlesForTeam(id).catch(() => []);
   const league = await teamLeagueHistory(id).catch(() => []);
   const access = (await teamAccessMap([id]).catch(() => new Map<string, string>())).get(id) ?? null;
+  const leagueStatus = await teamLeagueStatus(team).catch(() => null);
   const viewer = await getSession();
   const staff = viewer ? await isMatchStaff(viewer.discordId).catch(() => false) : false;
   return NextResponse.json({
@@ -57,6 +58,8 @@ export async function GET(
     league,
     // Invite-only named divisions: "Main Access", or null when the team plays in Open by skill.
     leagueAccess: access ? { code: access, label: accessLabel(access) } : null,
+    // Where it plays next season: its status, or its Open band by skill (league v2 C4).
+    leagueStatus,
     staff,
   });
 }

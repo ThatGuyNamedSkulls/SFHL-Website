@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { RankBadge } from "@/components/rank-badge";
 import { EmptyState } from "@/components/empty-state";
 import { Flag } from "@/components/flag";
 import { RankTierLetter } from "@/types";
-import { Users, Globe, ChevronDown } from "lucide-react";
+import { Users, Globe, ChevronDown, Swords } from "lucide-react";
 import { useLeaderboardRegion } from "@/components/use-play-region";
 import { PLAY_REGIONS, isGlobalRegion, regionMeta, type PlayRegionId } from "@/lib/regions";
 import { countryName, flagPath, COUNTRY_CHANGE_EVENT } from "@/lib/countries";
@@ -14,6 +15,8 @@ import { countryToPlayRegion } from "@/lib/country-regions";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson } from "@/lib/client-api";
 import { ClubTaggedName } from "@/components/club-identity";
+import { PRO_DIVISION_WEIGHTS } from "@/lib/pro-league";
+import { LEVEL_NAMES } from "@/lib/league-standings";
 
 interface ApiPlayer {
   id: string;
@@ -33,6 +36,48 @@ interface ApiPlayer {
   placementDone?: boolean;
   clubTag?: string | null;
   stats: { wins: number; kd: number; winPercent: number; headshotPercent: number; matchesPlayed: number };
+  /** Pro ladder only: the league matches that earned it (league v2 C6). */
+  league?: {
+    matches: number;
+    lastDelta: number;
+    division: string | null;
+    code: string | null;
+    team: { id: string; name: string; tag: string } | null;
+  } | null;
+}
+
+/** The Pro tab's header: where Pro Elo comes from, and each division's weight. */
+function ProLadderIntro() {
+  return (
+    <div className="w-full rounded-xl border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-4 py-3">
+      <div className="flex items-center gap-2 text-[13px] font-black text-white">
+        <Swords className="h-4 w-4 text-[#d8b4fe]" /> Earned in league matches
+      </div>
+      <p className="mt-1 text-[12px] leading-relaxed text-[#a0a0a0]">
+        Every league match in Open 10 and above counts, for the players on its saved scoreboard. Everyone starts at 0;
+        higher divisions give more.{" "}
+        <Link href="/league" className="font-bold text-[#d8b4fe] hover:underline">
+          Go to the League
+        </Link>
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {Object.entries(PRO_DIVISION_WEIGHTS).map(([code, w]) => (
+          <span key={code} className="rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-[11px] font-bold text-white/80">
+            {LEVEL_NAMES[code]} <span className="text-[#d8b4fe]">×{w.toFixed(1)}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DivisionChip({ name }: { name: string | null }) {
+  if (!name) return <span className="text-[#6a6a6a]">—</span>;
+  return (
+    <span className="inline-block max-w-full truncate rounded-md border border-[#a855f7]/30 bg-[#a855f7]/10 px-2 py-0.5 text-[11px] font-bold text-[#d8b4fe]">
+      {name}
+    </span>
+  );
 }
 
 function SkillPill({ position, rank }: { position: number; rank: RankTierLetter }) {
@@ -75,11 +120,13 @@ function FilterSelect({
   );
 }
 
-export default function LeaderboardsPage() {
+function LeaderboardsInner() {
   const [players, setPlayers] = useState<ApiPlayer[]>([]);
   const [loading, setLoading] = useState(true);
-  // "main" = the 5v5 ladder; "pro" = Pro Matchmaking (public, S2+ players).
-  const [ladder, setLadder] = useState<"main" | "pro">("main");
+  // "main" = the 5v5 ladder; "pro" = the Pro ladder, earned in league matches
+  // (Open10 and above). ?mode=pro opens it (the dashboard's Pro Ladder card).
+  const initialLadder = useSearchParams().get("mode") === "pro" ? "pro" : "main";
+  const [ladder, setLadder] = useState<"main" | "pro">(initialLadder);
   const { session } = useSession();
   const loggedIn = !!session;
   const myPlayer = session?.playerName || session?.username || null;
@@ -245,6 +292,7 @@ export default function LeaderboardsPage() {
         <h2 className="text-sm font-bold text-white">
           {meta.short} {ladder === "pro" ? "Pro " : ""}Rankings
         </h2>
+        {ladder === "pro" ? <ProLadderIntro /> : null}
         {!isGlobalRegion(region) && unsetCountryCount > 0 ? (
           <button
             type="button"
@@ -278,13 +326,24 @@ export default function LeaderboardsPage() {
       </div>
 
       <div className="w-full">
-        <div className="hidden md:grid grid-cols-[56px_1fr_90px_140px_88px] gap-2 px-1 pb-2 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
-          <span>Rank</span>
-          <span>Player</span>
-          <span className="text-center">Country</span>
-          <span className="text-center">Skill level</span>
-          <span className="text-right">ELO</span>
-        </div>
+        {ladder === "pro" ? (
+          <div className="hidden md:grid grid-cols-[56px_1fr_160px_110px_70px_120px] gap-2 px-1 pb-2 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+            <span>Rank</span>
+            <span>Player</span>
+            <span>Last division</span>
+            <span className="text-center">League matches</span>
+            <span className="text-center">Last</span>
+            <span className="text-right">Pro ELO</span>
+          </div>
+        ) : (
+          <div className="hidden md:grid grid-cols-[56px_1fr_90px_140px_88px] gap-2 px-1 pb-2 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+            <span>Rank</span>
+            <span>Player</span>
+            <span className="text-center">Country</span>
+            <span className="text-center">Skill level</span>
+            <span className="text-right">ELO</span>
+          </div>
+        )}
 
         {loading ? (
           <div className="py-16 text-center text-sm text-[#6a6a6a]">Loading…</div>
@@ -294,7 +353,7 @@ export default function LeaderboardsPage() {
             title={ladder === "pro" && players.length === 0 ? "No Pro ratings yet" : "No players found"}
             hint={
               ladder === "pro" && players.length === 0
-                ? "S2+ players (1900+ Elo) get a Pro rating after their first Pro Matchmaking game."
+                ? "Play a league match in Open10 or above to get on the Pro ladder."
                 : isGlobalRegion(region)
                   ? "No players match your filters."
                   : "No players from this region yet. Set your country in Settings to appear on the matching board."
@@ -306,6 +365,69 @@ export default function LeaderboardsPage() {
             const boardRank = idx + 1;
             const placing = isPlacing(player);
             const displayRank = placing ? "UNRANKED" : (player.rank as RankTierLetter);
+            if (ladder === "pro") {
+              const lg = player.league ?? null;
+              return (
+                <Link
+                  key={player.id}
+                  href={`/profile?player=${encodeURIComponent(player.username)}`}
+                  className={`grid grid-cols-[32px_1fr_auto] md:grid-cols-[56px_1fr_160px_110px_70px_120px] gap-2 items-center px-1 min-h-14 py-2 md:h-16 md:py-0 border-b border-white/[0.04] ${
+                    isMe ? "bg-[#ff5500]/10" : "hover:bg-white/[0.03]"
+                  }`}
+                >
+                  <span className="text-sm tabular-nums text-[#8a8a8a]">{boardRank}</span>
+                  <span className="flex items-center gap-3 min-w-0">
+                    {player.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={player.avatarUrl}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="w-10 h-10 rounded-md object-cover bg-[#1a1a1a] shrink-0"
+                      />
+                    ) : (
+                      <span className="w-10 h-10 rounded-md bg-[#1a1a1a] text-[#ff5500] text-xs font-bold flex items-center justify-center shrink-0">
+                        {player.username.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2 min-w-0">
+                        {player.countryFlag ? (
+                          <Flag src={player.countryFlag} name={player.countryName} className="w-5 h-[14px] shrink-0" />
+                        ) : null}
+                        <span className="text-[15px] font-medium text-white truncate">
+                          <ClubTaggedName name={player.username} tag={player.clubTag} />
+                        </span>
+                      </span>
+                      <span className="block truncate text-[11px] text-[#8a8a8a]">
+                        {lg?.team ? `${lg.team.name} [${lg.team.tag}]` : "League player"}
+                        <span className="md:hidden">
+                          {lg?.division ? ` · ${lg.division}` : ""}
+                          {lg ? ` · ${lg.matches} match${lg.matches === 1 ? "" : "es"}` : ""}
+                        </span>
+                      </span>
+                    </span>
+                  </span>
+                  <span className="hidden md:block min-w-0">
+                    <DivisionChip name={lg?.division ?? null} />
+                  </span>
+                  <span className="hidden md:block text-center text-sm tabular-nums text-white/80">{lg?.matches ?? player.stats.matchesPlayed}</span>
+                  <span
+                    className={`hidden md:block text-center text-sm font-bold tabular-nums ${
+                      !lg || lg.lastDelta === 0 ? "text-[#8a8a8a]" : lg.lastDelta > 0 ? "text-hl-green" : "text-hl-red"
+                    }`}
+                  >
+                    {lg ? (lg.lastDelta > 0 ? `+${lg.lastDelta}` : lg.lastDelta) : "—"}
+                  </span>
+                  <span className="flex items-center justify-end gap-2">
+                    <RankBadge rank={displayRank} size="sm" showGlow={false} className="!w-6 !h-6" />
+                    <span className={`text-[15px] font-semibold tabular-nums ${placing ? "text-[#8a8a8a]" : "text-white"}`}>
+                      {placing ? "—" : player.elo.toLocaleString()}
+                    </span>
+                  </span>
+                </Link>
+              );
+            }
             return (
               <Link
                 key={player.id}
@@ -361,5 +483,13 @@ export default function LeaderboardsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LeaderboardsPage() {
+  return (
+    <Suspense fallback={<div className="py-16 text-center text-sm text-[#6a6a6a]">Loading…</div>}>
+      <LeaderboardsInner />
+    </Suspense>
   );
 }

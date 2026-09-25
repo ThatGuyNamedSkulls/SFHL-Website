@@ -20,6 +20,7 @@ import {
   Gem,
 } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
+import { PRO_QUEUE_ENABLED } from "@/lib/queue-modes";
 
 interface DashboardProps {
   session: UserSession;
@@ -124,15 +125,26 @@ export function Dashboard({ session }: DashboardProps) {
       glow: "from-hl-gold/35",
       soon: false,
     },
-    {
-      href: "/queue",
-      title: "Pro Matchmaking",
-      desc: proEligible ? "S2+ only · Pro Elo" : "Locked · reach S2 (1900 Elo)",
-      icon: Gem,
-      glow: "from-purple-500/30",
-      soon: !proEligible,
-      lockedHint: "Reach S2 (1900 Elo) to unlock Pro Matchmaking",
-    },
+    // Pro Matchmaking is switched off: its card now points at the Pro ladder,
+    // which league matches in Open10 and above feed (docs/LEAGUE_V2_PLAN.md).
+    PRO_QUEUE_ENABLED
+      ? {
+          href: "/queue",
+          title: "Pro Matchmaking",
+          desc: proEligible ? "S2+ only · Pro Elo" : "Locked · reach S2 (1900 Elo)",
+          icon: Gem,
+          glow: "from-purple-500/30",
+          soon: !proEligible,
+          lockedHint: "Reach S2 (1900 Elo) to unlock Pro Matchmaking",
+        }
+      : {
+          href: "/leaderboards?mode=pro",
+          title: "Pro Ladder",
+          desc: "Earned in league matches · Open10+",
+          icon: Gem,
+          glow: "from-purple-500/30",
+          soon: false,
+        },
     {
       href: "/league",
       title: "League",

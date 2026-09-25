@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { ClubMark } from "@/components/club-identity";
 import { Flag } from "@/components/flag";
+import { LeagueDivisionPicker } from "@/components/league-division-select";
 import { Empty } from "@/components/league-standings";
 import { getSession } from "@/lib/auth";
 import { countryName, flagPath } from "@/lib/countries";
 import { getSeason } from "@/lib/league";
 import { seasonStats, statsDivisions } from "@/lib/league-stats";
 import { parseSort, sortTotals, type SortKey } from "@/lib/league-stats-rules";
+import { conferenceGroups, filterPicker, parseDivisionFilter } from "@/lib/league-standings";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +31,8 @@ const COLUMNS: { key: SortKey; label: string; title: string; fmt?: (n: number) =
 
 /**
  * Stats (docs/LEAGUE_UI_PLAN.md step 9): per-player totals from the
- * scoreboards Match Staff saved, per division; every column sorts.
- * ?division= (id or none = all) · ?sort= · ?dir=asc
+ * scoreboards Match Staff saved, per division or conference; every column
+ * sorts. ?division= (an id, a split division's code, or none = all) · ?sort= · ?dir=asc
  */
 export default async function SeasonStatsPage({
   params,
@@ -44,43 +46,37 @@ export default async function SeasonStatsPage({
   if (!season) notFound();
   const q = await searchParams;
   const divisions = await statsDivisions(season.id);
-  const division =
-    typeof q.division === "string" && divisions.some((d) => String(d.id) === q.division) ? Number(q.division) : null;
+  const groups = conferenceGroups(divisions);
+  const filter = parseDivisionFilter(q.division, groups);
   const sort = parseSort(q.sort);
   const asc = q.dir === "asc";
-  const rows = sortTotals(await seasonStats(season.id, division), sort, asc);
+  const rows = sortTotals(await seasonStats(season.id, filter.ids), sort, asc);
+  const matchCount = new Map(divisions.map((d) => [d.id, d.matches]));
+  const counted = (ids: number[]) => {
+    const n = ids.reduce((sum, id) => sum + (matchCount.get(id) ?? 0), 0);
+    return ` · ${n} match${n === 1 ? "" : "es"}`;
+  };
   const session = await getSession();
   const base = `/league/${season.id}/stats`;
-  const href = (patch: { division?: number | null; sort?: SortKey; asc?: boolean }) => {
+  const href = (patch: { sort?: SortKey; asc?: boolean }) => {
     const p = new URLSearchParams();
-    const d = patch.division === undefined ? division : patch.division;
     const s = patch.sort ?? sort;
     const a = patch.asc ?? asc;
-    if (d) p.set("division", String(d));
+    if (filter.value) p.set("division", filter.value);
     if (s !== "kills") p.set("sort", s);
     if (a) p.set("dir", "asc");
     return p.size ? `${base}?${p}` : base;
   };
-  const chip = (on: boolean) =>
-    `inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-xs font-black ${
-      on ? "border-[#ff5500] bg-[#ff5500]/15 text-white" : "border-white/[0.12] text-white/70 hover:text-white"
-    }`;
   const th = "px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.1em]";
 
   return (
     <div className="space-y-5">
       {divisions.length > 1 ? (
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Division">
-          <Link href={href({ division: null })} scroll={false} className={chip(division === null)}>
-            All divisions
-          </Link>
-          {divisions.map((d) => (
-            <Link key={d.id} href={href({ division: d.id })} scroll={false} className={chip(division === d.id)}>
-              {d.name}
-              <span className={division === d.id ? "text-[#ff5500]" : "text-white/40"}>{d.matches}</span>
-            </Link>
-          ))}
-        </div>
+        <LeagueDivisionPicker
+          base={base}
+          keep={{ sort: sort === "kills" ? null : sort, dir: asc ? "asc" : null }}
+          picker={filterPicker(groups, filter, counted)}
+        />
       ) : null}
 
       {rows.length === 0 ? (

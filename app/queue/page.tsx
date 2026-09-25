@@ -28,6 +28,7 @@ import { usePlayRegion, setQueueLocked } from "@/components/use-play-region";
 import { QUEUE_REGIONS, regionQueueLabel, isQueueRegion } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 import {
+  PRO_QUEUE_ENABLED,
   QUEUE_MODE_PRO,
   QUEUE_MODE_SUPER,
   SUPER_PARTY_MAX,
@@ -634,7 +635,8 @@ export default function QueuePage() {
         </div>
         {playTab === "type" ? (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 max-w-6xl gap-4">
-          {MATCH_TYPES.map((mt) => {
+          {/* Pro Matchmaking is switched off: Pro Elo comes from league matches now. */}
+          {MATCH_TYPES.filter((mt) => PRO_QUEUE_ENABLED || mt.id !== QUEUE_MODE_PRO).map((mt) => {
             const active = matchType === mt.id;
             const TypeIcon = mt.icon;
             const superLocked = mt.id === QUEUE_MODE_SUPER && superPlacementBlocked;

@@ -6,6 +6,7 @@ import { LeagueTimeline } from "@/components/league-timeline";
 import { LeagueUpcomingHero } from "@/components/league-upcoming-hero";
 import { getSession } from "@/lib/auth";
 import { findCount } from "@/lib/league-find";
+import { viewerLineup } from "@/lib/league-lineup";
 import { leagueTeams, type LeagueTeamRow } from "@/lib/league-teams";
 import {
   ACCESS_CODES,
@@ -24,8 +25,8 @@ export const dynamic = "force-dynamic";
 const DEFAULT_DESCRIPTION =
   "HyperLeague's team league is where organised teams play weekly official matches against teams of their level: " +
   "a six-week regular season inside your division, best-of-3 playoffs for the top 4, team titles and HL Coin prizes. " +
-  "Pro, Advanced, Main, Intermediate and Entry are invite-only; every other team plays in the Open division of its skill. " +
-  "League games never change your ranked Elo.";
+  "New teams start in the Open division of their skill; the top of every division moves up each season and the bottom moves down, from Open 8-9 all the way to Pro. " +
+  "League games never change your ranked Elo; matches in Open10 and above earn Pro ladder Elo instead.";
 
 const ROUND_LABEL: Record<string, string> = {
   semi1: "Semi-final",
@@ -133,7 +134,8 @@ export default async function SeasonOverviewPage({ params }: { params: Promise<{
           teams={teams.length}
           prizePerPlayer={PRIZES[0]}
           loggedIn={!!session}
-          myTeam={mine ? { name: mine.team.name, players: mine.players, captain: mine.captain } : null}
+          myTeam={mine ? { name: mine.team.name, captain: mine.captain } : null}
+          lineup={session ? await viewerLineup(season.id, session.discordId) : null}
           findCount={await findCount(season.id)}
         />
         <LeagueTimeline strip={strip} all={all} />
@@ -210,7 +212,7 @@ export default async function SeasonOverviewPage({ params }: { params: Promise<{
                       </span>
                       <span className="inline-flex items-center gap-1">
                         {inviteOnly ? <Lock className="h-3 w-3" /> : null}
-                        {inviteOnly ? "Invite-only" : "Open"}
+                        {inviteOnly ? "Earned status" : "Open"}
                       </span>
                     </div>
                   </div>

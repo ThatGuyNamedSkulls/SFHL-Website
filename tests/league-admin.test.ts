@@ -14,6 +14,7 @@ import { createTempDb } from "./helpers/temp-db";
 process.env.HL_LEAGUE_ROSTER_MIN = "5";
 const tmp = createTempDb("league-admin");
 let admin: typeof import("@/lib/league-admin");
+let swiss: typeof import("@/lib/league-swiss");
 let league: typeof import("@/lib/league");
 let lm: typeof import("@/lib/league-matches");
 let client: typeof import("@/lib/db").client;
@@ -27,6 +28,7 @@ const vectors = JSON.parse(readFileSync(join(__dirname, "league-vectors.json"), 
 
 before(async () => {
   admin = await import("@/lib/league-admin");
+  swiss = await import("@/lib/league-swiss");
   league = await import("@/lib/league");
   lm = await import("@/lib/league-matches");
   client = (await import("@/lib/db")).client;
@@ -59,11 +61,11 @@ async function addTeam(id: string, ids: number[], elo: number) {
 }
 
 describe("draw and schedule rules match the bot", () => {
-  it("division sizes", () => {
-    for (const [n, sizes] of Object.entries(vectors.divisionSizes)) {
-      assert.deepEqual(admin.divisionSizes(Number(n)), sizes, `${n} teams`);
+  it("conference sizes (league v2: split only above 32)", () => {
+    for (const [n, sizes] of Object.entries(vectors.conferenceSizes)) {
+      assert.deepEqual(swiss.conferenceSizes(Number(n)), sizes, `${n} teams`);
     }
-    for (const n of vectors.divisionSizesTooFew) assert.throws(() => admin.divisionSizes(n), /At least 4/);
+    assert.throws(() => admin.planDivisions([]), /At least 4/);
   });
 
   it("round-robin schedules for 4–7 teams", () => {
@@ -99,9 +101,10 @@ describe("running a season from the website", () => {
     await admin.openSignups(season.id, 7, STAFF);
     assert.equal((await league.getSeason(season.id))!.status, "signup");
 
+    // Two skill bands: team0-4 in Open 8-9 (2400-2000), team5-8 in Open 5-7 (1800-1500).
     for (let t = 0; t < 9; t++) {
       const ids = [100 + t * 10, 101 + t * 10, 102 + t * 10, 103 + t * 10, 104 + t * 10];
-      await addTeam(`team${t}`, ids, 2400 - t * 100);
+      await addTeam(`team${t}`, ids, t < 5 ? 2400 - t * 100 : 2300 - t * 100);
       await league.signUpTeam(`team${t}`, String(ids[0]));
     }
     await addTeam("joke", [700, 701, 702, 703, 704], 1000);
@@ -123,7 +126,7 @@ describe("running a season from the website", () => {
     const bad = await admin.previewStart(season.id, "2099-01-05");
     assert.equal(bad.ok, false);
     assert.match(bad.divisions[0].problem!, /3 teams/);
-    await assert.rejects(admin.startSeason(season.id, "2099-01-05", STAFF), /needs 4–7/);
+    await assert.rejects(admin.startSeason(season.id, "2099-01-05", STAFF), /needs 4–32/);
     await admin.moveTeam(season.id, "team3", divs[0].id, STAFF);
 
     const plan = await admin.previewStart(season.id, "2099-01-07"); // a Wednesday → next Monday

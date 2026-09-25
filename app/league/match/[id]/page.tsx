@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ClubMark } from "@/components/club-identity";
 import { LeagueScoreboards, LeagueStatsEditor } from "@/components/league-scoreboard";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
+import type { MatchProElo } from "@/lib/league-stats";
 import type { MapScoreboard } from "@/lib/league-stats-rules";
 import { ArrowLeft, CalendarDays, Crown, Flag, ShieldCheck, Swords } from "lucide-react";
 
@@ -46,6 +47,8 @@ interface MatchView {
   rules: { proposeMinLeadMs: number; forfeitClaimAfterMs: number; confirmWindowMs: number };
   /** Saved map scoreboards (league stats). */
   stats?: MapScoreboard[];
+  /** Pro ladder weight + each player's change (league matches in Open10 and above). */
+  proElo?: MatchProElo;
 }
 
 const STATUS: Record<string, string> = {
@@ -541,7 +544,7 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
         </section>
       ) : null}
 
-      <LeagueScoreboards maps={data.stats ?? []} teamA={teamA} teamB={teamB} />
+      <LeagueScoreboards maps={data.stats ?? []} teamA={teamA} teamB={teamB} proElo={data.proElo} />
 
       <section>
         <h2 className="mb-3 text-lg font-black text-white">Rosters</h2>

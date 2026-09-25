@@ -60,7 +60,8 @@ describe("pro queue mode", () => {
     assert.equal(modes.parseQueueMode("pro"), "pro");
     assert.equal(modes.parseQueueMode("Pro Matchmaking"), "pro");
     assert.equal(modes.isQueueMode("pro"), true);
-    assert.equal(modes.queueModeLabel("pro"), "Pro Matchmaking");
+    // Pro Matchmaking is switched off; its old games keep their label, marked old.
+    assert.equal(modes.queueModeLabel("pro"), modes.PRO_QUEUE_ENABLED ? "Pro Matchmaking" : "Pro Matchmaking (old)");
     assert.equal(modes.queueModeLabel("super"), "Super Match");
     assert.equal(modes.queueModeLabel(null), "Standard Match");
   });

@@ -15,8 +15,8 @@
  */
 import { client } from "@/lib/db";
 import {
-  ACCESS_CODES,
   DIVISION_NAMES,
+  STATUS_CODES,
   DIVISION_ORDER,
   LIVE_STATUSES,
   UPCOMING_STATUSES,
@@ -36,10 +36,10 @@ import {
   type SeasonStatus,
 } from "@/lib/league";
 import { getTeam } from "@/lib/teams";
+import { CONFERENCE_MAX, conferenceSizes, firstRound, formatFor, type DivisionFormat } from "@/lib/league-swiss";
 
-export const DIVISION_TARGET = 6;
+/** Smaller divisions merge with the next one down. Conferences: at most CONFERENCE_MAX (lib/league-swiss.ts). */
 export const DIVISION_MIN = 4;
-export const DIVISION_MAX = 7;
 export const SEASON_WEEKS = 6;
 export const BO_REGULAR = 1;
 const DAY = 86_400_000;
@@ -58,20 +58,6 @@ const fail = (message: string): never => {
 };
 
 // --- pure rules (same as core/league.py) ------------------------------------------------------
-
-/** Teams per division, top first: aim for 6, 4–7 allowed, spare teams go up. */
-export function divisionSizes(teamCount: number): number[] {
-  if (teamCount < DIVISION_MIN) fail(`At least ${DIVISION_MIN} eligible teams are needed (have ${teamCount}).`);
-  let k = Math.ceil(teamCount / DIVISION_TARGET);
-  while (k > 1 && Math.floor(teamCount / k) < DIVISION_MIN) k -= 1;
-  const base = Math.floor(teamCount / k);
-  const extra = teamCount % k;
-  const sizes = Array.from({ length: k }, (_, i) => base + (i < extra ? 1 : 0));
-  if (Math.max(...sizes) > DIVISION_MAX) {
-    fail(`Can't split ${teamCount} teams into divisions of ${DIVISION_MIN}–${DIVISION_MAX}.`);
-  }
-  return sizes;
-}
 
 /** Single round-robin rounds (circle method); odd counts get a bye each round. */
 export function roundRobin(teamIds: string[]): [string, string][][] {
@@ -143,6 +129,8 @@ export interface PlannedDivision<T> {
   /** "main", "open57", merged "pro+advanced" */
   code: string;
   teams: T[];
+  /** "rr" up to 7 teams, else "swiss". */
+  format: DivisionFormat;
 }
 
 /** Deal strongest-first teams into groups in a snake (1,2,3,3,2,1,...) so groups are even. */
@@ -165,17 +153,18 @@ function snake<T>(teams: T[], sizes: number[]): T[][] {
 }
 
 /**
- * Place teams (same as core/league.py plan_divisions): named division by the
- * team's access, else its Open skill band. A division with fewer than 4 teams
+ * Place teams (same as core/league.py plan_divisions): division by the team's
+ * status (access), else its Open skill band. A division with fewer than 4 teams
  * plays together with the next one down ("Pro/Advanced"); the last one merges
- * up instead. A division with more than 7 teams splits into even groups of ~6.
+ * up instead. A division with more than 32 teams splits into even conferences
+ * ("Main A", "Main B"). Up to 7 teams play a round-robin, more play Swiss.
  */
 export function planDivisions<T extends Seeded>(eligible: T[], access: Record<string, string> = {}): PlannedDivision<T>[] {
   if (eligible.length < DIVISION_MIN) fail(`At least ${DIVISION_MIN} eligible teams are needed (have ${eligible.length}).`);
   const buckets = new Map<string, T[]>(DIVISION_ORDER.map(([code]) => [code, []]));
   for (const e of eligible) {
     const code = access[e.teamId];
-    buckets.get(code && ACCESS_CODES.includes(code) ? code : openBand(e.seedElo))!.push(e);
+    buckets.get(code && STATUS_CODES.includes(code) ? code : openBand(e.seedElo))!.push(e);
   }
   type Level = { codes: string[]; names: string[]; teams: T[] };
   const levels: Level[] = [...buckets.entries()]
@@ -205,12 +194,12 @@ export function planDivisions<T extends Seeded>(eligible: T[], access: Record<st
   for (const { codes, names, teams } of merged) {
     const name = names.join("/");
     const code = codes.join("+");
-    if (teams.length <= DIVISION_MAX) {
-      out.push({ name, code, teams });
+    if (teams.length <= CONFERENCE_MAX) {
+      out.push({ name, code, teams, format: formatFor(teams.length) });
       continue;
     }
-    snake(teams, divisionSizes(teams.length)).forEach((group, i) => {
-      out.push({ name: `${name} ${String.fromCharCode(65 + i)}`, code, teams: drawOrder(group) });
+    snake(teams, conferenceSizes(teams.length)).forEach((group, i) => {
+      out.push({ name: `${name} ${String.fromCharCode(65 + i)}`, code, teams: drawOrder(group), format: formatFor(group.length) });
     });
   }
   return out;
@@ -219,7 +208,7 @@ export function planDivisions<T extends Seeded>(eligible: T[], access: Record<st
 /** Give a team access to a named division, or take it away (null → Open by skill). */
 export async function setTeamAccess(teamId: string, access: string | null, actor: Actor): Promise<void> {
   await ensureLeagueSchema();
-  if (access !== null && !ACCESS_CODES.includes(access)) fail("Unknown division access.");
+  if (access !== null && !STATUS_CODES.includes(access)) fail("Unknown division access.");
   const team = await getTeam(teamId);
   if (!team) fail("Team not found.");
   if (access === null) {
@@ -397,6 +386,7 @@ export interface DrawPlan {
     name: string;
     tier: number;
     code: string;
+    format: DivisionFormat;
     teams: { teamId: string; name: string; tag: string; seedElo: number; access: string | null }[];
   }[];
   notPlaced: { teamId: string; name: string; note: string }[];
@@ -449,6 +439,7 @@ function planOf(eligible: DrawnEntry[], ineligible: DrawnEntry[], access: Record
       name: d.name,
       tier: i + 1,
       code: d.code,
+      format: d.format,
       teams: d.teams.map((e) => ({
         teamId: e.teamId,
         name: e.teamName,
@@ -484,8 +475,8 @@ export async function closeSignups(seasonId: number, actor: Actor): Promise<Draw
     const divisionOf = new Map<string, number>();
     for (const d of plan.divisions) {
       const rs = await client.execute({
-        sql: "INSERT INTO league_divisions (season_id, name, tier, code) VALUES (?, ?, ?, ?)",
-        args: [season.id, d.name, d.tier, d.code],
+        sql: "INSERT INTO league_divisions (season_id, name, tier, code, format) VALUES (?, ?, ?, ?, ?)",
+        args: [season.id, d.name, d.tier, d.code, d.format],
       });
       for (const t of d.teams) divisionOf.set(t.teamId, Number(rs.lastInsertRowid));
     }
@@ -525,7 +516,7 @@ export async function moveTeam(seasonId: number, teamId: string, divisionId: num
 export interface StartPlan {
   firstWeek: number;
   ok: boolean;
-  divisions: { id: number; name: string; teams: number; matches: number; problem: string | null }[];
+  divisions: { id: number; name: string; teams: number; matches: number; format: DivisionFormat; problem: string | null }[];
 }
 
 async function startPlan(season: Season, firstWeek: number) {
@@ -534,10 +525,23 @@ async function startPlan(season: Season, firstWeek: number) {
   const rows = divisions.map((d) => {
     const teams = drawOrder(placed.filter((e) => e.divisionId === d.id));
     const problem =
-      teams.length < DIVISION_MIN || teams.length > DIVISION_MAX
-        ? `${d.name} has ${teams.length} teams; each division needs ${DIVISION_MIN}–${DIVISION_MAX}.`
+      teams.length < DIVISION_MIN || teams.length > CONFERENCE_MAX
+        ? `${d.name} has ${teams.length} teams; each division needs ${DIVISION_MIN}–${CONFERENCE_MAX}.`
         : null;
-    return { division: d, teams, games: problem ? [] : seasonSchedule(teams.map((e) => e.teamId), season.weeks), problem };
+    // Staff moves after the draw can change the size, so the format follows the teams.
+    const format = formatFor(teams.length);
+    const ids = teams.map((e) => e.teamId);
+    let games: [number, string, string][] = [];
+    let bye: string | null = null;
+    if (!problem && format === "swiss") {
+      // Swiss: only week 1 now; the bot's league loop pairs every later week.
+      const [pairs, sitsOut] = firstRound(ids);
+      games = pairs.map(([a, b]) => [1, a, b] as [number, string, string]);
+      bye = sitsOut;
+    } else if (!problem) {
+      games = seasonSchedule(ids, season.weeks);
+    }
+    return { division: d, teams, games, bye, format, problem };
   });
   const plan: StartPlan = {
     firstWeek,
@@ -547,6 +551,7 @@ async function startPlan(season: Season, firstWeek: number) {
       name: r.division.name,
       teams: r.teams.length,
       matches: r.games.length,
+      format: r.format,
       problem: r.problem,
     })),
   };
@@ -574,13 +579,20 @@ export async function startSeason(seasonId: number, firstWeekText: string, actor
   const stamp = Date.now();
   try {
     await client.batch(
-      rows.flatMap((r) =>
-        r.games.map(([week, a, b]) => ({
+      rows.flatMap((r) => [
+        { sql: "UPDATE league_divisions SET format = ? WHERE id = ?", args: [r.format, r.division.id] },
+        ...r.games.map(([week, a, b]) => ({
           sql: `INSERT INTO league_matches (season_id, division_id, week, stage, team_a, team_b, bo, status, updated_at)
                 VALUES (?, ?, ?, 'regular', ?, ?, ?, 'unscheduled', ?)`,
           args: [season.id, r.division.id, week, a, b, BO_REGULAR, stamp],
-        }))
-      ),
+        })),
+        ...(r.bye
+          ? [{
+              sql: "INSERT OR IGNORE INTO league_byes (season_id, division_id, week, team_id) VALUES (?, ?, 1, ?)",
+              args: [season.id, r.division.id, r.bye],
+            }]
+          : []),
+      ]),
       "write"
     );
   } catch (error) {

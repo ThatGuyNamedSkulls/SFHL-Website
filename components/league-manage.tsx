@@ -22,7 +22,19 @@ const ACCESS_OPTIONS: [string, string][] = [
   ["main", "Main Access"],
   ["intermediate", "Intermediate Access"],
   ["entry", "Entry Access"],
+  ["open10", "Open 10 Access (earned)"],
 ];
+
+/** Division names for the season-end moves (same codes as lib/league.ts). */
+const MOVE_NAMES: Record<string, string> = {
+  pro: "Pro",
+  advanced: "Advanced",
+  main: "Main",
+  intermediate: "Intermediate",
+  entry: "Entry",
+  open10: "Open 10",
+  "": "skill band",
+};
 
 interface AdminData {
   live: SeasonRef;
@@ -66,7 +78,14 @@ interface DrawPlan {
 }
 
 interface EndPlan {
-  divisions: { divisionId: number; name: string; tier: number; places: string[]; champion: string }[];
+  divisions: {
+    divisionId: number;
+    name: string;
+    tier: number;
+    places: string[];
+    champion: string;
+    moves: { teamId: string; direction: "up" | "down"; to: string }[];
+  }[];
 }
 
 interface StartPlan {
@@ -416,7 +435,7 @@ export function LeagueManage({
               <p className="mb-2 text-xs text-hl-muted">
                 {data.openPlayoffs > 0 || data.playoffFinalsCreated < data.divisions.length
                   ? "Ending the season unlocks once every final and third-place match has a result."
-                  : "Every playoff match is done. Ending the season sets the final places, awards the champion titles and pays the HL Coin prizes."}
+                  : "Every playoff match is done. Ending the season sets the final places, awards the champion titles, pays the HL Coin prizes and moves teams up and down the ladder (each captain gets a DM)."}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -437,16 +456,24 @@ export function LeagueManage({
                     {endPlan.divisions.map((d) => (
                       <div key={d.divisionId} className="rounded-lg border border-hl-border/60 bg-hl-base/50 p-3 text-xs">
                         <div className="mb-1 font-black header-caps text-white">{d.name}</div>
-                        {d.places.map((teamId, i) => (
-                          <div key={teamId} className="flex justify-between text-white/85">
-                            <span>
-                              {i + 1}. {nameOf(teamId)}
-                            </span>
-                            <span className="text-hl-muted">
-                              {i < 3 ? `${[5000, 2500, 1000][i].toLocaleString()} coins each` : ""}
-                            </span>
-                          </div>
-                        ))}
+                        {d.places.map((teamId, i) => {
+                          const move = d.moves.find((m) => m.teamId === teamId);
+                          return (
+                            <div key={teamId} className="flex justify-between gap-2 text-white/85">
+                              <span>
+                                {i + 1}. {nameOf(teamId)}
+                              </span>
+                              <span className="text-right text-hl-muted">
+                                {i < 3 ? `${[5000, 2500, 1000][i].toLocaleString()} coins each` : ""}
+                                {move ? (
+                                  <span className={`ml-2 font-bold ${move.direction === "up" ? "text-hl-green" : "text-hl-red"}`}>
+                                    {move.direction === "up" ? "⏫" : "⏬"} {MOVE_NAMES[move.to] ?? move.to}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     ))}
                   </div>
@@ -529,7 +556,7 @@ export function LeagueManage({
                     <select
                       value={e.access ?? "open"}
                       disabled={busy}
-                      title="Division access (invite-only named divisions) — stays with the team between seasons"
+                      title="League status — set by promotion/relegation at season end, stays with the team between seasons"
                       onChange={(ev) =>
                         run("setAccess", { teamId: e.teamId, access: ev.target.value }, `${e.name}: league status updated.`)
                       }
