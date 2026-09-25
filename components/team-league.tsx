@@ -19,8 +19,7 @@ function statusNote(status: TeamLeagueStatus, seasons: TeamLeagueSeason[]): stri
   const after = last ? ` after ${last.season}` : "";
   if (status.bySkill) {
     const elo = status.seedElo ? ` · ${status.seedElo.toLocaleString("en-US")} Elo (top-5 average)` : "";
-    const lost = last?.movement === "down" && last.movedTo === "" ? `Lost Open 10 status${after} · ` : "";
-    return `${lost}No earned status: placed by skill${elo}`;
+    return `No earned status: placed by skill${elo}`;
   }
   if (!status.earned) return "Set by Match Staff";
   if (last?.movement === "up") return `Promoted${after}`;
@@ -77,16 +76,19 @@ export function TeamLeague({
   status,
   seasons,
   staffControl,
+  records = true,
 }: {
   status: TeamLeagueStatus | null;
   seasons: TeamLeagueSeason[];
   /** Match Staff: the status select. */
   staffControl?: React.ReactNode;
+  /** The season records list (the team page's League tab has its own season picker). */
+  records?: boolean;
 }) {
   const climbing = status ? CLIMB.includes(status.code) : false;
   return (
     <section className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#121212]">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/[0.06] p-4 sm:p-5">
+      <div className={`flex flex-wrap items-start justify-between gap-4 p-4 sm:p-5 ${records ? "border-b border-white/[0.06]" : ""}`}>
         <div className="min-w-0 space-y-2.5">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50">League status · next season</div>
           {status ? (
@@ -114,6 +116,7 @@ export function TeamLeague({
         {staffControl ? <div className="shrink-0">{staffControl}</div> : null}
       </div>
 
+      {records ? (
       <div className="p-4 sm:p-5">
         <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50">Season records</div>
         {seasons.length === 0 ? (
@@ -163,6 +166,7 @@ export function TeamLeague({
           </ul>
         )}
       </div>
+      ) : null}
     </section>
   );
 }

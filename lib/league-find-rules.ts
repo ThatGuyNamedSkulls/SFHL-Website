@@ -1,7 +1,10 @@
 /**
  * Find Teammates (docs/LEAGUE_UI_PLAN.md step 7): the option lists, post
  * validation and board filters. Pure — no DB — so client forms use it too.
+ * The Elo range (docs/LEAGUE_V2_PLAN.md D3) uses skill levels 1–10 = the rank
+ * tiers D … ★, between 100 and 9999 Elo.
  */
+import { RANK_TIERS } from "@/data/ranks";
 
 export const ROLES = [
   ["igl", "IGL"],
@@ -63,7 +66,50 @@ export const TARGET_DIVISIONS = [
 export const TITLE_MAX = 80;
 export const BODY_MAX = 600;
 export const MESSAGE_MAX = 400;
-export const ELO_MAX = 5000;
+export const ELO_FLOOR = 100;
+export const ELO_MAX = 9999;
+
+/** Skill levels 1–10: the rank tiers (D … ★) and their Elo, clamped to 100–9999. */
+export const LEVELS = RANK_TIERS.filter((t) => t.letter !== "UNRANKED").map((t, i) => ({
+  level: i + 1,
+  letter: t.letter,
+  min: Math.max(ELO_FLOOR, t.minElo),
+  max: Math.min(ELO_MAX, t.maxElo),
+}));
+
+/** The level an Elo falls in (below 100 → 1, above 9999 → 10). */
+export function levelOf(elo: number): number {
+  for (let i = LEVELS.length - 1; i >= 0; i--) if (elo >= LEVELS[i].min) return LEVELS[i].level;
+  return 1;
+}
+
+/** Dragging the handles: from the low level's floor up to the high level's ceiling (the "rank cap"). */
+export function levelBounds(lo: number, hi: number): { minElo: number; maxElo: number } {
+  const a = Math.max(1, Math.min(lo, hi));
+  const b = Math.min(LEVELS.length, Math.max(lo, hi));
+  return { minElo: LEVELS[a - 1].min, maxElo: LEVELS[b - 1].max };
+}
+
+/** Where the handles sit for a range (no bound = the ends). */
+export function rangeLevels(minElo: number | null, maxElo: number | null): [number, number] {
+  return [minElo === null ? 1 : levelOf(minElo), maxElo === null ? LEVELS.length : levelOf(maxElo)];
+}
+
+/** "Level 3–8 · 1,000–2,199", or "Any skill level". */
+export function rangeLabel(v: { minElo: number | null; maxElo: number | null }): string {
+  if (v.minElo === null && v.maxElo === null) return "Any skill level";
+  const [lo, hi] = rangeLevels(v.minElo, v.maxElo);
+  const levels = lo === hi ? `Level ${lo}` : `Level ${lo}–${hi}`;
+  return `${levels} · ${(v.minElo ?? ELO_FLOOR).toLocaleString("en-US")}–${(v.maxElo ?? ELO_MAX).toLocaleString("en-US")}`;
+}
+
+/** A range as stored: the full 100–9999 means "any" (null), and the ends are kept in order. */
+export function cleanRange(minElo: number | null, maxElo: number | null): { minElo: number | null; maxElo: number | null } {
+  let lo = minElo === null ? null : Math.max(ELO_FLOOR, Math.min(ELO_MAX, Math.round(minElo)));
+  let hi = maxElo === null ? null : Math.max(ELO_FLOOR, Math.min(ELO_MAX, Math.round(maxElo)));
+  if (lo !== null && hi !== null && lo > hi) [lo, hi] = [hi, lo];
+  return { minElo: lo === ELO_FLOOR ? null : lo, maxElo: hi === ELO_MAX ? null : hi };
+}
 /** Messages one player can send from the board per hour. */
 export const MESSAGES_PER_HOUR = 5;
 

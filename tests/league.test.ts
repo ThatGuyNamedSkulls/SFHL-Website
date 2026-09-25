@@ -92,7 +92,7 @@ describe("league sign-ups", () => {
     await addTeam("poach", [40, 41, 42, 43, 11]);
 
     await assert.rejects(league.signUpTeam("aaa", "11"), /Only the team captain/);
-    await assert.rejects(league.signUpTeam("short", "20"), /at least 5 accepted members \(has 4\)/);
+    await assert.rejects(league.signUpTeam("short", "20"), /at least 5 accepted players \(has 4\)/);
     await assert.rejects(league.signUpTeam("unlinked", "30"), /Not linked to a player: user34/);
 
     const entry = await league.signUpTeam("aaa", "10");

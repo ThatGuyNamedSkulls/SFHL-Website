@@ -80,7 +80,8 @@ export async function POST(
       if (!playerName) return NextResponse.json({ error: "Player name required." }, { status: 400 });
       const invitee = await findPlayerByName(playerName);
       if (!invitee) return NextResponse.json({ error: "No linked player with that name." }, { status: 404 });
-      const team = await inviteToTeam(id, session.discordId, invitee);
+      const slot = body.slot === "starter" || body.slot === "sub" || body.slot === "coach" ? body.slot : undefined;
+      const team = await inviteToTeam(id, session.discordId, invitee, slot);
       return NextResponse.json({ team });
     }
     if (action === "respond") {
@@ -94,8 +95,8 @@ export async function POST(
     }
     if (action === "slot") {
       const role = String(body.role || "") as TeamRole;
-      if (role !== "starter" && role !== "sub") {
-        return NextResponse.json({ error: "Role must be starter or sub." }, { status: 400 });
+      if (role !== "starter" && role !== "sub" && role !== "coach") {
+        return NextResponse.json({ error: "Role must be main roster, sub or coach." }, { status: 400 });
       }
       const team = await setMemberRole(id, session.discordId, String(body.discordId || ""), role);
       return NextResponse.json({ team });
@@ -127,14 +128,20 @@ export async function PATCH(
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const name = body.name == null ? undefined : String(body.name);
   const tag = body.tag == null ? undefined : String(body.tag);
+  const description = body.description === undefined ? undefined : body.description == null ? null : String(body.description);
   if (containsProfanity(`${name || ""} ${tag || ""}`)) {
     return NextResponse.json({ error: "Name or tag not allowed." }, { status: 400 });
+  }
+  if (description && containsProfanity(description)) {
+    return NextResponse.json({ error: "Please keep the description friendly." }, { status: 400 });
   }
   try {
     const team = await patchTeam(id, session.discordId, {
       name,
       tag,
       logoUrl: body.logoUrl === undefined ? undefined : body.logoUrl == null ? null : String(body.logoUrl),
+      bannerUrl: body.bannerUrl === undefined ? undefined : body.bannerUrl == null ? null : String(body.bannerUrl),
+      description,
       accentColor: body.accentColor == null ? undefined : String(body.accentColor),
       region: body.region == null ? undefined : String(body.region),
     });

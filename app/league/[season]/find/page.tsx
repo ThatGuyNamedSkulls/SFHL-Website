@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FindFilterBar, MyRecruitingPanel } from "@/components/league-find";
+import { FindFilterBar, FindTip, MyRecruitingPanel, QuickPostButton } from "@/components/league-find";
 import { PlayerPostCard, TeamPostCard } from "@/components/league-find-cards";
 import { CountryCell, Empty, TeamCell } from "@/components/league-standings";
 import { getSession } from "@/lib/auth";
@@ -12,9 +12,10 @@ import { leagueTeams } from "@/lib/league-teams";
 export const dynamic = "force-dynamic";
 
 /**
- * Find Teammates (docs/LEAGUE_UI_PLAN.md step 7), upcoming seasons only:
- * Find team (recruiting teams) · Find player (free agents) · Registered, with
- * division / language / role / Elo filters, plus the viewer's own recruiting.
+ * Find Teammates (docs/LEAGUE_UI_PLAN.md step 7; FACEIT layout, LEAGUE_V2_PLAN
+ * D2/D3), upcoming seasons only: Find team (recruiting teams, with their roster
+ * cards) · Find player (free agents) · Registered, with division / language /
+ * role / skill-level filters, plus the viewer's own recruiting.
  */
 export default async function FindTeammatesPage({
   params,
@@ -96,11 +97,35 @@ export default async function FindTeammatesPage({
         })}
       </nav>
 
-      {filters.tab !== "registered" ? <FindFilterBar base={base} filters={filters} /> : null}
+      {filters.tab !== "registered" ? (
+        <>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <FindFilterBar base={base} filters={filters} />
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-white/55">
+                {filters.tab === "teams"
+                  ? `${teams.length} team${teams.length === 1 ? "" : "s"} displayed`
+                  : `${players.length} player${players.length === 1 ? "" : "s"} displayed`}
+              </span>
+              <QuickPostButton kind={filters.tab === "teams" ? "team" : "player"} seasonId={season.id} data={mine} />
+            </div>
+          </div>
+          {filters.tab === "teams" ? (
+            <FindTip id="teams">
+              Teams have up to 5 main-roster players, 6 substitutes and 1 coach. Apply to a team: the captain gets a DM, and if
+              they accept you get a team invite.
+            </FindTip>
+          ) : (
+            <FindTip id="players">
+              Post your profile so captains can find you. Messages reach you as a Discord DM with the sender&apos;s Discord name.
+            </FindTip>
+          )}
+        </>
+      ) : null}
 
       {filters.tab === "teams" ? (
         teams.length ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="space-y-3">
             {teams.map((p) => (
               <TeamPostCard key={p.id} post={p} seasonId={season.id} loggedIn={!!session} />
             ))}
@@ -110,7 +135,7 @@ export default async function FindTeammatesPage({
         )
       ) : filters.tab === "players" ? (
         players.length ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="space-y-3">
             {players.map((p) => (
               <PlayerPostCard key={p.id} post={p} seasonId={season.id} loggedIn={!!session} />
             ))}

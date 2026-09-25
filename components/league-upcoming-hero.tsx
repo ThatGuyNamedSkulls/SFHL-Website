@@ -6,11 +6,9 @@
  * grid under the buttons. Server-safe.
  */
 import Link from "next/link";
-import { Check, Coins, Crown, UserRound, Users } from "lucide-react";
-import { Flag } from "@/components/flag";
+import { Check, Coins, Users } from "lucide-react";
 import { LeagueJoinButton } from "@/components/league-join";
-import { RankBadge } from "@/components/rank-badge";
-import { countryName, flagPath } from "@/lib/countries";
+import { PlayerCard } from "@/components/player-card";
 import type { Season } from "@/lib/league";
 import type { Lineup, LineupCard } from "@/lib/league-lineup";
 import { STATUS_HEADLINE, seasonNumber } from "@/lib/league-shell";
@@ -28,48 +26,17 @@ function fmtDay(ts: number) {
   return new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
-/** One card: the player's picture, name, flag and rank; silhouette when the slot is empty. */
-function PlayerCard({ card, index }: { card: LineupCard | null; index: number }) {
-  const tilt = [-9, -4.5, 0, 4.5, 9][index];
+/** A lineup slot, fanned out: the outer cards tilt and drop a little (FACEIT-style card, D1). */
+function FannedCard({ card, index }: { card: LineupCard | null; index: number }) {
+  const tilt = [-8, -4, 0, 4, 8][index];
   const lift = [22, 8, 0, 8, 22][index];
   const middle = index === 2;
   return (
     <div
-      className={`relative -mx-3 flex h-[210px] w-[118px] flex-col overflow-hidden rounded-xl border bg-gradient-to-b from-[#262626] to-[#111] shadow-[0_18px_40px_rgba(0,0,0,0.55)] ${
-        middle && card ? "border-[#ff5500]/70" : "border-white/[0.12]"
-      }`}
+      className="-mx-2.5"
       style={{ transform: `translateY(${lift}px) rotate(${tilt}deg)`, zIndex: middle ? 3 : index === 1 || index === 3 ? 2 : 1 }}
     >
-      <span className={`absolute inset-x-0 top-0 z-10 h-1 ${card ? "bg-[#ff5500]" : "bg-[#ff5500]/40"}`} />
-      <div className="relative flex min-h-0 flex-1 items-center justify-center">
-        {card?.avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element -- Roblox/Discord avatar CDNs
-          <img src={card.avatar} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
-        ) : (
-          <UserRound className={`h-20 w-20 ${card ? "text-[#ff5500]/80" : "text-white/15"}`} strokeWidth={1.25} />
-        )}
-        {card ? (
-          <div className="absolute left-1.5 top-2.5 z-10 flex gap-1">
-            {card.me ? <span className="rounded bg-[#ff5500] px-1.5 text-[9px] font-black leading-4 text-white">YOU</span> : null}
-            {card.sub ? <span className="rounded bg-black/70 px-1.5 text-[9px] font-black leading-4 text-white/80">SUB</span> : null}
-          </div>
-        ) : null}
-        {card?.captain ? (
-          <Crown className="absolute right-1.5 top-2.5 z-10 h-4 w-4 text-[#ff5500] drop-shadow" aria-label="Captain" />
-        ) : null}
-        {card ? (
-          <div className="absolute bottom-1 left-1/2 z-10 -translate-x-1/2">
-            <RankBadge rank={card.rank} size="sm" showGlow={false} />
-          </div>
-        ) : null}
-      </div>
-      <div className="w-full border-t border-white/[0.08] bg-black/60 px-2 py-1.5 text-center">
-        <div className={`flex items-center justify-center gap-1 text-[11px] font-black ${card ? "text-white" : "text-white/35"}`}>
-          {card?.country ? <Flag src={flagPath(card.country)} name={countryName(card.country)} className="h-2.5 w-3.5 shrink-0" /> : null}
-          <span className="truncate">{card ? card.name : "Open spot"}</span>
-        </div>
-        <div className="text-[10px] tabular-nums text-white/55">{card ? (card.elo !== null ? `${card.elo.toLocaleString()} Elo` : "Unranked") : "\u00a0"}</div>
-      </div>
+      <PlayerCard card={card} highlight={middle && !!card} />
     </div>
   );
 }
@@ -78,9 +45,9 @@ function PlayerCard({ card, index }: { card: LineupCard | null; index: number })
 function PlayerCards({ lineup }: { lineup: Lineup | null }) {
   const slots = lineup?.cards ?? [null, null, null, null, null];
   return (
-    <div className="relative flex h-[290px] items-end justify-center" aria-label={lineup ? `${lineup.team.name} lineup` : undefined}>
+    <div className="relative flex h-[300px] items-end justify-center" aria-label={lineup ? `${lineup.team.name} lineup` : undefined}>
       {slots.map((card, i) => (
-        <PlayerCard key={i} card={card} index={i} />
+        <FannedCard key={i} card={card} index={i} />
       ))}
       {lineup ? (
         <div className="absolute left-1/2 top-0 z-10 flex -translate-x-1/2 flex-col items-center gap-0.5 whitespace-nowrap">

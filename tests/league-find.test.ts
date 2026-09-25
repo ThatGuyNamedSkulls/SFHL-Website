@@ -53,8 +53,9 @@ async function addTeam(t: number, memberIds: string[], elo = 1500) {
   const team = {
     id: `team${t}`, name: `Team ${t}`, tag: `T${t}`, logoUrl: null, accentColor: "#ff5500", region: "EU",
     captainId: memberIds[0], captainName: `p${memberIds[0]}`,
-    members: memberIds.map((d) => ({ discordId: d, username: `u${d}`, playerName: `p${d}`, avatar: null,
-      role: "starter", status: "accepted", joinedAt: 0 })),
+    // Roster slots (lib/team-roster.ts): the first 5 are the main roster, the rest subs.
+    members: memberIds.map((d, i) => ({ discordId: d, username: `u${d}`, playerName: `p${d}`, avatar: null,
+      role: i === 0 ? "captain" : i < 5 ? "starter" : "sub", status: "accepted", joinedAt: 0 })),
     createdAt: 0, updatedAt: 0,
   };
   await client.execute({ sql: "INSERT INTO web_teams (id, data, updated_at) VALUES (?, ?, ?)", args: [team.id, JSON.stringify(team), t] });
@@ -174,7 +175,8 @@ describe("the board", () => {
   it("withdrawing, removing a post, full teams and closed recruiting", async () => {
     await wipe();
     const seasonId = await openSeason();
-    await addTeam(1, ["1100", "1101", "1102", "1103", "1104", "1105", "1106"]); // 7 = full
+    // 5 main + 6 subs = no player slot left (only the coach's, which you can't apply for).
+    await addTeam(1, Array.from({ length: 11 }, (_, i) => String(1100 + i)));
     await addTeam(2, ["1200"]);
     await addPlayer("5100", 1500);
     await find.saveTeamPost(seasonId, "team1", viewer("1100"), TEAM_POST);

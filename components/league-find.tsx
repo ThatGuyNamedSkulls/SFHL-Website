@@ -1,16 +1,18 @@
 "use client";
 
 /**
- * Find Teammates (docs/LEAGUE_UI_PLAN.md step 7) — the interactive parts:
- * the filter bar, Apply / Message buttons, the post editor and the viewer's
- * "Your recruiting" panel. Everything posts to /api/league/find, then
- * refreshes the server-rendered board.
+ * Find Teammates (docs/LEAGUE_UI_PLAN.md step 7; FACEIT layout, LEAGUE_V2_PLAN
+ * D2/D3) — the interactive parts: the filter bar (with the skill level / Elo
+ * range picker), Apply / Message buttons, "+ Post team" / "+ Post profile", the
+ * tip bar, the post editor and the viewer's "Your recruiting" panel.
+ * Everything posts to /api/league/find, then refreshes the server-rendered board.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Megaphone, MessageSquare, Pencil, Send, Trash2, UserPlus, X } from "lucide-react";
+import { Check, Info, Megaphone, MessageSquare, Pencil, Plus, Send, Trash2, UserPlus, X } from "lucide-react";
 import { ClubMark } from "@/components/club-identity";
+import { EloRangeFields, EloRangeFilter } from "@/components/elo-range";
 import {
   BODY_MAX,
   DAYS,
@@ -96,35 +98,16 @@ export function FindFilterBar({ base, filters }: { base: string; filters: FindFi
       </select>
     </label>
   );
-  const eloBox = (key: "minElo" | "maxElo", placeholder: string) => (
-    <input
-      type="number"
-      min={0}
-      inputMode="numeric"
-      placeholder={placeholder}
-      defaultValue={filters[key] ?? ""}
-      onBlur={(e) => {
-        const v = e.target.value.trim();
-        if (v !== String(filters[key] ?? "")) go({ [key]: v || null });
-      }}
-      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-      className={`${field} h-10 w-24`}
-    />
-  );
   const active = filters.division || filters.language || filters.role || filters.minElo !== null || filters.maxElo !== null;
   return (
     <div className="flex flex-wrap items-end gap-3">
       {select("division", "All divisions", TARGET_DIVISIONS)}
       {select("language", "Any language", LANGUAGES)}
       {select("role", "Any role", ROLES)}
-      <div>
-        <span className={label}>Elo range</span>
-        <div className="flex items-center gap-1.5">
-          {eloBox("minElo", "Min")}
-          <span className="text-white/40">–</span>
-          {eloBox("maxElo", "Max")}
-        </div>
-      </div>
+      <EloRangeFilter
+        value={{ minElo: filters.minElo, maxElo: filters.maxElo }}
+        onApply={(v) => go({ minElo: v.minElo === null ? null : String(v.minElo), maxElo: v.maxElo === null ? null : String(v.maxElo) })}
+      />
       {active ? (
         <button
           type="button"
@@ -300,8 +283,8 @@ interface Draft {
   days: string[];
   times: string[];
   language: string;
-  minElo: string;
-  maxElo: string;
+  minElo: number | null;
+  maxElo: number | null;
   divisions: string[];
 }
 
@@ -360,8 +343,8 @@ function PostEditor({
     days: initial?.days ?? [],
     times: initial?.times ?? [],
     language: initial?.language ?? "",
-    minElo: initial && "minElo" in initial && initial.minElo !== null ? String(initial.minElo) : "",
-    maxElo: initial && "maxElo" in initial && initial.maxElo !== null ? String(initial.maxElo) : "",
+    minElo: initial && "minElo" in initial ? initial.minElo : null,
+    maxElo: initial && "maxElo" in initial ? initial.maxElo : null,
     divisions: initial && "divisions" in initial ? initial.divisions : [],
   }));
   const [busy, setBusy] = useState(false);
@@ -378,8 +361,6 @@ function PostEditor({
       post: {
         ...d,
         language: d.language || null,
-        minElo: d.minElo || null,
-        maxElo: d.maxElo || null,
       },
     });
     setBusy(false);
@@ -425,12 +406,11 @@ function PostEditor({
           </div>
         ) : (
           <div>
-            <span className={label}>Elo you&apos;re looking for</span>
-            <div className="flex items-center gap-2">
-              <input type="number" min={0} value={d.minElo} onChange={(e) => set("minElo", e.target.value)} placeholder="Any" className={`${field} w-28`} />
-              <span className="text-white/40">–</span>
-              <input type="number" min={0} value={d.maxElo} onChange={(e) => set("maxElo", e.target.value)} placeholder="Any" className={`${field} w-28`} />
-            </div>
+            <span className={label}>Skill level you&apos;re looking for</span>
+            <EloRangeFields
+              value={{ minElo: d.minElo, maxElo: d.maxElo }}
+              onChange={(v) => setD((x) => ({ ...x, minElo: v.minElo, maxElo: v.maxElo }))}
+            />
           </div>
         )}
         <div>
@@ -465,6 +445,97 @@ function PostEditor({
         </button>
       </div>
     </Dialog>
+  );
+}
+
+// --- + post / tip bar (FACEIT header) ------------------------------------------------------------
+
+/** "+ Post team" (a captain's team; the first without a post) or "+ Post profile". */
+export function QuickPostButton({
+  kind,
+  seasonId,
+  data,
+}: {
+  kind: "team" | "player";
+  seasonId: number;
+  data: MyRecruiting | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const cls = `${primary} h-10`;
+  const text = kind === "team" ? "Post team" : "Post profile";
+  if (!data)
+    return (
+      <Link href="/login" className={cls}>
+        <Plus className="h-4 w-4" /> {text}
+      </Link>
+    );
+  if (kind === "team" && !data.captainTeams.length)
+    return (
+      <Link href="/teams?create=1" className={cls}>
+        <Plus className="h-4 w-4" /> Create a team
+      </Link>
+    );
+  const target = kind === "team" ? data.captainTeams.find((t) => !t.post) ?? data.captainTeams[0] : null;
+  const existing = kind === "team" ? target?.post ?? null : data.playerPost;
+  return (
+    <>
+      <button
+        type="button"
+        disabled={kind === "player" && !data.linked}
+        title={kind === "player" && !data.linked ? "Link your HyperLeague player first" : undefined}
+        onClick={() => setOpen(true)}
+        className={cls}
+      >
+        {existing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+        {existing ? (kind === "team" ? "Edit team post" : "Edit profile post") : text}
+      </button>
+      {open ? (
+        <PostEditor kind={kind} seasonId={seasonId} teamId={target?.team.id} initial={existing} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
+  );
+}
+
+const TIP_EVENT = "hl-find-tip";
+
+/** A tip under the board's header; closing it is remembered on this device. */
+export function FindTip({ id, children }: { id: string; children: React.ReactNode }) {
+  const key = `hl-find-tip-${id}`;
+  const hidden = useSyncExternalStore(
+    (cb) => {
+      window.addEventListener(TIP_EVENT, cb);
+      return () => window.removeEventListener(TIP_EVENT, cb);
+    },
+    () => {
+      try {
+        return window.localStorage.getItem(key) === "1";
+      } catch {
+        return false;
+      }
+    },
+    () => true
+  );
+  if (hidden) return null;
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-[#ff5500]/25 bg-[#ff5500]/[0.06] px-4 py-3 text-sm text-white/75">
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#ff5500]" />
+      <div className="min-w-0 flex-1">{children}</div>
+      <button
+        type="button"
+        aria-label="Hide this tip"
+        onClick={() => {
+          try {
+            window.localStorage.setItem(key, "1");
+          } catch {
+            /* private mode: it just comes back next time */
+          }
+          window.dispatchEvent(new Event(TIP_EVENT));
+        }}
+        className="text-white/50 hover:text-white"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
   );
 }
 

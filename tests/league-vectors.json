@@ -2022,7 +2022,7 @@
    ]
   },
   {
-   "label": "Open10 bottom loses its status",
+   "label": "Open10 bottom keeps its status (only goes up)",
    "places": [
     "o0",
     "o1",
@@ -2051,18 +2051,6 @@
      "direction": "up",
      "from": "open10",
      "to": "entry"
-    },
-    {
-     "teamId": "o4",
-     "direction": "down",
-     "from": "open10",
-     "to": ""
-    },
-    {
-     "teamId": "o5",
-     "direction": "down",
-     "from": "open10",
-     "to": ""
     }
    ]
   },
@@ -2163,12 +2151,6 @@
      "direction": "down",
      "from": "entry",
      "to": "open10"
-    },
-    {
-     "teamId": "b2",
-     "direction": "down",
-     "from": "open10",
-     "to": ""
     }
    ]
   }

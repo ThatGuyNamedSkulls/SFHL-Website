@@ -6,7 +6,10 @@
  */
 import { client } from "@/lib/db";
 import { addNotification, ensureSocialSchema } from "@/lib/social";
-import { getTeam, inviteToTeam, listTeams, MAX_TEAM_MEMBERS, type Team } from "@/lib/teams";
+import { getTeam, inviteToTeam, listTeams, type Team } from "@/lib/teams";
+import { getEquippedVisualsMap } from "@/lib/cosmetics";
+import { cardFromMember, type PlayerCardData } from "@/lib/player-card";
+import { openSlot, slotCounts, type RosterSlot } from "@/lib/team-roster";
 import { containsProfanity } from "@/lib/content-moderation";
 import {
   ACCESS_CODES,
@@ -51,7 +54,13 @@ export interface TeamPostView extends TeamPostInput {
   members: number;
   starters: number;
   subs: number;
-  /** Members + pending invites < 7. */
+  /** The roster as cards (D2): main roster (captain first), subs, coach. */
+  roster: { starters: PlayerCardData[]; subs: PlayerCardData[]; coach: PlayerCardData | null };
+  /** Slots taken (accepted + invited) per slot. */
+  slots: Record<RosterSlot, number>;
+  /** The team's most common player country. */
+  country: string | null;
+  /** A main-roster or sub slot is free (lib/team-roster.ts). */
   joinable: boolean;
   signedUp: boolean;
   /** Average main Elo of the best 5 (unranked = 1200); null with no linked players. */
@@ -73,6 +82,8 @@ export interface PlayerPostView extends PlayerPostInput {
   avatar: string | null;
   /** On a team signed up for this season already. */
   signedUpWith: string | null;
+  /** The FACEIT-style card (D3). */
+  card: PlayerCardData;
   open: boolean;
   updatedAt: number;
   mine: boolean;
@@ -137,6 +148,41 @@ async function playerInfo(names: string[]): Promise<Map<string, Row>> {
 
 const eloOf = (r: Row | undefined) =>
   r && Number(r.placement_done ?? 1) === 1 && Number(r.elo) > 0 ? Number(r.elo) : null;
+
+/** Equipped profile cards by player name (banner art); empty if cosmetics aren't set up. */
+async function cardArt(): Promise<Map<string, { card: string | null }>> {
+  return getEquippedVisualsMap().catch(() => new Map<string, { card: string | null }>());
+}
+
+/** The most common country among these players (ties: first seen). */
+function commonCountry(rows: (Row | undefined)[]): string | null {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const c = r?.country ? String(r.country).toLowerCase() : null;
+    if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  for (const [c, n] of counts) if (best === null || n > (counts.get(best) ?? 0)) best = c;
+  return best;
+}
+
+/** A team's roster as cards: main roster (captain first, then by Elo), subs by Elo, coach. */
+function rosterCards(team: Team, info: Map<string, Row>, art: Map<string, { card: string | null }>) {
+  const accepted = team.members.filter((m) => m.status === "accepted");
+  const card = (m: Team["members"][number]) =>
+    cardFromMember(m, {
+      row: m.playerName ? info.get(m.playerName.toLowerCase()) : undefined,
+      tag: team.tag,
+      captainId: team.captainId,
+      cardArt: m.playerName ? art.get(m.playerName)?.card ?? null : null,
+    });
+  const byElo = (a: PlayerCardData, b: PlayerCardData) => Number(b.captain) - Number(a.captain) || (b.elo ?? -1) - (a.elo ?? -1);
+  return {
+    starters: accepted.filter((m) => m.role === "captain" || m.role === "starter").map(card).sort(byElo),
+    subs: accepted.filter((m) => m.role === "sub").map(card).sort(byElo),
+    coach: accepted.filter((m) => m.role === "coach").map(card)[0] ?? null,
+  };
+}
 
 function teamSeedElo(team: Team, info: Map<string, Row>): number | null {
   const names = team.members.filter((m) => m.status === "accepted" && m.playerName).map((m) => m.playerName!);
@@ -239,6 +285,7 @@ export async function listTeamPosts(seasonId: number, viewerId: string | null): 
   const info = await playerInfo(
     rows.flatMap((r) => teams.get(String(r.team_id))?.members.map((m) => m.playerName ?? "") ?? [])
   );
+  const art = await cardArt();
   const mineApps = new Map<string, ApplicationStatus>();
   if (viewerId) {
     const apps = await client.execute({
@@ -263,9 +310,12 @@ export async function listTeamPosts(seasonId: number, viewerId: string | null): 
       divisionLabel: accessLabel(code, seed),
       inviteOnly: code !== null,
       members: accepted.length,
-      starters: accepted.filter((m) => m.role !== "sub").length,
+      starters: accepted.filter((m) => m.role === "captain" || m.role === "starter").length,
       subs: accepted.filter((m) => m.role === "sub").length,
-      joinable: team.members.length < MAX_TEAM_MEMBERS,
+      roster: rosterCards(team, info, art),
+      slots: slotCounts(team.members),
+      country: commonCountry(accepted.map((m) => (m.playerName ? info.get(m.playerName.toLowerCase()) : undefined))),
+      joinable: openSlot(team.members) !== null,
       signedUp: entries.has(team.id),
       seedElo: seed,
       title: String(r.title),
@@ -327,6 +377,7 @@ export async function listPlayerPosts(seasonId: number, viewerId: string | null)
   const rows = rs.rows as Row[];
   if (!rows.length) return [];
   const info = await playerInfo(rows.map((r) => String(r.player_name)));
+  const art = await cardArt();
   const signed = new Map<string, string>();
   for (const e of await seasonEntries(seasonId)) {
     if (e.status === "ineligible") continue;
@@ -343,6 +394,10 @@ export async function listPlayerPosts(seasonId: number, viewerId: string | null)
       country: p?.country == null ? null : String(p.country).toLowerCase(),
       avatar: (p?.roblox_avatar_image ?? p?.discord_avatar ?? null) as string | null,
       signedUpWith: signed.get(String(r.discord_id)) ?? null,
+      card: cardFromMember(
+        { discordId: String(r.discord_id), username: String(r.player_name), playerName: String(r.player_name), avatar: null, role: "starter" },
+        { row: p, viewerId, cardArt: art.get(String(r.player_name))?.card ?? null }
+      ),
       title: String(r.title),
       body: r.body == null ? null : String(r.body),
       roles: arr(r.roles),
@@ -370,7 +425,7 @@ export async function applyToTeam(seasonId: number, teamId: string, viewer: View
   const team = await getTeam(teamId);
   if (!team) fail("Team not found.");
   if (team.members.some((m) => m.discordId === viewer.discordId)) fail("You're already on this team (or invited to it).");
-  if (team.members.length >= MAX_TEAM_MEMBERS) fail("This team is full.");
+  if (!openSlot(team.members)) fail("This team is full.");
   const message = rawMessage ? String(rawMessage).trim().slice(0, 400) || null : null;
   clean(message);
 

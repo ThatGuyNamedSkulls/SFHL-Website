@@ -35,7 +35,7 @@ export function defaultRules({ weeks, rosterMin, rosterMax, prizes }: RulesConst
     [
       "Teams & rosters",
       [
-        `A team needs ${rosterMin}–${rosterMax} accepted members, all linked to a HyperLeague player. Only the captain can sign it up.`,
+        `A team needs ${rosterMin}–${rosterMax} accepted players (up to 5 main roster + 6 substitutes), all linked to a HyperLeague player. A team can also have 1 coach, who doesn't play. Only the captain can sign it up.`,
         "Each player can play for one team per season.",
         "Rosters lock when sign-ups close.",
       ],
@@ -45,7 +45,7 @@ export function defaultRules({ weeks, rosterMin, rosterMax, prizes }: RulesConst
       [
         "A new team starts in the Open division of its skill (the average Elo of its best 5 players): Open 10 (★), Open 8-9 (S2–S3), Open 5-7 (A2–S1), Open 1-4 (D–A1).",
         "Entry, Intermediate, Main, Advanced and Pro are earned: every season the top of each division moves up and the bottom moves down — Open 8-9 → Open 10 → Entry → Intermediate → Main → Advanced → Pro. Open 5-7 and Open 1-4 are just for fun (no promotion).",
-        "Up to 4 teams go up and 4 go down in each conference (fewer in small divisions: 1 with 4–5 teams, 2 with 6–9, 3 with 10–13). The bottom of Open 10 goes back to its skill band. A team keeps its status between seasons; Match Staff can change it.",
+        "Up to 4 teams go up and 4 go down in each conference (fewer in small divisions: 1 with 4–5 teams, 2 with 6–9, 3 with 10–13). Open 10 never goes down: an Open team's level comes from its players' Elo, so it only climbs by finishing on top. A team keeps its status between seasons; Match Staff can change it.",
         "A division with fewer than 4 teams plays together with the next one down; a division with more than 32 teams is split into conferences (A, B, …).",
       ],
     ],

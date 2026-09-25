@@ -14,7 +14,8 @@ import { swissStandings } from "@/lib/league-swiss";
 /** TESTING: 1 so small teams can try the league. The real rule is 5 — change it
  * back here and in core/league.py before a real season. */
 export const ROSTER_MIN = Number(process.env.HL_LEAGUE_ROSTER_MIN) || 1;
-export const ROSTER_MAX = 7;
+/** Players on a league roster: 5 main + 6 subs (a team's coach doesn't play; lib/team-roster.ts). */
+export const ROSTER_MAX = 11;
 export const SEED_TOP_PLAYERS = 5;
 export const UNRANKED_ELO = 1200;
 export const SEASON_WEEKS = 6;
@@ -608,10 +609,10 @@ export async function seasonMatches(seasonId: number): Promise<LeagueMatch[]> {
 
 // --- rosters & sign-ups ------------------------------------------------------------------
 
-/** A team's league roster (accepted members) and what stops it from signing up. */
+/** A team's league roster (accepted players; the coach doesn't play) and what stops it from signing up. */
 export function rosterFromTeam(team: Team): { roster: RosterPlayer[]; problems: string[] } {
   const roster = team.members
-    .filter((m) => m.status === "accepted")
+    .filter((m) => m.status === "accepted" && m.role !== "coach")
     .map((m) => ({
       discordId: String(m.discordId),
       playerName: m.playerName || null,
@@ -620,10 +621,10 @@ export function rosterFromTeam(team: Team): { roster: RosterPlayer[]; problems: 
     }));
   const problems: string[] = [];
   if (roster.length < ROSTER_MIN) {
-    problems.push(`Needs at least ${ROSTER_MIN} accepted members (has ${roster.length}).`);
+    problems.push(`Needs at least ${ROSTER_MIN} accepted players (has ${roster.length}).`);
   }
   if (roster.length > ROSTER_MAX) {
-    problems.push(`Can have at most ${ROSTER_MAX} members (has ${roster.length}).`);
+    problems.push(`Can have at most ${ROSTER_MAX} players (has ${roster.length}).`);
   }
   const unlinked = roster.filter((r) => !r.playerName).map((r) => r.username || r.discordId);
   if (unlinked.length) problems.push(`Not linked to a player: ${unlinked.join(", ")}.`);

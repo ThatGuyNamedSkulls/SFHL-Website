@@ -157,7 +157,7 @@ export interface DivisionMoves {
   /** How many of the conference go up / down (0 = nobody). */
   up: number;
   down: number;
-  /** [own level, where it goes] for each level that moves ("" = back to the Open skill band). */
+  /** [own level, where it goes] for each level that moves. */
   upTo: [string, string][];
   downTo: [string, string][];
 }
@@ -207,23 +207,16 @@ export function upText(moves: DivisionMoves): { title: string; short: string; no
   };
 }
 
-/** The red card / band text: "Relegated to Entry status", "Lose Open 10 status". */
+/** The red card / band text: "Relegated to Entry status", or one level down per level. */
 export function downText(moves: DivisionMoves): { title: string; short: string; note: string | null } {
   if (moves.downTo.length === 1) {
-    const [from, to] = moves.downTo[0];
-    if (!to) {
-      return {
-        title: `Lose ${levelName(from)} status`,
-        short: `Lose ${levelName(from)}`,
-        note: [onlyNote(moves, moves.downTo), "Back to their Open skill band"].filter(Boolean).join(" · "),
-      };
-    }
-    return { title: `Relegated to ${levelName(to)} status`, short: `Down to ${levelName(to)}`, note: onlyNote(moves, moves.downTo) };
+    const to = levelName(moves.downTo[0][1]);
+    return { title: `Relegated to ${to} status`, short: `Down to ${to}`, note: onlyNote(moves, moves.downTo) };
   }
   return {
     title: "Relegated one level",
     short: "One level down",
-    note: moves.downTo.map(([from, to]) => `${levelName(from)} → ${to ? levelName(to) : "skill band"}`).join(" · "),
+    note: moves.downTo.map(([from, to]) => `${levelName(from)} → ${levelName(to)}`).join(" · "),
   };
 }
 

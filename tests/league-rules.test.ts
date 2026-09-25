@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { defaultRules, parseRules, rulesToText } from "@/lib/league-rules";
 
-const CONSTS = { weeks: 6, rosterMin: 5, rosterMax: 7, prizes: [5000, 2500, 1000] };
+const CONSTS = { weeks: 6, rosterMin: 5, rosterMax: 11, prizes: [5000, 2500, 1000] };
 
 describe("rules format", () => {
   it("sections, bullets and paragraphs", () => {
@@ -63,7 +63,7 @@ describe("rules format", () => {
       std.map((s) => s.title),
       ["Teams & rosters", "Divisions", "Season format", "Scheduling", "Results", "Prizes"]
     );
-    assert.match(std[0].blocks[0].lines[0], /needs 5–7 accepted members/);
+    assert.match(std[0].blocks[0].lines[0], /needs 5–11 accepted players/);
     assert.match(std[5].blocks[0].lines[0], /5,000 \/ 2,500 \/ 1,000 HL Coins/);
     const round = parseRules(rulesToText(std));
     assert.deepEqual(round, std);

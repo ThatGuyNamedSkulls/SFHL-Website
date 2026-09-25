@@ -202,13 +202,12 @@ describe("promotion / relegation on the Standings tab (league v2 C2)", () => {
       short: "One level down",
       note: "Pro → Advanced · Advanced → Main",
     });
-    assert.deepEqual(downText(divisionMoves("open10", 12)), {
-      title: "Lose Open 10 status",
-      short: "Lose Open 10",
-      note: "Back to their Open skill band",
-    });
+    // Open 10 only goes up (owner, 2026-09-25): its level comes from the players' Elo.
+    assert.deepEqual([divisionMoves("open10", 12).up, divisionMoves("open10", 12).down], [3, 0]);
+    assert.equal(upText(divisionMoves("open10", 12)).title, "Promoted to Entry status");
     assert.equal(upText(divisionMoves("open89", 9)).title, "Promoted to Open 10 status");
-    assert.equal(downText(divisionMoves("open10+open89", 6)).note, "Open 10 teams · Back to their Open skill band");
+    assert.deepEqual(divisionMoves("entry+open10", 6).downTo, [["entry", "open10"]]);
+    assert.equal(downText(divisionMoves("entry+open10", 6)).note, "Entry teams");
   });
 
   it("stage outcome cards", () => {

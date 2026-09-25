@@ -1,25 +1,16 @@
 /**
  * The five player cards on an upcoming season's Overview (docs/LEAGUE_V2_PLAN.md
- * C1): the viewer's team's main roster with the viewer always in the middle.
- * A sub still sits in the middle, next to the team's top 4 starters by Elo.
+ * C1, FACEIT card style D1): the viewer's team's main roster with the viewer
+ * always in the middle. A sub (or the coach) still sits in the middle, next to
+ * the team's top 4 starters by Elo.
  */
 import { client } from "@/lib/db";
-import { getRankForElo } from "@/data/ranks";
+import { getEquippedVisualsMap } from "@/lib/cosmetics";
 import { seasonEntries, type TeamBadge } from "@/lib/league";
+import { cardFromMember, type PlayerCardData } from "@/lib/player-card";
 import { listTeams, type Team } from "@/lib/teams";
-import type { RankTierLetter } from "@/types";
 
-export interface LineupCard {
-  name: string;
-  avatar: string | null;
-  country: string | null;
-  /** Main Elo; null while unranked (placements not done). */
-  elo: number | null;
-  rank: RankTierLetter;
-  captain: boolean;
-  me: boolean;
-  sub: boolean;
-}
+export type LineupCard = PlayerCardData;
 
 export interface Lineup {
   team: TeamBadge;
@@ -74,28 +65,21 @@ export async function viewerLineup(seasonId: number, viewerId: string): Promise<
       .catch(() => ({ rows: [] as Record<string, unknown>[] }));
     for (const r of rs.rows as Record<string, unknown>[]) info.set(String(r.name).toLowerCase(), r);
   }
+  const visuals = await getEquippedVisualsMap().catch(() => new Map<string, { card: string | null }>());
   const card = (m: Team["members"][number]) => {
-    const p = m.playerName ? info.get(m.playerName.toLowerCase()) : undefined;
-    const placed = p ? Number(p.placement_done ?? 1) === 1 : false;
-    const elo = p && placed && Number(p.elo) > 0 ? Number(p.elo) : null;
-    return {
-      key: m.discordId,
-      elo,
-      card: {
-        name: m.playerName || m.username,
-        avatar: (p?.roblox_avatar_image as string | null) ?? m.avatar ?? null,
-        country: p?.country ? String(p.country).toLowerCase() : null,
-        elo,
-        rank: (elo === null ? "UNRANKED" : getRankForElo(elo).letter) as RankTierLetter,
-        captain: m.discordId === team.captainId,
-        me: m.discordId === viewerId,
-        sub: m.role === "sub",
-      } satisfies LineupCard,
-    };
+    const c = cardFromMember(m, {
+      row: m.playerName ? info.get(m.playerName.toLowerCase()) : undefined,
+      tag: team.tag,
+      captainId: team.captainId,
+      viewerId,
+      cardArt: m.playerName ? visuals.get(m.playerName)?.card ?? null : null,
+    });
+    return { key: m.discordId, elo: c.elo, card: c };
   };
   const meMember = accepted.find((m) => m.discordId === viewerId);
   if (!meMember) return null;
-  const starters = accepted.filter((m) => m.role !== "sub").map(card);
+  // The main roster: the captain and the starters (not the subs or the coach).
+  const starters = accepted.filter((m) => m.role === "captain" || m.role === "starter").map(card);
   const slots = arrangeLineup(card(meMember), starters);
   return {
     team: { id: team.id, name: team.name, tag: team.tag, logoUrl: team.logoUrl, accentColor: team.accentColor },

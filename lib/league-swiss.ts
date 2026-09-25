@@ -12,7 +12,8 @@
  * - Season end: each conference's top k go up and bottom k go down
  *   (k = 4 in big conferences, fewer in small ones):
  *   Open 8-9 → Open10 → Entry → Intermediate → Main → Advanced → Pro.
- *   Open 5-7 and 1-4 never move; the bottom of Open10 loses its status.
+ *   Open 5-7 and 1-4 never move; Open 8-9 and Open10 never go down (an Open
+ *   team's level comes from its players' Elo, so Open10 only goes up).
  */
 
 export const ROUND_ROBIN_MAX = 7;
@@ -133,11 +134,10 @@ export function promotionTarget(code: string): string | null {
   return i >= 0 && i < LADDER.length - 1 ? LADDER[i + 1] : null;
 }
 
-/** Where the bottom goes; "" = the status is removed; null = no relegation. */
+/** Where the bottom goes; null = no relegation (Open10 and the Open skill bands only go up). */
 export function relegationTarget(code: string): string | null {
   const i = (LADDER as readonly string[]).indexOf(code);
-  if (i < 0) return null;
-  return i > 0 ? LADDER[i - 1] : "";
+  return i > 0 ? LADDER[i - 1] : null;
 }
 
 export interface Move {

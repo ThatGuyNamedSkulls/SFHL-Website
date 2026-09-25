@@ -6,8 +6,9 @@
 import { randomUUID } from "crypto";
 import { client } from "@/lib/db";
 import { isQueueRegion, type QueueRegionId } from "@/lib/regions";
+import { MAX_TEAM_MEMBERS, fullMessage, hasRoom, openSlot, type RosterSlot, type TeamRole } from "@/lib/team-roster";
 
-export type TeamRole = "captain" | "starter" | "sub";
+export { MAX_TEAM_MEMBERS, type TeamRole };
 export type TeamMemberStatus = "invited" | "accepted";
 
 export interface TeamMember {
@@ -30,11 +31,16 @@ export interface Team {
   captainId: string;
   captainName: string;
   members: TeamMember[];
+  /** "About" on the team page (D4). */
+  description?: string | null;
+  /** Banner image URL for the team page header (else generated art). */
+  bannerUrl?: string | null;
   createdAt: number;
   updatedAt: number;
 }
 
-export const MAX_TEAM_MEMBERS = 7;
+export const DESCRIPTION_MAX = 500;
+
 export const MAX_OWNED_TEAMS = 3;
 const DEFAULT_REGION: QueueRegionId = "EU";
 const TAG_RE = /^[A-Z0-9]{2,5}$/;
@@ -211,7 +217,9 @@ export async function inviteToTeam(
     username: string;
     playerName: string | null;
     avatar: string | null;
-  }
+  },
+  /** The slot to invite into; default: the main roster while it has room, then the bench. */
+  slot?: RosterSlot
 ): Promise<Team> {
   const team = await getTeam(teamId);
   if (!team) throw new Error("Team not found.");
@@ -219,15 +227,15 @@ export async function inviteToTeam(
   if (team.members.some((m) => m.discordId === invitee.discordId)) {
     throw new Error("That player is already on the team.");
   }
-  if (team.members.filter((m) => m.status === "accepted" || m.status === "invited").length >= MAX_TEAM_MEMBERS) {
-    throw new Error(`Teams are capped at ${MAX_TEAM_MEMBERS} players.`);
-  }
+  const role = slot ?? openSlot(team.members);
+  if (!role) throw new Error(`Teams are capped at ${MAX_TEAM_MEMBERS} members (5 main roster, 6 subs, 1 coach).`);
+  if (!hasRoom(team.members, role)) throw new Error(fullMessage(role));
   team.members.push({
     discordId: invitee.discordId,
     username: invitee.username,
     playerName: invitee.playerName,
     avatar: invitee.avatar,
-    role: "starter",
+    role,
     status: "invited",
     joinedAt: Date.now(),
   });
@@ -285,6 +293,7 @@ export async function setMemberRole(
   const member = team.members.find((m) => m.discordId === targetDiscordId && m.status === "accepted");
   if (!member) throw new Error("Player is not on the team.");
   if (member.role === "captain") throw new Error("Can't demote the captain this way.");
+  if (member.role !== role && !hasRoom(team.members, role, member.discordId)) throw new Error(fullMessage(role));
   member.role = role;
   await save(team);
   return team;
@@ -309,8 +318,10 @@ export async function transferCaptain(
   if (team.captainId !== byDiscordId) throw new Error("Only the captain can transfer.");
   const next = team.members.find((m) => m.discordId === newCaptainId && m.status === "accepted");
   if (!next) throw new Error("New captain must be an accepted member.");
+  if (next.role === "coach") throw new Error("The captain must be a player, not the coach.");
+  // Swap: the old captain takes the new captain's slot, so the slot counts stay the same.
   const prev = team.members.find((m) => m.discordId === byDiscordId);
-  if (prev) prev.role = "starter";
+  if (prev) prev.role = next.role === "sub" ? "sub" : "starter";
   next.role = "captain";
   team.captainId = next.discordId;
   team.captainName = next.playerName || next.username;
@@ -321,7 +332,15 @@ export async function transferCaptain(
 export async function patchTeam(
   teamId: string,
   byDiscordId: string,
-  patch: { name?: string; tag?: string; logoUrl?: string | null; accentColor?: string; region?: string }
+  patch: {
+    name?: string;
+    tag?: string;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    description?: string | null;
+    accentColor?: string;
+    region?: string;
+  }
 ): Promise<Team> {
   const team = await getTeam(teamId);
   if (!team) throw new Error("Team not found.");
@@ -337,6 +356,8 @@ export async function patchTeam(
     team.tag = tag;
   }
   if (patch.logoUrl !== undefined) team.logoUrl = patch.logoUrl?.trim() || null;
+  if (patch.bannerUrl !== undefined) team.bannerUrl = patch.bannerUrl?.trim().slice(0, 500) || null;
+  if (patch.description !== undefined) team.description = patch.description?.trim().slice(0, DESCRIPTION_MAX) || null;
   if (patch.accentColor != null) team.accentColor = cleanColor(patch.accentColor);
   if (patch.region != null && isQueueRegion(patch.region)) team.region = patch.region;
   await save(team);
