@@ -33,8 +33,12 @@ import {
   queueModeLabel,
 } from "@/lib/queue-modes";
 import { useSession } from "@/components/session-provider";
+import { useMyParty } from "@/components/use-my-party";
+import { usePolling } from "@/components/use-polling";
+import { signalQueueChanged } from "@/lib/queue-signal";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
 import { LEVELS, levelOf } from "@/lib/league-find-rules";
+import { STATUS_TTL_MS } from "@/components/status-poller";
 
 interface WebQueueEntry {
   id: number;
@@ -146,7 +150,6 @@ export default function QueuePage() {
   const { session, discordInvite: sessionInvite } = useSession();
   const [discordInvite, setDiscordInvite] = useState<string | null>(null);
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
-  const [party, setParty] = useState<PartyLite | null>(null);
   const [queue, setQueue] = useState<WebQueueEntry[]>([]);
   // Live queue format (5v5).
   const [teamSize, setTeamSize] = useState(MATCH_TEAM_SIZE);
@@ -173,10 +176,15 @@ export default function QueuePage() {
     if (sessionInvite) setDiscordInvite(sessionInvite);
   }, [sessionInvite]);
 
-  useEffect(() => {
-    const fetchQueue = async () => {
+  // The party comes from the shared party store (one poll for the whole site).
+  const { party: sharedParty } = useMyParty(session?.discordId);
+  const party = (sharedParty as unknown as PartyLite | null) ?? null;
+
+  // Poll the queue every 5 s: while queued it keeps going in a hidden tab (the
+  // popup handles the ready check); otherwise it pauses there and slows when idle.
+  const fetchQueue = async () => {
       try {
-        const [q, p, sub] = await Promise.all([
+        const [q] = await Promise.all([
           apiGetJson<{
             queue?: WebQueueEntry[];
             teamSize?: number;
@@ -186,8 +194,6 @@ export default function QueuePage() {
             me?: { region?: string; mode?: string } | null;
             proEligible?: boolean;
           }>(`/api/queue?region=${encodeURIComponent(region)}&_=${Date.now()}`, { force: true }),
-          apiGetJson<{ parties?: PartyLite[] }>("/api/parties?mine=1"),
-          apiGetJson<{ count?: number }>("/api/subs"),
         ]);
         const qData = q.json;
         if (!actionInFlight.current) setQueue(qData.queue || []);
@@ -208,24 +214,27 @@ export default function QueuePage() {
             ? { region: qData.me.region, mode: parseQueueMode(qData.me.mode) }
             : null
         );
-        const me = session;
-        const mine = me
-          ? (p.json.parties as PartyLite[] | undefined)?.find((party) =>
-              party.members.some((m) => m.discordId === me.discordId)
-            )
-          : null;
-        setParty(mine ?? null);
-        setSubCount(Number(sub.json?.count ?? 0));
         setLoading(false);
       } catch (err) {
         console.error("Queue poll error:", err);
         setLoading(false);
       }
-    };
-    fetchQueue();
-    const interval = setInterval(fetchQueue, 5000);
-    return () => clearInterval(interval);
-  }, [region, session?.discordId]);
+  };
+  const queuedNow = !!queuedSpot;
+  usePolling(fetchQueue, 5000, {
+    keepWhenHidden: queuedNow,
+    idleSlowdown: !queuedNow,
+    // A new region or account polls again at once.
+    restartKey: `${region}:${session?.discordId ?? ""}`,
+  });
+  // The substitute strip: slower, it's only a count.
+  usePolling(
+    () =>
+      apiGetJson<{ count?: number }>("/api/subs", { ttlMs: STATUS_TTL_MS })
+        .then(({ json }) => setSubCount(Number(json?.count ?? 0)))
+        .catch(() => undefined),
+    15_000
+  );
 
   // Fetch the linked player's rank/elo for the lobby slot + season display.
   useEffect(() => {
@@ -285,6 +294,7 @@ export default function QueuePage() {
       else {
         setQueue(data.queue);
         setQueuedSpot({ region, mode: matchType });
+        signalQueueChanged();
       }
     } catch {
       setError("An error occurred");
@@ -306,6 +316,7 @@ export default function QueuePage() {
       else {
         setQueue(data.queue);
         setQueuedSpot(null);
+        signalQueueChanged();
       }
     } catch {
       setError("An error occurred");

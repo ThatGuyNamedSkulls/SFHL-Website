@@ -10,6 +10,7 @@ import { Flag } from "@/components/flag";
 import { RankBadge } from "@/components/rank-badge";
 import { countryName, flagPath } from "@/lib/countries";
 import type { PlayerCardData } from "@/lib/player-card";
+import { optimizedAsset } from "@/lib/optimized-asset";
 
 const SIZES = {
   lg: { card: "w-[136px] h-[228px]", banner: "h-[78px]", ring: 70, pad: 3, name: "text-[12px]", badge: "md" as const, elo: "text-[11px]" },
@@ -53,7 +54,7 @@ export function PlayerCard({
       <div className={`relative ${s.banner} w-full shrink-0 overflow-hidden`}>
         {card?.cardArt ? (
           // eslint-disable-next-line @next/next/no-img-element -- cosmetic asset
-          <img src={card.cardArt} alt="" className="h-full w-full object-cover" />
+          <img src={optimizedAsset(card.cardArt)} alt="" className="h-full w-full object-cover" />
         ) : (
           <div
             className={`h-full w-full ${

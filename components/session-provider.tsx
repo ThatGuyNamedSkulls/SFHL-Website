@@ -10,6 +10,7 @@ import {
 } from "react";
 import { UserSession } from "@/types";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
+import { startPolling } from "@/lib/poll-gate";
 
 type SessionState = {
   session: UserSession | null;
@@ -71,8 +72,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!state.loaded || !state.session) return;
     const gated = !state.session.inGuild || state.session.verified === false;
     const ms = gated ? 8000 : 30000;
-    const id = window.setInterval(() => refresh({ force: gated }), ms);
-    return () => window.clearInterval(id);
+    return startPolling(() => refresh({ force: gated }), ms, { immediate: false });
   }, [
     state.loaded,
     state.session?.discordId,

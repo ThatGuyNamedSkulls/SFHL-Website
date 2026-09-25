@@ -1,19 +1,24 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { acceptReadyCheck, myReadyCheck } from "@/lib/ready-checks";
+import { isInWebQueue } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/** GET — the signed-in player's current (or just-finished) ready check. */
+/**
+ * GET — the signed-in player's current (or just-finished) ready check, and
+ * whether they're queued (the popup polls fast only while queued or pending).
+ */
 export async function GET() {
   const session = await getSession();
-  if (!session) return NextResponse.json({ check: null });
+  if (!session) return NextResponse.json({ check: null, queued: false });
   try {
-    return NextResponse.json({ check: await myReadyCheck(session.discordId) });
+    const [check, queued] = await Promise.all([myReadyCheck(session.discordId), isInWebQueue(session.discordId)]);
+    return NextResponse.json({ check, queued });
   } catch (error) {
     console.error("ready-check GET", error);
-    return NextResponse.json({ check: null });
+    return NextResponse.json({ check: null, queued: false });
   }
 }
 

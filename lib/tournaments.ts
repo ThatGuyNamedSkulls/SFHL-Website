@@ -30,6 +30,7 @@ import {
   type TournamentKind,
   type TournamentTeam,
 } from "@/lib/tournament-types";
+import { schemaOnce } from "@/lib/schema-once";
 
 const MAX_OTHERS = 6;
 const MAX_STARTERS = 5;
@@ -60,7 +61,7 @@ let schemaReady: Promise<void> | null = null;
 
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("tournaments", async () => {
       await client.execute(
         `CREATE TABLE IF NOT EXISTS web_tournaments (
            id TEXT PRIMARY KEY,

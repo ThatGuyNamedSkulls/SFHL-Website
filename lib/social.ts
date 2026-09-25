@@ -14,6 +14,7 @@
 
 import { client, mapRank } from "@/lib/db";
 import { pickAvatar } from "@/lib/avatar";
+import { schemaOnce } from "@/lib/schema-once";
 
 export interface Friend {
   name: string;
@@ -49,7 +50,7 @@ let schemaReady: Promise<void> | null = null;
 /** Create the social tables once per process (idempotent, mirrors core/schema.py). */
 export function ensureSocialSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("social", async () => {
       await client.batch([
         // Maps a player name -> their Discord id, captured whenever the website
         // knows both (login/queue/party). Lets the bot DM by user id instead of

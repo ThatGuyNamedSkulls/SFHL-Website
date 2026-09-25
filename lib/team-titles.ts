@@ -3,6 +3,7 @@
  * The bot writes team_titles; the website only reads it.
  */
 import { client } from "@/lib/db";
+import { schemaOnce } from "@/lib/schema-once";
 
 export interface TeamTitle {
   id: number;
@@ -16,7 +17,7 @@ let schemaReady: Promise<void> | null = null;
 /** Same definition as core/team_titles.py, so a fresh DB works either way. */
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("team_titles", async () => {
       // One round trip (Turso is remote).
       await client.batch(
         [

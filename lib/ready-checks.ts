@@ -4,6 +4,7 @@
  * here. The website reads the check and records accepts; the bot decides.
  */
 import { client } from "@/lib/db";
+import { schemaOnce } from "@/lib/schema-once";
 
 export type ReadyCheckStatus = "pending" | "started" | "failed" | "cancelled";
 
@@ -29,7 +30,7 @@ let schemaReady: Promise<void> | null = null;
 /** Same definitions as core/ready_checks.py. */
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("ready_checks", async () => {
       await client.execute(
         `CREATE TABLE IF NOT EXISTS ready_checks (
            id TEXT PRIMARY KEY,

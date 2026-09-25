@@ -11,6 +11,7 @@ import type { SubRequestView } from "@/types";
 import { AlertCircle, Clock, UserPlus, Zap } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson } from "@/lib/client-api";
+import { startPolling } from "@/lib/poll-gate";
 
 /** How a sub's Elo works, so nobody claims a slot without knowing the deal. */
 const RULES = [
@@ -46,9 +47,7 @@ export default function SubsPage() {
 
   useEffect(() => {
     if (claimed) return;  // claimed: the matchroom watcher below takes over
-    poll();
-    const id = setInterval(poll, 5000);
-    return () => clearInterval(id);
+    return startPolling(poll, 5000);
   }, [poll, claimed]);
 
   // After claiming, the bot still has to grant Discord access and add the

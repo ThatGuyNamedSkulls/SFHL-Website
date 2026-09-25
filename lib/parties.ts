@@ -25,6 +25,7 @@ import {
   syncPartyVoiceMembers,
   partyVoiceAppUrl,
 } from "@/lib/discord-party-voice";
+import { schemaOnce } from "@/lib/schema-once";
 
 /** 30 minutes without any party operation (create/join/leave) before a party
  *  is auto-disbanded. */
@@ -88,7 +89,7 @@ let schemaReady: Promise<void> | null = null;
 /** Create the table once per process (idempotent). */
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("parties", async () => {
       await client.execute(
         `CREATE TABLE IF NOT EXISTS web_parties (
            id TEXT PRIMARY KEY,

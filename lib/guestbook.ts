@@ -1,4 +1,5 @@
 import { client, mapRank } from "@/lib/db";
+import { schemaOnce } from "@/lib/schema-once";
 
 export interface GuestbookEntry {
   id: number;
@@ -13,7 +14,7 @@ let schemaReady: Promise<void> | null = null;
 
 export function ensureGuestbookSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("guestbook", async () => {
       await client
         .execute(
           `CREATE TABLE IF NOT EXISTS guestbook (

@@ -5,10 +5,17 @@ import { usePathname, useRouter } from "next/navigation";
 import { regionMeta } from "@/lib/regions";
 import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 import { useSession } from "@/components/session-provider";
+import { usePolling } from "@/components/use-polling";
+import { useMyParty } from "@/components/use-my-party";
+import { QUEUE_EVENT } from "@/lib/queue-signal";
 
 const STORAGE_PREFIX = "hl-match-accepted:";
+/** A check is on screen: follow it closely. */
 const PENDING_POLL_MS = 1500;
-const IDLE_POLL_MS = 3000;
+/** Queued: a check can start any second (keeps going in a hidden tab). */
+const QUEUED_POLL_MS = 3000;
+/** Not queued: no check can start for you, so just a slow safety poll. */
+const IDLE_POLL_MS = 30_000;
 
 /** Remember that this player already opened a match room (kept for callers
  *  that mark a lobby as seen). */
@@ -64,6 +71,7 @@ export function MatchReadyModal() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
+  const [queued, setQueued] = useState(false);
   const redirecting = useRef<string | null>(null);
 
   const apply = useCallback((next: ReadyCheck | null) => {
@@ -75,25 +83,32 @@ export function MatchReadyModal() {
     try {
       const res = await fetch("/api/ready-check", { cache: "no-store" });
       if (!res.ok) return;
-      const data = (await res.json()) as { check?: ReadyCheck | null };
+      const data = (await res.json()) as { check?: ReadyCheck | null; queued?: boolean };
       apply(data.check ?? null);
+      setQueued(data.queued === true);
     } catch {
       /* next poll retries */
     }
   }, [apply]);
 
-  const pending = check?.status === "pending";
-  const pollMs = pending ? PENDING_POLL_MS : IDLE_POLL_MS;
+  // A party leader can queue the whole party, so party members stay on the fast pace too.
+  const { party } = useMyParty(session?.discordId);
+  const inParty = !!party && party.members.length > 1;
 
+  // Joined/left the queue here, or the queue pill saw it change: check right away.
   useEffect(() => {
-    if (!session?.discordId) return;
-    const first = window.setTimeout(load, 0);
-    const id = window.setInterval(load, pollMs);
-    return () => {
-      window.clearTimeout(first);
-      window.clearInterval(id);
-    };
-  }, [session?.discordId, load, pollMs]);
+    const onQueue = () => void load();
+    window.addEventListener(QUEUE_EVENT, onQueue);
+    return () => window.removeEventListener(QUEUE_EVENT, onQueue);
+  }, [load]);
+
+  const pending = check?.status === "pending";
+  const urgent = pending || queued || inParty;
+  // Fast (and on in hidden tabs) only while queued or a check is on screen.
+  usePolling(load, session?.discordId ? (pending ? PENDING_POLL_MS : urgent ? QUEUED_POLL_MS : IDLE_POLL_MS) : null, {
+    keepWhenHidden: urgent,
+    idleSlowdown: !urgent,
+  });
 
   useEffect(() => {
     if (!pending) return;

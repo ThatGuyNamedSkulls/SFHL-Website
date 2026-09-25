@@ -16,6 +16,7 @@
 import { client, ensurePlayerCoinsColumn } from "@/lib/db";
 import { remember } from "@/lib/server-cache";
 import { DEFAULT_PROFILE_BACKGROUNDS } from "@/lib/profile-backgrounds";
+import { schemaOnce } from "@/lib/schema-once";
 
 export type CosmeticType = "card" | "title" | "badge" | "frame" | "background";
 
@@ -50,7 +51,7 @@ let schemaReady: Promise<void> | null = null;
  *  core/schema.py). Schema only — item seeding is bot-side. */
 function ensureCosmeticsSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("cosmetics", async () => {
       await client.batch([
         `CREATE TABLE IF NOT EXISTS cosmetic_items (
            id          INTEGER PRIMARY KEY AUTOINCREMENT,

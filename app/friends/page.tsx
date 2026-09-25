@@ -10,6 +10,7 @@ import { RankTierLetter } from "@/types";
 import { UserPlus, Users, Check, X, Search, UserMinus, Clock } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { OnlineBadge, OnlineLabel, useOnline } from "@/components/online-status";
+import { startPolling } from "@/lib/poll-gate";
 
 interface Friend {
   name: string;
@@ -95,9 +96,7 @@ export default function FriendsPage() {
   }, [session?.discordId]);
 
   useEffect(() => {
-    load();
-    const interval = setInterval(load, 15000);
-    return () => clearInterval(interval);
+    return startPolling(load, 15_000);
   }, [load]);
 
   useEffect(() => {

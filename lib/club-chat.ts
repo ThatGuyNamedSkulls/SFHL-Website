@@ -1,5 +1,6 @@
 import { client } from "@/lib/db";
 import { getClub, memberOf } from "@/lib/clubs";
+import { schemaOnce } from "@/lib/schema-once";
 
 export const CLUB_CHAT_MAX_LENGTH = 250;
 const CHAT_LIMIT = 80;
@@ -19,7 +20,7 @@ let schemaReady: Promise<void> | null = null;
 
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("club_chat", async () => {
       await client.execute(
         `CREATE TABLE IF NOT EXISTS web_club_chat (
            id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -14,7 +14,8 @@ const TABS: { id: MissionTab; label: string }[] = [
 const FILTERS: { id: MissionCategory; label: string }[] = [
   { id: "all", label: "All" },
   { id: "sponsored", label: "Sponsored" },
-  { id: "sf", label: "SF" },
+  { id: "daily", label: "Daily" },
+  { id: "weekly", label: "Weekly" },
   { id: "monthly", label: "Monthly" },
 ];
 

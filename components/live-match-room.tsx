@@ -12,6 +12,7 @@ import { queueModeLabel } from "@/lib/queue-modes";
 import { ExternalLink, Mic, Crown, Calendar, Send, Gamepad2 } from "lucide-react";
 import { SubRolePill } from "@/components/sub-role-pill";
 import { WinChanceBar } from "@/components/win-chance-bar";
+import { startPolling } from "@/lib/poll-gate";
 
 export interface LiveLobbyMember {
   discordId: string;
@@ -180,9 +181,7 @@ export function LiveMatchRoom({
         /* ignore */
       }
     };
-    loadChat();
-    const id = setInterval(loadChat, 2000);
-    return () => clearInterval(id);
+    return startPolling(loadChat, 2000, { idleSlowdown: false });
   }, [lobby.channelId]);
 
   useEffect(() => {

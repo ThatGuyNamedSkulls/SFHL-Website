@@ -38,18 +38,9 @@ export function CountryPrompt() {
       if (sessionStorage.getItem("hl_country_saved")) return;
     }
     let cancelled = false;
-    let id: ReturnType<typeof setInterval> | null = null;
+    // Once per page load (it used to re-check every 8 s): a country is set here
+    // or in Settings, and both close the prompt themselves.
     const check = async () => {
-      if (typeof window !== "undefined") {
-        if (sessionStorage.getItem("hl_country_skipped")) {
-          if (id) clearInterval(id);
-          return;
-        }
-        if (sessionStorage.getItem("hl_country_saved")) {
-          if (id) clearInterval(id);
-          return;
-        }
-      }
       try {
         const r = await fetch("/api/players/country", { cache: "no-store" });
         const d = await r.json();
@@ -57,7 +48,6 @@ export function CountryPrompt() {
         if (d.country) {
           savedRef.current = true;
           setOpen(false);
-          if (id) clearInterval(id);
           return;
         }
         if (d.linked && !d.country) setOpen(true);
@@ -65,19 +55,9 @@ export function CountryPrompt() {
         /* ignore */
       }
     };
-    const start = async () => {
-      await check();
-      if (cancelled || savedRef.current) return;
-      if (typeof window !== "undefined") {
-        if (sessionStorage.getItem("hl_country_skipped")) return;
-        if (sessionStorage.getItem("hl_country_saved")) return;
-      }
-      id = setInterval(check, 8000);
-    };
-    void start();
+    void check();
     return () => {
       cancelled = true;
-      if (id) clearInterval(id);
     };
   }, [loaded, session?.discordId]);
 

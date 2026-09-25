@@ -11,6 +11,7 @@ import { rankRing } from "@/lib/player-card";
 import { RankTierLetter } from "@/types";
 import { Plus, Search, Crown, BadgeCheck, CircleAlert, UserRound } from "lucide-react";
 import { MmAccessBadge } from "@/components/mm-access-badge";
+import { optimizedAsset } from "@/lib/optimized-asset";
 
 export interface LobbyMember {
   username: string;
@@ -68,7 +69,7 @@ function LobbyCard({ member, center }: { member: LobbyMember; center: boolean })
         {member.card ? (
           // eslint-disable-next-line @next/next/no-img-element -- cosmetic asset
           <img
-            src={member.card}
+            src={optimizedAsset(member.card)}
             alt=""
             className="h-full w-full object-cover"
             onError={(e) => {

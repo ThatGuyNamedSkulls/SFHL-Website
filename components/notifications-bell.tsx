@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Bell, UserPlus, Users, Check, X, Swords, Headphones, Trophy, MessageSquare } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
+import { usePolling } from "@/components/use-polling";
+import { STATUS_TTL_MS } from "@/components/status-poller";
 
 interface NotificationView {
   id: number;
@@ -36,12 +38,13 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
 
   useEffect(() => setMounted(true), []);
 
-  const load = useCallback(async () => {
+  // Passive refreshes read the shell's combined status (StatusPoller); after an action, fetch fresh.
+  const load = useCallback(async (fresh = false) => {
     try {
       const { ok, json } = await apiGetJson<{
         notifications?: NotificationView[];
         unread?: number;
-      }>("/api/notifications");
+      }>("/api/notifications", fresh ? { force: true } : { ttlMs: STATUS_TTL_MS });
       if (!ok) return;
       setItems(json.notifications ?? []);
       setUnread(json.unread ?? 0);
@@ -50,11 +53,7 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
     }
   }, []);
 
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 15000);
-    return () => clearInterval(interval);
-  }, [load]);
+  usePolling(() => load(), 15_000);
 
   // Close on outside click — the dropdown is portaled outside the button, so
   // check both the button and the dropdown before closing.
@@ -99,7 +98,7 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fromName: n.actorId }),
       });
-      await load();
+      await load(true);
     } finally {
       setBusy(null);
     }
@@ -114,7 +113,7 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fromName: n.actorId }),
       });
-      await load();
+      await load(true);
     } finally {
       setBusy(null);
     }
@@ -129,7 +128,7 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
         setOpen(false);
         router.push("/party-finder");
       }
-      await load();
+      await load(true);
     } finally {
       setBusy(null);
     }

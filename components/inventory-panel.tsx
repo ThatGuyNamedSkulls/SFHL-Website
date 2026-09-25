@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { InventoryItem, CosmeticType } from "@/types";
 import { CreditCard, Type, Award, Check, CircleUserRound, UserRound, Palette } from "lucide-react";
 import { BackgroundSwatch } from "@/components/profile-background";
+import { optimizedAsset } from "@/lib/optimized-asset";
 
 const TABS: { id: CosmeticType; label: string; icon: typeof Award }[] = [
   { id: "background", label: "Backgrounds", icon: Palette },
@@ -38,7 +39,7 @@ function CardPreview({ item }: { item: InventoryItem }) {
       {item.asset && !broken ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={item.asset}
+          src={optimizedAsset(item.asset)}
           alt={item.name}
           className="w-full h-full object-cover"
           onError={() => setBroken(true)}
@@ -63,7 +64,7 @@ function FramePreview({ item }: { item: InventoryItem }) {
       {item.asset && !broken && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={item.asset}
+          src={optimizedAsset(item.asset)}
           alt={item.name}
           className="absolute -inset-[14%] w-[128%] h-[128%] max-w-none object-contain pointer-events-none"
           onError={() => setBroken(true)}
@@ -80,7 +81,7 @@ function BadgeIcon({ item, className = "w-10 h-10" }: { item: InventoryItem; cla
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={item.asset}
+        src={optimizedAsset(item.asset)}
         alt={item.name}
         className={`${className} object-contain shrink-0`}
         onError={() => setBroken(true)}

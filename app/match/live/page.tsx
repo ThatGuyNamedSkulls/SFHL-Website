@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Swords } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson } from "@/lib/client-api";
+import { startPolling } from "@/lib/poll-gate";
 
 export default function LiveMatchPage() {
   const { session } = useSession();
@@ -27,9 +28,7 @@ export default function LiveMatchPage() {
         setLoaded(true);
       }
     };
-    poll();
-    const id = setInterval(poll, 3000);
-    return () => clearInterval(id);
+    return startPolling(poll, 3000, { idleSlowdown: false });
   }, []);
 
   if (!loaded) {

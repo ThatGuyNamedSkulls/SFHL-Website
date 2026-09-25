@@ -9,8 +9,10 @@
  */
 import { cache } from "react";
 import { client } from "@/lib/db";
+import { remember } from "@/lib/server-cache";
 import { getTeam, listTeams, type Team } from "@/lib/teams";
 import { swissStandings } from "@/lib/league-swiss";
+import { schemaOnce } from "@/lib/schema-once";
 
 /** TESTING: 1 so small teams can try the league. The real rule is 5 — change it
  * back here and in core/league.py before a real season. */
@@ -224,7 +226,7 @@ let schemaReady: Promise<void> | null = null;
 /** Same tables as core/league.py, so a fresh DB works whichever side runs first. */
 export function ensureLeagueSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("league", async () => {
       // One round trip per step (Turso is remote): every CREATE in a batch, then the
       // column checks in a batch, then only the missing columns.
       const ddl: string[] = [];
@@ -826,8 +828,19 @@ export interface CaptainTeamOption extends TeamBadge {
   inviteOnly: boolean;
 }
 
-/** Everything the /league page shows for a season (read-only apart from sign-ups). */
+/**
+ * Everything the /league page shows for a season (read-only apart from sign-ups).
+ * Logged-out visitors share one copy per season for 30 s (docs/PERFORMANCE_PLAN.md
+ * step 7); a viewer's own highlights are always built fresh.
+ */
 export async function leagueView(seasonId: number | null, viewerId: string | null) {
+  if (viewerId === null && !process.env.HL_TESTING) {
+    return remember(`league-view:${seasonId ?? "current"}`, 30_000, () => buildLeagueView(seasonId, null));
+  }
+  return buildLeagueView(seasonId, viewerId);
+}
+
+async function buildLeagueView(seasonId: number | null, viewerId: string | null) {
   const [seasons, teams] = await Promise.all([listSeasons(), listTeams()]);
   const season =
     (seasonId ? seasons.find((s) => s.id === seasonId) : null) ??
@@ -987,7 +1000,7 @@ export async function leagueView(seasonId: number | null, viewerId: string | nul
   };
 }
 
-export type LeagueView = Awaited<ReturnType<typeof leagueView>>;
+export type LeagueView = Awaited<ReturnType<typeof buildLeagueView>>;
 
 /** A team's league seasons for its team page: division, record, final place, move, prize. */
 export async function teamLeagueHistory(teamId: string) {

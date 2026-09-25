@@ -2,6 +2,7 @@
 
 import { RankTierLetter } from "@/types";
 import { RANK_TIERS } from "@/data/ranks";
+import { optimizedAsset } from "@/lib/optimized-asset";
 
 /** Tiers that have a real icon in /public/ranks. STAR/UNRANKED fall back to a letter badge. */
 const ICON_TIERS: RankTierLetter[] = [
@@ -9,7 +10,7 @@ const ICON_TIERS: RankTierLetter[] = [
 ];
 
 function iconSrc(rank: RankTierLetter): string | null {
-  return ICON_TIERS.includes(rank) ? `/ranks/${rank.toLowerCase()}.png` : null;
+  return ICON_TIERS.includes(rank) ? optimizedAsset(`/ranks/${rank.toLowerCase()}.png`) : null;
 }
 
 interface RankBadgeProps {

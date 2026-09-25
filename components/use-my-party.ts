@@ -2,6 +2,8 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
+import { startPolling } from "@/lib/poll-gate";
+import { STATUS_TTL_MS } from "@/components/status-poller";
 
 export interface PartyMemberLite {
   discordId: string;
@@ -22,7 +24,7 @@ export interface PartyLite {
   invitedNames?: string[];
 }
 
-const POLL_MS = 8000;
+const POLL_MS = 10_000;
 
 /* One shared poll of GET /api/parties?mine=1 for every component that needs
  * the signed-in user's party (the party rail, the Social panel). */
@@ -30,7 +32,7 @@ let party: PartyLite | null = null;
 let loaded = false;
 let version = 0;
 let subscribers = 0;
-let timer: number | null = null;
+let stopPoll: (() => void) | null = null;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -44,9 +46,11 @@ export async function refreshMyParty(force = false): Promise<void> {
     invalidateClientApi("/api/parties");
   }
   try {
-    const { ok, json } = await apiGetJson<{ parties?: PartyLite[] }>("/api/parties?mine=1", {
-      force,
-    });
+    // Passive refreshes read the shell's combined status (StatusPoller); forced ones fetch fresh.
+    const { ok, json } = await apiGetJson<{ parties?: PartyLite[] }>(
+      "/api/parties?mine=1",
+      force ? { force: true } : { ttlMs: STATUS_TTL_MS }
+    );
     const next = ok ? json.parties?.[0] ?? null : null;
     party = next;
   } catch {
@@ -67,14 +71,14 @@ export function useMyParty(sessionId: string | null | undefined) {
     if (!sessionId) return;
     subscribers += 1;
     if (subscribers === 1) {
-      refreshMyParty();
-      timer = window.setInterval(() => refreshMyParty(), POLL_MS);
+      // Paused in hidden tabs, slower when idle (lib/poll-gate.ts).
+      stopPoll = startPolling(() => refreshMyParty(), POLL_MS);
     }
     return () => {
       subscribers -= 1;
-      if (subscribers === 0 && timer !== null) {
-        window.clearInterval(timer);
-        timer = null;
+      if (subscribers === 0 && stopPoll) {
+        stopPoll();
+        stopPoll = null;
       }
     };
   }, [sessionId]);

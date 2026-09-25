@@ -21,6 +21,7 @@ import { RailDrawer, TextTabs } from "@/components/rail-drawer";
 import { useMyParty } from "@/components/use-my-party";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
 import { RAIL_CHAT_MESSAGES, onlineBadgeCount } from "@/lib/chat-limits";
+import { startPolling } from "@/lib/poll-gate";
 
 const OPEN_POLL_MS = 15000;
 const CLOSED_POLL_MS = 30000;
@@ -68,12 +69,7 @@ function useFriends(enabled: boolean, open: boolean) {
   }, []);
   useEffect(() => {
     if (!enabled) return;
-    const first = window.setTimeout(load, 0);
-    const id = window.setInterval(load, open ? OPEN_POLL_MS : CLOSED_POLL_MS);
-    return () => {
-      window.clearTimeout(first);
-      window.clearInterval(id);
-    };
+    return startPolling(load, open ? OPEN_POLL_MS : CLOSED_POLL_MS);
   }, [enabled, open, load]);
   return { ...data, linked, reload: load };
 }

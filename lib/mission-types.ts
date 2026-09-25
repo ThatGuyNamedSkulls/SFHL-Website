@@ -1,6 +1,6 @@
 export type MissionTab = "upcoming" | "ongoing" | "ended";
-export type MissionMetric = "wins" | "matches" | "placement_done";
-export type MissionCategory = "all" | "monthly" | "sf" | "sponsored";
+export type MissionMetric = "wins" | "matches" | "placement_done" | "matches_played" | "matches_won";
+export type MissionCategory = "all" | "monthly" | "weekly" | "daily" | "sponsored";
 
 export interface MissionDef {
   id: string;

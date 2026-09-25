@@ -21,6 +21,15 @@ export function invalidateClientApi(url?: string) {
   inflight.clear();
 }
 
+/**
+ * Store an answer fetched some other way (the shell's combined status call,
+ * app/api/me/status) as if `url` had just been fetched, so the next
+ * apiGetJson(url, { ttlMs }) is served from memory.
+ */
+export function primeClientApi(url: string, status: number, json: unknown) {
+  memo.set(url, { at: Date.now(), ok: status >= 200 && status < 300, status, json });
+}
+
 export async function apiGetJson<T = unknown>(
   url: string,
   opts?: { ttlMs?: number; force?: boolean }

@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Gamepad2 } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
+import { usePolling } from "@/components/use-polling";
+import { signalQueueChanged } from "@/lib/queue-signal";
+import { STATUS_TTL_MS } from "@/components/status-poller";
 
 interface QueueEntry {
   discord_id: string;
@@ -17,26 +21,27 @@ interface QueueEntry {
 export function QueuePill({ discordId }: { discordId?: string | null }) {
   const [count, setCount] = useState<number | null>(null);
   const [inQueue, setInQueue] = useState(false);
+  const wasQueued = useRef<boolean | null>(null);
+  // The queue page polls the queue itself; the pill rests there.
+  const onQueuePage = usePathname() === "/queue";
 
-  useEffect(() => {
-    let active = true;
-    const load = () =>
-      apiGetJson<{ queue?: QueueEntry[] }>("/api/queue")
+  usePolling(
+    () =>
+      apiGetJson<{ queue?: QueueEntry[] }>("/api/queue", { ttlMs: STATUS_TTL_MS })
         .then(({ json: d }) => {
-          if (!active) return;
           const q: QueueEntry[] = d.queue || [];
+          const mine = discordId ? q.some((e) => e.discord_id === discordId) : false;
           setCount(q.length);
-          setInQueue(
-            discordId ? q.some((e) => e.discord_id === discordId) : false
-          );
+          setInQueue(mine);
+          // Queued from elsewhere (Discord, a party leader): wake the ready-check popup.
+          if (wasQueued.current !== null && wasQueued.current !== mine) signalQueueChanged();
+          wasQueued.current = mine;
         })
-        .catch(() => {});
-    load();
-    const id = setInterval(load, 10000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
+        .catch(() => {}),
+    onQueuePage ? null : 10_000
+  );
+  useEffect(() => {
+    wasQueued.current = null;
   }, [discordId]);
 
   if (count === null || (count === 0 && !inQueue)) return null;

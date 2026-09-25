@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ShopItem, CosmeticType } from "@/types";
 import { Coins, Check, Award, UserRound, Lock } from "lucide-react";
+import { optimizedAsset } from "@/lib/optimized-asset";
 
 type ShopFilter = CosmeticType | "all" | "featured";
 
@@ -36,7 +37,7 @@ function ShopPreview({ item }: { item: ShopItem }) {
   const [broken, setBroken] = useState(false);
   if (item.type === "card" && item.asset && !broken) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={item.asset} alt={item.name} className="w-full h-full object-cover" onError={() => setBroken(true)} />;
+    return <img src={optimizedAsset(item.asset)} alt={item.name} className="w-full h-full object-cover" onError={() => setBroken(true)} />;
   }
   if (item.type === "frame") {
     return (
@@ -48,7 +49,7 @@ function ShopPreview({ item }: { item: ShopItem }) {
           {item.asset && !broken && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={item.asset}
+              src={optimizedAsset(item.asset)}
               alt={item.name}
               className="absolute -inset-[14%] h-[128%] w-[128%] max-w-none object-contain"
               onError={() => setBroken(true)}
@@ -63,7 +64,7 @@ function ShopPreview({ item }: { item: ShopItem }) {
       <div className="flex h-full w-full items-center justify-center">
         {item.asset && !broken ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.asset} alt={item.name} className="h-16 w-16 object-contain" onError={() => setBroken(true)} />
+          <img src={optimizedAsset(item.asset)} alt={item.name} className="h-16 w-16 object-contain" onError={() => setBroken(true)} />
         ) : (
           <Award className="h-12 w-12 text-hl-gold/70" />
         )}

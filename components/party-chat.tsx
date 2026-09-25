@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { lastMessages, type ThreadMessage } from "@/components/chat-thread";
 import { RAIL_CHAT_MESSAGES } from "@/lib/chat-limits";
+import { startPolling } from "@/lib/poll-gate";
 
 const OPEN_POLL_MS = 3000;
 const CLOSED_POLL_MS = 12000;
@@ -94,12 +95,7 @@ export function usePartyChat(partyId: string | null, me: string | null, visible:
 
   useEffect(() => {
     if (!partyId) return;
-    const first = window.setTimeout(poll, 0);
-    const id = window.setInterval(poll, visible ? OPEN_POLL_MS : CLOSED_POLL_MS);
-    return () => {
-      window.clearTimeout(first);
-      window.clearInterval(id);
-    };
+    return startPolling(poll, visible ? OPEN_POLL_MS : CLOSED_POLL_MS, { idleSlowdown: !visible });
   }, [partyId, visible, poll]);
 
   const send = useCallback(

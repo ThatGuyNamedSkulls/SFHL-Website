@@ -4,6 +4,7 @@ import { useState } from "react";
 import { InventoryItem, CosmeticType } from "@/types";
 import { Award, Check, UserRound } from "lucide-react";
 import { BackgroundSwatch } from "@/components/profile-background";
+import { optimizedAsset } from "@/lib/optimized-asset";
 
 const FILTERS: { id: CosmeticType | "all"; label: string }[] = [
   { id: "all", label: "All" },
@@ -36,7 +37,7 @@ function ItemPreview({ item }: { item: InventoryItem }) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={item.asset}
+        src={optimizedAsset(item.asset)}
         alt={item.name}
         className="w-full h-full object-cover"
         onError={() => setBroken(true)}
@@ -54,7 +55,7 @@ function ItemPreview({ item }: { item: InventoryItem }) {
           {item.asset && !broken && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={item.asset}
+              src={optimizedAsset(item.asset)}
               alt={item.name}
               className="absolute -inset-[14%] w-[128%] h-[128%] max-w-none object-contain pointer-events-none"
               onError={() => setBroken(true)}
@@ -69,7 +70,7 @@ function ItemPreview({ item }: { item: InventoryItem }) {
       <div className="w-full h-full flex items-center justify-center">
         {item.asset && !broken ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.asset} alt={item.name} className="w-16 h-16 object-contain" onError={() => setBroken(true)} />
+          <img src={optimizedAsset(item.asset)} alt={item.name} className="w-16 h-16 object-contain" onError={() => setBroken(true)} />
         ) : (
           <Award className="w-12 h-12 text-hl-gold/70" />
         )}

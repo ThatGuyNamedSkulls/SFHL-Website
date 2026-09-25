@@ -13,6 +13,7 @@ import {
 import { DEFAULT_PROFILE_BACKGROUNDS } from "@/lib/profile-backgrounds";
 import { isQueueRegion, type QueueRegionId } from "@/lib/regions";
 import { forget, remember } from "@/lib/server-cache";
+import { schemaOnce } from "@/lib/schema-once";
 
 export const OWNER_ROLE_ID = "owner";
 export const MEMBER_ROLE_ID = "member";
@@ -108,7 +109,7 @@ let schemaReady: Promise<void> | null = null;
 
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("clubs", async () => {
       await client.execute(
         `CREATE TABLE IF NOT EXISTS web_clubs (
            id TEXT PRIMARY KEY,

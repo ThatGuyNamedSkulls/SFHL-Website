@@ -12,10 +12,7 @@ import { RankBadge } from "@/components/rank-badge";
 import { GameSkillBar } from "@/components/game-skill-bar";
 import { PerformanceCard } from "@/components/performance-card";
 import { ConsistencyDonut } from "@/components/consistency-donut";
-import { EloGraphFaceit } from "@/components/elo-graph-faceit";
-import { RecentPerformance } from "@/components/recent-performance";
 import { MapStatsTable } from "@/components/map-stats-table";
-import { MetricChart } from "@/components/metric-chart";
 import { ProfileInventory } from "@/components/profile-inventory";
 import { ProfilePageBackdrop } from "@/components/profile-background";
 import { MmAccessBadge } from "@/components/mm-access-badge";
@@ -48,6 +45,23 @@ import {
   Share2,
   Pencil,
 } from "lucide-react";
+import { optimizedAsset } from "@/lib/optimized-asset";
+import dynamic from "next/dynamic";
+
+// The charts (recharts, ~380 KB) load after the rest of the profile (docs/PERFORMANCE_PLAN.md step 13).
+const chartPlaceholder = () => <div className="h-64 w-full animate-pulse rounded-xl bg-white/[0.04]" />;
+const EloGraphFaceit = dynamic(() => import("@/components/elo-graph-faceit").then((m) => m.EloGraphFaceit), {
+  ssr: false,
+  loading: chartPlaceholder,
+});
+const RecentPerformance = dynamic(() => import("@/components/recent-performance").then((m) => m.RecentPerformance), {
+  ssr: false,
+  loading: chartPlaceholder,
+});
+const MetricChart = dynamic(() => import("@/components/metric-chart").then((m) => m.MetricChart), {
+  ssr: false,
+  loading: chartPlaceholder,
+});
 
 type MainTab = "games" | "friends" | "inventory" | "guestbook" | "clubs" | "teams";
 type SubTab = "summary" | "matches" | "stats";
@@ -473,7 +487,7 @@ function ProfileContent() {
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={cardArt}
+                  src={optimizedAsset(cardArt)}
                   alt=""
                   className="absolute inset-0 w-full h-full object-cover"
                   onError={(e) => {

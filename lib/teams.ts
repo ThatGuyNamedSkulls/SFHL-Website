@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import { client } from "@/lib/db";
 import { isQueueRegion, type QueueRegionId } from "@/lib/regions";
 import { MAX_TEAM_MEMBERS, fullMessage, hasRoom, openSlot, type RosterSlot, type TeamRole } from "@/lib/team-roster";
+import { schemaOnce } from "@/lib/schema-once";
 
 export { MAX_TEAM_MEMBERS, type TeamRole };
 export type TeamMemberStatus = "invited" | "accepted";
@@ -50,7 +51,7 @@ let schemaReady: Promise<void> | null = null;
 
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("teams", async () => {
       // One round trip (Turso is remote).
       await client.batch(
         [

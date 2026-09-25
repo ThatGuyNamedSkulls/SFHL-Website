@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronsRight, SendHorizontal, Trash2 } from "lucide-react";
 import { OnlineBadge, useOnline } from "@/components/online-status";
 import { RAIL_CHAT_MESSAGES, lastMessages as keepLast } from "@/lib/chat-limits";
+import { startPolling } from "@/lib/poll-gate";
 
 const MAX_LENGTH = 250;
 const POLL_MS = 3000;
@@ -56,12 +57,7 @@ export function usePolledChat(opts: {
 
   useEffect(() => {
     if (!key || !visible) return;
-    const first = window.setTimeout(poll, 0);
-    const id = window.setInterval(poll, POLL_MS);
-    return () => {
-      window.clearTimeout(first);
-      window.clearInterval(id);
-    };
+    return startPolling(poll, POLL_MS, { idleSlowdown: false });
   }, [key, visible, poll]);
 
   const post = useCallback(

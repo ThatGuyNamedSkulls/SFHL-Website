@@ -15,6 +15,7 @@ import { PartyView } from "@/types";
 import { RANK_TIERS } from "@/data/ranks";
 import { Users, Plus, Filter, ShieldCheck, Mic } from "lucide-react";
 import { useSession } from "@/components/session-provider";
+import { startPolling } from "@/lib/poll-gate";
 
 const SKILL_TIERS = RANK_TIERS.filter((t) => t.letter !== "UNRANKED");
 const tierIdx = (letter: string) => SKILL_TIERS.findIndex((t) => t.letter === letter);
@@ -226,10 +227,8 @@ function PartyFinderContent() {
   };
 
   useEffect(() => {
-    load();
     loadFriends();
-    const interval = setInterval(load, 8000);
-    return () => clearInterval(interval);
+    return startPolling(load, 8000);
   }, []);
 
   const handleInvite = async (partyId: string, friendName: string) => {

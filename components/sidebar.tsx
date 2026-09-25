@@ -21,6 +21,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
+import { usePolling } from "@/components/use-polling";
+import { startPolling } from "@/lib/poll-gate";
+import { STATUS_TTL_MS } from "@/components/status-poller";
 
 interface NavItem {
   href?: string;
@@ -118,24 +121,14 @@ function NavRow({
 
 function PlaySubBadge() {
   const [count, setCount] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const { ok, json } = await apiGetJson<{ count?: number }>("/api/subs");
-        if (!ok) return;
-        if (!cancelled) setCount(Number(json.count ?? 0));
-      } catch {
-        /* ignore */
-      }
-    };
-    load();
-    const id = setInterval(load, 15000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, []);
+  usePolling(async () => {
+    try {
+      const { ok, json } = await apiGetJson<{ count?: number }>("/api/subs", { ttlMs: STATUS_TTL_MS });
+      if (ok) setCount(Number(json.count ?? 0));
+    } catch {
+      /* ignore */
+    }
+  }, 30_000);
   if (count <= 0) return null;
   return (
     <span className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] px-[3px] rounded-full bg-[#ffc44d] text-[#1a1400] text-[9px] font-black leading-[14px] text-center">
@@ -207,11 +200,10 @@ function ClubRail() {
         if (!cancelled) setClubs([]);
       }
     };
-    load();
-    const id = setInterval(load, 20000);
+    const stop = startPolling(load, 30_000);
     return () => {
       cancelled = true;
-      clearInterval(id);
+      stop();
     };
   }, []);
 

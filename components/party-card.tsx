@@ -26,6 +26,7 @@ import {
   BadgeCheck,
   CircleAlert,
 } from "lucide-react";
+import { optimizedAsset } from "@/lib/optimized-asset";
 
 export interface FriendOption {
   name: string;
@@ -77,7 +78,7 @@ function MemberSlot({
         <div className="absolute inset-0 pointer-events-none">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={member.card}
+            src={optimizedAsset(member.card)}
             alt=""
             className="w-full h-full object-cover"
             onError={(e) => {

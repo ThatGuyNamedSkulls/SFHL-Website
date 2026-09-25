@@ -12,6 +12,7 @@ import { Lock, MessageSquare, Users } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { regionMeta } from "@/lib/regions";
 import type { RankTierLetter } from "@/types";
+import { startPolling } from "@/lib/poll-gate";
 
 interface ClubRoleDef {
   id: string;
@@ -835,10 +836,11 @@ function ClubChat({
   }, [clubId, member]);
 
   useEffect(() => {
-    load();
-    if (!member) return;
-    const id = window.setInterval(load, 4000);
-    return () => window.clearInterval(id);
+    if (!member) {
+      void load();
+      return;
+    }
+    return startPolling(load, 4000);
   }, [load, member]);
 
   useEffect(() => {

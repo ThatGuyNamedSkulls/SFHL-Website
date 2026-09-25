@@ -8,6 +8,7 @@
  */
 
 import { client } from "@/lib/db";
+import { schemaOnce } from "@/lib/schema-once";
 
 export const HEARTBEAT_MS = 60_000;
 export const ONLINE_WINDOW_MS = 150_000;
@@ -17,7 +18,7 @@ let schemaReady: Promise<void> | null = null;
 
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("presence", async () => {
       await client.execute(
         `CREATE TABLE IF NOT EXISTS web_presence (
            discord_id TEXT PRIMARY KEY,

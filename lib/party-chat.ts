@@ -1,5 +1,6 @@
 import { client } from "@/lib/db";
 import { getParty } from "@/lib/parties";
+import { schemaOnce } from "@/lib/schema-once";
 
 export const PARTY_CHAT_MAX_LENGTH = 250;
 const CHAT_LIMIT = 80;
@@ -22,7 +23,7 @@ let schemaReady: Promise<void> | null = null;
 
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("party_chat", async () => {
       await client.execute(
         `CREATE TABLE IF NOT EXISTS web_party_chat (
            id INTEGER PRIMARY KEY AUTOINCREMENT,

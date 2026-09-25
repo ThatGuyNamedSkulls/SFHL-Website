@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Bell, UserPlus, Users, Check, X, Swords } from "lucide-react";
 import { useSession } from "@/components/session-provider";
+import { startPolling } from "@/lib/poll-gate";
 
 interface NotificationView {
   id: number;
@@ -46,10 +47,8 @@ export default function AlertsPage() {
   }, []);
 
   useEffect(() => {
-    load();
     fetch("/api/notifications", { method: "POST" }).catch(() => {});
-    const interval = setInterval(load, 15000);
-    return () => clearInterval(interval);
+    return startPolling(load, 15_000);
   }, [load]);
 
   const post = (url: string, body: object) =>

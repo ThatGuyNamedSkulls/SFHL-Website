@@ -12,6 +12,8 @@ import { SWING_GREAT } from "@/lib/match-stats";
 import { SubRolePill } from "@/components/sub-role-pill";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson } from "@/lib/client-api";
+import { usePolling } from "@/components/use-polling";
+import { STATUS_TTL_MS } from "@/components/status-poller";
 
 interface RecentMatch {
   id: number;
@@ -133,10 +135,11 @@ export function VsMatchesPanel() {
 
   const load = useCallback(async () => {
     try {
+      const cached = open ? undefined : { ttlMs: STATUS_TTL_MS };
       const [l, m, q] = await Promise.all([
-        apiGetJson<{ lobby?: LiveLobby | null }>("/api/lobby"),
-        apiGetJson<{ matches?: RecentMatch[] }>("/api/matches/recent"),
-        apiGetJson<{ queue?: { discord_id: string; joined_at: string }[] }>("/api/queue"),
+        apiGetJson<{ lobby?: LiveLobby | null }>("/api/lobby", cached),
+        apiGetJson<{ matches?: RecentMatch[] }>("/api/matches/recent", cached),
+        apiGetJson<{ queue?: { discord_id: string; joined_at: string }[] }>("/api/queue", cached),
       ]);
       const user = session;
       setLobby((l.json?.lobby as LiveLobby | null) ?? null);
@@ -151,13 +154,9 @@ export function VsMatchesPanel() {
     } catch {
       /* ignore */
     }
-  }, [session?.discordId]);
+  }, [session?.discordId, open]);
 
-  useEffect(() => {
-    load();
-    const id = setInterval(load, open ? 3000 : 10000);
-    return () => clearInterval(id);
-  }, [load, open]);
+  usePolling(load, open ? 3000 : 20_000, { restartKey: open ? 1 : 0 });
 
   useEffect(() => {
     if (!open || !queuedAt || lobby) return;

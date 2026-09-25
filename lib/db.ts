@@ -3,6 +3,7 @@ import { isQueueRegion } from "@/lib/regions";
 import { countryToPlayRegion, countriesInPlayRegion } from "@/lib/country-regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
 import { parseQueueMode, type QueueModeId } from "@/lib/queue-modes";
+import { ddlBatch, missingColumns, schemaOnce } from "@/lib/schema-once";
 
 // Ensure we have a database URL
 if (!process.env.TURSO_DATABASE_URL) {
@@ -50,10 +51,39 @@ const rawClient = createClient({
   intMode: "bigint",
 });
 
+// --- measuring (docs/PERFORMANCE_PLAN.md steps 16–17) -------------------------------------------
+// Every execute/batch below is one round trip to Turso. Tests count them with
+// onDbTrip (tests/query-budget.test.ts). On a LOCAL file database only,
+// HL_PERF_LATENCY_MS adds a fake round-trip delay and HL_PERF_LOG appends each
+// trip to a file (scripts/perf/): never active against the real database.
+type TripListener = (sql: string) => void;
+const tripListeners = new Set<TripListener>();
+const LOCAL_DB = String(process.env.TURSO_DATABASE_URL ?? "").startsWith("file:");
+const PERF_LATENCY_MS = LOCAL_DB ? Number(process.env.HL_PERF_LATENCY_MS || 0) : 0;
+const PERF_LOG = LOCAL_DB ? process.env.HL_PERF_LOG || "" : "";
+
+/** Call `fn` on every database round trip; returns unsubscribe. */
+export function onDbTrip(fn: TripListener): () => void {
+  tripListeners.add(fn);
+  return () => {
+    tripListeners.delete(fn);
+  };
+}
+
+async function trip(sql: string): Promise<void> {
+  tripListeners.forEach((l) => l(sql));
+  if (PERF_LOG) {
+    const fs = await import("node:fs");
+    fs.appendFileSync(PERF_LOG, `${Date.now()} ${sql.replace(/\s+/g, " ").slice(0, 90)}\n`);
+  }
+  if (PERF_LATENCY_MS > 0) await new Promise((r) => setTimeout(r, PERF_LATENCY_MS));
+}
+
 export const client: Client = new Proxy(rawClient, {
   get(target, prop, _receiver) {
     if (prop === "execute") {
       return async (stmt: Parameters<Client["execute"]>[0], args?: Parameters<Client["execute"]>[1]) => {
+        await trip(typeof stmt === "string" ? stmt : String((stmt as { sql?: unknown }).sql ?? ""));
         const rs =
           typeof stmt === "string" ? await target.execute(stmt, args) : await target.execute(stmt);
         return coerceResult(rs);
@@ -61,6 +91,7 @@ export const client: Client = new Proxy(rawClient, {
     }
     if (prop === "batch") {
       return async (...args: Parameters<Client["batch"]>) => {
+        await trip(`BATCH x${args[0].length}`);
         const results = await target.batch(...args);
         return results.map(coerceResult);
       };
@@ -167,14 +198,22 @@ function hidePlacementRating<T extends DbPlayer>(player: T): T {
 let discordColsReady: Promise<void> | null = null;
 export function ensurePlayerDiscordColumns(): Promise<void> {
   if (!discordColsReady) {
-    discordColsReady = (async () => {
-      await client.execute("ALTER TABLE players ADD COLUMN discord_id TEXT DEFAULT NULL").catch(() => {});
-      await client.execute("ALTER TABLE players ADD COLUMN discord_username TEXT DEFAULT NULL").catch(() => {});
-      await client.execute("ALTER TABLE players ADD COLUMN discord_avatar TEXT DEFAULT NULL").catch(() => {});
-      await client.execute("ALTER TABLE players ADD COLUMN country TEXT DEFAULT NULL").catch(() => {});
-      await client.execute("ALTER TABLE players ADD COLUMN mm_access INTEGER DEFAULT 0").catch(() => {});
+    discordColsReady = schemaOnce("players_discord", async () => {
+      // One column check + one batch of the missing columns (was 5 separate ALTERs).
+      const ddl: Record<string, string> = {
+        discord_id: "TEXT DEFAULT NULL",
+        discord_username: "TEXT DEFAULT NULL",
+        discord_avatar: "TEXT DEFAULT NULL",
+        country: "TEXT DEFAULT NULL",
+        mm_access: "INTEGER DEFAULT 0",
+      };
+      const missing = await missingColumns({ players: Object.keys(ddl) }).catch(() => ({ players: [] as string[] }));
+      await ddlBatch(missing.players.map((c) => `ALTER TABLE players ADD COLUMN ${c} ${ddl[c]}`));
       await ensureLookupIndexes();
-    })();
+    })().catch((e) => {
+      discordColsReady = null;
+      throw e;
+    });
   }
   return discordColsReady;
 }
@@ -213,11 +252,10 @@ const LOOKUP_INDEXES = [
 let lookupIndexesReady: Promise<void> | null = null;
 export function ensureLookupIndexes(): Promise<void> {
   if (!lookupIndexesReady) {
-    lookupIndexesReady = (async () => {
-      for (const sql of LOOKUP_INDEXES) {
-        await client.execute(sql).catch(() => undefined);
-      }
-    })();
+    // One round trip (was one per index); one by one only if a table is missing.
+    lookupIndexesReady = schemaOnce("lookup_indexes", async () => {
+      await ddlBatch(LOOKUP_INDEXES);
+    })().catch(() => undefined);
   }
   return lookupIndexesReady;
 }
@@ -376,10 +414,9 @@ export async function setPlayerCountry(
 let coinsColumnReady: Promise<void> | null = null;
 export function ensurePlayerCoinsColumn(): Promise<void> {
   if (!coinsColumnReady) {
-    coinsColumnReady = client
-      .execute("ALTER TABLE players ADD COLUMN coins INTEGER DEFAULT 0")
-      .then(() => undefined)
-      .catch(() => undefined); // already exists — fine
+    coinsColumnReady = schemaOnce("players_coins", async () => {
+      await client.execute("ALTER TABLE players ADD COLUMN coins INTEGER DEFAULT 0").catch(() => undefined); // already exists — fine
+    })().catch(() => undefined);
   }
   return coinsColumnReady;
 }
@@ -418,10 +455,9 @@ export async function refundPlayerCoins(name: string, amount: number): Promise<v
 let lastQueueRegionColReady: Promise<void> | null = null;
 export function ensureLastQueueRegionColumn(): Promise<void> {
   if (!lastQueueRegionColReady) {
-    lastQueueRegionColReady = client
-      .execute("ALTER TABLE players ADD COLUMN last_queue_region TEXT DEFAULT NULL")
-      .then(() => undefined)
-      .catch(() => undefined);
+    lastQueueRegionColReady = schemaOnce("players_last_region", async () => {
+      await client.execute("ALTER TABLE players ADD COLUMN last_queue_region TEXT DEFAULT NULL").catch(() => undefined);
+    })().catch(() => undefined);
   }
   return lastQueueRegionColReady;
 }
@@ -990,7 +1026,7 @@ export interface WebQueueEntry {
 let webQueueModeReady: Promise<void> | null = null;
 export function ensureWebQueueModeColumn(): Promise<void> {
   if (!webQueueModeReady) {
-    webQueueModeReady = (async () => {
+    webQueueModeReady = schemaOnce("web_queue", async () => {
       await client.execute(`
         CREATE TABLE IF NOT EXISTS web_queue (
           id INTEGER PRIMARY KEY AUTOINCREMENT,

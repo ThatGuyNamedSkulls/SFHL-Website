@@ -12,6 +12,7 @@ import { MatchReadyModal } from "@/components/match-ready-modal";
 import { VerifyPrompt } from "@/components/verify-prompt";
 import { PresenceHeartbeat } from "@/components/online-status";
 import "./globals.css";
+import { StatusPoller } from "@/components/status-poller";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -62,6 +63,7 @@ export default function RootLayout({
             <CountryPrompt />
             <VerifyPrompt />
             <MatchReadyModal />
+            <StatusPoller />
             <PresenceHeartbeat />
           </SessionProvider>
         </TooltipProvider>

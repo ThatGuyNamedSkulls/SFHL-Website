@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { optimizedAsset } from "@/lib/optimized-asset";
 
 /**
  * Overlays an equipped avatar-frame image around a circular avatar.
@@ -22,7 +23,7 @@ export function AvatarFrame({
       {frame && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={frame}
+          src={optimizedAsset(frame)}
           alt=""
           aria-hidden
           className="absolute -inset-[14%] w-[128%] h-[128%] max-w-none object-contain pointer-events-none select-none z-10"

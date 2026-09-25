@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useSession } from "@/components/session-provider";
+import { startPolling } from "@/lib/poll-gate";
 
 const HEARTBEAT_MS = 60_000;
 const POLL_MS = 30_000;
@@ -53,7 +54,7 @@ const watchers = new Map<string, number>(); // "n:name" | "i:id" -> ref count
 const online = new Set<string>();
 const listeners = new Set<() => void>();
 let version = 0;
-let pollTimer: number | null = null;
+let stopPoll: (() => void) | null = null;
 let fetchTimer: number | null = null;
 
 function emit() {
@@ -96,16 +97,16 @@ function watch(keys: string[]): () => void {
     watchers.set(k, n + 1);
   }
   if (added) scheduleRefresh();
-  if (pollTimer === null) pollTimer = window.setInterval(refresh, POLL_MS);
+  if (stopPoll === null) stopPoll = startPolling(refresh, POLL_MS, { immediate: false });
   return () => {
     for (const k of keys) {
       const n = (watchers.get(k) ?? 1) - 1;
       if (n <= 0) watchers.delete(k);
       else watchers.set(k, n);
     }
-    if (watchers.size === 0 && pollTimer !== null) {
-      window.clearInterval(pollTimer);
-      pollTimer = null;
+    if (watchers.size === 0 && stopPoll !== null) {
+      stopPoll();
+      stopPoll = null;
     }
   };
 }
