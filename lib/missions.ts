@@ -49,7 +49,7 @@ function buildCatalog(now: number): MissionDef[] {
       rewardCoins: 500,
       startsAt: now - 3 * DAY,
       endsAt: now + 4 * DAY,
-      category: "sf",
+      category: "weekly",
       organizedBy: "HyperLeague",
     },
     {
@@ -61,7 +61,7 @@ function buildCatalog(now: number): MissionDef[] {
       rewardCoins: 300,
       startsAt: monthStart.getTime(),
       endsAt: monthEnd.getTime(),
-      category: "sf",
+      category: "monthly",
       organizedBy: "HyperLeague",
     },
     {
@@ -97,7 +97,7 @@ function buildCatalog(now: number): MissionDef[] {
       rewardCoins: 200,
       startsAt: now - 40 * DAY,
       endsAt: now - 10 * DAY,
-      category: "sf",
+      category: "weekly",
       organizedBy: "HyperLeague",
     },
   ];
