@@ -1,14 +1,15 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AvatarFrame } from "@/components/avatar-frame";
 import { RankBadge } from "@/components/rank-badge";
 import { Flag } from "@/components/flag";
 import { flagPath, countryName } from "@/lib/countries";
+import { getRankByLetter } from "@/data/ranks";
+import { rankRing } from "@/lib/player-card";
 import { RankTierLetter } from "@/types";
-import { Plus, Search, Crown, BadgeCheck, CircleAlert } from "lucide-react";
-import { ClubTaggedName } from "@/components/club-identity";
+import { Plus, Search, Crown, BadgeCheck, CircleAlert, UserRound } from "lucide-react";
 import { MmAccessBadge } from "@/components/mm-access-badge";
 
 export interface LobbyMember {
@@ -16,9 +17,11 @@ export interface LobbyMember {
   discordUsername?: string | null;
   avatar?: string | null;
   rank?: RankTierLetter;
+  /** Main Elo, for the rank ring and the Elo line (unknown → the ring is just the rank colour). */
+  elo?: number | null;
   leader?: boolean;
   country?: string | null;
-  /** Equipped profile-card art, rendered as the slot background. */
+  /** Equipped profile-card art, rendered as the card's banner. */
   card?: string | null;
   /** Equipped avatar-frame art, rendered around the avatar. */
   frame?: string | null;
@@ -40,13 +43,131 @@ interface LobbySlotsProps {
   findPartiesHref?: string;
 }
 
+/** The avatar ring: the rank's colour, filled by progress through the rank (same as the league player cards). */
+function ring(m: LobbyMember): { color: string; progress: number } {
+  const rank = m.rank ?? "UNRANKED";
+  if (typeof m.elo === "number" && m.elo > 0 && rank !== "UNRANKED") {
+    const r = rankRing(m.elo);
+    return { color: r.color, progress: r.progress };
+  }
+  return { color: getRankByLetter(rank).color, progress: rank === "UNRANKED" ? 0 : 1 };
+}
+
+function LobbyCard({ member, center }: { member: LobbyMember; center: boolean }) {
+  const r = ring(member);
+  const rank = member.rank ?? "UNRANKED";
+  const avatarPx = center ? 92 : 78;
+  return (
+    <div
+      className={`relative flex h-full flex-col overflow-hidden rounded-xl border bg-[#141414] ${
+        center ? "border-[#ff5500]/70 shadow-[0_0_28px_rgba(255,85,0,0.15)]" : "border-white/[0.1]"
+      }`}
+    >
+      {/* Banner: the equipped profile card, or a plain gradient. */}
+      <div className={`relative w-full shrink-0 overflow-hidden ${center ? "h-[92px]" : "h-[80px]"}`}>
+        {member.card ? (
+          // eslint-disable-next-line @next/next/no-img-element -- cosmetic asset
+          <img
+            src={member.card}
+            alt=""
+            className="h-full w-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+          <div className="h-full w-full bg-[linear-gradient(135deg,#262626,#161616)]" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#141414]" />
+        {member.self ? (
+          <span className="absolute left-2 top-2 rounded bg-[#ff5500] px-1.5 text-[9px] font-black leading-4 text-white">YOU</span>
+        ) : null}
+        {member.canQueue === false ? (
+          <span
+            title="This player can't queue — not in the Discord server or not linked to a player."
+            className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/70"
+          >
+            <CircleAlert className="h-4 w-4 text-[#f5c518]" />
+          </span>
+        ) : null}
+      </div>
+
+      {/* Avatar in its rank ring (and the equipped frame), overlapping the banner. */}
+      <div className="relative flex justify-center" style={{ marginTop: -avatarPx / 2 }}>
+        {member.leader ? (
+          <Crown className="absolute -top-4 left-1/2 z-20 h-4 w-4 -translate-x-1/2 text-hl-gold drop-shadow" aria-label="Party leader" />
+        ) : null}
+        <AvatarFrame frame={member.frame}>
+          <span
+            className="grid place-items-center rounded-full"
+            style={{
+              width: avatarPx,
+              height: avatarPx,
+              padding: 3,
+              background: `conic-gradient(${r.color} ${Math.round(r.progress * 360)}deg, rgba(255,255,255,0.12) 0deg)`,
+            }}
+          >
+            <span className="grid h-full w-full place-items-center overflow-hidden rounded-full border-2 border-[#141414] bg-[#222]">
+              {member.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element -- Roblox/Discord avatar CDNs
+                <img src={member.avatar} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <UserRound className="h-1/2 w-1/2 text-[#ff5500]/80" strokeWidth={1.5} />
+              )}
+            </span>
+          </span>
+        </AvatarFrame>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col items-center px-2 pb-3 pt-2 text-center">
+        <div className="flex max-w-full items-center justify-center gap-1 text-sm font-black text-white">
+          <span className="truncate" title={member.discordUsername ? `@${member.discordUsername}` : undefined}>
+            {member.clubTag ? <span className="text-[#ff5500]">[{member.clubTag}] </span> : null}
+            {member.username}
+          </span>
+          {member.mmAccess ? (
+            <MmAccessBadge />
+          ) : member.verified != null ? (
+            <span title={member.verified ? "Verified — in the Discord server" : "Not verified — not in the Discord server"}>
+              <BadgeCheck className={`h-3.5 w-3.5 shrink-0 ${member.verified ? "text-hl-green" : "text-hl-red"}`} />
+            </span>
+          ) : null}
+        </div>
+        {member.country ? (
+          <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase text-white/55">
+            <Flag src={flagPath(member.country)} name={countryName(member.country)} className="h-3 w-4" />
+            {member.country}
+          </span>
+        ) : null}
+        <div className="mt-auto flex flex-col items-center gap-0.5 pt-2">
+          <RankBadge rank={rank} size="md" showGlow={false} />
+          <span className="text-[11px] tabular-nums text-white/60">
+            {rank === "UNRANKED" ? "Unranked" : typeof member.elo === "number" && member.elo > 0 ? `${member.elo.toLocaleString("en-US")} Elo` : rank}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
- * FACEIT-style 5-slot lobby row: tall portrait cards, your own card raised in
- * the center, teammates filling the slots around it, and the last free slot
- * doubling as "Find parties".
+ * FACEIT-style 5-slot lobby row: player cards (same look as the league's —
+ * banner art, rank-ring avatar, [TAG] name, level badge), your own card raised
+ * in the center, teammates filling the slots around it, and the last free
+ * slot doubling as "Find parties".
  */
 export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder" }: LobbySlotsProps) {
   const center = Math.floor(size / 2);
+  const row = useRef<HTMLDivElement>(null);
+  // Phones scroll the row sideways: start on your own (middle) card, not the first slot.
+  useEffect(() => {
+    const el = row.current;
+    const mid = el?.children[center] as HTMLElement | undefined;
+    if (!el || !mid || el.scrollWidth <= el.clientWidth) return;
+    const a = el.getBoundingClientRect();
+    const b = mid.getBoundingClientRect();
+    el.scrollLeft += b.left + b.width / 2 - (a.left + a.width / 2);
+  }, [center, members.length]);
 
   // Place yourself in the center, then teammates outward (left, right, …).
   const positions: (LobbyMember | undefined)[] = Array.from({ length: size });
@@ -64,15 +185,16 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
     positions[idx] = rest.shift();
   }
 
-  // 1v1 mode renders a single centered card instead of the 5-slot grid.
-  const slotW = size === 1 ? "w-full max-w-[240px]" : "";
+  const slot = "h-[272px] w-[170px] shrink-0 snap-center lg:w-auto";
+  const empty = `${slot} flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.015]`;
 
   return (
     <div
+      ref={row}
       className={
         size === 1
-          ? "flex justify-center gap-3 items-center"
-          : "flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory lg:grid lg:grid-cols-5 lg:overflow-visible lg:mx-0 lg:px-0 lg:snap-none"
+          ? "flex items-center justify-center"
+          : "-mx-1 flex snap-x snap-mandatory items-center gap-3 overflow-x-auto px-1 pb-2 pt-3 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-5 lg:overflow-visible lg:px-0"
       }
     >
       {positions.map((member, i) => {
@@ -83,69 +205,9 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
           return (
             <div
               key={i}
-              className={`lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center px-3 gap-3 rounded-xl w-[150px] shrink-0 snap-center lg:w-auto ${slotW} ${isCenter
-                  ? `py-8 lg:py-10 border-hl-gold/60 shadow-[0_0_24px_rgba(255,85,0,0.12)] z-10 ${size > 1 ? "lg:-my-3" : ""}`
-                  : "py-8"
-                }`}
+              className={`${slot} ${size === 1 ? "!w-[220px]" : ""} ${isCenter && size > 1 ? "z-10 lg:-my-3 lg:h-[296px]" : ""}`}
             >
-              {/* Queue-requirement warning (FACEIT-style, floating on the slot) */}
-              {member.canQueue === false && (
-                <span
-                  title="This player can't queue — not in the Discord server or not linked to a player."
-                  className="absolute top-2 left-1/2 -translate-x-1/2 z-20"
-                >
-                  <CircleAlert className="w-4 h-4 text-[#f5c518]" />
-                </span>
-              )}
-              {/* Equipped profile card as the slot background */}
-              {member.card && (
-                <div className="absolute inset-0 pointer-events-none">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={member.card}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.currentTarget.parentElement as HTMLElement).style.display = "none";
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/55 to-hl-panel" />
-                </div>
-              )}
-              <div className="relative z-10">
-                <AvatarFrame frame={member.frame}>
-                  <Avatar className={`border-2 border-hl-border shadow-xl ${isCenter ? "w-20 h-20 lg:w-24 lg:h-24" : "w-16 h-16"}`}>
-                    {member.avatar ? <AvatarImage src={member.avatar} /> : null}
-                    <AvatarFallback className="bg-hl-panel-light text-hl-gold font-bold">
-                      {member.username.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                </AvatarFrame>
-                {member.leader && (
-                  <Crown className="w-4 h-4 text-hl-gold absolute -top-1 -right-1 z-20" />
-                )}
-              </div>
-              <div className="relative z-10 flex items-center gap-1.5 max-w-full">
-                <span className="text-sm font-bold text-white truncate">
-                  <ClubTaggedName
-                    name={member.username}
-                    tag={member.clubTag}
-                    discordUsername={member.discordUsername}
-                  />
-                </span>
-                {member.mmAccess ? (
-                  <MmAccessBadge />
-                ) : member.verified != null ? (
-                  <span title={member.verified ? "Verified — in the Discord server" : "Not verified — not in the Discord server"}>
-                    <BadgeCheck className={`w-3.5 h-3.5 shrink-0 ${member.verified ? "text-hl-green" : "text-hl-red"}`} />
-                  </span>
-                ) : null}
-                {member.country && <Flag src={flagPath(member.country)} name={countryName(member.country)} className="w-4 h-3 shrink-0" />}
-              </div>
-              {/* Skill-level chip under the name, like FACEIT */}
-              <div className="relative z-10 flex items-center justify-center rounded-full bg-hl-base/70 border border-hl-border px-2.5 py-1">
-                <RankBadge rank={member.rank ?? "UNRANKED"} size="sm" showGlow={false} />
-              </div>
+              <LobbyCard member={member} center={isCenter} />
             </div>
           );
         }
@@ -153,24 +215,19 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
         // Last empty slot doubles as "find parties".
         if (isLast) {
           return (
-            <Link
-              key={i}
-              href={findPartiesHref}
-              className={`lobby-slot empty flex flex-col items-center justify-center py-8 px-3 gap-3 rounded-xl hover:border-hl-gold/40 transition-colors w-[150px] shrink-0 snap-center lg:w-auto ${slotW}`}
-            >
-              <div className="w-16 h-16 rounded-full bg-hl-panel-light flex items-center justify-center">
-                <Search className="w-6 h-6 text-hl-muted" />
-              </div>
-              <div className="text-xs text-hl-muted font-semibold">Find parties</div>
+            <Link key={i} href={findPartiesHref} className={`${empty} transition-colors hover:border-[#ff5500]/50 hover:bg-[#ff5500]/[0.04]`}>
+              <span className="grid h-14 w-14 place-items-center rounded-full bg-white/[0.06]">
+                <Search className="h-6 w-6 text-white/60" />
+              </span>
+              <span className="text-xs font-black uppercase tracking-wide text-white/70">Find parties</span>
             </Link>
           );
         }
 
         return (
-          <div key={i} className={`lobby-slot empty flex flex-col items-center justify-center py-8 px-3 gap-3 rounded-xl w-[150px] shrink-0 snap-center lg:w-auto ${slotW}`}>
-            <div className="w-16 h-16 rounded-full flex items-center justify-center">
-              <Plus className="w-8 h-8 text-hl-muted/60" />
-            </div>
+          <div key={i} className={empty} aria-label="Open party slot">
+            <Plus className="h-8 w-8 text-white/25" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/30">Open slot</span>
           </div>
         );
       })}

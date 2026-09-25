@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { LobbySlots, LobbyMember } from "@/components/lobby-slots";
 import { RankTierLetter } from "@/types";
@@ -13,7 +10,6 @@ import {
   Users,
   Loader2,
   Swords,
-  Info,
   ShieldCheck,
   Activity,
   Medal,
@@ -38,7 +34,7 @@ import {
 } from "@/lib/queue-modes";
 import { useSession } from "@/components/session-provider";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
-import { ClubTaggedName } from "@/components/club-identity";
+import { LEVELS, levelOf } from "@/lib/league-find-rules";
 
 interface WebQueueEntry {
   id: number;
@@ -137,9 +133,6 @@ const MATCH_TYPES: {
     ],
   },
 ];
-
-/** Ranked tier ladder for the skill-level segments in the header. */
-const TIER_LADDER: RankTierLetter[] = ["D", "C", "B", "A1", "A2", "A3", "S1", "S2", "S3"];
 
 /** Placement games required before a rank is assigned (matches the bot). */
 const PLACEMENT_GAMES = 3;
@@ -330,6 +323,7 @@ export default function QueuePage() {
       username: session.playerName || session.username,
       avatar: player?.avatarUrl || session.avatar,
       rank: player?.rank,
+      elo: player?.placementDone ? player.elo : null,
       leader: true,
       country: player?.country ?? null,
       card: player?.card ?? null,
@@ -353,6 +347,7 @@ export default function QueuePage() {
         username: m.playerName || m.username,
         avatar: (isMe ? player?.avatarUrl || session.avatar : m.avatar) ?? null,
         rank: ((isMe ? player?.rank : undefined) ?? m.rank) as RankTierLetter,
+        elo: isMe ? (player?.placementDone ? player.elo : null) : m.elo,
         leader: m.discordId === party.leaderId,
         country: (isMe ? player?.country ?? m.country : m.country) ?? null,
         card: (isMe ? player?.card ?? m.card : m.card) ?? null,
@@ -405,98 +400,107 @@ export default function QueuePage() {
               ? `${queueModeLabel(matchType)} is closed in ${region}.`
             : null;
 
-  // Header banner state: placement progress until ranked, tier ladder after.
+  // Header banner state: placement progress until ranked, skill level after.
   const placed = !!player?.placementDone;
   const placementPlayed = Math.min(player?.placementGamesPlayed ?? 0, PLACEMENT_GAMES);
-  const tierIdx = player ? TIER_LADDER.indexOf(player.rank) : -1;
+  const level = placed && player && player.elo > 0 ? levelOf(player.elo) : 0;
   const wins = player?.wins ?? 0;
+  const regionLive = openRegions.includes(region);
+  const panel = "rounded-xl border border-white/[0.08] bg-[#121212]";
+  const label = "text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50";
 
   return (
-    <div className="hl-page">
+    <div className="hl-page space-y-5">
       {/* Queue region pill — follows the server you picked in Servers */}
-      <div className="flex justify-center mb-5">
-        <span className="bg-gold-gradient text-hl-base rounded-full px-4 py-1.5 text-xs font-black header-caps">
+      <div className="flex justify-center">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${
+            regionLive ? "border-[#ff5500]/50 bg-[#ff5500]/10 text-[#ff5500]" : "border-white/15 bg-white/[0.05] text-white/70"
+          }`}
+        >
+          {regionLive ? <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ff5500]" /> : null}
           {regionQueueLabel(region, teamSize)}
         </span>
       </div>
 
-      {/* Season / skill-level banner (FACEIT-style) */}
-      <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
-        <div className="flex flex-wrap items-center gap-5">
+      {/* Season / skill level (FACEIT-style) */}
+      <section className={`${panel} relative overflow-hidden p-4 md:p-6`}>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_50%,rgba(255,85,0,0.16),transparent_45%)]"
+        />
+        <div className="relative flex flex-wrap items-center gap-5">
           <RankBadge rank={placed && player ? player.rank : "UNRANKED"} size="lg" />
           <div className="min-w-0">
-            <span className="inline-block bg-hl-panel-light text-hl-muted rounded-full px-3 py-0.5 text-[11px] font-bold mb-1.5">
-              Season 1
-            </span>
-            <div className="text-3xl font-black text-white leading-tight">
-              {placed && player ? player.rank : "Unranked"}
+            <div className={label}>Season 1 · Skill level</div>
+            <div className="mt-1 flex items-baseline gap-2.5">
+              <span className="text-3xl font-black leading-tight text-white">{placed && player ? player.rank : "Unranked"}</span>
+              {level ? <span className="text-sm font-black text-[#ff5500]">Level {level}</span> : null}
             </div>
             {placed && player ? (
               <>
-                <div className="flex items-center gap-1.5 mt-2">
-                  {TIER_LADDER.map((t, i) => (
-                    <span
-                      key={t}
-                      className={`w-7 h-1 rounded-full ${i <= tierIdx ? "bg-hl-gold" : "bg-hl-border"}`}
-                    />
+                <div className="mt-2 flex items-center gap-1" aria-label={`Level ${level} of ${LEVELS.length}`}>
+                  {LEVELS.map((l) => (
+                    <span key={l.level} className={`h-1.5 w-6 rounded-full ${l.level <= level ? "bg-[#ff5500]" : "bg-white/[0.1]"}`} />
                   ))}
                 </div>
-                <div className="text-[11px] text-hl-muted mt-1.5">
-                  ELO <b className="text-white stat-number">{player.elo}</b> · Peak{" "}
-                  <b className="text-white stat-number">{player.peakElo}</b>
+                <div className="mt-1.5 text-[11px] text-white/55">
+                  Elo <b className="stat-number text-white">{player.elo.toLocaleString("en-US")}</b> · Peak{" "}
+                  <b className="stat-number text-white">{player.peakElo.toLocaleString("en-US")}</b>
                 </div>
               </>
             ) : (
               <>
-                <div className="flex items-center gap-1.5 mt-2">
+                <div className="mt-2 flex items-center gap-1">
                   {Array.from({ length: PLACEMENT_GAMES }).map((_, i) => (
-                    <span
-                      key={i}
-                      className={`w-7 h-1 rounded-full ${i < placementPlayed ? "bg-hl-gold" : "bg-hl-border"}`}
-                    />
+                    <span key={i} className={`h-1.5 w-8 rounded-full ${i < placementPlayed ? "bg-[#ff5500]" : "bg-white/[0.1]"}`} />
                   ))}
                 </div>
-                <div className="text-[11px] text-hl-muted mt-1.5">
-                  <b className="text-hl-gold">{PLACEMENT_GAMES - placementPlayed} matches left</b> to get your{" "}
-                  <span className="text-hl-gold">Skill Level</span>
+                <div className="mt-1.5 text-[11px] text-white/55">
+                  <b className="text-[#ff5500]">{PLACEMENT_GAMES - placementPlayed} matches left</b> to get your skill level
                 </div>
               </>
             )}
           </div>
 
           {/* Prestige path */}
-          <div className="ml-auto flex items-center gap-4 rounded-xl border border-hl-border bg-hl-panel-light/40 p-4 w-full sm:w-auto sm:min-w-[300px]">
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] header-caps text-hl-gold">Season 1 Prestige Path</div>
-              <div className="text-sm font-bold text-white mt-1">Get 20 wins</div>
+          <div className="flex w-full items-center gap-4 rounded-xl border border-white/[0.08] bg-black/30 p-4 sm:ml-auto sm:w-auto sm:min-w-[300px]">
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[#ff5500]">Season 1 prestige path</div>
+              <div className="mt-1 text-sm font-black text-white">Get 20 wins</div>
               <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-hl-base rounded-full">
-                  <div
-                    className="h-1.5 bg-gold-gradient rounded-full"
-                    style={{ width: `${Math.min(100, (wins / 20) * 100)}%` }}
-                  />
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+                  <div className="h-full rounded-full bg-[#ff5500]" style={{ width: `${Math.min(100, (wins / 20) * 100)}%` }} />
                 </div>
-                <span className="text-xs text-hl-muted">
-                  <b className="text-white stat-number">{Math.min(wins, 20)}</b> /20
+                <span className="text-xs text-white/55">
+                  <b className="stat-number text-white">{Math.min(wins, 20)}</b>/20
                 </span>
               </div>
             </div>
-            <div className="w-12 h-12 shrink-0 rounded-lg bg-hl-base border border-hl-gold/40 flex items-center justify-center text-hl-gold font-black text-sm">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-4 border-[#ff5500]/60 text-sm font-black text-[#ff5500]">
               S1
             </div>
           </div>
         </div>
-      </Card>
+      </section>
 
-      {/* Lobby slots */}
-      <Card className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6">
-        {inQueue && (
-          <div className="flex justify-end mb-3">
-            <Badge className="bg-hl-green/15 text-hl-green border-hl-green/30 animate-pulse-glow">
-              <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Searching…
-            </Badge>
+      {/* Party + Find match */}
+      <section className={`${panel} p-4 md:p-6`}>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-base font-black text-white">Your party</h2>
+            <span className="text-xs tabular-nums text-white/50">
+              {lobbyMembers.length}/{teamSize}
+            </span>
           </div>
-        )}
+          {inQueue ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-hl-green/35 bg-hl-green/10 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-hl-green">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…
+            </span>
+          ) : (
+            <span className="text-[11px] font-bold text-white/45">{queueModeLabel(matchType)} · {modeLabel}</span>
+          )}
+        </div>
 
         <div className="py-3">
           <LobbySlots members={lobbyMembers} size={teamSize} findPartiesHref="/party-finder" />
@@ -504,203 +508,173 @@ export default function QueuePage() {
 
         {/* Warning banner */}
         {session && !canQueue && (
-          <div className="mt-5 p-4 rounded-xl bg-hl-gold/10 border border-hl-gold/30 text-hl-gold flex items-center gap-2 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>
-              {!session.inGuild ? (
-                <>
-                  You must be in the HyperLeague Discord server to queue.{" "}
-                  {discordInvite ? (
-                    <a
-                      href={discordInvite}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline font-bold hover:text-white"
-                    >
-                      Join the server
-                    </a>
-                  ) : null}
-                </>
-              ) : session.verified === false ? (
-                "You have to verify with Bloxlink in the HyperLeague Discord before you can queue."
-              ) : (
-                "Your Discord account is not linked to a HyperLeague player. Join the Discord server and verify with Bloxlink first."
-              )}
-            </span>
-          </div>
+          <Notice tone="warn">
+            {!session.inGuild ? (
+              <>
+                You must be in the HyperLeague Discord server to queue.{" "}
+                {discordInvite ? (
+                  <a href={discordInvite} target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-white">
+                    Join the server
+                  </a>
+                ) : null}
+              </>
+            ) : session.verified === false ? (
+              "You have to verify with Bloxlink in the HyperLeague Discord before you can queue."
+            ) : (
+              "Your Discord account is not linked to a HyperLeague player. Join the Discord server and verify with Bloxlink first."
+            )}
+          </Notice>
         )}
         {session && canQueue && partyBlocked && (
-          <div className="mt-5 p-4 rounded-xl bg-hl-gold/10 border border-hl-gold/30 text-hl-gold flex items-center gap-2 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            There are requirements one or more party members don&apos;t meet — check the warning icon above their card.
-          </div>
+          <Notice tone="warn">
+            There are requirements one or more party members don&apos;t meet — check the warning icon on their card.
+          </Notice>
         )}
-        {findHint && (
-          <div className="mt-5 p-4 rounded-xl bg-hl-gold/10 border border-hl-gold/30 text-hl-gold flex items-center gap-2 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0" /> {findHint}
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-5 p-4 rounded-xl bg-hl-red/10 border border-hl-red/20 text-hl-red flex items-center gap-2 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0" /> {error}
-          </div>
-        )}
+        {findHint && <Notice tone="warn">{findHint}</Notice>}
+        {error && <Notice tone="error">{error}</Notice>}
 
         {/* Find match button */}
-        <div className="flex justify-center mt-6">
+        <div className="mt-6 flex justify-center">
           {!session ? (
             <Link
               href="/login"
-              className="find-match-btn inline-flex items-center justify-center gap-2 w-full sm:w-auto px-8 sm:px-12 py-4 rounded-xl text-hl-base font-black text-lg header-caps"
+              className="find-match-btn header-caps inline-flex w-full items-center justify-center gap-2 rounded-xl px-8 py-4 text-lg font-black text-hl-base sm:w-auto sm:px-14"
             >
-              Log in to Play
+              Log in to play
             </Link>
           ) : (
             <button
               onClick={inQueue ? handleLeave : handleJoin}
               disabled={findDisabled}
-              className={`inline-flex items-center justify-center gap-2 w-full sm:w-auto px-8 sm:px-12 py-4 rounded-xl font-black text-lg header-caps transition-all ${inQueue
-                  ? "bg-hl-red/10 text-hl-red border border-hl-red/30 hover:bg-hl-red/20"
-                  : "find-match-btn text-hl-base"
-                } ${findDisabled && "opacity-50 cursor-not-allowed"}`}
+              className={`header-caps inline-flex w-full items-center justify-center gap-2 rounded-xl px-8 py-4 text-lg font-black transition-all sm:w-auto sm:px-14 ${
+                inQueue ? "border border-hl-red/40 bg-hl-red/10 text-hl-red hover:bg-hl-red/20" : "find-match-btn text-hl-base"
+              } ${findDisabled && "cursor-not-allowed opacity-50"}`}
             >
-              {actionLoading ? "Processing…" : inQueue ? "Cancel" : "Find Match"}
+              {actionLoading ? "Processing…" : inQueue ? "Cancel" : "Find match"}
             </button>
           )}
         </div>
-      </Card>
+      </section>
 
       {/* Substitute CTA — live matches missing a player. Hidden while queueing,
           since you can't be waiting for a match and joining one at once. */}
       {!inQueue && (
-        <Card
-          className={`bg-hl-panel p-5 mb-6 ${
-            subCount > 0 ? "border-hl-gold/40" : "border-hl-border"
-          }`}
-        >
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="w-11 h-11 shrink-0 rounded-xl bg-hl-gold/10 border border-hl-gold/30 flex items-center justify-center">
-              <UserPlus className="w-5 h-5 text-hl-gold" />
+        <section className={`${panel} flex flex-wrap items-center gap-4 p-4 sm:p-5 ${subCount > 0 ? "border-[#ff5500]/40" : ""}`}>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#ff5500]/15 text-[#ff5500]">
+            <UserPlus className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-base font-black text-white">Only have time for a quick one? Join a match as a substitute!</div>
+            <div className="mt-0.5 text-sm text-white/55">
+              {subCount > 0
+                ? `${subCount === 1 ? "1 live match needs" : `${subCount} live matches need`} a player right now — you earn Elo for the rounds you play.`
+                : "No match needs a player right now. Slots open when someone leaves mid-game, and they fill fast."}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-base font-black text-white">
-                Only have time for a quick one? Join a match as a substitute!
-              </div>
-              <div className="text-sm text-hl-muted mt-0.5">
-                {subCount > 0
-                  ? `${subCount === 1 ? "1 live match needs" : `${subCount} live matches need`} a player right now — you earn Elo for the rounds you play.`
-                  : "No match needs a player right now. Slots open when someone leaves mid-game, and they fill fast."}
-              </div>
-            </div>
-            <Link
-              href="/subs"
-              className={`inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 rounded-xl font-black text-sm header-caps ${
-                subCount > 0
-                  ? "find-match-btn text-hl-base"
-                  : "bg-hl-panel-light text-white border border-hl-border hover:border-hl-gold/40 transition-colors"
-              }`}
-            >
-              {subCount > 0 && <Zap className="w-4 h-4" />} Join now
-            </Link>
           </div>
-        </Card>
+          <Link
+            href="/subs"
+            className={`header-caps inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-black sm:w-auto ${
+              subCount > 0 ? "find-match-btn text-hl-base" : "border border-white/15 bg-white/[0.04] text-white hover:border-white/35"
+            }`}
+          >
+            {subCount > 0 && <Zap className="h-4 w-4" />} Join now
+          </Link>
+        </section>
       )}
 
       {/* Match type / Servers (FACEIT-style). Maps stay post-match veto. */}
-      <div className="mb-6">
-        <div className="border-b border-hl-border mb-4 flex items-center justify-between overflow-x-auto">
-          <div className="flex items-center gap-6 shrink-0">
-            <button
-              type="button"
-              onClick={() => setPlayTab("type")}
-              className={`inline-flex items-center gap-2 pb-3 border-b-2 text-sm font-bold header-caps ${
-                playTab === "type" ? "text-hl-gold border-hl-gold" : "text-hl-muted border-transparent hover:text-white"
-              }`}
-            >
-              <Swords className="w-4 h-4" />
-              Match Type
-            </button>
-            <button
-              type="button"
-              onClick={() => setPlayTab("servers")}
-              className={`inline-flex items-center gap-2 pb-3 border-b-2 text-sm font-bold header-caps ${
-                playTab === "servers" ? "text-hl-gold border-hl-gold" : "text-hl-muted border-transparent hover:text-white"
-              }`}
-            >
-              <Server className="w-4 h-4" />
-              Servers
-            </button>
-          </div>
-        </div>
-        {playTab === "type" ? (
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 max-w-6xl gap-4">
-          {/* Pro Matchmaking is switched off: Pro Elo comes from league matches now. */}
-          {MATCH_TYPES.filter((mt) => PRO_QUEUE_ENABLED || mt.id !== QUEUE_MODE_PRO).map((mt) => {
-            const active = matchType === mt.id;
-            const TypeIcon = mt.icon;
-            const superLocked = mt.id === QUEUE_MODE_SUPER && superPlacementBlocked;
-            // Everyone sees Pro; below S2 it stays locked (the API refuses too).
-            const proLocked = mt.id === QUEUE_MODE_PRO && !proEligible && matchType !== QUEUE_MODE_PRO;
-            const typeDisabled = (selectionLocked && mt.id !== matchType) || superLocked || proLocked;
+      <section>
+        <nav aria-label="Queue options" className="mb-4 flex gap-6 overflow-x-auto border-b border-white/[0.08]">
+          {(
+            [
+              ["type", "Match type", Swords],
+              ["servers", "Servers", Server],
+            ] as const
+          ).map(([key, text, Icon]) => {
+            const on = playTab === key;
             return (
               <button
-                key={mt.id}
+                key={key}
                 type="button"
-                disabled={typeDisabled}
-                title={proLocked ? "Reach S2 (1900 Elo) to unlock Pro Matchmaking" : undefined}
-                onClick={() => {
-                  if (typeDisabled) return;
-                  setMatchType(mt.id);
-                }}
-                className={`relative w-full h-full text-left p-4 rounded-xl border overflow-hidden bg-hl-panel ${
-                  active ? "border-white/60" : "border-hl-border hover:border-hl-gold/40"
-                } ${typeDisabled ? "opacity-40 cursor-not-allowed hover:border-hl-border" : "transition-colors"}`}
+                aria-pressed={on}
+                onClick={() => setPlayTab(key)}
+                className={`-mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 pb-3 text-sm font-black uppercase tracking-wide ${
+                  on ? "border-[#ff5500] text-white" : "border-transparent text-white/55 hover:text-white"
+                }`}
               >
-                {mt.green && (
-                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-hl-green/15 to-transparent pointer-events-none" />
-                )}
-                {mt.pro && (
-                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#a855f7]/15 to-transparent pointer-events-none" />
-                )}
-                <div className="relative flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <TypeIcon
-                      className={`w-4 h-4 shrink-0 ${mt.green ? "text-hl-green" : mt.pro ? "text-[#c084fc]" : "text-white"}`}
-                    />
-                    <span
-                      className={`text-sm font-bold truncate ${mt.green ? "text-hl-green" : mt.pro ? "text-[#c084fc]" : "text-white"}`}
-                    >
-                      {mt.label}
-                    </span>
-                    <span className="text-xs text-hl-muted shrink-0">· {modeLabel}</span>
-                  </div>
-                  {proLocked ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-hl-muted shrink-0">
-                      <Lock className="w-3.5 h-3.5" /> S2 required
-                    </span>
-                  ) : (
-                    <Info className="w-4 h-4 text-hl-muted shrink-0" />
-                  )}
-                </div>
-                <div className={`relative grid gap-2 ${mt.features.length > 2 ? "grid-cols-2" : "grid-cols-1"}`}>
-                  {mt.features.map(({ icon: FeatIcon, text, star }) => (
-                    <div
-                      key={text}
-                      className="flex items-center gap-1.5 rounded-md bg-hl-base/70 border border-hl-border/60 px-2 py-2"
-                    >
-                      <FeatIcon className="w-3.5 h-3.5 text-hl-muted shrink-0" />
-                      <span className="text-[10px] font-semibold text-white/85 leading-tight min-w-0">{text}</span>
-                      {star && <Star className="w-3 h-3 text-hl-green fill-current ml-auto shrink-0" />}
-                    </div>
-                  ))}
-                </div>
+                <Icon className="h-4 w-4" /> {text}
               </button>
             );
           })}
-        </div>
+        </nav>
+        {playTab === "type" ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {/* Pro Matchmaking is switched off: Pro Elo comes from league matches now. */}
+            {MATCH_TYPES.filter((mt) => PRO_QUEUE_ENABLED || mt.id !== QUEUE_MODE_PRO).map((mt) => {
+              const active = matchType === mt.id;
+              const TypeIcon = mt.icon;
+              const superLocked = mt.id === QUEUE_MODE_SUPER && superPlacementBlocked;
+              // Everyone sees Pro; below S2 it stays locked (the API refuses too).
+              const proLocked = mt.id === QUEUE_MODE_PRO && !proEligible && matchType !== QUEUE_MODE_PRO;
+              const typeDisabled = (selectionLocked && mt.id !== matchType) || superLocked || proLocked;
+              const accent = mt.green ? "text-hl-green" : mt.pro ? "text-[#c084fc]" : "text-white";
+              const open = modesForRegion.includes(mt.id);
+              return (
+                <button
+                  key={mt.id}
+                  type="button"
+                  disabled={typeDisabled}
+                  aria-pressed={active}
+                  title={proLocked ? "Reach S2 (1900 Elo) to unlock Pro Matchmaking" : undefined}
+                  onClick={() => {
+                    if (typeDisabled) return;
+                    setMatchType(mt.id);
+                  }}
+                  className={`relative h-full w-full overflow-hidden rounded-xl border p-4 text-left ${
+                    active ? "border-[#ff5500] bg-[#ff5500]/[0.06]" : "border-white/[0.08] bg-[#121212] hover:border-white/25"
+                  } ${typeDisabled ? "cursor-not-allowed opacity-40 hover:border-white/[0.08]" : "transition-colors"}`}
+                >
+                  {mt.green && (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-hl-green/10 to-transparent" />
+                  )}
+                  {mt.pro && (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#a855f7]/15 to-transparent" />
+                  )}
+                  <div className="relative mb-3 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <TypeIcon className={`h-4 w-4 shrink-0 ${accent}`} />
+                      <span className={`truncate text-sm font-black ${accent}`}>{mt.label}</span>
+                      <span className="shrink-0 text-xs text-white/45">· {modeLabel}</span>
+                    </div>
+                    {proLocked ? (
+                      <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white/50">
+                        <Lock className="h-3.5 w-3.5" /> S2 required
+                      </span>
+                    ) : (
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+                          open ? "bg-hl-green/15 text-hl-green" : "bg-white/[0.06] text-white/45"
+                        }`}
+                      >
+                        {open ? "Open" : "Closed"}
+                      </span>
+                    )}
+                  </div>
+                  <div className={`relative grid gap-2 ${mt.features.length > 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+                    {mt.features.map(({ icon: FeatIcon, text, star }) => (
+                      <div key={text} className="flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-black/30 px-2 py-2">
+                        <FeatIcon className="h-3.5 w-3.5 shrink-0 text-white/50" />
+                        <span className="min-w-0 text-[10px] font-semibold leading-tight text-white/85">{text}</span>
+                        {star && <Star className="ml-auto h-3 w-3 shrink-0 fill-current text-hl-green" />}
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {QUEUE_REGIONS.map((r) => {
               const selected = region === r.id;
               const thisOpen = openRegions.includes(r.id);
@@ -708,24 +682,27 @@ export default function QueuePage() {
                 <button
                   key={r.id}
                   type="button"
+                  aria-pressed={selected}
                   disabled={selectionLocked && r.id !== region}
                   onClick={() => {
                     if (selectionLocked) return;
                     setRegion(r.id);
                   }}
-                  className={`text-left p-4 rounded-xl border bg-hl-panel ${
-                    selected ? "border-white/70" : "border-hl-border hover:border-hl-gold/40"
-                  } ${selectionLocked && r.id !== region ? "opacity-40 cursor-not-allowed hover:border-hl-border" : "transition-colors"}`}
+                  className={`rounded-xl border p-4 text-left ${
+                    selected ? "border-[#ff5500] bg-[#ff5500]/[0.06]" : "border-white/[0.08] bg-[#121212] hover:border-white/25"
+                  } ${selectionLocked && r.id !== region ? "cursor-not-allowed opacity-40 hover:border-white/[0.08]" : "transition-colors"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-black text-white">{r.label}</span>
-                    <span className="text-xs font-bold text-hl-muted">{r.short}</span>
+                    <span className="text-xs font-bold text-white/45">{r.short}</span>
                   </div>
                   <div className="mt-2 text-[11px]">
                     {thisOpen ? (
-                      <span className="text-hl-green font-bold">Queue open</span>
+                      <span className="inline-flex items-center gap-1.5 font-bold text-hl-green">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-hl-green" /> Queue open
+                      </span>
                     ) : (
-                      <span className="text-hl-muted">Closed until staff run /queue {r.short}</span>
+                      <span className="text-white/45">Closed until staff run /queue {r.short}</span>
                     )}
                   </div>
                 </button>
@@ -733,51 +710,57 @@ export default function QueuePage() {
             })}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Web queue list */}
-      <Card className="bg-hl-panel border-hl-border overflow-hidden">
-        <div className="px-5 py-4 border-b border-hl-border flex items-center justify-between bg-hl-panel-light/30">
-          <h3 className="font-bold text-white header-caps flex items-center gap-2">
-            <Users className="w-4 h-4 text-hl-gold" /> Players queuing ({visibleQueue.length})
+      <section className={`${panel} overflow-hidden`}>
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3 sm:px-5">
+          <h3 className="flex items-center gap-2 text-sm font-black text-white">
+            <Users className="h-4 w-4 text-[#ff5500]" /> Players queuing
+            <span className="text-white/45">({visibleQueue.length})</span>
           </h3>
-          <Badge className="bg-hl-gold/10 text-hl-gold border-hl-gold/30">Live</Badge>
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#ff5500]">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ff5500]" /> Live
+          </span>
         </div>
-        <div className="divide-y divide-hl-border">
-          {visibleQueue.length === 0 ? (
-            <div className="px-5 py-8 text-center text-hl-muted text-sm">
-              No one is queuing yet.
-            </div>
-          ) : (
-            visibleQueue.map((entry, idx) => (
-              <div key={entry.id} className="flex items-center justify-between px-5 py-3 hover:bg-hl-panel-light/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="text-xs text-hl-muted w-4">{idx + 1}.</div>
-                  <Avatar className="w-8 h-8 border border-hl-border">
-                    <AvatarFallback className="bg-hl-panel-light text-xs font-bold text-hl-gold">
-                      {entry.discord_username.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="font-semibold text-white text-sm">
-                      <ClubTaggedName
-                        name={entry.player_name || entry.discord_username}
-                        tag={entry.clubTag}
-                      />
-                    </div>
-                    {entry.player_name && <div className="text-[10px] text-hl-muted">Linked: {entry.player_name}</div>}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
+        {visibleQueue.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sm text-white/50">No one is queuing for {queueModeLabel(matchType)} yet.</div>
+        ) : (
+          <ul className="divide-y divide-white/[0.05]">
+            {visibleQueue.map((entry, idx) => (
+              <li key={entry.id} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
+                <span className="w-5 text-xs tabular-nums text-white/40">{idx + 1}</span>
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-white/[0.06] text-[10px] font-black text-white/70">
+                  {(entry.player_name || entry.discord_username).slice(0, 2).toUpperCase()}
+                </span>
+                <span className="min-w-0 truncate text-sm font-bold text-white">
+                  {entry.clubTag ? <span className="text-[#ff5500]">[{entry.clubTag}] </span> : null}
+                  {entry.player_name || entry.discord_username}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* Footer stat strip */}
-      <div className="mt-6 border-t border-hl-border pt-4 text-center text-xs text-hl-muted">
-        Players queuing: <b className="text-white stat-number">{queue.length}</b>
+      <div className="border-t border-white/[0.08] pt-4 text-center text-xs text-white/50">
+        Players queuing in {region}: <b className="stat-number text-white">{queue.length}</b>
       </div>
+    </div>
+  );
+}
+
+/** An inline notice under the party (hints, warnings, errors). */
+function Notice({ tone, children }: { tone: "warn" | "error"; children: React.ReactNode }) {
+  return (
+    <div
+      className={`mt-4 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm ${
+        tone === "error" ? "border-hl-red/30 bg-hl-red/10 text-hl-red" : "border-[#ff5500]/30 bg-[#ff5500]/[0.07] text-[#ff8a4d]"
+      }`}
+    >
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{children}</span>
     </div>
   );
 }
