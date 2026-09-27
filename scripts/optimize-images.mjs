@@ -44,7 +44,12 @@ for (const [folder, width] of Object.entries(FOLDERS)) {
     const src = path.join(dir, file);
     const out = path.join(OUT, folder, file.replace(INPUT, ".webp"));
     try {
-      await sharp(src).resize({ width, withoutEnlargement: true }).webp({ quality: 82, alphaQuality: 90 }).toFile(out);
+      // animated: keep every frame of animated WebP/GIF/APNG (e.g. the Red Aura
+      // frame). Without it sharp reads only frame 1 and the copy stops moving.
+      await sharp(src, { animated: true })
+        .resize({ width, withoutEnlargement: true })
+        .webp({ quality: 82, alphaQuality: 90 })
+        .toFile(out);
     } catch (e) {
       console.log(`skip  ${folder}/${file}  (${String(e.message).split("\n")[0]})`);
       continue;
