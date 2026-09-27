@@ -63,8 +63,9 @@ function LobbyCard({ member, center }: { member: LobbyMember; center: boolean })
         center ? "border-[#ff5500]/70 shadow-[0_0_28px_rgba(255,85,0,0.15)]" : "border-white/[0.1]"
       }`}
     >
-      {/* Banner: the equipped profile card, or a plain gradient. */}
-      <div className={`relative w-full shrink-0 overflow-hidden ${center ? "h-[92px]" : "h-[80px]"}`}>
+      {/* Card art: the equipped profile card (or a plain gradient) behind the
+          top of the card — avatar and name included — fading out near the bottom. */}
+      <div className="absolute inset-x-0 top-0 h-[72%] overflow-hidden">
         {member.card ? (
           // eslint-disable-next-line @next/next/no-img-element -- cosmetic asset
           <img
@@ -78,7 +79,11 @@ function LobbyCard({ member, center }: { member: LobbyMember; center: boolean })
         ) : (
           <div className="h-full w-full bg-[linear-gradient(135deg,#262626,#161616)]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#141414]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_55%,#141414)]" />
+      </div>
+
+      {/* Banner space the avatar overlaps, plus the corner markers. */}
+      <div className={`relative w-full shrink-0 ${center ? "h-[92px]" : "h-[80px]"}`}>
         {member.self ? (
           <span className="absolute left-2 top-2 rounded bg-[#ff5500] px-1.5 text-[9px] font-black leading-4 text-white">YOU</span>
         ) : null}
@@ -119,7 +124,7 @@ function LobbyCard({ member, center }: { member: LobbyMember; center: boolean })
         </AvatarFrame>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col items-center px-2 pb-3 pt-2 text-center">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center px-2 pb-3 pt-2 text-center [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
         <div className="flex max-w-full items-center justify-center gap-1 text-sm font-black text-white">
           <span className="truncate" title={member.discordUsername ? `@${member.discordUsername}` : undefined}>
             {member.clubTag ? <span className="text-[#ff5500]">[{member.clubTag}] </span> : null}
