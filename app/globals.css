@@ -54,6 +54,11 @@
   --color-hl-red: #e74c3c;
   --color-hl-muted: #a0a0a0;
   --color-hl-text: #ffffff;
+  /* Surfaces and states (docs/QUEUE_UI_PLAN.md §7) */
+  --color-hl-surface-1: #131313;
+  --color-hl-surface-2: #161616;
+  --color-hl-surface-3: #1c1c1c;
+  --color-hl-warn: #f5b73b;
 
   /* Sidebar (inherited from shadcn) */
   --color-sidebar-ring: var(--sidebar-ring);
@@ -331,6 +336,32 @@
 /* Phone bottom tabs sit over the scrollport — keep page content above them */
 .hl-main {
   padding-bottom: calc(var(--hl-tabbar-h) + env(safe-area-inset-bottom, 0px));
+}
+/* Match found pop-up entrance */
+@keyframes hl-pop-in {
+  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hl-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.hl-pop-in { animation: hl-pop-in 0.24s cubic-bezier(0.2, 0.9, 0.3, 1.15) both; }
+.hl-fade-in { animation: hl-fade-in 0.18s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .hl-pop-in, .hl-fade-in { animation: none; }
+}
+
+/* Play page: the action bar pinned above the phone tab bar (docs/QUEUE_UI_PLAN.md §4) */
+.queue-sticky-bar {
+  position: sticky;
+  bottom: calc(var(--hl-tabbar-h) + env(safe-area-inset-bottom, 0px));
+  z-index: 20;
+}
+@media (min-width: 768px) {
+  .queue-sticky-bar {
+    bottom: 0;
+  }
 }
 .hl-more-sheet {
   padding-bottom: calc(var(--hl-tabbar-h) + env(safe-area-inset-bottom, 0px));

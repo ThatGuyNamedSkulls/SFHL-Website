@@ -9,10 +9,11 @@ import {
   getQueueTeamSize,
   getQueueGate,
   getPlayer,
+  countWebQueueByRegion,
 } from "@/lib/db";
 import { getPartyForMember } from "@/lib/parties";
 import { clubTagIndex, lookupClubTag } from "@/lib/clubs";
-import { getActiveLobbyMemberIds } from "@/lib/lobby";
+import { countLiveMatches, getActiveLobbyMemberIds } from "@/lib/lobby";
 import { upsertWebUser } from "@/lib/social";
 import { isQueueRegion, regionMeta } from "@/lib/regions";
 import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
@@ -54,23 +55,29 @@ export async function GET(request: Request) {
     const regionParam = (searchParams.get("region") || "").toUpperCase();
     const region = isQueueRegion(regionParam) ? regionParam : undefined;
     const session = await getSession();
-    const [queue, teamSize, gate, me, tags, proEligible] = await Promise.all([
+    const [queue, teamSize, gate, me, tags, proEligible, liveMatches, queuing] = await Promise.all([
       getWebQueue(region),
       getQueueTeamSize(),
       getQueueGate(),
       session ? getWebQueueSpot(session.discordId) : Promise.resolve(null),
       clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
       session ? hasProAccess(session.discordId).catch(() => false) : Promise.resolve(false),
+      countLiveMatches(),
+      countWebQueueByRegion(),
     ]);
     return queueJson({
-      queue: queue.map((entry) => ({
-        ...entry,
-        clubTag: lookupClubTag(
-          tags,
-          entry.player_name,
-          entry.discord_id != null ? String(entry.discord_id) : null
-        ),
-      })),
+      // Names are for signed-in players only (docs/QUEUE_UI_PLAN.md Q2):
+      // guests get the count and each entry's mode, nothing that identifies anyone.
+      queue: session
+        ? queue.map((entry) => ({
+            ...entry,
+            clubTag: lookupClubTag(
+              tags,
+              entry.player_name,
+              entry.discord_id != null ? String(entry.discord_id) : null
+            ),
+          }))
+        : queue.map((entry, i) => ({ id: i + 1, queue_mode: entry.queue_mode ?? null })),
       count: queue.length,
       teamSize,
       open: gate.open,
@@ -80,6 +87,10 @@ export async function GET(request: Request) {
       me,
       // Pro Matchmaking is only shown to players who can join it (S2+).
       proEligible: PRO_QUEUE_ENABLED && proEligible,
+      // Footer counts (all servers).
+      liveMatches,
+      queuingAll: queuing.total,
+      queuingByRegion: queuing.byRegion,
     });
   } catch (error) {
     console.error("Error fetching queue:", error);

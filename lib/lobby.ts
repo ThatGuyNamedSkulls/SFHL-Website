@@ -354,6 +354,19 @@ export async function getActiveLobbyMemberIds(): Promise<Set<string>> {
   return ids;
 }
 
+/** How many matches are live right now (lobby rows younger than the TTL). */
+export async function countLiveMatches(): Promise<number> {
+  try {
+    const rs = await client.execute({
+      sql: "SELECT COUNT(*) AS c FROM web_lobbies WHERE created_at >= ?",
+      args: [Date.now() - LOBBY_TTL_MS],
+    });
+    return Number(rs.rows[0]?.c ?? 0);
+  } catch {
+    return 0; // table not created yet
+  }
+}
+
 /**
  * The active lobby the given Discord user is in, or null. Prunes rows older
  * than the TTL as it scans (best-effort).

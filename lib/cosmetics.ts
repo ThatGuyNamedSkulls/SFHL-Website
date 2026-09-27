@@ -49,7 +49,7 @@ let schemaReady: Promise<void> | null = null;
 
 /** Create the cosmetics tables once per process (idempotent, mirrors
  *  core/schema.py). Schema only — item seeding is bot-side. */
-function ensureCosmeticsSchema(): Promise<void> {
+export function ensureCosmeticsSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = schemaOnce("cosmetics", async () => {
       await client.batch([

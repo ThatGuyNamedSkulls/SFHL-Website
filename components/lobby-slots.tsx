@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { AvatarFrame } from "@/components/avatar-frame";
 import { RankBadge } from "@/components/rank-badge";
@@ -159,16 +158,6 @@ function LobbyCard({ member, center }: { member: LobbyMember; center: boolean })
  */
 export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder" }: LobbySlotsProps) {
   const center = Math.floor(size / 2);
-  const row = useRef<HTMLDivElement>(null);
-  // Phones scroll the row sideways: start on your own (middle) card, not the first slot.
-  useEffect(() => {
-    const el = row.current;
-    const mid = el?.children[center] as HTMLElement | undefined;
-    if (!el || !mid || el.scrollWidth <= el.clientWidth) return;
-    const a = el.getBoundingClientRect();
-    const b = mid.getBoundingClientRect();
-    el.scrollLeft += b.left + b.width / 2 - (a.left + a.width / 2);
-  }, [center, members.length]);
 
   // Place yourself in the center, then teammates outward (left, right, …).
   const positions: (LobbyMember | undefined)[] = Array.from({ length: size });
@@ -186,16 +175,18 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
     positions[idx] = rest.shift();
   }
 
-  const slot = "h-[272px] w-[170px] shrink-0 snap-center lg:w-auto";
+  const slot = "h-[272px] w-[170px] shrink-0 snap-start lg:w-[164px]";
   const empty = `${slot} flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.015]`;
 
   return (
     <div
-      ref={row}
+      // Remount when your card arrives: a scroll-snapped row otherwise stays
+      // snapped to the empty slot it showed first, leaving your card off-screen.
+      key={members.some((m) => m.self) ? "with-self" : "no-self"}
       className={
         size === 1
           ? "flex items-center justify-center"
-          : "-mx-1 flex snap-x snap-mandatory items-center gap-3 overflow-x-auto px-1 pb-2 pt-3 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-5 lg:overflow-visible lg:px-0"
+          : "-mx-1 flex snap-x snap-mandatory items-center gap-3 overflow-x-auto px-1 pb-2 pt-3 lg:mx-0 lg:justify-center lg:gap-4 lg:snap-none lg:overflow-visible lg:px-0"
       }
     >
       {positions.map((member, i) => {
@@ -206,7 +197,9 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
           return (
             <div
               key={i}
-              className={`${slot} ${size === 1 ? "!w-[220px]" : ""} ${isCenter && size > 1 ? "z-10 lg:-my-3 lg:h-[296px]" : ""}`}
+              // Phones scroll this row sideways: your card comes first there, so it's
+              // never off-screen (desktop keeps it raised in the center).
+              className={`${slot} ${size === 1 ? "!w-[220px]" : ""} ${isCenter && size > 1 ? "z-10 lg:-my-3 lg:h-[296px] lg:w-[188px]" : ""} ${member.self ? "max-lg:order-first" : ""}`}
             >
               <LobbyCard member={member} center={isCenter} />
             </div>

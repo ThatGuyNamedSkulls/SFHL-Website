@@ -9,6 +9,7 @@ import { TopBar } from "@/components/top-bar";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { CountryPrompt } from "@/components/country-prompt";
 import { MatchReadyModal } from "@/components/match-ready-modal";
+import { QueueAttention } from "@/components/queue-attention";
 import { VerifyPrompt } from "@/components/verify-prompt";
 import { PresenceHeartbeat } from "@/components/online-status";
 import "./globals.css";
@@ -63,6 +64,7 @@ export default function RootLayout({
             <CountryPrompt />
             <VerifyPrompt />
             <MatchReadyModal />
+            <QueueAttention />
             <StatusPoller />
             <PresenceHeartbeat />
           </SessionProvider>

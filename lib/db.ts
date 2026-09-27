@@ -136,9 +136,12 @@ export function publicRating(player: {
   placement_done: number;
 }): { elo: number; peakElo: number; rank: string; placementDone: boolean } {
   const done = isPlacementComplete(player.placement_done);
+  const elo = done ? Number(player.elo) || 0 : 0;
   return {
-    elo: done ? Number(player.elo) || 0 : 0,
-    peakElo: done ? Number(player.peak_elo) || 0 : 0,
+    elo,
+    // Peak can't be below the current Elo. The bot only raises peak_elo on
+    // ranked results, so /addelo or placement graduation could leave it behind.
+    peakElo: done ? Math.max(Number(player.peak_elo) || 0, elo) : 0,
     rank: done ? mapRank(player.rank) : "UNRANKED",
     placementDone: done,
   };
@@ -1032,6 +1035,42 @@ export async function getWebQueue(region?: string): Promise<WebQueueEntry[]> {
   } catch (error) {
     console.error("getWebQueue failed:", error);
     return [];
+  }
+}
+
+/** Players queuing, per server and in total (the Play page footer + server cards). */
+export async function countWebQueueByRegion(): Promise<{ total: number; byRegion: Record<string, number> }> {
+  try {
+    const rs = await client.execute(
+      "SELECT UPPER(TRIM(COALESCE(region, ''))) AS region, COUNT(*) AS c FROM web_queue GROUP BY 1"
+    );
+    const byRegion: Record<string, number> = {};
+    let total = 0;
+    for (const row of rs.rows) {
+      const n = Number(row.c ?? 0);
+      total += n;
+      if (row.region) byRegion[String(row.region)] = n;
+    }
+    return { total, byRegion };
+  } catch {
+    return { total: 0, byRegion: {} };
+  }
+}
+
+/** When this user joined the web queue (ms since epoch), or null when not queued. */
+export async function getWebQueueJoinedAt(discordUserId: string): Promise<number | null> {
+  try {
+    const rs = await client.execute({
+      sql: "SELECT joined_at FROM web_queue WHERE discord_id = CAST(? AS TEXT)",
+      args: [String(discordUserId)],
+    });
+    if (!rs.rows.length) return null;
+    const raw = rs.rows[0].joined_at;
+    // CURRENT_TIMESTAMP text is UTC "YYYY-MM-DD HH:MM:SS"; a number is already ms.
+    const ms = typeof raw === "number" ? raw : Date.parse(String(raw).replace(" ", "T") + "Z");
+    return Number.isFinite(ms) ? ms : Date.now();
+  } catch {
+    return null;
   }
 }
 

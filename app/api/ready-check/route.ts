@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { acceptReadyCheck, myReadyCheck } from "@/lib/ready-checks";
-import { isInWebQueue } from "@/lib/db";
+import { getWebQueueJoinedAt } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -13,13 +13,17 @@ export const revalidate = 0;
  */
 export async function GET() {
   const session = await getSession();
-  if (!session) return NextResponse.json({ check: null, queued: false });
+  if (!session) return NextResponse.json({ check: null, queued: false, queuedSince: null });
   try {
-    const [check, queued] = await Promise.all([myReadyCheck(session.discordId), isInWebQueue(session.discordId)]);
-    return NextResponse.json({ check, queued });
+    const [check, queuedSince] = await Promise.all([
+      myReadyCheck(session.discordId),
+      getWebQueueJoinedAt(session.discordId),
+    ]);
+    // queuedSince drives the search timer and the tab title while you wait.
+    return NextResponse.json({ check, queued: queuedSince !== null, queuedSince });
   } catch (error) {
     console.error("ready-check GET", error);
-    return NextResponse.json({ check: null, queued: false });
+    return NextResponse.json({ check: null, queued: false, queuedSince: null });
   }
 }
 
