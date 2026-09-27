@@ -100,3 +100,36 @@ export async function addGuestbookEntry(
     rank: await authorRank(fromName),
   };
 }
+
+/** The exact stored name of a player (case-insensitive lookup), or null. */
+export async function canonicalPlayerName(name: string): Promise<string | null> {
+  const rs = await client.execute({
+    sql: "SELECT name FROM players WHERE lower(name) = lower(?) LIMIT 1",
+    args: [name.trim()],
+  });
+  return rs.rows[0]?.name == null ? null : String(rs.rows[0].name);
+}
+
+/**
+ * Delete one entry. Allowed for the profile owner, the author, or Match Staff
+ * (security report L5). Returns false when the entry doesn't exist.
+ */
+export async function deleteGuestbookEntry(
+  id: number,
+  actor: { playerName: string | null; staff: boolean }
+): Promise<boolean> {
+  await ensureGuestbookSchema();
+  const rs = await client.execute({
+    sql: "SELECT profile_name, from_name FROM guestbook WHERE id = ?",
+    args: [id],
+  });
+  const row = rs.rows[0];
+  if (!row) return false;
+  const me = (actor.playerName || "").toLowerCase();
+  const allowed =
+    actor.staff ||
+    (!!me && (String(row.profile_name).toLowerCase() === me || String(row.from_name).toLowerCase() === me));
+  if (!allowed) throw new Error("You can only delete messages on your own profile or that you wrote.");
+  await client.execute({ sql: "DELETE FROM guestbook WHERE id = ?", args: [id] });
+  return true;
+}

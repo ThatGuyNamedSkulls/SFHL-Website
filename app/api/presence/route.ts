@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { getOnline, touchPresence } from "@/lib/presence";
 
@@ -12,6 +13,9 @@ function list(value: string | null): string[] {
 /** GET ?names=a,b&ids=1,2 — which of these players have the site open. */
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  // Signed-in viewers only: anonymous callers could otherwise watch any
+  // player's online status (security report L3).
+  if (!(await getSession())) return NextResponse.json({ names: [], ids: [] });
   try {
     const online = await getOnline({
       names: list(url.searchParams.get("names")),
@@ -29,6 +33,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false }, { status: 401 });
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
   const leave = new URL(request.url).searchParams.get("leave") === "1";
   try {
     await touchPresence(session.discordId, session.playerName ?? null, leave);

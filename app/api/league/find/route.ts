@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import {
   FindInputError,
@@ -25,6 +26,8 @@ export const revalidate = 0;
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Log in first." }, { status: 401 });
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const viewer: Viewer = {
     discordId: session.discordId,
     playerName: session.playerName ?? null,

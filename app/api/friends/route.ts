@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import {
   getFriends,
   getIncomingRequests,
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
   if (!toName || typeof toName !== "string") {
     return NextResponse.json({ error: "Missing target player" }, { status: 400 });
   }
+  const tooMany = await limited(`friend-request:${session!.discordId}`, LIMITS.friendRequest);
+  if (tooMany) return tooMany;
   const result = await sendFriendRequest(session!.playerName!, toName);
   if (result === "self") return NextResponse.json({ error: "You can't add yourself" }, { status: 400 });
   if (result === "no_such_player")
@@ -60,6 +63,8 @@ export async function DELETE(request: Request) {
   const session = await getSession();
   const gate = requireLinked(session);
   if (gate) return NextResponse.json({ error: gate.error }, { status: gate.status });
+  const limitHit = await limited(`general:${session!.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
   const { name } = await request.json().catch(() => ({}));
   if (!name || typeof name !== "string") {
     return NextResponse.json({ error: "Missing friend name" }, { status: 400 });

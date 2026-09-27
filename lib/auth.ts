@@ -6,6 +6,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { UserSession } from "@/types";
+import { liveIdentity } from "@/lib/session-store";
 
 const SESSION_COOKIE = "hl_session";
 /** Short-lived cookie holding the OAuth `state` value, to defend the login
@@ -35,30 +36,79 @@ function getSecret(): Uint8Array {
   return _secret;
 }
 
-/** Encode a user session into a signed JWT */
+/** A session can be refreshed for at most this long after the Discord sign-in. */
+export const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_TTL_S = 7 * 24 * 60 * 60;
+
+/** Encode a user session into a signed JWT (7-day cookie, refreshed by /api/auth/me). */
 export async function encodeSession(session: UserSession): Promise<string> {
-  return new SignJWT(session as unknown as Record<string, unknown>)
+  // Only identity claims go in the token; exp/iat are set here.
+  const claims = { ...session } as Record<string, unknown>;
+  delete claims.exp;
+  delete claims.iat;
+  delete claims.clubTag;
+  return new SignJWT({ ...claims, authAt: session.authAt ?? Date.now(), epoch: session.epoch ?? 0 })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
     .setExpirationTime("7d")
     .sign(getSecret());
 }
 
-/** Decode and verify a session JWT */
-export async function decodeSession(token: string): Promise<UserSession | null> {
+export type Claims = UserSession & { exp?: number; iat?: number };
+
+async function verify(token: string): Promise<Claims | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecret());
-    return payload as unknown as UserSession;
+    const { payload } = await jwtVerify(token, getSecret(), { algorithms: ["HS256"] });
+    return payload as unknown as Claims;
   } catch {
     return null;
   }
 }
 
-/** Get the current user session from cookies (for use in API routes) */
+/**
+ * Check a verified token against the server (docs/WEBSITE_SECURITY_PLAN.md 1.3):
+ * reject it past the 30-day cap or after "log out everywhere", and replace the
+ * JWT's player name with the account's CURRENT link (by discord_id). If the
+ * database can't be reached the token's own claims are used.
+ */
+export async function validateSessionClaims(claims: Claims): Promise<UserSession | null> {
+  if (!claims.discordId) return null;
+  // Tokens from before authAt existed: count from their original issue time.
+  const authAt =
+    typeof claims.authAt === "number"
+      ? claims.authAt
+      : typeof claims.iat === "number"
+        ? claims.iat * 1000
+        : typeof claims.exp === "number"
+          ? (claims.exp - SESSION_TTL_S) * 1000
+          : Date.now();
+  if (Date.now() - authAt > SESSION_MAX_AGE_MS) return null;
+  const session: UserSession = { ...claims, authAt, epoch: Number(claims.epoch ?? 0) || 0 };
+  delete (session as Claims).exp;
+  delete (session as Claims).iat;
+  try {
+    const live = await liveIdentity(claims.discordId);
+    if (session.epoch! < live.epoch) return null;
+    session.playerName = live.playerName;
+  } catch (error) {
+    console.error("session check failed; using token claims", error);
+  }
+  return session;
+}
+
+/** Decode and verify a session JWT (signature and expiry only — no server checks). */
+export async function decodeSession(token: string): Promise<UserSession | null> {
+  return verify(token);
+}
+
+/** Get the current user session from cookies (for use in API routes). The
+ *  player name is the account's live link, not the one in the cookie. */
 export async function getSession(): Promise<UserSession | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  return decodeSession(token);
+  const claims = await verify(token);
+  return claims ? validateSessionClaims(claims) : null;
 }
 
 /** Session plus JWT expiry (unix seconds). Used so /api/auth/me can skip
@@ -71,15 +121,11 @@ export async function getSessionWithExpiry(): Promise<{
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return { session: null, exp: null };
-  try {
-    const { payload } = await jwtVerify(token, getSecret());
-    return {
-      session: payload as unknown as UserSession,
-      exp: typeof payload.exp === "number" ? payload.exp : null,
-    };
-  } catch {
-    return { session: null, exp: null };
-  }
+  const claims = await verify(token);
+  if (!claims) return { session: null, exp: null };
+  const exp = typeof claims.exp === "number" ? claims.exp : null;
+  const session = await validateSessionClaims(claims);
+  return { session, exp: session ? exp : null };
 }
 
 /** Discord OAuth2 URLs and config */

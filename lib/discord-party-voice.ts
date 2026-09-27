@@ -43,8 +43,15 @@ async function discordApi(path: string, init?: RequestInit): Promise<Response | 
   }
 }
 
-/** The "[MS] Match Staff" role id (10 min; a failed lookup is retried, not kept forever). */
+/**
+ * The Match Staff role id. Set MATCH_STAFF_ROLE_ID so it's pinned: looking it
+ * up by name lets anyone who can create/rename a role called "[MS] Match Staff"
+ * grant website staff powers (security report L6). The name lookup (10 min
+ * cache; a failed lookup is retried) is only a fallback.
+ */
 async function matchStaffRoleId(): Promise<string | null> {
+  const pinned = (process.env.MATCH_STAFF_ROLE_ID || "").trim();
+  if (/^\d{15,22}$/.test(pinned)) return pinned;
   return remember("match-staff-role", 10 * 60_000, async () => {
     const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/roles`);
     if (!res?.ok) throw new Error("Discord roles lookup failed");

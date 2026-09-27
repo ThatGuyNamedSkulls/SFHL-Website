@@ -14,6 +14,7 @@ import { RANK_TIERS } from "@/data/ranks";
 import { Swords, Check, ChevronDown, Zap } from "lucide-react";
 import { MATCH_MODE_LABEL, PARTY_MAX_SIZE } from "@/lib/match-mode";
 import { SUPER_PARTY_MAX } from "@/lib/queue-modes";
+import { PARTY_VIBES } from "@/lib/party-rules";
 
 interface CreatePartyModalProps {
   open: boolean;
@@ -29,7 +30,7 @@ const LABEL_CLS = "text-[11px] header-caps text-hl-muted mb-1.5 block";
 
 const SKILL_TIERS = RANK_TIERS.filter((t) => t.letter !== "UNRANKED");
 
-export const PARTY_VIBES = ["Chill", "Fun", "Balanced", "Serious", "Intense"];
+export { PARTY_VIBES };
 
 /** FACEIT-style match types. */
 const MATCH_TYPE_OPTIONS = [

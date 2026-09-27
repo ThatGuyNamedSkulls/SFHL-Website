@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { setPlayerLastQueueRegion } from "@/lib/db";
 import { isQueueRegion } from "@/lib/regions";
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
   if (!session?.playerName) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
 
   let body: { region?: string } = {};
   try {

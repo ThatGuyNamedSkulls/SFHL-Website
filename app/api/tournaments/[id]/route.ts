@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { publicErrorMessage } from "@/lib/route-errors";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { getClub } from "@/lib/clubs";
 import { isMatchStaff } from "@/lib/discord-party-voice";
 import {
   assignCaptain,
   cancelTournament,
+  confirmMatch,
+  disputeMatch,
   getTournament,
   invitePlayer,
   kickRoster,
@@ -37,7 +41,7 @@ async function actor(): Promise<TournamentActor | null> {
 }
 
 function fail(error: unknown) {
-  const message = error instanceof Error ? error.message : "Failed";
+  const message = publicErrorMessage(error, "Failed");
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
@@ -68,6 +72,8 @@ export async function POST(
 ) {
   const me = await actor();
   if (!me) return NextResponse.json({ error: "Log in first." }, { status: 401 });
+  const limitHit = await limited(`groupWrite:${me.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const { id } = await params;
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const action = String(body.action || "");
@@ -114,6 +120,12 @@ export async function POST(
         break;
       case "report":
         t = await reportMatch(id, me, String(body.matchId ?? ""), body.scores);
+        break;
+      case "confirm":
+        t = await confirmMatch(id, me, String(body.matchId ?? ""));
+        break;
+      case "dispute":
+        t = await disputeMatch(id, me, String(body.matchId ?? ""), String(body.reason ?? ""));
         break;
       case "cancel":
         t = await cancelTournament(id, me);

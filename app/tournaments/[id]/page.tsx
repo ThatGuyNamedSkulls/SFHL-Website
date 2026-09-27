@@ -119,8 +119,10 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const losers = matchesToView(tournament.matches, names, "losers", tournament.size, tournament.id);
   const grand = matchesToView(tournament.matches, names, "grand", tournament.size, tournament.id);
   const ready = tournament.matches.filter((m) => m.status === "ready");
+  // Organizers / staff settle results; playing captains report and confirm each other.
   const canReport = (match: BracketMatch) =>
     viewer.organizer ||
+    viewer.staff ||
     tournament.teams.some(
       (team) =>
         viewer.captainOf === team.id && (team.id === match.teamAId || team.id === match.teamBId)
@@ -517,6 +519,50 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 <div className="text-sm font-bold text-white mb-3">
                   {roundLabel(match, tournament.size)} · {teamA} vs {teamB}
                 </div>
+                {match.report ? (
+                  <div className="mb-3 rounded-lg border border-hl-border bg-hl-base p-3 text-xs text-hl-muted">
+                    <div>
+                      <span className="font-bold text-white">
+                        {names.get(match.report.teamId) || "A captain"}
+                      </span>{" "}
+                      reported:{" "}
+                      <span className="text-white">
+                        {match.report.scores.map((s) => `${s.map} ${s.scoreA}–${s.scoreB}`).join(", ")}
+                      </span>
+                    </div>
+                    {match.dispute ? (
+                      <div className="mt-1 text-red-300">
+                        Disputed: {match.dispute.reason} The organizer decides the result.
+                      </div>
+                    ) : viewer.captainOf === match.report.teamId ? (
+                      <div className="mt-1">Waiting for the other captain to confirm.</div>
+                    ) : viewer.captainOf === match.teamAId || viewer.captainOf === match.teamBId ? (
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void act({ action: "confirm", matchId: match.id })}
+                          className="h-8 rounded-lg bg-gold-gradient px-3 text-xs font-black text-hl-base"
+                        >
+                          Confirm result
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            const reason = window.prompt("What's wrong with this result?") ?? "";
+                            if (reason.trim()) void act({ action: "dispute", matchId: match.id, reason });
+                          }}
+                          className="h-8 rounded-lg border border-red-500/40 px-3 text-xs font-bold text-red-300"
+                        >
+                          Dispute
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-1">Waiting for the other captain to confirm.</div>
+                    )}
+                  </div>
+                ) : null}
                 <div className="space-y-2">
                   {rows.map((row, index) => (
                     <div key={index} className="grid grid-cols-[1fr_5rem_5rem] gap-2">

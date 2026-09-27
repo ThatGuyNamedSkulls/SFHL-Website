@@ -15,6 +15,7 @@
 import { client, mapRank } from "@/lib/db";
 import { pickAvatar } from "@/lib/avatar";
 import { schemaOnce } from "@/lib/schema-once";
+import { discordSafe } from "@/lib/discord-safe";
 
 export interface Friend {
   name: string;
@@ -91,6 +92,9 @@ export function ensureSocialSchema(): Promise<void> {
         "ALTER TABLE notifications ADD COLUMN player_id INTEGER",
         "ALTER TABLE notifications ADD COLUMN actor_player_id INTEGER",
         "ALTER TABLE discord_dm_outbox ADD COLUMN player_id INTEGER",
+        // Who triggered a DM (player name), for the per-sender / per-recipient
+        // limits in enqueueDM (docs/WEBSITE_SECURITY_PLAN.md 1.1).
+        "ALTER TABLE discord_dm_outbox ADD COLUMN from_player TEXT",
       ];
       for (const sql of idColumns) {
         await client.execute(sql).catch(() => undefined);
@@ -102,6 +106,8 @@ export function ensureSocialSchema(): Promise<void> {
         "CREATE INDEX IF NOT EXISTS idx_party_invites_to ON party_invites(to_player)",
         "CREATE INDEX IF NOT EXISTS idx_notifications_player ON notifications(player_name, read)",
         "CREATE INDEX IF NOT EXISTS idx_dm_outbox_sent ON discord_dm_outbox(sent)",
+        "CREATE INDEX IF NOT EXISTS idx_dm_outbox_from ON discord_dm_outbox(from_player, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_dm_outbox_to ON discord_dm_outbox(player_name, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_web_users_player_id ON web_users(player_id)",
         "CREATE INDEX IF NOT EXISTS idx_friendships_player_b_id ON friendships(player_b_id)",
         "CREATE INDEX IF NOT EXISTS idx_friend_requests_to_id ON friend_requests(to_player_id)",
@@ -149,16 +155,21 @@ export async function upsertWebUser(
   });
 }
 
-/** Look up a known Discord id for a player name, if we've ever seen them. */
+/** The Discord id of a player: the bot-verified `players.discord_id` first
+ *  (authoritative), then the last login seen for that name. */
 export async function getDiscordIdForPlayer(name: string): Promise<string | null> {
   await ensureSocialSchema();
   const rs = await client.execute({
-    sql: `SELECT discord_id FROM web_users
-          WHERE player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?
-          ORDER BY updated_at DESC LIMIT 1`,
-    args: [name, name],
+    sql: `SELECT discord_id FROM players WHERE name = ? AND discord_id IS NOT NULL
+          UNION ALL
+          SELECT * FROM (SELECT discord_id FROM web_users
+                          WHERE player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?
+                          ORDER BY updated_at DESC LIMIT 1)
+          LIMIT 1`,
+    args: [name, name, name],
   });
-  return (rs.rows[0]?.discord_id as string) ?? null;
+  const id = rs.rows[0]?.discord_id;
+  return id == null ? null : String(id);
 }
 
 // --- player directory (from the real players table) ------------------------
@@ -274,7 +285,8 @@ export async function sendFriendRequest(
   await addNotification(toName, "friend_request", `${fromName} sent you a friend request.`, fromName);
   await enqueueDM(
     toName,
-    `👋 **${fromName}** sent you a friend request on HyperLeague. Accept it here: https://sf-hl.com/friends`
+    `👋 **${discordSafe(fromName, 40)}** sent you a friend request on HyperLeague. Accept it here: https://sf-hl.com/friends`,
+    fromName
   );
   return "sent";
 }
@@ -312,7 +324,11 @@ export async function acceptFriendRequest(meName: string, fromName: string): Pro
     args: [x, y, x, y, now()],
   });
   await addNotification(fromName, "friend_accepted", `${meName} accepted your friend request.`, meName);
-  await enqueueDM(fromName, `✅ **${meName}** accepted your friend request on HyperLeague.`);
+  await enqueueDM(
+    fromName,
+    `✅ **${discordSafe(meName, 40)}** accepted your friend request on HyperLeague.`,
+    meName
+  );
 }
 
 export async function rejectFriendRequest(meName: string, fromName: string): Promise<void> {
@@ -407,7 +423,8 @@ export async function createPartyInvite(
   );
   await enqueueDM(
     toName,
-    `🎉 **${fromName}** invited you to their party "${partyName}" on HyperLeague. Join here: https://sf-hl.com/party-finder`
+    `🎉 **${discordSafe(fromName, 40)}** invited you to their party "${discordSafe(partyName, 40)}" on HyperLeague. Join here: https://sf-hl.com/party-finder`,
+    fromName
   );
   return "sent";
 }
@@ -543,18 +560,53 @@ export async function markNotificationsRead(meName: string): Promise<void> {
 
 // --- Discord DM outbox -----------------------------------------------------
 
+/** DMs one player can receive per hour because of other players' actions. */
+export const DM_PER_RECIPIENT_PER_HOUR = 3;
+/** DMs one player's actions can cause per hour. */
+export const DM_PER_SENDER_PER_HOUR = 20;
+const HOUR_MS = 60 * 60_000;
+
 /**
- * Queue a DM for the bot to deliver. We store the target's Discord **user id**
- * when we know it (so the bot can `fetch_user` reliably regardless of nickname
- * or member-cache state); otherwise we fall back to the player name and let the
- * bot resolve it by display name.
+ * Queue a DM for the bot to deliver, by the target's Discord user id when we
+ * know it. `fromName` marks a DM caused by another player's action (friend
+ * request, party invite): those are capped per recipient and per sender and
+ * silently dropped above the cap — the website notification still arrives
+ * (docs/WEBSITE_SECURITY_REPORT.md H4). Returns whether it was queued.
  */
-export async function enqueueDM(toName: string, message: string): Promise<void> {
+export async function enqueueDM(
+  toName: string,
+  message: string,
+  fromName: string | null = null
+): Promise<boolean> {
   await ensureSocialSchema();
+  if (fromName) {
+    const since = now() - HOUR_MS;
+    const [toRs, fromRs] = await client.batch(
+      [
+        {
+          sql: `SELECT COUNT(*) AS c FROM discord_dm_outbox
+                WHERE player_name = ? AND from_player IS NOT NULL AND created_at > ?`,
+          args: [toName, since],
+        },
+        {
+          sql: "SELECT COUNT(*) AS c FROM discord_dm_outbox WHERE from_player = ? AND created_at > ?",
+          args: [fromName, since],
+        },
+      ],
+      "read"
+    );
+    if (
+      Number(toRs.rows[0]?.c ?? 0) >= DM_PER_RECIPIENT_PER_HOUR ||
+      Number(fromRs.rows[0]?.c ?? 0) >= DM_PER_SENDER_PER_HOUR
+    ) {
+      return false;
+    }
+  }
   const discordId = await getDiscordIdForPlayer(toName);
   await client.execute({
-    sql: `INSERT INTO discord_dm_outbox (discord_id, player_name, player_id, message, sent, created_at)
-          VALUES (?, ?, (SELECT id FROM players WHERE name = ?), ?, 0, ?)`,
-    args: [discordId, toName, toName, message, now()],
+    sql: `INSERT INTO discord_dm_outbox (discord_id, player_name, player_id, message, sent, created_at, from_player)
+          VALUES (?, ?, (SELECT id FROM players WHERE name = ?), ?, 0, ?, ?)`,
+    args: [discordId, toName, toName, message, now(), fromName],
   });
+  return true;
 }

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getSession, getGuildPresenceCached } from "@/lib/auth";
-import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, mapRank, publicRating, setPlayerMmAccess } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, mapRank, publicRating } from "@/lib/db";
 import { buildEloTimeline } from "@/lib/elo-timeline";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
-import { resolvePlayerAvatar, resolveAvatarMap } from "@/lib/avatar";
+import { pickAvatar, resolveAvatarMap } from "@/lib/avatar";
 import { prettyMap, prettyRegion, formatRoundScore } from "@/lib/format";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
 import { countryToPlayRegion } from "@/lib/country-regions";
@@ -50,22 +50,9 @@ export async function GET(
     }
 
     const playerName = player.name;
-    const storedMmAccess = Number(player.mm_access) === 1;
-    let mmAccess = storedMmAccess;
-    const discordId = player.discord_id != null ? String(player.discord_id) : "";
-    if (discordId) {
-      try {
-        const live = await getGuildPresenceCached(discordId);
-        if (live) {
-          mmAccess = live.mmAccess;
-          if (mmAccess !== storedMmAccess) {
-            setPlayerMmAccess(discordId, mmAccess).catch(() => {});
-          }
-        }
-      } catch {
-        /* keep the stored flag */
-      }
-    }
+    // Stored flag only: the bot syncs it hourly and every login refreshes it.
+    // A public GET must not call Discord or write (security report M1).
+    const mmAccess = Number(player.mm_access) === 1;
 
     // These are all independent of one another — fetch them concurrently
     // instead of one sequential await per data source.
@@ -74,7 +61,7 @@ export async function GET(
         getMatchesForPlayer(playerName),
         getPlacementMatchesForPlayer(playerName),
         getEloChanges(playerName),
-        resolvePlayerAvatar(playerName, player.roblox_avatar_image, player.discord_avatar, player.discord_id),
+        pickAvatar(player.roblox_avatar_image, player.discord_avatar, player.discord_id),
         getMostPlayedWith(playerName, 10),
         getPlayerRankings(playerName).catch(() => ({ overall: null, country: null, region: null })),
         getEquippedCosmetics(playerName).catch(() => ({

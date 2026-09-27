@@ -323,24 +323,12 @@ export async function getPlayerByDiscordId(discordId: string): Promise<DbPlayer 
   return playerFromRows(rs);
 }
 
-/** Linked player row: Discord snowflake first, then name / Discord handle. */
-export async function resolveLinkedPlayer(
-  name?: string | null,
-  discordId?: string | null
-): Promise<DbPlayer | undefined> {
-  if (discordId) {
-    const byDiscord = await getPlayerByDiscordId(String(discordId));
-    if (byDiscord) return byDiscord;
-  }
-  const key = (name || "").trim();
-  if (!key) return undefined;
-  return getPlayer(key);
-}
-
-/** Record a player's Discord identity (called on login for the user's own row;
- *  the bot's hourly sync keeps everyone else fresh). */
+/** Refresh the Discord @handle / avatar on the user's OWN row (matched by
+ *  discord_id only). The website never writes `players.discord_id`: only the
+ *  bot's Bloxlink-verified enrollment may bind an account to a player row —
+ *  a name match here would let anyone claim an unlinked row by renaming
+ *  themselves on Discord (docs/WEBSITE_SECURITY_REPORT.md H1). */
 export async function setPlayerDiscordIdentity(
-  name: string,
   discordId: string,
   username: string,
   avatar?: string | null
@@ -348,17 +336,13 @@ export async function setPlayerDiscordIdentity(
   await ensurePlayerDiscordColumns();
   if (avatar) {
     await client.execute({
-      sql: `UPDATE players SET discord_id = ?, discord_username = ?, discord_avatar = ?
-            WHERE discord_id = ?
-               OR lower(name) = lower(?)`,
-      args: [discordId, username, avatar, String(discordId), name],
+      sql: "UPDATE players SET discord_username = ?, discord_avatar = ? WHERE discord_id = ?",
+      args: [username, avatar, String(discordId)],
     });
   } else {
     await client.execute({
-      sql: `UPDATE players SET discord_id = ?, discord_username = ?
-            WHERE discord_id = ?
-               OR lower(name) = lower(?)`,
-      args: [discordId, username, String(discordId), name],
+      sql: "UPDATE players SET discord_username = ? WHERE discord_id = ?",
+      args: [username, String(discordId)],
     });
   }
 }
@@ -370,43 +354,23 @@ function readCountry(row: unknown): string | null {
   return code || null;
 }
 
-export async function getPlayerCountry(
-  name: string,
-  discordId?: string | null
-): Promise<string | null> {
-  await ensurePlayerDiscordColumns();
-  const player = await resolveLinkedPlayer(name, discordId);
+/** Country of the player linked to this Discord account (null when unlinked). */
+export async function getPlayerCountry(discordId: string): Promise<string | null> {
+  const player = await getPlayerByDiscordId(discordId);
   return readCountry(player ?? null);
 }
 
-export async function setPlayerCountry(
-  name: string,
-  code: string,
-  discordId?: string | null
-): Promise<boolean> {
+/** Set the country on the player linked to this Discord account. False when
+ *  the account isn't linked (the row is found by discord_id only — see H1). */
+export async function setPlayerCountry(discordId: string, code: string): Promise<boolean> {
   await ensurePlayerDiscordColumns();
-  const normalized = code.toLowerCase();
-  const player = await resolveLinkedPlayer(name, discordId);
-  if (!player) return false;
-
-  const did = String(discordId || player.discord_id || "").trim();
-  await client.execute({
-    sql: `UPDATE players SET country = ?
-          WHERE id = ?
-             OR lower(name) = lower(?)
-             OR (? != '' AND discord_id = ?)`,
-    args: [normalized, player.id, player.name, did, did],
+  const id = String(discordId || "").trim();
+  if (!id) return false;
+  const rs = await client.execute({
+    sql: "UPDATE players SET country = ? WHERE discord_id = ?",
+    args: [code.toLowerCase(), id],
   });
-
-  if (did && (player.discord_id == null || String(player.discord_id) !== did)) {
-    await client.execute({
-      sql: `UPDATE players SET discord_id = ?
-            WHERE id = ? AND discord_id IS NULL`,
-      args: [did, player.id],
-    });
-  }
-
-  return (await getPlayerCountry(player.name, did || null)) === normalized;
+  return rs.rowsAffected > 0;
 }
 
 /** Lazily add the shop-currency column if the bot hasn't migrated it yet

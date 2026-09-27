@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSession, isUserInGuildCached, getGuildPresenceCached } from "@/lib/auth";
+import { LIMITS, limited } from "@/lib/rate-limit";
+import { getSession, getGuildPresenceCached } from "@/lib/auth";
 import {
   getWebQueue,
   joinWebQueue,
@@ -30,6 +31,15 @@ import { PRO_KEEP_ELO, PRO_MIN_ELO, hasProAccess, proAccessByDiscordId } from "@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
+
+const DISCORD_UNREACHABLE =
+  "Can't check your Discord membership right now. Please try again in a moment.";
+
+/** Membership / Bloxlink checks can only be skipped in local development
+ *  without a bot token; in production an unknown status blocks the join. */
+function verificationRequired(): boolean {
+  return !!process.env.DISCORD_BOT_TOKEN || process.env.NODE_ENV === "production";
+}
 
 function queueJson(data: unknown, init?: { status?: number }) {
   const res = NextResponse.json(data, init);
@@ -97,6 +107,8 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
 
   const body = await request.json().catch(() => ({} as { region?: unknown; mode?: unknown }));
   const requested = typeof body.region === "string" ? body.region.toUpperCase() : "";
@@ -134,11 +146,14 @@ export async function POST(request: Request) {
   }
 
   // Live guild + Bloxlink check — login-time flags go stale if they leave
-  // Discord or haven't verified yet.
+  // Discord or haven't verified yet. When Discord can't be reached the join is
+  // refused (fail closed), not waved through (security report M6).
   const presence = await getGuildPresenceCached(session.discordId);
-  const liveInGuild =
-    presence !== null ? presence.inGuild : await isUserInGuildCached(session.discordId);
-  if (liveInGuild === false || (!session.inGuild && liveInGuild !== true)) {
+  if (presence === null && verificationRequired()) {
+    return NextResponse.json({ error: DISCORD_UNREACHABLE }, { status: 503 });
+  }
+  const liveInGuild = presence !== null ? presence.inGuild : !!session.inGuild;
+  if (!liveInGuild) {
     return NextResponse.json(
       { error: "You must be a member of the HyperLeague Discord server to join the queue" },
       { status: 403 }
@@ -214,7 +229,12 @@ export async function POST(request: Request) {
           continue;
         }
         const memberPresence = await getGuildPresenceCached(m.discordId);
-        if (memberPresence === null) continue;
+        if (memberPresence === null) {
+          if (verificationRequired()) {
+            return NextResponse.json({ error: DISCORD_UNREACHABLE }, { status: 503 });
+          }
+          continue;
+        }
         if (!memberPresence.inGuild || !memberPresence.verified) {
           blocked.push(m.playerName || m.username);
         }
@@ -343,6 +363,8 @@ export async function DELETE(request: Request) {
       { status: 401 }
     );
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
 
   try {
     // Leaving as part of a party pulls the whole party out of the queue, the

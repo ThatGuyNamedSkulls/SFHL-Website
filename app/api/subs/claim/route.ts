@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession, isUserInGuildCached } from "@/lib/auth";
 import { claimSubRequest } from "@/lib/subs";
 import { upsertWebUser } from "@/lib/social";
@@ -21,6 +22,8 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
 
   const body = await request.json().catch(() => ({} as { requestId?: unknown }));
   const requestId = Number(body.requestId);
@@ -29,6 +32,14 @@ export async function POST(request: Request) {
   }
 
   const liveInGuild = await isUserInGuildCached(session.discordId);
+  // Fail closed: an unknown membership (Discord unreachable) can't claim a slot
+  // in production (security report M6).
+  if (liveInGuild === null && (process.env.DISCORD_BOT_TOKEN || process.env.NODE_ENV === "production")) {
+    return NextResponse.json(
+      { error: "Can't check your Discord membership right now. Please try again in a moment." },
+      { status: 503 }
+    );
+  }
   const result = await claimSubRequest(
     {
       discordId: session.discordId,

@@ -15,11 +15,14 @@ export function LogoutButton({
   className,
   children,
   onBeforeLogout,
+  everywhere = false,
 }: {
   className?: string;
   children: React.ReactNode;
   /** Optional hook fired before logout (e.g. to close a menu). */
   onBeforeLogout?: () => void;
+  /** Also sign out every other browser/device on this account. */
+  everywhere?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -30,7 +33,7 @@ export function LogoutButton({
     onBeforeLogout?.();
     setBusy(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch(everywhere ? "/api/auth/logout?everywhere=1" : "/api/auth/logout", { method: "POST" });
     } catch {
       /* even if the request fails, fall through and send them home */
     }

@@ -9,6 +9,7 @@ import { client } from "@/lib/db";
 import { isQueueRegion, type QueueRegionId } from "@/lib/regions";
 import { MAX_TEAM_MEMBERS, fullMessage, hasRoom, openSlot, type RosterSlot, type TeamRole } from "@/lib/team-roster";
 import { schemaOnce } from "@/lib/schema-once";
+import { deleteBlobIf, mutateBlob } from "@/lib/blob-cas";
 
 export { MAX_TEAM_MEMBERS, type TeamRole };
 export type TeamMemberStatus = "invited" | "accepted";
@@ -42,6 +43,8 @@ export interface Team {
 }
 
 export const DESCRIPTION_MAX = 500;
+/** Longest accepted team logo / banner link. */
+const IMAGE_URL_MAX = 500;
 
 export const MAX_OWNED_TEAMS = 3;
 const DEFAULT_REGION: QueueRegionId = "EU";
@@ -108,11 +111,6 @@ async function save(team: Team): Promise<void> {
           ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
     args: [team.id, JSON.stringify(team), team.updatedAt],
   });
-}
-
-async function remove(id: string): Promise<void> {
-  await ensureSchema();
-  await client.execute({ sql: "DELETE FROM web_teams WHERE id = ?", args: [id] });
 }
 
 export async function getTeam(id: string): Promise<Team | null> {
@@ -190,7 +188,7 @@ export async function createTeam(input: {
     id: newId(),
     name,
     tag,
-    logoUrl: input.logoUrl?.trim() || null,
+    logoUrl: cleanImageUrl(input.logoUrl, "logo"),
     accentColor: cleanColor(input.accentColor || "#ff5500"),
     region,
     captainId: input.captain.discordId,
@@ -213,6 +211,46 @@ export async function createTeam(input: {
   return team;
 }
 
+function parseTeam(raw: string): Team | null {
+  try {
+    const team = JSON.parse(raw) as Team;
+    return team?.id ? team : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Safe read-modify-write of one team (lib/blob-cas): `fn` re-runs on the freshest copy. */
+async function mutateTeam(teamId: string, fn: (team: Team) => void | Promise<void>): Promise<Team> {
+  await ensureSchema();
+  return mutateBlob<Team>({
+    table: "web_teams",
+    id: teamId,
+    parse: parseTeam,
+    notFound: "Team not found.",
+    mutate: async (team) => {
+      await fn(team);
+      team.updatedAt = Date.now();
+    },
+    columns: (team) => ({ updated_at: team.updatedAt }),
+  });
+}
+
+/** Team logo / banner: https only, bounded length (security report L2). */
+function cleanImageUrl(raw: string | null | undefined, what: string): string | null {
+  const s = (raw ?? "").trim();
+  if (!s) return null;
+  if (s.length > IMAGE_URL_MAX) throw new Error(`The ${what} link is too long.`);
+  let url: URL;
+  try {
+    url = new URL(s);
+  } catch {
+    throw new Error(`The ${what} must be a valid https link.`);
+  }
+  if (url.protocol !== "https:") throw new Error(`The ${what} must be an https link.`);
+  return url.toString();
+}
+
 export async function inviteToTeam(
   teamId: string,
   byDiscordId: string,
@@ -225,26 +263,24 @@ export async function inviteToTeam(
   /** The slot to invite into; default: the main roster while it has room, then the bench. */
   slot?: RosterSlot
 ): Promise<Team> {
-  const team = await getTeam(teamId);
-  if (!team) throw new Error("Team not found.");
-  if (team.captainId !== byDiscordId) throw new Error("Only the captain can invite.");
-  if (team.members.some((m) => m.discordId === invitee.discordId)) {
-    throw new Error("That player is already on the team.");
-  }
-  const role = slot ?? openSlot(team.members);
-  if (!role) throw new Error(`Teams are capped at ${MAX_TEAM_MEMBERS} members (5 main roster, 6 subs, 1 coach).`);
-  if (!hasRoom(team.members, role)) throw new Error(fullMessage(role));
-  team.members.push({
-    discordId: invitee.discordId,
-    username: invitee.username,
-    playerName: invitee.playerName,
-    avatar: invitee.avatar,
-    role,
-    status: "invited",
-    joinedAt: Date.now(),
+  return mutateTeam(teamId, (team) => {
+    if (team.captainId !== byDiscordId) throw new Error("Only the captain can invite.");
+    if (team.members.some((m) => m.discordId === invitee.discordId)) {
+      throw new Error("That player is already on the team.");
+    }
+    const role = slot ?? openSlot(team.members);
+    if (!role) throw new Error(`Teams are capped at ${MAX_TEAM_MEMBERS} members (5 main roster, 6 subs, 1 coach).`);
+    if (!hasRoom(team.members, role)) throw new Error(fullMessage(role));
+    team.members.push({
+      discordId: invitee.discordId,
+      username: invitee.username,
+      playerName: invitee.playerName,
+      avatar: invitee.avatar,
+      role,
+      status: "invited",
+      joinedAt: Date.now(),
+    });
   });
-  await save(team);
-  return team;
 }
 
 export async function respondToInvite(
@@ -252,22 +288,19 @@ export async function respondToInvite(
   discordId: string,
   accept: boolean
 ): Promise<Team | null> {
-  const team = await getTeam(teamId);
-  if (!team) throw new Error("Team not found.");
-  const idx = team.members.findIndex((m) => m.discordId === discordId && m.status === "invited");
-  if (idx < 0) throw new Error("No invite for you on this team.");
-  if (!accept) {
-    team.members.splice(idx, 1);
-    await save(team);
-    return team;
-  }
-  if (team.members.filter((m) => m.status === "accepted").length >= MAX_TEAM_MEMBERS) {
-    throw new Error("This team is full.");
-  }
-  team.members[idx].status = "accepted";
-  team.members[idx].joinedAt = Date.now();
-  await save(team);
-  return team;
+  return mutateTeam(teamId, (team) => {
+    const idx = team.members.findIndex((m) => m.discordId === discordId && m.status === "invited");
+    if (idx < 0) throw new Error("No invite for you on this team.");
+    if (!accept) {
+      team.members.splice(idx, 1);
+      return;
+    }
+    if (team.members.filter((m) => m.status === "accepted").length >= MAX_TEAM_MEMBERS) {
+      throw new Error("This team is full.");
+    }
+    team.members[idx].status = "accepted";
+    team.members[idx].joinedAt = Date.now();
+  });
 }
 
 export async function kickFromTeam(
@@ -275,13 +308,11 @@ export async function kickFromTeam(
   byDiscordId: string,
   targetDiscordId: string
 ): Promise<Team> {
-  const team = await getTeam(teamId);
-  if (!team) throw new Error("Team not found.");
-  if (team.captainId !== byDiscordId) throw new Error("Only the captain can kick.");
-  if (targetDiscordId === team.captainId) throw new Error("You can't kick the captain.");
-  team.members = team.members.filter((m) => m.discordId !== targetDiscordId);
-  await save(team);
-  return team;
+  return mutateTeam(teamId, (team) => {
+    if (team.captainId !== byDiscordId) throw new Error("Only the captain can kick.");
+    if (targetDiscordId === team.captainId) throw new Error("You can't kick the captain.");
+    team.members = team.members.filter((m) => m.discordId !== targetDiscordId);
+  });
 }
 
 export async function setMemberRole(
@@ -290,26 +321,22 @@ export async function setMemberRole(
   targetDiscordId: string,
   role: TeamRole
 ): Promise<Team> {
-  const team = await getTeam(teamId);
-  if (!team) throw new Error("Team not found.");
-  if (team.captainId !== byDiscordId) throw new Error("Only the captain can change roles.");
-  if (role === "captain") throw new Error("Transfer ownership to change captain.");
-  const member = team.members.find((m) => m.discordId === targetDiscordId && m.status === "accepted");
-  if (!member) throw new Error("Player is not on the team.");
-  if (member.role === "captain") throw new Error("Can't demote the captain this way.");
-  if (member.role !== role && !hasRoom(team.members, role, member.discordId)) throw new Error(fullMessage(role));
-  member.role = role;
-  await save(team);
-  return team;
+  return mutateTeam(teamId, (team) => {
+    if (team.captainId !== byDiscordId) throw new Error("Only the captain can change roles.");
+    if (role === "captain") throw new Error("Transfer ownership to change captain.");
+    const member = team.members.find((m) => m.discordId === targetDiscordId && m.status === "accepted");
+    if (!member) throw new Error("Player is not on the team.");
+    if (member.role === "captain") throw new Error("Can't demote the captain this way.");
+    if (member.role !== role && !hasRoom(team.members, role, member.discordId)) throw new Error(fullMessage(role));
+    member.role = role;
+  });
 }
 
 export async function leaveTeam(teamId: string, discordId: string): Promise<Team | null> {
-  const team = await getTeam(teamId);
-  if (!team) throw new Error("Team not found.");
-  if (team.captainId === discordId) throw new Error("Transfer ownership or delete the team first.");
-  team.members = team.members.filter((m) => m.discordId !== discordId);
-  await save(team);
-  return team;
+  return mutateTeam(teamId, (team) => {
+    if (team.captainId === discordId) throw new Error("Transfer ownership or delete the team first.");
+    team.members = team.members.filter((m) => m.discordId !== discordId);
+  });
 }
 
 export async function transferCaptain(
@@ -317,20 +344,18 @@ export async function transferCaptain(
   byDiscordId: string,
   newCaptainId: string
 ): Promise<Team> {
-  const team = await getTeam(teamId);
-  if (!team) throw new Error("Team not found.");
-  if (team.captainId !== byDiscordId) throw new Error("Only the captain can transfer.");
-  const next = team.members.find((m) => m.discordId === newCaptainId && m.status === "accepted");
-  if (!next) throw new Error("New captain must be an accepted member.");
-  if (next.role === "coach") throw new Error("The captain must be a player, not the coach.");
-  // Swap: the old captain takes the new captain's slot, so the slot counts stay the same.
-  const prev = team.members.find((m) => m.discordId === byDiscordId);
-  if (prev) prev.role = next.role === "sub" ? "sub" : "starter";
-  next.role = "captain";
-  team.captainId = next.discordId;
-  team.captainName = next.playerName || next.username;
-  await save(team);
-  return team;
+  return mutateTeam(teamId, (team) => {
+    if (team.captainId !== byDiscordId) throw new Error("Only the captain can transfer.");
+    const next = team.members.find((m) => m.discordId === newCaptainId && m.status === "accepted");
+    if (!next) throw new Error("New captain must be an accepted member.");
+    if (next.role === "coach") throw new Error("The captain must be a player, not the coach.");
+    // Swap: the old captain takes the new captain's slot, so the slot counts stay the same.
+    const prev = team.members.find((m) => m.discordId === byDiscordId);
+    if (prev) prev.role = next.role === "sub" ? "sub" : "starter";
+    next.role = "captain";
+    team.captainId = next.discordId;
+    team.captainName = next.playerName || next.username;
+  });
 }
 
 export async function patchTeam(
@@ -346,31 +371,38 @@ export async function patchTeam(
     region?: string;
   }
 ): Promise<Team> {
-  const team = await getTeam(teamId);
-  if (!team) throw new Error("Team not found.");
-  if (team.captainId !== byDiscordId) throw new Error("Only the captain can edit.");
-  if (patch.name != null) {
-    const name = cleanName(patch.name);
-    if (name.length < 2) throw new Error("Team name must be at least 2 characters.");
-    team.name = name;
-  }
-  if (patch.tag != null) {
-    const tag = cleanTag(patch.tag);
-    if (!TAG_RE.test(tag)) throw new Error("Tag must be 2–5 letters or numbers.");
-    team.tag = tag;
-  }
-  if (patch.logoUrl !== undefined) team.logoUrl = patch.logoUrl?.trim() || null;
-  if (patch.bannerUrl !== undefined) team.bannerUrl = patch.bannerUrl?.trim().slice(0, 500) || null;
-  if (patch.description !== undefined) team.description = patch.description?.trim().slice(0, DESCRIPTION_MAX) || null;
-  if (patch.accentColor != null) team.accentColor = cleanColor(patch.accentColor);
-  if (patch.region != null && isQueueRegion(patch.region)) team.region = patch.region;
-  await save(team);
-  return team;
+  // Validate the links before the write loop (same result on every retry).
+  const logoUrl = patch.logoUrl === undefined ? undefined : cleanImageUrl(patch.logoUrl, "logo");
+  const bannerUrl = patch.bannerUrl === undefined ? undefined : cleanImageUrl(patch.bannerUrl, "banner");
+  return mutateTeam(teamId, (team) => {
+    if (team.captainId !== byDiscordId) throw new Error("Only the captain can edit.");
+    if (patch.name != null) {
+      const name = cleanName(patch.name);
+      if (name.length < 2) throw new Error("Team name must be at least 2 characters.");
+      team.name = name;
+    }
+    if (patch.tag != null) {
+      const tag = cleanTag(patch.tag);
+      if (!TAG_RE.test(tag)) throw new Error("Tag must be 2–5 letters or numbers.");
+      team.tag = tag;
+    }
+    if (logoUrl !== undefined) team.logoUrl = logoUrl;
+    if (bannerUrl !== undefined) team.bannerUrl = bannerUrl;
+    if (patch.description !== undefined) team.description = patch.description?.trim().slice(0, DESCRIPTION_MAX) || null;
+    if (patch.accentColor != null) team.accentColor = cleanColor(patch.accentColor);
+    if (patch.region != null && isQueueRegion(patch.region)) team.region = patch.region;
+  });
 }
 
 export async function deleteTeam(teamId: string, byDiscordId: string): Promise<void> {
-  const team = await getTeam(teamId);
-  if (!team) throw new Error("Team not found.");
-  if (team.captainId !== byDiscordId) throw new Error("Only the captain can delete.");
-  await remove(teamId);
+  await ensureSchema();
+  await deleteBlobIf<Team>({
+    table: "web_teams",
+    id: teamId,
+    parse: parseTeam,
+    notFound: "Team not found.",
+    check: (team) => {
+      if (team.captainId !== byDiscordId) throw new Error("Only the captain can delete.");
+    },
+  });
 }

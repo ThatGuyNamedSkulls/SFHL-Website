@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { publicErrorMessage } from "@/lib/route-errors";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
 import {
@@ -47,6 +49,8 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "Log in to create a team." }, { status: 401 });
   }
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   if (!session.playerName) {
     return NextResponse.json(
       { error: "Link a HyperLeague player to create a team." },
@@ -76,7 +80,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ team });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not create team." },
+      { error: publicErrorMessage(error, "Could not create team.") },
       { status: 400 }
     );
   }

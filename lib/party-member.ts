@@ -86,11 +86,17 @@ export async function withFreshCosmetics<T extends Party>(parties: T[]): Promise
  * Attach live queue-eligibility to every member: `verified` (Bloxlink role on
  * the HyperLeague Discord; null when it can't be determined) and `canQueue`
  * (in the guild, Bloxlink-verified, and linked to a player).
+ *
+ * `live` is false for anonymous viewers: they get no Discord lookups (statuses
+ * stay null), so crawling the public party list can't spend the bot token's
+ * rate limit (docs/WEBSITE_SECURITY_REPORT.md M1).
  */
-export async function withMemberStatus<T extends Party>(parties: T[]): Promise<T[]> {
+export async function withMemberStatus<T extends Party>(parties: T[], live = true): Promise<T[]> {
   const ids = Array.from(new Set(parties.flatMap((p) => p.members.map((m) => m.discordId))));
   const status = new Map<string, { inGuild: boolean; verified: boolean; mmAccess: boolean } | null>();
-  await Promise.all(ids.map(async (id) => status.set(id, await getGuildPresenceCached(id))));
+  if (live) {
+    await Promise.all(ids.map(async (id) => status.set(id, await getGuildPresenceCached(id))));
+  }
   let tags: { byName: Record<string, string>; byDiscord: Record<string, string> } = {
     byName: {},
     byDiscord: {},

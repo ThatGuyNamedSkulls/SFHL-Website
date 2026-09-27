@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { isMatchStaff } from "@/lib/discord-party-voice";
 import {
@@ -55,6 +56,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Log in first." }, { status: 401 });
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
   const id = matchId((await params).id);
   if (id === null) return NextResponse.json({ error: "League match not found." }, { status: 404 });
   const body = await request.json().catch(() => ({} as Record<string, unknown>));

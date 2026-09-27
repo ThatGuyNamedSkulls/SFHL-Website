@@ -3,6 +3,7 @@
  */
 
 import { client } from "@/lib/db";
+import { discordSafe } from "@/lib/discord-safe";
 
 export interface ChatMessage {
   id: number;
@@ -105,7 +106,8 @@ async function postToDiscordChannel(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        content: `**${authorName}:** ${content}`,
+        // User text is escaped: no masked links, markdown or pings from the site.
+        content: `**${discordSafe(authorName, 80)}:** ${discordSafe(content, 400)}`,
         allowed_mentions: { parse: [] },
       }),
     });

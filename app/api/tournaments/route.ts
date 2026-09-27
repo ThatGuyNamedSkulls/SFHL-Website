@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { publicErrorMessage } from "@/lib/route-errors";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { getClub } from "@/lib/clubs";
 import { isMatchStaff } from "@/lib/discord-party-voice";
@@ -27,7 +29,7 @@ async function actor(): Promise<TournamentActor | null> {
 }
 
 function fail(error: unknown) {
-  const message = error instanceof Error ? error.message : "Failed";
+  const message = publicErrorMessage(error, "Failed");
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
@@ -59,6 +61,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const me = await actor();
   if (!me) return NextResponse.json({ error: "Log in to create a cup." }, { status: 401 });
+  const limitHit = await limited(`groupWrite:${me.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   try {
     const body = await request.json().catch(() => ({} as Record<string, unknown>));
     const tournament = await createTournament(

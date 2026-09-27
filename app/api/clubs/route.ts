@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { publicErrorMessage } from "@/lib/route-errors";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
 import {
@@ -42,6 +44,8 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "Log in to create a clan." }, { status: 401 });
   }
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   if (!session.playerName) {
     return NextResponse.json(
       { error: "Link a HyperLeague player to spend coins and create a clan." },
@@ -93,7 +97,7 @@ export async function POST(request: Request) {
   } catch (error) {
     await refundPlayerCoins(session.playerName, CLUB_CREATE_COST).catch(() => {});
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create clan." },
+      { error: publicErrorMessage(error, "Failed to create clan.") },
       { status: 400 }
     );
   }

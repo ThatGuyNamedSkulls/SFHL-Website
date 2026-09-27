@@ -10,10 +10,22 @@ export async function GET(
   { params }: { params: Promise<{ file: string }> }
 ) {
   const { file } = await params;
-  const decoded = decodeURIComponent(file);
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(file);
+  } catch {
+    // Malformed %-escape: a client error, not a 500.
+    return new Response("Invalid avatar", { status: 400 });
+  }
 
-  // Prevent path traversal — only allow a bare filename.
-  if (decoded.includes("/") || decoded.includes("\\") || decoded.includes("..")) {
+  // Prevent path traversal — only allow a bare image filename.
+  if (
+    decoded.includes("/") ||
+    decoded.includes("\\") ||
+    decoded.includes("..") ||
+    decoded.includes("\0") ||
+    !/\.(png|jpe?g|webp)$/i.test(decoded)
+  ) {
     return new Response("Invalid avatar", { status: 400 });
   }
 

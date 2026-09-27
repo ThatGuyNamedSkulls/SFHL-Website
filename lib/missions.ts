@@ -4,7 +4,8 @@
  * placement state; claims are stored in web_mission_claims.
  */
 
-import { client, ensurePlayerCoinsColumn } from "@/lib/db";
+import { client } from "@/lib/db";
+import { creditOnce } from "@/lib/coin-ledger";
 import type {
   MissionDef,
   MissionMetric,
@@ -131,7 +132,23 @@ function ensureClaimsSchema(): Promise<void> {
            PRIMARY KEY (player_name, mission_id)
          )`
       );
-    })();
+      // Claims follow the player id so a rename can't re-open them
+      // (docs/WEBSITE_SECURITY_REPORT.md M4); backfill from the current names.
+      await client.execute("ALTER TABLE web_mission_claims ADD COLUMN player_id INTEGER").catch(() => undefined);
+      await client
+        .execute(
+          `UPDATE web_mission_claims
+              SET player_id = (SELECT id FROM players WHERE players.name = web_mission_claims.player_name)
+            WHERE player_id IS NULL`
+        )
+        .catch(() => undefined);
+      await client
+        .execute("CREATE INDEX IF NOT EXISTS idx_mission_claims_player_id ON web_mission_claims (player_id)")
+        .catch(() => undefined);
+    })().catch((e) => {
+      schemaReady = null;
+      throw e;
+    });
   }
   return schemaReady;
 }
@@ -139,8 +156,9 @@ function ensureClaimsSchema(): Promise<void> {
 async function claimedIds(playerName: string): Promise<Set<string>> {
   await ensureClaimsSchema();
   const rs = await client.execute({
-    sql: "SELECT mission_id FROM web_mission_claims WHERE player_name = ?",
-    args: [playerName],
+    sql: `SELECT mission_id FROM web_mission_claims
+          WHERE player_name = ? OR player_id = (SELECT id FROM players WHERE name = ?)`,
+    args: [playerName, playerName],
   });
   return new Set(rs.rows.map((r) => String(r.mission_id)));
 }
@@ -227,21 +245,27 @@ export async function claimMission(
   if (mission.progress < mission.goal) return { ok: false, error: "Mission not complete yet." };
 
   await ensureClaimsSchema();
-  await ensurePlayerCoinsColumn();
+  const idRs = await client.execute({ sql: "SELECT id FROM players WHERE name = ?", args: [playerName] });
+  const playerId = idRs.rows[0]?.id;
+  if (playerId == null) return { ok: false, error: "Mission not found." };
 
-  try {
-    await client.execute({
-      sql: "INSERT INTO web_mission_claims (player_name, mission_id, claimed_at) VALUES (?, ?, ?)",
-      args: [playerName, missionId, Date.now()],
-    });
-  } catch {
-    return { ok: false, error: "Already claimed." };
-  }
-
-  await client.execute({
-    sql: "UPDATE players SET coins = coins + ? WHERE name = ?",
-    args: [mission.rewardCoins, playerName],
+  // The coins are keyed on the player id in the ledger, so the reward can be
+  // paid once per player — not once per name (a rename used to re-open it).
+  const paid = await creditOnce({
+    key: `mission:${playerId}:${missionId}`,
+    playerName,
+    delta: mission.rewardCoins,
+    reason: `Mission: ${mission.title}`,
   });
+  await client
+    .execute({
+      sql: `INSERT OR IGNORE INTO web_mission_claims (player_name, player_id, mission_id, claimed_at)
+            VALUES (?, ?, ?, ?)`,
+      args: [playerName, Number(playerId), missionId, Date.now()],
+    })
+    .catch(() => undefined);
+  if (!paid) return { ok: false, error: "Already claimed." };
+
   const rs = await client.execute({
     sql: "SELECT coins FROM players WHERE name = ?",
     args: [playerName],

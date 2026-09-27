@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { getNotifications, getUnreadCount, markNotificationsRead } from "@/lib/social";
 import { getLobbyForUser } from "@/lib/lobby";
@@ -38,6 +39,8 @@ export async function POST() {
   if (!session?.playerName) {
     return NextResponse.json({ error: "You must be logged in" }, { status: 401 });
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
   await markNotificationsRead(session.playerName);
   return NextResponse.json({ ok: true });
 }

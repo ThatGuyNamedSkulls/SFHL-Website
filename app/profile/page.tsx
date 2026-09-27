@@ -1033,6 +1033,9 @@ function ProfileContent() {
 }
 
 function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost: boolean }) {
+  const { session } = useSession();
+  const me = (session?.playerName || "").toLowerCase();
+  const ownProfile = !!me && me === profileName.toLowerCase();
   const [entries, setEntries] = useState<{ id: number; fromName: string; message: string; createdAt: number; rank?: string }[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1068,6 +1071,17 @@ function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost
     } finally {
       setBusy(false);
     }
+  };
+
+  const remove = async (id: number) => {
+    setError(null);
+    const res = await fetch(`/api/guestbook?id=${id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(typeof data.error === "string" ? data.error : "Failed to delete");
+      return;
+    }
+    setEntries((prev) => prev.filter((x) => x.id !== id));
   };
 
   return (
@@ -1118,8 +1132,18 @@ function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost
                   />
                   <span className="truncate">{e.fromName}</span>
                 </Link>
-                <span className="text-[11px] text-hl-muted">
+                <span className="flex items-center gap-2 text-[11px] text-hl-muted">
                   {new Date(e.createdAt).toLocaleDateString()}
+                  {ownProfile || e.fromName.toLowerCase() === me ? (
+                    <button
+                      type="button"
+                      onClick={() => void remove(e.id)}
+                      className="text-hl-muted hover:text-hl-red"
+                      title="Delete message"
+                    >
+                      Delete
+                    </button>
+                  ) : null}
                 </span>
               </div>
               <p className="text-sm text-hl-muted whitespace-pre-wrap">{e.message}</p>

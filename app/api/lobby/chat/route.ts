@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { getLobbyForUser } from "@/lib/lobby";
 import { listLobbyChat, postLobbyChat } from "@/lib/lobby-chat";
 import { MAX_CHAT_FETCH, parseChatLimit } from "@/lib/chat-limits";
+import { containsProfanity } from "@/lib/content-moderation";
+import { LIMITS, limited } from "@/lib/rate-limit";
 
 /** GET ?limit=<n> — latest match-room chat for the logged-in player's live
  *  lobby (the right-bar chat asks for the last 10). */
@@ -35,6 +37,12 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
+
+  if (containsProfanity(content)) {
+    return NextResponse.json({ error: "Message contains language that is not allowed." }, { status: 400 });
+  }
+  const tooMany = await limited(`chat:${session.discordId}`, LIMITS.chat);
+  if (tooMany) return tooMany;
 
   const lobby = await getLobbyForUser(session.discordId);
   if (!lobby) {

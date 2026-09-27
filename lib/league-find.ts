@@ -5,6 +5,7 @@
  * (Discord DM + website notification). Tables live in ensureLeagueSchema.
  */
 import { client } from "@/lib/db";
+import { discordSafe } from "@/lib/discord-safe";
 import { addNotification, ensureSocialSchema } from "@/lib/social";
 import { getTeam, inviteToTeam, listTeams, type Team } from "@/lib/teams";
 import { getEquippedVisualsMap } from "@/lib/cosmetics";
@@ -217,7 +218,8 @@ async function notify(
   actorName: string | null = null
 ): Promise<void> {
   if (to.playerName) await addNotification(to.playerName, "league", message, actorName, path);
-  await dm(to.discordId, `${message}\n${siteUrl(path)}`);
+  // Names and applicant text are user-written: escape them for Discord (security plan 1.1).
+  await dm(to.discordId, `${discordSafe(message, 1500)}\n${siteUrl(path)}`);
 }
 
 function siteUrl(path: string): string {
@@ -531,7 +533,10 @@ export async function messagePlayer(seasonId: number, postId: number, viewer: Vi
   const from = teams.length === 1 ? `${viewer.playerName} (captain of ${teams[0].name})` : viewer.playerName;
   const message = `${from} messaged you about your ${season.name} Find Teammates post: "${text}"`;
   await addNotification(String(post.player_name), "league_message", message, viewer.playerName, findPath(seasonId, "players"));
-  await dm(String(post.discord_id), `${message}\nReply to them on Discord (@${viewer.username}).`);
+  await dm(
+    String(post.discord_id),
+    `${discordSafe(message, 1500)}\nReply to them on Discord (@${discordSafe(viewer.username, 40)}).`
+  );
 }
 
 // --- the viewer's own recruiting ------------------------------------------------------------

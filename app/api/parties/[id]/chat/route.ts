@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { containsProfanity } from "@/lib/content-moderation";
 import { RAIL_CHAT_MESSAGES, parseChatLimit } from "@/lib/chat-limits";
 import {
@@ -47,6 +48,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (!session) {
     return NextResponse.json({ error: "Log in to chat." }, { status: 401 });
   }
+  const tooMany = await limited(`chat:${session.discordId}`, LIMITS.chat);
+  if (tooMany) return tooMany;
   const { id } = await ctx.params;
   const body = await request.json().catch(() => ({} as { message?: string }));
   const message = typeof body.message === "string" ? body.message : "";
@@ -79,6 +82,8 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
   if (!session) {
     return NextResponse.json({ error: "Log in first." }, { status: 401 });
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
   const { id } = await ctx.params;
   const messageId = Number(new URL(request.url).searchParams.get("id"));
   if (!Number.isFinite(messageId) || messageId <= 0) {

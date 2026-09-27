@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { getParty, joinParty } from "@/lib/parties";
 import { memberFromSession, withFreshCosmetics, withMemberStatus } from "@/lib/party-member";
@@ -10,6 +11,8 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/parties/[i
   if (!session) {
     return NextResponse.json({ error: "You must be logged in to join a party" }, { status: 401 });
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
 
   try {
     const { id } = await ctx.params;

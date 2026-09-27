@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { acceptReadyCheck, myReadyCheck } from "@/lib/ready-checks";
 import { isInWebQueue } from "@/lib/db";
@@ -32,6 +33,8 @@ const MESSAGES: Record<string, string> = {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Log in first." }, { status: 401 });
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
   const body = await request.json().catch(() => ({} as { id?: string }));
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) return NextResponse.json({ error: "Missing ready check." }, { status: 400 });

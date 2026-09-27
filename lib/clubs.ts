@@ -14,6 +14,7 @@ import { DEFAULT_PROFILE_BACKGROUNDS } from "@/lib/profile-backgrounds";
 import { isQueueRegion, type QueueRegionId } from "@/lib/regions";
 import { forget, remember } from "@/lib/server-cache";
 import { schemaOnce } from "@/lib/schema-once";
+import { deleteBlobIf, mutateBlob } from "@/lib/blob-cas";
 
 export const OWNER_ROLE_ID = "owner";
 export const MEMBER_ROLE_ID = "member";
@@ -468,44 +469,67 @@ export async function createClub(input: {
   return writeClub(club);
 }
 
+/**
+ * Safe read-modify-write of one clan (lib/blob-cas). `fn` runs on the freshest
+ * copy and re-runs if anyone else wrote in between, so its permission checks
+ * always see current roles: a demoted or kicked member's in-flight request
+ * can't write the old roster back (docs/WEBSITE_SECURITY_REPORT.md M3).
+ */
+async function mutateClub(id: string, fn: (club: Club) => void | Promise<void>): Promise<Club> {
+  await ensureSchema();
+  const club = await mutateBlob<Club>({
+    table: "web_clubs",
+    id,
+    parse: (raw) => parseClub(raw),
+    notFound: "Clan not found.",
+    mutate: async (c) => {
+      await fn(c);
+      c.updatedAt = Date.now();
+    },
+    columns: (c) => ({ updated_at: c.updatedAt }),
+  });
+  forgetClubTagIndex();
+  return club;
+}
+
 export async function updateClub(id: string, discordId: string, patch: ClubPatch): Promise<Club> {
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
-  if (!actorCan(club, discordId, "canEdit") && club.ownerId !== discordId) {
-    throw new Error("You cannot edit this clan.");
-  }
-  const ownerOnly = club.ownerId === discordId;
-  if (typeof patch.name === "string") {
-    if (!ownerOnly) throw new Error("Only the owner can change the clan name.");
-    const name = patch.name.trim().slice(0, 40);
-    if (name.length < 3) throw new Error("Clan name must be at least 3 characters.");
-    club.name = name;
-  }
-  if (typeof patch.description === "string") {
-    club.description = patch.description.trim().slice(0, 280);
-  }
-  if (typeof patch.rules === "string") {
-    club.rules = patch.rules.trim().slice(0, 2000);
-  }
-  if (typeof patch.tag === "string") {
-    if (!ownerOnly) throw new Error("Only the owner can change the clan tag.");
-    const tag = assertClubTag(patch.tag);
-    if (tag !== club.tag && (await tagTaken(tag, club.id))) {
-      throw new Error("That clan tag is already in use.");
+  const logoUrl = patch.logoUrl !== undefined ? assertLogoUrl(patch.logoUrl) : undefined;
+  return mutateClub(id, async (club) => {
+    if (!actorCan(club, discordId, "canEdit") && club.ownerId !== discordId) {
+      throw new Error("You cannot edit this clan.");
     }
-    club.tag = tag;
-  }
-  if (typeof patch.accentColor === "string") {
-    club.accentColor = assertAccent(patch.accentColor);
-  }
-  if (patch.logoUrl !== undefined) {
-    club.logoUrl = assertLogoUrl(patch.logoUrl);
-  }
-  if (typeof patch.private === "boolean") {
-    if (!ownerOnly) throw new Error("Only the owner can change clan privacy.");
-    club.private = patch.private;
-  }
-  return writeClub(club);
+    const ownerOnly = club.ownerId === discordId;
+    if (typeof patch.name === "string") {
+      if (!ownerOnly) throw new Error("Only the owner can change the clan name.");
+      const name = patch.name.trim().slice(0, 40);
+      if (name.length < 3) throw new Error("Clan name must be at least 3 characters.");
+      club.name = name;
+    }
+    if (typeof patch.description === "string") {
+      club.description = patch.description.trim().slice(0, 280);
+    }
+    if (typeof patch.rules === "string") {
+      club.rules = patch.rules.trim().slice(0, 2000);
+    }
+    if (typeof patch.tag === "string") {
+      if (!ownerOnly) throw new Error("Only the owner can change the clan tag.");
+      const tag = assertClubTag(patch.tag);
+      if (tag !== club.tag && (await tagTaken(tag, club.id))) {
+        throw new Error("That clan tag is already in use.");
+      }
+      club.tag = tag;
+    }
+    if (typeof patch.accentColor === "string") {
+      club.accentColor = assertAccent(patch.accentColor);
+    }
+    if (logoUrl !== undefined) {
+      club.logoUrl = logoUrl;
+    }
+    if (typeof patch.private === "boolean") {
+      if (!ownerOnly) throw new Error("Only the owner can change clan privacy.");
+      club.private = patch.private;
+    }
+  });
 }
 
 export async function joinClub(
@@ -513,36 +537,43 @@ export async function joinClub(
   member: Omit<ClubMember, "role" | "joinedAt">,
   inviteToken?: string
 ): Promise<Club> {
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
-  if (club.members.some((existing) => existing.discordId === member.discordId)) return club;
-  if (club.private) {
-    const token = (inviteToken || "").trim();
-    if (!token || !club.invites.some((inv) => inv.token === token)) {
-      throw new Error("This clan is invite-only.");
+  const existing = await getClub(id);
+  if (!existing) throw new Error("Clan not found.");
+  if (existing.members.some((m) => m.discordId === member.discordId)) return existing;
+  return mutateClub(id, (club) => {
+    if (club.members.some((m) => m.discordId === member.discordId)) return;
+    if (club.private) {
+      const token = (inviteToken || "").trim();
+      if (!token || !club.invites.some((inv) => inv.token === token)) {
+        throw new Error("This clan is invite-only.");
+      }
     }
-  }
-  club.members.push({ ...member, role: MEMBER_ROLE_ID, joinedAt: Date.now() });
-  return writeClub(club);
+    club.members.push({ ...member, role: MEMBER_ROLE_ID, joinedAt: Date.now() });
+  });
 }
 
 export async function leaveClub(id: string, discordId: string): Promise<Club | null> {
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
-  if (club.ownerId === discordId) {
-    throw new Error("The owner cannot leave. Transfer the clan or delete it.");
-  }
-  club.members = club.members.filter((m) => m.discordId !== discordId);
+  const club = await mutateClub(id, (c) => {
+    if (c.ownerId === discordId) {
+      throw new Error("The owner cannot leave. Transfer the clan or delete it.");
+    }
+    c.members = c.members.filter((m) => m.discordId !== discordId);
+  });
   await clearClubTagPrefIf(discordId, club.id);
-  return writeClub(club);
+  return club;
 }
 
 export async function deleteClub(id: string, discordId: string): Promise<void> {
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
-  if (club.ownerId !== discordId) throw new Error("Only the owner can delete this clan.");
   await ensureSchema();
-  await client.execute({ sql: "DELETE FROM web_clubs WHERE id = ?", args: [id] });
+  const club = await deleteBlobIf<Club>({
+    table: "web_clubs",
+    id,
+    parse: (raw) => parseClub(raw),
+    notFound: "Clan not found.",
+    check: (c) => {
+      if (c.ownerId !== discordId) throw new Error("Only the owner can delete this clan.");
+    },
+  });
   for (const member of club.members) {
     await clearClubTagPrefIf(member.discordId, club.id);
   }
@@ -550,35 +581,34 @@ export async function deleteClub(id: string, discordId: string): Promise<void> {
 }
 
 export async function createInvite(id: string, discordId: string): Promise<Club> {
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
-  if (!actorCan(club, discordId, "canInvite")) throw new Error("You cannot invite players.");
-  club.invites = [
-    { token: randomUUID().replace(/-/g, "").slice(0, 10), createdBy: discordId, createdAt: Date.now() },
-    ...club.invites,
-  ].slice(0, 5);
-  return writeClub(club);
+  return mutateClub(id, (club) => {
+    if (!actorCan(club, discordId, "canInvite")) throw new Error("You cannot invite players.");
+    club.invites = [
+      { token: randomUUID().replace(/-/g, "").slice(0, 10), createdBy: discordId, createdAt: Date.now() },
+      ...club.invites,
+    ].slice(0, 5);
+  });
 }
 
 export async function kickMember(id: string, actorId: string, targetId: string): Promise<Club> {
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
   if (actorId === targetId) throw new Error("Leave the clan instead of kicking yourself.");
-  if (!actorCan(club, actorId, "canKick")) throw new Error("You cannot kick members.");
-  const target = memberOf(club, targetId);
-  if (!target) throw new Error("They are not in this clan.");
-  if (target.role === OWNER_ROLE_ID || targetId === club.ownerId) {
-    throw new Error("The owner cannot be kicked.");
-  }
-  const actor = memberOf(club, actorId);
-  const actorRank = actor ? roleById(club, actor.role).rank : 999;
-  const targetRank = roleById(club, target.role).rank;
-  if (club.ownerId !== actorId && targetRank <= actorRank) {
-    throw new Error("You can only kick members below your role.");
-  }
-  club.members = club.members.filter((m) => m.discordId !== targetId);
+  const club = await mutateClub(id, (c) => {
+    if (!actorCan(c, actorId, "canKick")) throw new Error("You cannot kick members.");
+    const target = memberOf(c, targetId);
+    if (!target) throw new Error("They are not in this clan.");
+    if (target.role === OWNER_ROLE_ID || targetId === c.ownerId) {
+      throw new Error("The owner cannot be kicked.");
+    }
+    const actor = memberOf(c, actorId);
+    const actorRank = actor ? roleById(c, actor.role).rank : 999;
+    const targetRank = roleById(c, target.role).rank;
+    if (c.ownerId !== actorId && targetRank <= actorRank) {
+      throw new Error("You can only kick members below your role.");
+    }
+    c.members = c.members.filter((m) => m.discordId !== targetId);
+  });
   await clearClubTagPrefIf(targetId, club.id);
-  return writeClub(club);
+  return club;
 }
 
 export async function setMemberRole(
@@ -587,26 +617,25 @@ export async function setMemberRole(
   targetId: string,
   roleId: string
 ): Promise<Club> {
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
-  if (!actorCan(club, actorId, "canPromote")) throw new Error("You cannot change member roles.");
-  const target = memberOf(club, targetId);
-  if (!target) throw new Error("They are not in this clan.");
-  if (targetId === club.ownerId || target.role === OWNER_ROLE_ID) {
-    throw new Error("The owner's role cannot be changed.");
-  }
   if (roleId === OWNER_ROLE_ID) throw new Error("Owner cannot be assigned this way.");
-  const next = roleById(club, roleId);
-  if (!club.roles.some((r) => r.id === roleId)) throw new Error("Unknown role.");
-  const actor = memberOf(club, actorId);
-  const actorRank = actor ? roleById(club, actor.role).rank : 999;
-  const targetRank = roleById(club, target.role).rank;
-  if (club.ownerId !== actorId) {
-    if (targetRank <= actorRank) throw new Error("You can only manage members below your role.");
-    if (next.rank <= actorRank) throw new Error("You can only assign roles below yours.");
-  }
-  target.role = roleId;
-  return writeClub(club);
+  return mutateClub(id, (club) => {
+    if (!actorCan(club, actorId, "canPromote")) throw new Error("You cannot change member roles.");
+    const target = memberOf(club, targetId);
+    if (!target) throw new Error("They are not in this clan.");
+    if (targetId === club.ownerId || target.role === OWNER_ROLE_ID) {
+      throw new Error("The owner's role cannot be changed.");
+    }
+    const next = roleById(club, roleId);
+    if (!club.roles.some((r) => r.id === roleId)) throw new Error("Unknown role.");
+    const actor = memberOf(club, actorId);
+    const actorRank = actor ? roleById(club, actor.role).rank : 999;
+    const targetRank = roleById(club, target.role).rank;
+    if (club.ownerId !== actorId) {
+      if (targetRank <= actorRank) throw new Error("You can only manage members below your role.");
+      if (next.rank <= actorRank) throw new Error("You can only assign roles below yours.");
+    }
+    target.role = roleId;
+  });
 }
 
 export async function transferOwnership(
@@ -615,20 +644,19 @@ export async function transferOwnership(
   targetId: string
 ): Promise<Club> {
   if (actorId === targetId) throw new Error("You already own this clan.");
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
-  if (club.ownerId !== actorId) throw new Error("Only the owner can transfer the clan.");
-  const target = memberOf(club, targetId);
-  if (!target) throw new Error("They must be a member of the clan first.");
   if ((await ownedClubCount(targetId)) >= MAX_OWNED_CLUBS) {
     throw new Error(`That player already owns ${MAX_OWNED_CLUBS} clans.`);
   }
-  const prev = memberOf(club, actorId);
-  if (prev) prev.role = MEMBER_ROLE_ID;
-  target.role = OWNER_ROLE_ID;
-  club.ownerId = target.discordId;
-  club.ownerName = target.playerName || target.username;
-  return writeClub(club);
+  return mutateClub(id, (club) => {
+    if (club.ownerId !== actorId) throw new Error("Only the owner can transfer the clan.");
+    const target = memberOf(club, targetId);
+    if (!target) throw new Error("They must be a member of the clan first.");
+    const prev = memberOf(club, actorId);
+    if (prev) prev.role = MEMBER_ROLE_ID;
+    target.role = OWNER_ROLE_ID;
+    club.ownerId = target.discordId;
+    club.ownerName = target.playerName || target.username;
+  });
 }
 
 export async function addClubRole(
@@ -636,31 +664,30 @@ export async function addClubRole(
   actorId: string,
   input: { name: string } & ClubRolePatch
 ): Promise<Club> {
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
-  if (club.ownerId !== actorId) throw new Error("Only the owner can create roles.");
-  if (club.roles.length >= MAX_CLUB_ROLES) {
-    throw new Error(`A clan can have at most ${MAX_CLUB_ROLES} roles.`);
-  }
   const name = input.name.trim().slice(0, ROLE_NAME_MAX);
   if (name.length < 2) throw new Error("Role name must be at least 2 characters.");
-  let roleId = slugRole(name);
-  if (club.roles.some((r) => r.id === roleId)) roleId = `${roleId}-${randomUUID().slice(0, 3)}`;
-  const customCount = club.roles.filter((r) => !r.builtin).length;
-  club.roles = normalizeRoles([
-    ...club.roles,
-    {
-      id: roleId,
-      name,
-      rank: 10 * (customCount + 1),
-      canInvite: !!input.canInvite,
-      canKick: !!input.canKick,
-      canPromote: !!input.canPromote,
-      canEdit: !!input.canEdit,
-      builtin: false,
-    },
-  ]);
-  return writeClub(club);
+  return mutateClub(id, (club) => {
+    if (club.ownerId !== actorId) throw new Error("Only the owner can create roles.");
+    if (club.roles.length >= MAX_CLUB_ROLES) {
+      throw new Error(`A clan can have at most ${MAX_CLUB_ROLES} roles.`);
+    }
+    let roleId = slugRole(name);
+    if (club.roles.some((r) => r.id === roleId)) roleId = `${roleId}-${randomUUID().slice(0, 3)}`;
+    const customCount = club.roles.filter((r) => !r.builtin).length;
+    club.roles = normalizeRoles([
+      ...club.roles,
+      {
+        id: roleId,
+        name,
+        rank: 10 * (customCount + 1),
+        canInvite: !!input.canInvite,
+        canKick: !!input.canKick,
+        canPromote: !!input.canPromote,
+        canEdit: !!input.canEdit,
+        builtin: false,
+      },
+    ]);
+  });
 }
 
 export async function updateClubRole(
@@ -669,40 +696,38 @@ export async function updateClubRole(
   roleId: string,
   patch: ClubRolePatch
 ): Promise<Club> {
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
-  if (club.ownerId !== actorId) throw new Error("Only the owner can edit roles.");
   if (roleId === OWNER_ROLE_ID || roleId === MEMBER_ROLE_ID) {
     throw new Error("Default roles cannot be edited.");
   }
-  const role = club.roles.find((r) => r.id === roleId);
-  if (!role) throw new Error("Unknown role.");
-  if (typeof patch.name === "string") {
-    const name = patch.name.trim().slice(0, ROLE_NAME_MAX);
-    if (name.length < 2) throw new Error("Role name must be at least 2 characters.");
-    role.name = name;
-  }
-  if (typeof patch.canInvite === "boolean") role.canInvite = patch.canInvite;
-  if (typeof patch.canKick === "boolean") role.canKick = patch.canKick;
-  if (typeof patch.canPromote === "boolean") role.canPromote = patch.canPromote;
-  if (typeof patch.canEdit === "boolean") role.canEdit = patch.canEdit;
-  club.roles = normalizeRoles(club.roles);
-  return writeClub(club);
+  return mutateClub(id, (club) => {
+    if (club.ownerId !== actorId) throw new Error("Only the owner can edit roles.");
+    const role = club.roles.find((r) => r.id === roleId);
+    if (!role) throw new Error("Unknown role.");
+    if (typeof patch.name === "string") {
+      const name = patch.name.trim().slice(0, ROLE_NAME_MAX);
+      if (name.length < 2) throw new Error("Role name must be at least 2 characters.");
+      role.name = name;
+    }
+    if (typeof patch.canInvite === "boolean") role.canInvite = patch.canInvite;
+    if (typeof patch.canKick === "boolean") role.canKick = patch.canKick;
+    if (typeof patch.canPromote === "boolean") role.canPromote = patch.canPromote;
+    if (typeof patch.canEdit === "boolean") role.canEdit = patch.canEdit;
+    club.roles = normalizeRoles(club.roles);
+  });
 }
 
 export async function deleteClubRole(id: string, actorId: string, roleId: string): Promise<Club> {
-  const club = await getClub(id);
-  if (!club) throw new Error("Clan not found.");
-  if (club.ownerId !== actorId) throw new Error("Only the owner can delete roles.");
   if (roleId === OWNER_ROLE_ID || roleId === MEMBER_ROLE_ID) {
     throw new Error("Default roles cannot be deleted.");
   }
-  if (!club.roles.some((r) => r.id === roleId)) throw new Error("Unknown role.");
-  club.roles = normalizeRoles(club.roles.filter((r) => r.id !== roleId));
-  for (const member of club.members) {
-    if (member.role === roleId) member.role = MEMBER_ROLE_ID;
-  }
-  return writeClub(club);
+  return mutateClub(id, (club) => {
+    if (club.ownerId !== actorId) throw new Error("Only the owner can delete roles.");
+    if (!club.roles.some((r) => r.id === roleId)) throw new Error("Unknown role.");
+    club.roles = normalizeRoles(club.roles.filter((r) => r.id !== roleId));
+    for (const member of club.members) {
+      if (member.role === roleId) member.role = MEMBER_ROLE_ID;
+    }
+  });
 }
 
 function asPlayer(row: Record<string, unknown>): DbPlayer {

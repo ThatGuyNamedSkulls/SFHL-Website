@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { publicErrorMessage } from "@/lib/route-errors";
 import { getSession } from "@/lib/auth";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { containsProfanity } from "@/lib/content-moderation";
 import { getClub, memberOf } from "@/lib/clubs";
 import { deleteClubChat, listClubChat, postClubChat } from "@/lib/club-chat";
@@ -35,6 +37,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (!session) {
     return NextResponse.json({ error: "Log in to chat." }, { status: 401 });
   }
+  const tooMany = await limited(`chat:${session.discordId}`, LIMITS.chat);
+  if (tooMany) return tooMany;
   const { id } = await ctx.params;
   const body = await request.json().catch(() => ({} as { message?: string }));
   const message = typeof body.message === "string" ? body.message : "";
@@ -58,7 +62,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     return NextResponse.json({ message: entry });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to send." },
+      { error: publicErrorMessage(error, "Failed to send.") },
       { status: 400 }
     );
   }
@@ -69,6 +73,8 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
   if (!session) {
     return NextResponse.json({ error: "Log in first." }, { status: 401 });
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
   const { id } = await ctx.params;
   const messageId = Number(
     new URL(request.url).searchParams.get("id") ||
@@ -82,7 +88,7 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete." },
+      { error: publicErrorMessage(error, "Failed to delete.") },
       { status: 400 }
     );
   }

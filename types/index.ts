@@ -412,4 +412,9 @@ export interface UserSession {
   mmAccess?: boolean;
   /** Club tag shown in front of the username. */
   clubTag?: string | null;
+  /** When the user signed in with Discord (ms). Refreshes keep it, so a
+   *  session can't be stretched past SESSION_MAX_AGE_MS. */
+  authAt?: number;
+  /** web_session_epochs value at sign-in; older epochs are logged out. */
+  epoch?: number;
 }

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { publicErrorMessage } from "@/lib/route-errors";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
 import {
@@ -53,6 +55,8 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   if (!session) {
     return NextResponse.json({ error: "Log in first." }, { status: 401 });
   }
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const { id } = await ctx.params;
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const name = typeof body.name === "string" ? body.name : undefined;
@@ -83,7 +87,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update clan." },
+      { error: publicErrorMessage(error, "Failed to update clan.") },
       { status: 400 }
     );
   }
@@ -94,13 +98,15 @@ export async function DELETE(_request: Request, ctx: { params: Promise<{ id: str
   if (!session) {
     return NextResponse.json({ error: "Log in first." }, { status: 401 });
   }
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const { id } = await ctx.params;
   try {
     await deleteClub(id, session.discordId);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete clan." },
+      { error: publicErrorMessage(error, "Failed to delete clan.") },
       { status: 400 }
     );
   }

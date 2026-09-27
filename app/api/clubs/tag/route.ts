@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import {
   HIDE_CLUB_TAG_ID,
@@ -33,6 +34,8 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "Log in to choose a clan tag." }, { status: 401 });
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
 
   const body = await request.json().catch(() => ({} as { clubId?: unknown }));
   const raw = body.clubId == null ? "" : String(body.clubId).trim();

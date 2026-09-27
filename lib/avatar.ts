@@ -89,6 +89,12 @@ export async function resolvePlayerAvatar(
   return pickAvatar(robloxAvatarImage, discordAvatar, discordId);
 }
 
+/**
+ * Avatars for many players from STORED data only (the bot syncs
+ * players.discord_avatar hourly). Public pages use this: a live Discord lookup
+ * per row let anonymous traffic spend the bot token's rate limit
+ * (docs/WEBSITE_SECURITY_REPORT.md M1).
+ */
 export async function resolveAvatarMap(
   rows: {
     name: string;
@@ -98,17 +104,10 @@ export async function resolveAvatarMap(
   }[]
 ): Promise<Map<string, string>> {
   const map = new Map<string, string>();
-  await Promise.all(
-    rows.map(async (r) => {
-      const url = await resolvePlayerAvatar(
-        r.name,
-        r.roblox_avatar_image,
-        r.discord_avatar,
-        r.discord_id
-      );
-      if (url) map.set(r.name, url);
-    })
-  );
+  for (const r of rows) {
+    const url = pickAvatar(r.roblox_avatar_image, r.discord_avatar, r.discord_id);
+    if (url) map.set(r.name, url);
+  }
   return map;
 }
 

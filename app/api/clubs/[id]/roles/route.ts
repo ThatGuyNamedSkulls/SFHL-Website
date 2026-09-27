@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { publicErrorMessage } from "@/lib/route-errors";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
 import {
@@ -25,6 +27,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (!session) {
     return NextResponse.json({ error: "Log in first." }, { status: 401 });
   }
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const { id } = await ctx.params;
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   try {
@@ -46,7 +50,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     return ok(id, session.discordId);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update role." },
+      { error: publicErrorMessage(error, "Failed to update role.") },
       { status: 400 }
     );
   }
@@ -57,6 +61,8 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   if (!session) {
     return NextResponse.json({ error: "Log in first." }, { status: 401 });
   }
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const { id } = await ctx.params;
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const roleId = String(body.roleId ?? "");
@@ -75,7 +81,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     return ok(id, session.discordId);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update role." },
+      { error: publicErrorMessage(error, "Failed to update role.") },
       { status: 400 }
     );
   }
@@ -86,6 +92,8 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
   if (!session) {
     return NextResponse.json({ error: "Log in first." }, { status: 401 });
   }
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const { id } = await ctx.params;
   const roleId =
     new URL(request.url).searchParams.get("roleId") ||
@@ -96,7 +104,7 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
     return ok(id, session.discordId);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete role." },
+      { error: publicErrorMessage(error, "Failed to delete role.") },
       { status: 400 }
     );
   }

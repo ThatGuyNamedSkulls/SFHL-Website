@@ -9,6 +9,7 @@ import { client, publicRating, ensurePlayerDiscordColumns } from "@/lib/db";
 import { perceivedSkill, teamWinChances } from "@/lib/win-chance";
 import { ChatMessage, listLobbyChat } from "@/lib/lobby-chat";
 import { pickAvatar, resolveAvatarsByDiscordId } from "@/lib/avatar";
+import { BusyError, mutateBlob } from "@/lib/blob-cas";
 
 /** 3 hours: a match is long over by then, so old lobby rows are ignored/pruned. */
 const LOBBY_TTL_MS = 3 * 60 * 60 * 1000;
@@ -388,93 +389,125 @@ export type VetoResult =
   | { ok: true; lobby: LobbyView }
   | { ok: false; error: string; status: number };
 
+class LobbyActionError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+/** The id of the live lobby row this player is in, or null. */
+async function myLobbyRowId(discordId: string): Promise<string | null> {
+  const rows = await loadLobbyRows();
+  if (!rows) return null;
+  const cutoff = Date.now() - LOBBY_TTL_MS;
+  for (const row of rows) {
+    if (Number(row.created_at) < cutoff) continue;
+    try {
+      const parsed = JSON.parse(row.data as string) as RawLobby;
+      if (parsed.members?.some((m) => m.discordId === discordId)) return row.id as string;
+    } catch {
+      /* skip */
+    }
+  }
+  return null;
+}
+
+/**
+ * Change this player's lobby with a compare-and-set write (lib/blob-cas): the
+ * bot writes the same row, so `change` re-runs on the freshest copy and its
+ * turn checks always see the current veto (security report M3).
+ */
+async function changeMyLobby(
+  discordId: string,
+  change: (data: RawLobby) => void
+): Promise<VetoResult> {
+  const rowId = await myLobbyRowId(discordId);
+  if (!rowId) return { ok: false, error: "You're not in a live match.", status: 404 };
+  try {
+    const next = await mutateBlob<RawLobby>({
+      table: "web_lobbies",
+      id: rowId,
+      parse: (raw) => {
+        try {
+          return JSON.parse(raw) as RawLobby;
+        } catch {
+          return null;
+        }
+      },
+      notFound: "You're not in a live match.",
+      mutate: (data) => {
+        if (!data.members?.some((m) => m.discordId === discordId)) {
+          throw new LobbyActionError("You're not in a live match.", 404);
+        }
+        change(data);
+      },
+    });
+    return { ok: true, lobby: await enrich(next, discordId) };
+  } catch (error) {
+    if (error instanceof LobbyActionError) return { ok: false, error: error.message, status: error.status };
+    if (error instanceof BusyError) return { ok: false, error: error.message, status: 409 };
+    if (error instanceof Error && error.message === "You're not in a live match.") {
+      return { ok: false, error: error.message, status: 404 };
+    }
+    console.error("lobby write failed", error);
+    return { ok: false, error: "Failed to save.", status: 500 };
+  }
+}
+
 /** Captain bans a map from the website. Bot poll applies it to Discord. */
 export async function applyWebsiteMapBan(
   discordId: string,
   mapName: string
 ): Promise<VetoResult> {
-  const rows = await loadLobbyRows();
-  if (!rows) return { ok: false, error: "No live match.", status: 404 };
-
-  const cutoff = Date.now() - LOBBY_TTL_MS;
-  let rowId: string | null = null;
-  let data: RawLobby | null = null;
-
-  for (const row of rows) {
-    if (Number(row.created_at) < cutoff) continue;
-    try {
-      const parsed = JSON.parse(row.data as string) as RawLobby;
-      if (parsed.members?.some((m) => m.discordId === discordId)) {
-        rowId = row.id as string;
-        data = parsed;
-        break;
-      }
-    } catch {
-      /* skip */
+  return changeMyLobby(discordId, (data) => {
+    const veto = normalizeVeto(data);
+    if (!veto || veto.complete || !veto.available) {
+      throw new LobbyActionError("Map veto is already finished.", 409);
     }
-  }
+    if (veto.currentTurnCaptainId !== discordId) {
+      throw new LobbyActionError("It's not your turn to ban.", 403);
+    }
+    if (!veto.remainingMaps.includes(mapName)) {
+      throw new LobbyActionError("That map is not available.", 400);
+    }
 
-  if (!rowId || !data) return { ok: false, error: "You're not in a live match.", status: 404 };
+    const remaining = veto.remainingMaps.filter((m) => m !== mapName);
+    const history = [...veto.history, { map: mapName, bannedByCaptainId: discordId }];
+    // BO1 ends at one map; BO3 league rooms ban until three remain (played in that order).
+    const keep = Math.max(1, Number(data.vetoKeep) || 1);
+    const complete = remaining.length <= keep;
+    const otherCaptain =
+      data.captains?.team1 === discordId ? data.captains?.team2 ?? null : data.captains?.team1 ?? null;
 
-  const veto = normalizeVeto(data);
-  if (!veto || veto.complete || !veto.available) {
-    return { ok: false, error: "Map veto is already finished.", status: 409 };
-  }
-  if (veto.currentTurnCaptainId !== discordId) {
-    return { ok: false, error: "It's not your turn to ban.", status: 403 };
-  }
-  if (!veto.remainingMaps.includes(mapName)) {
-    return { ok: false, error: "That map is not available.", status: 400 };
-  }
+    const nextVeto: VetoState = {
+      available: !complete,
+      actionSource: "website",
+      remainingMaps: remaining,
+      history,
+      currentTurnCaptainId: complete ? null : otherCaptain,
+      complete,
+      turnDeadlineAt: complete ? null : Date.now() + 30_000,
+    };
 
-  const remaining = veto.remainingMaps.filter((m) => m !== mapName);
-  const history = [...veto.history, { map: mapName, bannedByCaptainId: discordId }];
-  // BO1 ends at one map; BO3 league rooms ban until three remain (played in that order).
-  const keep = Math.max(1, Number(data.vetoKeep) || 1);
-  const complete = remaining.length <= keep;
-  const otherCaptain =
-    data.captains?.team1 === discordId ? data.captains?.team2 ?? null : data.captains?.team1 ?? null;
-
-  const nextVeto: VetoState = {
-    available: !complete,
-    actionSource: "website",
-    remainingMaps: remaining,
-    history,
-    currentTurnCaptainId: complete ? null : otherCaptain,
-    complete,
-    turnDeadlineAt: complete ? null : Date.now() + 30_000,
-  };
-
-  const chosen = complete ? remaining[0] : data.selectedMap ?? data.map ?? null;
-  const picker = complete ? resolveSidePicker(data) : null;
-  const next: RawLobby = {
-    ...data,
-    veto: nextVeto,
-    selectedMap: chosen,
-    map: chosen,
-    ...(complete && keep > 1 ? { seriesMaps: remaining } : {}),
-    status: complete ? (picker ? "side_selection" : "ready_to_play") : "veto",
-    ...(complete && picker
-      ? {
-          sidePick: {
-            captainId: picker.captainId,
-            team: picker.team,
-            options: picker.options,
-          },
-        }
-      : {}),
-  };
-
-  try {
-    await client.execute({
-      sql: "UPDATE web_lobbies SET data = ? WHERE id = ?",
-      args: [JSON.stringify(next), rowId],
+    const chosen = complete ? remaining[0] : data.selectedMap ?? data.map ?? null;
+    const picker = complete ? resolveSidePicker(data) : null;
+    Object.assign(data, {
+      veto: nextVeto,
+      selectedMap: chosen,
+      map: chosen,
+      ...(complete && keep > 1 ? { seriesMaps: remaining } : {}),
+      status: complete ? (picker ? "side_selection" : "ready_to_play") : "veto",
+      ...(complete && picker
+        ? {
+            sidePick: {
+              captainId: picker.captainId,
+              team: picker.team,
+              options: picker.options,
+            },
+          }
+        : {}),
     });
-  } catch {
-    return { ok: false, error: "Failed to save veto.", status: 500 };
-  }
-
-  return { ok: true, lobby: await enrich(next, discordId) };
+  });
 }
 
 /** Captain picks CT/T from the website. Bot poll applies it to Discord. */
@@ -482,71 +515,35 @@ export async function applyWebsiteSidePick(
   discordId: string,
   sideName: string
 ): Promise<VetoResult> {
-  const rows = await loadLobbyRows();
-  if (!rows) return { ok: false, error: "No live match.", status: 404 };
-
-  const cutoff = Date.now() - LOBBY_TTL_MS;
-  let rowId: string | null = null;
-  let data: RawLobby | null = null;
-
-  for (const row of rows) {
-    if (Number(row.created_at) < cutoff) continue;
-    try {
-      const parsed = JSON.parse(row.data as string) as RawLobby;
-      if (parsed.members?.some((m) => m.discordId === discordId)) {
-        rowId = row.id as string;
-        data = parsed;
-        break;
-      }
-    } catch {
-      /* skip */
+  return changeMyLobby(discordId, (data) => {
+    if (data.side?.name) {
+      throw new LobbyActionError("Starting side is already picked.", 409);
     }
-  }
-
-  if (!rowId || !data) return { ok: false, error: "You're not in a live match.", status: 404 };
-  if (data.side?.name) {
-    return { ok: false, error: "Starting side is already picked.", status: 409 };
-  }
-
-  const veto = normalizeVeto(data);
-  const mapReady = !!veto?.complete || data.status === "side_selection";
-  if (!mapReady) {
-    return { ok: false, error: "Map veto is still in progress.", status: 409 };
-  }
-
-  const picker = resolveSidePicker(data);
-  if (!picker) {
-    return { ok: false, error: "Side pick is not available.", status: 409 };
-  }
-  if (picker.captainId !== discordId) {
-    return { ok: false, error: "It's not your turn to pick a side.", status: 403 };
-  }
-
-  const name = sideName.trim();
-  if (!picker.options.includes(name)) {
-    return { ok: false, error: "That side is not available.", status: 400 };
-  }
-
-  const next: RawLobby = {
-    ...data,
-    status: "ready_to_play",
-    sidePick: null,
-    side: {
-      name,
-      team: picker.team,
-      selectedByCaptainId: discordId,
-      actionSource: "website",
-    },
-  };
-
-  try {
-    await client.execute({
-      sql: "UPDATE web_lobbies SET data = ? WHERE id = ?",
-      args: [JSON.stringify(next), rowId],
+    const veto = normalizeVeto(data);
+    const mapReady = !!veto?.complete || data.status === "side_selection";
+    if (!mapReady) {
+      throw new LobbyActionError("Map veto is still in progress.", 409);
+    }
+    const picker = resolveSidePicker(data);
+    if (!picker) {
+      throw new LobbyActionError("Side pick is not available.", 409);
+    }
+    if (picker.captainId !== discordId) {
+      throw new LobbyActionError("It's not your turn to pick a side.", 403);
+    }
+    const name = sideName.trim();
+    if (!picker.options.includes(name)) {
+      throw new LobbyActionError("That side is not available.", 400);
+    }
+    Object.assign(data, {
+      status: "ready_to_play",
+      sidePick: null,
+      side: {
+        name,
+        team: picker.team,
+        selectedByCaptainId: discordId,
+        actionSource: "website",
+      },
     });
-  } catch {
-    return { ok: false, error: "Failed to save side pick.", status: 500 };
-  }
-
-  return { ok: true, lobby: await enrich(next, discordId) };
+  });
 }

@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth";
 import { getPlayerByDiscordId, setPlayerDiscordIdentity, setPlayerMmAccess } from "@/lib/db";
 import { upsertWebUser } from "@/lib/social";
+import { forgetLiveIdentity, liveIdentity } from "@/lib/session-store";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -108,8 +109,15 @@ export async function GET(request: Request) {
       userData.global_name ||
       userData.username;
 
-    // Create session
+    // Create session. `epoch` ties it to the account's current "log out
+    // everywhere" counter; `authAt` caps how long refreshes can extend it.
+    forgetLiveIdentity(userData.id);
+    const epoch = await liveIdentity(userData.id)
+      .then((live) => live.epoch)
+      .catch(() => 0);
     const session = {
+      authAt: Date.now(),
+      epoch,
       discordId: userData.id,
       username: displayName,
       discordUsername: userData.username ?? null,
@@ -132,7 +140,7 @@ export async function GET(request: Request) {
     // "name (@handle)" display works before the bot's hourly guild sync runs.
     if (playerName && userData.username) {
       try {
-        await setPlayerDiscordIdentity(playerName, userData.id, userData.username, discordAvatar);
+        await setPlayerDiscordIdentity(userData.id, userData.username, discordAvatar);
       } catch (e) {
         console.error("Failed to record Discord identity:", e);
       }

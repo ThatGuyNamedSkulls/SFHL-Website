@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { claimMission, listMissionsForPlayer } from "@/lib/missions";
 import { getPlayerCoins } from "@/lib/db";
@@ -28,6 +29,8 @@ export async function POST(request: Request) {
   if (!session?.playerName) {
     return NextResponse.json({ error: "Link a HyperLeague player to claim rewards." }, { status: 401 });
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const missionId = String(body.missionId || "");
   if (!missionId) return NextResponse.json({ error: "Missing mission." }, { status: 400 });

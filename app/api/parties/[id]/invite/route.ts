@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getParty } from "@/lib/parties";
 import { createPartyInvite, playerExists } from "@/lib/social";
 
@@ -38,6 +39,16 @@ export async function POST(
     if (party.members.length >= party.maxSize) {
       return NextResponse.json({ error: "Party is full" }, { status: 409 });
     }
+    // Per inviter, and once per inviter → invitee across ALL parties, so a
+    // create-party / invite / leave loop can't re-send invites (and bot DMs).
+    const tooMany =
+      (await limited(`invite:${session.discordId}`, LIMITS.invite)) ||
+      (await limited(
+        `invite-pair:${session.discordId}:${toName.toLowerCase()}`,
+        LIMITS.invitePair,
+        "You invited them recently. Give them a few minutes."
+      ));
+    if (tooMany) return tooMany;
 
     const status = await createPartyInvite(party.id, me, toName, party.name);
     return NextResponse.json({ ok: true, status });

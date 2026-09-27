@@ -426,6 +426,12 @@ export default function SettingsPage() {
         <LogoutButton className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-hl-red/30 bg-hl-red/10 hover:bg-hl-red/20 transition-colors text-sm font-semibold text-hl-red">
           <LogOut className="w-4 h-4" /> Log out
         </LogoutButton>
+        <LogoutButton
+          everywhere
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-hl-border bg-hl-panel-light hover:bg-hl-base transition-colors text-sm font-semibold text-hl-muted"
+        >
+          <LogOut className="w-4 h-4" /> Log out on all devices
+        </LogoutButton>
       </div>
     </div>
   );

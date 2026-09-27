@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getParties, createParty, getPartyForMember } from "@/lib/parties";
-import { MATCH_MODE_LABEL } from "@/lib/match-mode";
-import { partyMaxForMatchType } from "@/lib/queue-modes";
+import { PartyInputError } from "@/lib/party-rules";
 import { memberFromSession, withFreshCosmetics, withMemberStatus } from "@/lib/party-member";
 import { getPartyInvitePartyIds, getInvitesForParties } from "@/lib/social";
 
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
     // Re-resolve each member's equipped card/frame so cosmetic changes made
     // after joining show up without re-joining the party, and attach live
     // verified/canQueue status for the badges and warnings.
-    const fresh = await withMemberStatus(await withFreshCosmetics(visible));
+    const fresh = await withMemberStatus(await withFreshCosmetics(visible), !!session);
     const withInvites = fresh.map((p) => ({
       ...p,
       invitedNames: invitesByParty.get(p.id) ?? [],
@@ -67,27 +67,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "You must be logged in to create a party" }, { status: 401 });
   }
 
+  const tooMany = await limited(`party-create:${session.discordId}`, LIMITS.partyCreate);
+  if (tooMany) return tooMany;
+
   try {
     const body = await request.json().catch(() => ({}));
     const party = await createParty({
-      name: body.name,
-      game: body.game,
-      gameMode: body.gameMode || MATCH_MODE_LABEL,
-      matchType: body.matchType,
-      region: body.region,
-      minSkill: body.minSkill,
-      maxSkill: body.maxSkill,
-      language: body.language,
-      countries: body.countries,
-      verifiedOnly: body.verifiedOnly,
-      voiceRequired: body.voiceRequired,
-      isPrivate: body.isPrivate,
-      vibe: body.vibe,
-      maxSize: partyMaxForMatchType(body.matchType),
+      fields: body && typeof body === "object" ? (body as Record<string, unknown>) : {},
       leader: await memberFromSession(session),
     });
     return NextResponse.json({ party });
   } catch (error) {
+    if (error instanceof PartyInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error("Error creating party:", error);
     return NextResponse.json({ error: "Failed to create party" }, { status: 500 });
   }

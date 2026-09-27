@@ -6,6 +6,7 @@
  * room, escalation, result posts).
  */
 import { client } from "@/lib/db";
+import { discordSafe } from "@/lib/discord-safe";
 import { defaultSlot, ensureLeagueSchema, getSeason, weekWindow, type Season } from "@/lib/league";
 import { ensureSocialSchema } from "@/lib/social";
 import { logEvent, type Actor } from "@/lib/league-admin";
@@ -136,6 +137,8 @@ export async function matchTeam(seasonId: number, teamId: string): Promise<Match
 }
 
 const label = (t: MatchTeam) => (t.tag ? `${t.name} [${t.tag}]` : t.name);
+/** Team label for Discord DMs: team names are user-chosen, so escape them (docs/WEBSITE_SECURITY_PLAN.md 1.1). */
+const dmLabel = (t: MatchTeam) => discordSafe(label(t), 60);
 const ts = (ms: number) => `<t:${Math.floor(ms / 1000)}:F>`;
 
 async function dm(discordIds: (string | null)[], message: string): Promise<void> {
@@ -195,7 +198,7 @@ export async function proposeTime(matchId: number, discordId: string, when: numb
   await update(match.id, { status: "proposed", proposed_time: Math.round(when), proposed_by: ctx.team });
   await dm(
     [other(ctx).captainId],
-    `🗓️ ${label(ctx.team === ctx.a.id ? ctx.a : ctx.b)} proposed ${ts(when)} for your league match ` +
+    `🗓️ ${dmLabel(ctx.team === ctx.a.id ? ctx.a : ctx.b)} proposed ${ts(when)} for your league match ` +
       `(week ${match.week}). Accept it on the website (League tab) or with \`/leaguematch accept\`.`
   );
 }
@@ -216,7 +219,7 @@ export async function acceptTime(matchId: number, discordId: string, now = Date.
   });
   await dm(
     [...ctx.a.roster, ...ctx.b.roster].map((p) => p.discordId),
-    `🏆 League match **${label(ctx.a)} vs ${label(ctx.b)}** (week ${match.week}) is scheduled for ${ts(when)}.`
+    `🏆 League match **${dmLabel(ctx.a)} vs ${dmLabel(ctx.b)}** (week ${match.week}) is scheduled for ${ts(when)}.`
   );
 }
 
@@ -281,7 +284,7 @@ export async function reportScore(matchId: number, discordId: string, scoreA: nu
   });
   await dm(
     [other(ctx).captainId],
-    `📝 Result reported for your league match: ${label(ctx.a)} ${scoreA} – ${scoreB} ${label(ctx.b)}. ` +
+    `📝 Result reported for your league match: ${dmLabel(ctx.a)} ${scoreA} – ${scoreB} ${dmLabel(ctx.b)}. ` +
       "Confirm or dispute it on the website (League tab) or with `/leaguematch`."
   );
 }
@@ -398,7 +401,7 @@ export async function staffReschedule(matchId: number, when: number, actor: Acto
   const [ta, tb] = [await matchTeam(m.seasonId, m.teamA), await matchTeam(m.seasonId, m.teamB)];
   await dm(
     [...ta.roster, ...tb.roster].map((p) => p.discordId),
-    `🗓️ Match Staff moved your league match **${label(ta)} vs ${label(tb)}** (week ${m.week}) to ${ts(when)}.`
+    `🗓️ Match Staff moved your league match **${dmLabel(ta)} vs ${dmLabel(tb)}** (week ${m.week}) to ${ts(when)}.`
   );
   await logEvent(m.seasonId, "match_rescheduled", actor, `${label(ta)} vs ${label(tb)} → ${new Date(when).toISOString().slice(0, 16).replace("T", " ")} UTC`, m.id);
 }

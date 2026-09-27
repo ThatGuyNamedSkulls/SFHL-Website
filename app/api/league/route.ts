@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { publicErrorMessage } from "@/lib/route-errors";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { isMatchStaff } from "@/lib/discord-party-voice";
 import { leagueView, signUpTeam, withdrawTeam } from "@/lib/league";
@@ -27,6 +29,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Log in first." }, { status: 401 });
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const teamId = String(body.teamId ?? "");
   try {
@@ -35,7 +39,7 @@ export async function POST(request: Request) {
     else return NextResponse.json({ error: "Unknown action." }, { status: 400 });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed";
+    const message = publicErrorMessage(error, "Failed");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

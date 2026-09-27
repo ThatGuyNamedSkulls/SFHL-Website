@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { leaveParty } from "@/lib/parties";
 
@@ -8,6 +9,8 @@ export async function DELETE(_request: Request, ctx: RouteContext<"/api/parties/
   if (!session) {
     return NextResponse.json({ error: "You must be logged in" }, { status: 401 });
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
 
   try {
     const { id } = await ctx.params;

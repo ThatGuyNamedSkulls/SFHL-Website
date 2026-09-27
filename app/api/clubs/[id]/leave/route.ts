@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { publicErrorMessage } from "@/lib/route-errors";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { clubForClient, clubLeaderboard, leaveClub } from "@/lib/clubs";
 
@@ -9,6 +11,8 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
   if (!session) {
     return NextResponse.json({ error: "Log in first." }, { status: 401 });
   }
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const { id } = await ctx.params;
   try {
     const club = await leaveClub(id, session.discordId);
@@ -17,7 +21,7 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ club: clubForClient(club, session.discordId), leaderboard });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to leave." },
+      { error: publicErrorMessage(error, "Failed to leave.") },
       { status: 400 }
     );
   }

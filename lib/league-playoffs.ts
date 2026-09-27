@@ -11,6 +11,7 @@
  *   conference's top k move up the ladder, its bottom k down; a team's status
  *   is kept in league_team_access. Swiss conferences rank by Buchholz (byes).
  */
+import { discordSafe } from "@/lib/discord-safe";
 import { client } from "@/lib/db";
 import { claim, logEvent, LeagueAdminError, type Actor } from "@/lib/league-admin";
 import {
@@ -298,7 +299,7 @@ async function applyMoves(season: Season, divisions: SeasonEndDivision[], entrie
               sql: "INSERT INTO discord_dm_outbox (discord_id, message, sent, created_at) VALUES (?, ?, 0, ?)",
               args: [
                 e.captainId,
-                `🏆 **${season.name}** is over — **${e.teamName}** ${verb} **${moveLabel(mv.to)}** for the next season.`,
+                `🏆 **${discordSafe(season.name, 60)}** is over — **${discordSafe(e.teamName, 40)}** ${verb} **${moveLabel(mv.to)}** for the next season.`,
                 now,
               ],
             }]

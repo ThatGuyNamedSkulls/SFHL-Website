@@ -7,7 +7,9 @@ import { randomUUID } from "crypto";
 import { MAP_NAMES } from "@/data/maps";
 import { getClub } from "@/lib/clubs";
 import { containsProfanity } from "@/lib/content-moderation";
-import { client, ensurePlayerCoinsColumn, getPlayer, refundPlayerCoins, spendPlayerCoins } from "@/lib/db";
+import { client, getPlayer } from "@/lib/db";
+import { mutateBlob, type MutateResult } from "@/lib/blob-cas";
+import { refundSpend, spendCoins, type CoinMove } from "@/lib/coin-ledger";
 import { isQueueRegion } from "@/lib/regions";
 import { getTeam, teamsCaptainedBy, type Team } from "@/lib/teams";
 import {
@@ -115,29 +117,42 @@ function parseTournament(raw: unknown): Tournament | null {
   }
 }
 
-type SqlStmt = { sql: string; args: (string | number | null)[] };
-
-async function writeTournament(t: Tournament, extra: SqlStmt[] = []): Promise<Tournament> {
+/** Create a new cup row. Every later change goes through `mutate`. */
+async function insertTournament(t: Tournament): Promise<Tournament> {
   await ensureSchema();
-  t.updatedAt = Date.now();
-  const save: SqlStmt = {
-    sql: "INSERT OR REPLACE INTO web_tournaments (id, data, updated_at, club_id) VALUES (?, ?, ?, ?)",
+  await client.execute({
+    sql: "INSERT INTO web_tournaments (id, data, updated_at, club_id) VALUES (?, ?, ?, ?)",
     args: [t.id, JSON.stringify(t), t.updatedAt, t.clubId],
-  };
-  if (extra.length) {
-    await ensurePlayerCoinsColumn();
-    await client.batch([...extra, save], "write");
-  } else {
-    await client.execute(save);
-  }
+  });
   return t;
 }
 
-function coinCredit(name: string, amount: number): SqlStmt {
-  return {
-    sql: "UPDATE players SET coins = coins + ? WHERE name = ?",
-    args: [amount, name],
-  };
+/**
+ * Safe read-modify-write of one cup (lib/blob-cas): `fn` runs on the freshest
+ * copy (re-run on a lost race), and any coin moves it returns are applied in
+ * the same transaction, at most once per ledger key.
+ */
+async function mutate(
+  id: string,
+  fn: (t: Tournament) => MutateResult | void | Promise<MutateResult | void>
+): Promise<Tournament> {
+  await ensureSchema();
+  return mutateBlob<Tournament>({
+    table: "web_tournaments",
+    id,
+    parse: (raw) => parseTournament(raw),
+    notFound: "Tournament not found.",
+    mutate: async (t) => {
+      const result = await fn(t);
+      t.updatedAt = Date.now();
+      return result;
+    },
+    columns: (t) => ({ updated_at: t.updatedAt, club_id: t.clubId }),
+  });
+}
+
+function refundKey(t: Tournament, team: TournamentTeam) {
+  return `cup:${t.id}:refund:${team.id}`;
 }
 
 export async function listTournaments(): Promise<Tournament[]> {
@@ -266,12 +281,7 @@ function cleanTeamName(t: Tournament, raw: string): string {
  * (web_teams) is what enters. `teamRef` is a team id or name; it may be left
  * empty when the player captains exactly one team.
  */
-async function captainedTeam(
-  t: Tournament,
-  captainId: string,
-  teamRef: string,
-  self: boolean
-): Promise<{ team: Team; name: string }> {
+async function findCaptainedTeam(captainId: string, teamRef: string, self: boolean): Promise<Team> {
   const owned = await teamsCaptainedBy(captainId);
   if (owned.length === 0) {
     throw new Error(
@@ -295,11 +305,16 @@ async function captainedTeam(
         : "Pick which team is entering."
     );
   }
+  return team;
+}
+
+/** Sync entry checks, re-run on the freshest copy of the cup. Returns the entry name. */
+function assertTeamCanEnter(t: Tournament, team: Team): string {
   const entered =
     t.teams.some((x) => x.teamId === team.id) ||
     t.requests.some((r) => r.status === "pending" && r.teamId === team.id);
   if (entered) throw new Error("That team is already entered in this cup.");
-  return { team, name: cleanTeamName(t, team.name) };
+  return cleanTeamName(t, team.name);
 }
 
 function onTeam(t: Tournament, discordId: string) {
@@ -328,11 +343,28 @@ async function resolvePlayer(name: string) {
   };
 }
 
-async function takeFee(playerName: string, fee: number) {
-  if (fee <= 0) return;
-  const spend = await spendPlayerCoins(playerName, fee);
-  if (!spend.ok) {
-    throw new Error(`Not enough HL Coins. Entry is ${fee.toLocaleString()}.`);
+/**
+ * Take `fee` from `playerName` (atomic, ledgered), run `write`, and give the fee
+ * back if the write fails — so a fee is never kept for an entry that wasn't saved.
+ */
+async function withFee<T>(
+  t: Tournament,
+  playerName: string,
+  fee: number,
+  write: () => Promise<T>
+): Promise<T> {
+  let spendKey: string | null = null;
+  if (fee > 0) {
+    spendKey = await spendCoins(playerName, fee, `Entry fee: ${t.name}`, `cup:${t.id}:fee`);
+    if (!spendKey) throw new Error(`Not enough HL Coins. Entry is ${fee.toLocaleString()}.`);
+  }
+  try {
+    return await write();
+  } catch (error) {
+    if (spendKey) {
+      await refundSpend(spendKey, playerName, fee, `Entry fee returned: ${t.name}`).catch(() => undefined);
+    }
+    throw error;
   }
 }
 
@@ -449,7 +481,7 @@ export async function createTournament(
     createdAt: now,
     updatedAt: now,
   };
-  return writeTournament(tournament);
+  return insertTournament(tournament);
 }
 
 export async function requestJoin(
@@ -457,49 +489,54 @@ export async function requestJoin(
   actor: TournamentActor,
   teamId: string
 ): Promise<Tournament> {
-  const t = await mustGet(id);
-  assertOpen(t);
+  const pre = await mustGet(id);
+  assertOpen(pre);
   if (!actor.playerName) throw new Error("Link a HyperLeague player before requesting a team.");
   const player = await resolvePlayer(actor.playerName);
   if (player.discordId !== actor.discordId) {
     throw new Error("Your linked player does not match this Discord account.");
   }
-  if (t.kind === "community") {
-    if (!t.clubId) throw new Error("This cup is not attached to a clan.");
-    const club = await getClub(t.clubId);
+  if (pre.kind === "community") {
+    if (!pre.clubId) throw new Error("This cup is not attached to a clan.");
+    const club = await getClub(pre.clubId);
     if (!club || !club.members.some((m) => m.discordId === actor.discordId)) {
       throw new Error("You need to be in the clan to join.");
     }
   }
-  if (t.teams.length >= t.size) throw new Error("This cup is full.");
-  const pending = t.requests.filter((r) => r.status === "pending").length;
-  if (t.teams.length + pending >= t.size) throw new Error("This cup has no open slots.");
-  assertFree(t, actor.discordId);
-  const { team, name: teamName } = await captainedTeam(t, actor.discordId, teamId, true);
-  await takeFee(player.playerName, t.entryFee);
-  const request: JoinRequest = {
-    id: randomUUID(),
-    teamId: team.id,
-    teamName,
-    captainId: actor.discordId,
-    captainName: player.username,
-    playerName: player.playerName,
-    avatar: player.avatar,
-    status: "pending",
-    paidAmount: t.entryFee,
-    paidBy: player.playerName,
-    createdAt: Date.now(),
+  const team = await findCaptainedTeam(actor.discordId, teamId, true);
+  // Cheap checks before charging; all of them run again on the fresh copy below.
+  const checkSlots = (t: Tournament) => {
+    assertOpen(t);
+    if (t.teams.length >= t.size) throw new Error("This cup is full.");
+    const pending = t.requests.filter((r) => r.status === "pending").length;
+    if (t.teams.length + pending >= t.size) throw new Error("This cup has no open slots.");
+    assertFree(t, actor.discordId);
+    return assertTeamCanEnter(t, team);
   };
-  t.requests = [
-    request,
-    ...t.requests.filter((r) => !(r.captainId === actor.discordId && r.status === "denied")),
-  ];
-  try {
-    return await writeTournament(t);
-  } catch (error) {
-    if (t.entryFee > 0) await refundPlayerCoins(player.playerName, t.entryFee).catch(() => {});
-    throw error;
-  }
+  checkSlots(pre);
+
+  return withFee(pre, player.playerName, pre.entryFee, () =>
+    mutate(id, (t) => {
+      const teamName = checkSlots(t);
+      const request: JoinRequest = {
+        id: randomUUID(),
+        teamId: team.id,
+        teamName,
+        captainId: actor.discordId,
+        captainName: player.username,
+        playerName: player.playerName,
+        avatar: player.avatar,
+        status: "pending",
+        paidAmount: pre.entryFee,
+        paidBy: player.playerName,
+        createdAt: Date.now(),
+      };
+      t.requests = [
+        request,
+        ...t.requests.filter((r) => !(r.captainId === actor.discordId && r.status === "denied")),
+      ];
+    })
+  );
 }
 
 export async function reviewRequest(
@@ -508,42 +545,56 @@ export async function reviewRequest(
   requestId: string,
   accept: boolean
 ): Promise<Tournament> {
-  const t = await mustGet(id);
-  assertOpen(t);
-  await assertOrganizer(t, actor);
-  const request = t.requests.find((r) => r.id === requestId && r.status === "pending");
-  if (!request) throw new Error("Request not found.");
+  const pre = await mustGet(id);
+  assertOpen(pre);
+  await assertOrganizer(pre, actor);
+  const preRequest = pre.requests.find((r) => r.id === requestId && r.status === "pending");
+  if (!preRequest) throw new Error("Request not found.");
+
   if (!accept) {
-    const paid = Number(request.paidAmount) || 0;
-    const paidBy = request.paidBy || "";
-    request.status = "denied";
-    request.paidAmount = 0;
-    return writeTournament(t, paid > 0 && paidBy ? [coinCredit(paidBy, paid)] : []);
+    return mutate(id, (t) => {
+      assertOpen(t);
+      const request = t.requests.find((r) => r.id === requestId && r.status === "pending");
+      if (!request) throw new Error("Request not found.");
+      const paid = Number(request.paidAmount) || 0;
+      const paidBy = request.paidBy || "";
+      request.status = "denied";
+      request.paidAmount = 0;
+      if (paid > 0 && paidBy) {
+        return {
+          coins: [{ key: `cup:${t.id}:reqrefund:${request.id}`, playerName: paidBy, delta: paid, reason: `Entry refused: ${t.name}` }],
+        };
+      }
+    });
   }
-  if (t.teams.length >= t.size) throw new Error("This cup is full.");
-  if (onTeam(t, request.captainId)) {
-    throw new Error("That player is already on a team in this cup.");
-  }
-  const player = await resolvePlayer(request.playerName);
-  if (player.discordId !== request.captainId) {
+
+  const player = await resolvePlayer(preRequest.playerName);
+  if (player.discordId !== preRequest.captainId) {
     throw new Error("That Discord account no longer matches this request.");
   }
-  if (request.teamId) {
-    const team = await getTeam(request.teamId);
-    if (!team || team.captainId !== request.captainId) {
+  if (preRequest.teamId) {
+    const team = await getTeam(preRequest.teamId);
+    if (!team || team.captainId !== preRequest.captainId) {
       throw new Error("That team no longer exists or has a new captain. Deny the request instead.");
     }
   }
-  if (t.kind === "community" && t.clubId) {
-    const club = await getClub(t.clubId);
+  if (pre.kind === "community" && pre.clubId) {
+    const club = await getClub(pre.clubId);
     if (!club || !club.members.some((m) => m.discordId === player.discordId)) {
       throw new Error("That player is not in the clan.");
     }
   }
-  const alreadyPaid = request.paidAmount != null;
-  const fee = alreadyPaid ? Number(request.paidAmount) || 0 : t.entryFee;
-  if (!alreadyPaid) await takeFee(player.playerName, fee);
-  try {
+  // Requests made before fees were charged up front pay on acceptance.
+  const alreadyPaid = preRequest.paidAmount != null;
+  const fee = alreadyPaid ? Number(preRequest.paidAmount) || 0 : pre.entryFee;
+  const accept_ = (t: Tournament) => {
+    assertOpen(t);
+    const request = t.requests.find((r) => r.id === requestId && r.status === "pending");
+    if (!request) throw new Error("Request not found.");
+    if (t.teams.length >= t.size) throw new Error("This cup is full.");
+    if (onTeam(t, request.captainId)) {
+      throw new Error("That player is already on a team in this cup.");
+    }
     t.pot += fee;
     t.teams.push(
       makeTeam({
@@ -557,11 +608,9 @@ export async function reviewRequest(
       })
     );
     t.requests = t.requests.filter((r) => r.id !== request.id);
-    return await writeTournament(t);
-  } catch (error) {
-    if (!alreadyPaid && fee > 0) await refundPlayerCoins(player.playerName, fee).catch(() => {});
-    throw error;
-  }
+  };
+  if (alreadyPaid) return mutate(id, accept_);
+  return withFee(pre, player.playerName, fee, () => mutate(id, accept_));
 }
 
 export async function assignCaptain(
@@ -570,39 +619,43 @@ export async function assignCaptain(
   playerName: string,
   teamRef: string
 ): Promise<Tournament> {
-  const t = await mustGet(id);
-  assertOpen(t);
-  if (t.kind !== "community" || !t.clubId) {
+  const pre = await mustGet(id);
+  assertOpen(pre);
+  if (pre.kind !== "community" || !pre.clubId) {
     throw new Error("Captains are assigned only for clan cups.");
   }
-  await assertOrganizer(t, actor);
-  if (t.teams.length >= t.size) throw new Error("This cup is full.");
+  await assertOrganizer(pre, actor);
   const player = await resolvePlayer(playerName);
-  const club = await getClub(t.clubId);
+  const club = await getClub(pre.clubId);
   if (!club || !club.members.some((m) => m.discordId === player.discordId)) {
     throw new Error("That player is not in this clan.");
   }
-  assertFree(t, player.discordId);
-  const { team, name: teamName } = await captainedTeam(t, player.discordId, teamRef, false);
-  await takeFee(player.playerName, t.entryFee);
-  try {
-    t.pot += t.entryFee;
-    t.teams.push(
-      makeTeam({
-        name: teamName,
-        teamId: team.id,
-        captainId: player.discordId,
-        username: player.username,
-        playerName: player.playerName,
-        avatar: player.avatar,
-        fee: t.entryFee,
-      })
-    );
-    return await writeTournament(t);
-  } catch (error) {
-    if (t.entryFee > 0) await refundPlayerCoins(player.playerName, t.entryFee).catch(() => {});
-    throw error;
-  }
+  const team = await findCaptainedTeam(player.discordId, teamRef, false);
+  const check = (t: Tournament) => {
+    assertOpen(t);
+    if (t.teams.length >= t.size) throw new Error("This cup is full.");
+    assertFree(t, player.discordId);
+    return assertTeamCanEnter(t, team);
+  };
+  check(pre);
+
+  return withFee(pre, player.playerName, pre.entryFee, () =>
+    mutate(id, (t) => {
+      const teamName = check(t);
+      t.pot += pre.entryFee;
+      t.teams.push(
+        makeTeam({
+          name: teamName,
+          teamId: team.id,
+          captainId: player.discordId,
+          username: player.username,
+          playerName: player.playerName,
+          avatar: player.avatar,
+          fee: pre.entryFee,
+        })
+      );
+    })
+  );
 }
 
 function starterCount(team: TournamentTeam, exceptId?: string) {
@@ -621,38 +674,39 @@ export async function invitePlayer(
   teamId: string,
   playerName: string
 ): Promise<Tournament> {
-  const t = await mustGet(id);
-  assertOpen(t);
-  const team = t.teams.find((row) => row.id === teamId);
-  if (!team || team.captainId !== actor.discordId) {
-    throw new Error("Only the team captain can invite.");
-  }
-  if (team.members.length >= MAX_OTHERS + 1) {
-    throw new Error("A roster is 5 starters and 2 subs.");
-  }
+  const pre = await mustGet(id);
   const player = await resolvePlayer(playerName);
   if (player.discordId === actor.discordId) throw new Error("You are already on the team.");
-  assertFree(t, player.discordId);
-  if (t.kind === "community" && t.clubId) {
-    const club = await getClub(t.clubId);
+  if (pre.kind === "community" && pre.clubId) {
+    const club = await getClub(pre.clubId);
     if (!club || !club.members.some((m) => m.discordId === player.discordId)) {
       throw new Error("Community cups can only invite clan members.");
     }
   }
-  let role: RosterRole = "starter";
-  if (starterCount(team) >= MAX_STARTERS) {
-    if (subCount(team) >= MAX_SUBS) throw new Error("A roster is 5 starters and 2 subs.");
-    role = "sub";
-  }
-  team.members.push({
-    discordId: player.discordId,
-    username: player.username,
-    playerName: player.playerName,
-    avatar: player.avatar,
-    role,
-    status: "invited",
+  return mutate(id, (t) => {
+    assertOpen(t);
+    const team = t.teams.find((row) => row.id === teamId);
+    if (!team || team.captainId !== actor.discordId) {
+      throw new Error("Only the team captain can invite.");
+    }
+    if (team.members.length >= MAX_OTHERS + 1) {
+      throw new Error("A roster is 5 starters and 2 subs.");
+    }
+    assertFree(t, player.discordId);
+    let role: RosterRole = "starter";
+    if (starterCount(team) >= MAX_STARTERS) {
+      if (subCount(team) >= MAX_SUBS) throw new Error("A roster is 5 starters and 2 subs.");
+      role = "sub";
+    }
+    team.members.push({
+      discordId: player.discordId,
+      username: player.username,
+      playerName: player.playerName,
+      avatar: player.avatar,
+      role,
+      status: "invited",
+    });
   });
-  return writeTournament(t);
 }
 
 export async function respondInvite(
@@ -661,17 +715,17 @@ export async function respondInvite(
   teamId: string,
   accept: boolean
 ): Promise<Tournament> {
-  const t = await mustGet(id);
-  assertOpen(t);
-  const team = t.teams.find((row) => row.id === teamId);
-  const member = team?.members.find((m) => m.discordId === actor.discordId && m.status === "invited");
-  if (!team || !member) throw new Error("You do not have an invite to that team.");
-  if (!accept) {
-    team.members = team.members.filter((m) => m.discordId !== actor.discordId);
-  } else {
-    member.status = "accepted";
-  }
-  return writeTournament(t);
+  return mutate(id, (t) => {
+    assertOpen(t);
+    const team = t.teams.find((row) => row.id === teamId);
+    const member = team?.members.find((m) => m.discordId === actor.discordId && m.status === "invited");
+    if (!team || !member) throw new Error("You do not have an invite to that team.");
+    if (!accept) {
+      team.members = team.members.filter((m) => m.discordId !== actor.discordId);
+    } else {
+      member.status = "accepted";
+    }
+  });
 }
 
 export async function kickRoster(
@@ -680,14 +734,14 @@ export async function kickRoster(
   teamId: string,
   discordId: string
 ): Promise<Tournament> {
-  const t = await mustGet(id);
-  assertOpen(t);
-  const team = t.teams.find((row) => row.id === teamId);
-  if (!team || team.captainId !== actor.discordId) throw new Error("Only the captain can kick.");
-  if (discordId === team.captainId) throw new Error("The captain cannot be kicked.");
-  if (!team.members.some((m) => m.discordId === discordId)) throw new Error("They are not on this team.");
-  team.members = team.members.filter((m) => m.discordId !== discordId);
-  return writeTournament(t);
+  return mutate(id, (t) => {
+    assertOpen(t);
+    const team = t.teams.find((row) => row.id === teamId);
+    if (!team || team.captainId !== actor.discordId) throw new Error("Only the captain can kick.");
+    if (discordId === team.captainId) throw new Error("The captain cannot be kicked.");
+    if (!team.members.some((m) => m.discordId === discordId)) throw new Error("They are not on this team.");
+    team.members = team.members.filter((m) => m.discordId !== discordId);
+  });
 }
 
 export async function setRosterSlot(
@@ -697,32 +751,31 @@ export async function setRosterSlot(
   discordId: string,
   slot: string
 ): Promise<Tournament> {
-  const t = await mustGet(id);
-  assertOpen(t);
-  const team = t.teams.find((row) => row.id === teamId);
-  if (!team || team.captainId !== actor.discordId) throw new Error("Only the captain can set slots.");
-  const member = team.members.find((m) => m.discordId === discordId);
-  if (!member) throw new Error("They are not on this team.");
-  if (member.role === "captain") throw new Error("The captain stays a starter.");
-  const role: RosterRole = slot === "sub" ? "sub" : "starter";
-  if (role === "starter" && starterCount(team, discordId) >= MAX_STARTERS) {
-    throw new Error("Only 5 starters.");
-  }
-  if (role === "sub" && subCount(team, discordId) >= MAX_SUBS) {
-    throw new Error("Only 2 subs.");
-  }
-  member.role = role;
-  return writeTournament(t);
+  return mutate(id, (t) => {
+    assertOpen(t);
+    const team = t.teams.find((row) => row.id === teamId);
+    if (!team || team.captainId !== actor.discordId) throw new Error("Only the captain can set slots.");
+    const member = team.members.find((m) => m.discordId === discordId);
+    if (!member) throw new Error("They are not on this team.");
+    if (member.role === "captain") throw new Error("The captain stays a starter.");
+    const role: RosterRole = slot === "sub" ? "sub" : "starter";
+    if (role === "starter" && starterCount(team, discordId) >= MAX_STARTERS) {
+      throw new Error("Only 5 starters.");
+    }
+    if (role === "sub" && subCount(team, discordId) >= MAX_SUBS) {
+      throw new Error("Only 2 subs.");
+    }
+    member.role = role;
+  });
 }
 
-function refundTeamCredit(t: Tournament, team: TournamentTeam): SqlStmt | null {
-  if (team.paidAmount > 0 && team.paidBy) {
-    const credit = coinCredit(team.paidBy, team.paidAmount);
-    t.pot = Math.max(0, t.pot - team.paidAmount);
-    team.paidAmount = 0;
-    return credit;
-  }
-  return null;
+/** Take a team's fee back out of the pot; the returned move pays it back (once). */
+function refundTeam(t: Tournament, team: TournamentTeam, reason: string): CoinMove | null {
+  if (!(team.paidAmount > 0) || !team.paidBy) return null;
+  const move: CoinMove = { key: refundKey(t, team), playerName: team.paidBy, delta: team.paidAmount, reason };
+  t.pot = Math.max(0, t.pot - team.paidAmount);
+  team.paidAmount = 0;
+  return move;
 }
 
 export async function withdrawTeam(
@@ -730,17 +783,19 @@ export async function withdrawTeam(
   actor: TournamentActor,
   teamId: string
 ): Promise<Tournament> {
-  const t = await mustGet(id);
-  assertOpen(t);
-  const team = t.teams.find((row) => row.id === teamId);
-  if (!team) throw new Error("Team not found.");
-  const organizer = await isOrganizer(t, actor);
-  if (team.captainId !== actor.discordId && !organizer) {
-    throw new Error("Only the captain or the organizer can withdraw this team.");
-  }
-  const credit = refundTeamCredit(t, team);
-  t.teams = t.teams.filter((row) => row.id !== team.id);
-  return writeTournament(t, credit ? [credit] : []);
+  const pre = await mustGet(id);
+  const organizer = await isOrganizer(pre, actor);
+  return mutate(id, (t) => {
+    assertOpen(t);
+    const team = t.teams.find((row) => row.id === teamId);
+    if (!team) throw new Error("Team not found.");
+    if (team.captainId !== actor.discordId && !organizer) {
+      throw new Error("Only the captain or the organizer can withdraw this team.");
+    }
+    const move = refundTeam(t, team, `Withdrew from ${t.name}`);
+    t.teams = t.teams.filter((row) => row.id !== team.id);
+    return move ? { coins: [move] } : undefined;
+  });
 }
 
 async function starterElo(team: TournamentTeam): Promise<number> {
@@ -757,14 +812,17 @@ async function starterElo(team: TournamentTeam): Promise<number> {
   return sum / starters.length;
 }
 
-async function payout(id: string): Promise<Tournament> {
-  let t = await mustGet(id);
-  if (t.paidOut || !bracketFinished(t.matches, t.bracket)) return t;
+/**
+ * Finish the cup: placements, prize credits (one ledger key per team, so a
+ * prize can never be paid twice), pot emptied. Runs inside `mutate`.
+ */
+function settle(t: Tournament): CoinMove[] {
+  if (t.paidOut || !bracketFinished(t.matches, t.bracket)) return [];
   const place = placements(t.matches, t.bracket);
-  const [p1, p2, p3] = t.potSplit;
+  const [p1, p2] = t.potSplit;
   const firstAmt = Math.floor((t.pot * p1) / 100);
   const secondAmt = Math.floor((t.pot * p2) / 100);
-  let thirdAmt = t.pot - firstAmt - secondAmt;
+  const thirdAmt = t.pot - firstAmt - secondAmt;
   const rows: { teamId: string; place: number; amount: number }[] = [
     { teamId: place.first, place: 1, amount: firstAmt },
   ];
@@ -778,53 +836,54 @@ async function payout(id: string): Promise<Tournament> {
       rows.push({ teamId, place: 3, amount: each + (index === 0 ? rem : 0) });
     });
   }
+  const moves: CoinMove[] = [];
   for (const row of rows) {
-    t = await mustGet(id);
     const team = t.teams.find((item) => item.id === row.teamId);
     if (!team || team.prizeCredited) continue;
-    if (row.amount > 0 && team.paidBy) await refundPlayerCoins(team.paidBy, row.amount);
+    if (row.amount > 0 && team.paidBy) {
+      moves.push({
+        key: `cup:${t.id}:prize:${team.id}`,
+        playerName: team.paidBy,
+        delta: row.amount,
+        reason: `Prize (#${row.place}): ${t.name}`,
+      });
+    }
     team.prizeCredited = true;
     team.placement = row.place;
-    await writeTournament(t);
   }
-  t = await mustGet(id);
   t.paidOut = true;
   t.pot = 0;
   t.status = "completed";
-  return writeTournament(t);
+  return moves;
 }
 
 export async function startTournament(id: string, actor: TournamentActor): Promise<Tournament> {
-  const t = await mustGet(id);
-  assertOpen(t);
-  await assertOrganizer(t, actor);
-  if (t.teams.length < 2) throw new Error("Need at least 2 teams to start.");
-  if (t.requests.some((r) => r.status === "pending")) {
-    throw new Error("Accept or deny pending requests before starting.");
-  }
-  const ranked = await Promise.all(
-    t.teams.map(async (team) => ({ team, elo: await starterElo(team) }))
+  const pre = await mustGet(id);
+  assertOpen(pre);
+  await assertOrganizer(pre, actor);
+  const elos = new Map(
+    await Promise.all(pre.teams.map(async (team) => [team.id, await starterElo(team)] as const))
   );
-  ranked.sort(
-    (a, b) => b.elo - a.elo || a.team.name.localeCompare(b.team.name)
-  );
-  ranked.forEach((row, index) => {
-    row.team.seed = index + 1;
+  return mutate(id, (t) => {
+    assertOpen(t);
+    if (t.teams.length < 2) throw new Error("Need at least 2 teams to start.");
+    if (t.requests.some((r) => r.status === "pending")) {
+      throw new Error("Accept or deny pending requests before starting.");
+    }
+    const ranked = t.teams.map((team) => ({ team, elo: elos.get(team.id) ?? 0 }));
+    ranked.sort((a, b) => b.elo - a.elo || a.team.name.localeCompare(b.team.name));
+    ranked.forEach((row, index) => {
+      row.team.seed = index + 1;
+    });
+    t.teams = ranked.map((row) => row.team);
+    t.matches = createBracket(
+      t.teams.map((team) => team.id),
+      t.size,
+      t.bracket
+    );
+    t.status = "live";
+    if (bracketFinished(t.matches, t.bracket)) return { coins: settle(t) };
   });
-  t.teams = ranked.map((row) => row.team);
-  t.matches = createBracket(
-    t.teams.map((team) => team.id),
-    t.size,
-    t.bracket
-  );
-  t.status = "live";
-  await writeTournament(t);
-  if (bracketFinished(t.matches, t.bracket)) {
-    t.status = "completed";
-    await writeTournament(t);
-    return payout(t.id);
-  }
-  return t;
 }
 
 function cleanScores(t: Tournament, raw: unknown): MapScore[] {
@@ -863,57 +922,142 @@ function cleanScores(t: Tournament, raw: unknown): MapScore[] {
   return scores;
 }
 
-async function canReport(t: Tournament, actor: TournamentActor, match: BracketMatch) {
-  if (await isOrganizer(t, actor)) return true;
-  const ids = [match.teamAId, match.teamBId];
-  return t.teams.some((team) => ids.includes(team.id) && team.captainId === actor.discordId);
+/** The tournament team id this user captains in this match, or null. */
+function sideOf(t: Tournament, match: BracketMatch, discordId: string): string | null {
+  for (const teamId of [match.teamAId, match.teamBId]) {
+    if (!teamId) continue;
+    if (t.teams.some((team) => team.id === teamId && team.captainId === discordId)) return teamId;
+  }
+  return null;
 }
 
+function sameScores(a: MapScore[], b: MapScore[]): boolean {
+  const key = (s: MapScore[]) => JSON.stringify(s.map((x) => [x.map, x.scoreA, x.scoreB]));
+  return key(a) === key(b);
+}
+
+/** Final result for a match; finishing the bracket settles the cup. */
+function applyScores(t: Tournament, match: BracketMatch, scores: MapScore[]): CoinMove[] {
+  const wins = seriesWins(scores);
+  const winnerId = wins.a > wins.b ? match.teamAId : match.teamBId;
+  if (!winnerId) throw new Error("That match has no winner.");
+  applyResult(t.matches, match.id, winnerId, scores);
+  match.report = null;
+  match.dispute = null;
+  return bracketFinished(t.matches, t.bracket) ? settle(t) : [];
+}
+
+function liveMatch(t: Tournament, matchId: string): BracketMatch {
+  if (t.status !== "live") throw new Error("This cup is not live.");
+  const match = t.matches.find((row) => row.id === matchId);
+  if (!match) throw new Error("Match not found.");
+  if (match.status !== "ready") throw new Error("That match is not ready to be reported.");
+  return match;
+}
+
+/**
+ * Report a result (docs/WEBSITE_SECURITY_PLAN.md 1.4). The organizer — or Match
+ * Staff — sets it directly, unless they captain one of the two teams. A playing
+ * captain's report waits for the other captain: a matching report or "confirm"
+ * makes it final; different scores or "dispute" leave it to the organizer.
+ */
 export async function reportMatch(
   id: string,
   actor: TournamentActor,
   matchId: string,
   rawScores: unknown
 ): Promise<Tournament> {
-  const t = await mustGet(id);
-  if (t.status !== "live") throw new Error("This cup is not live.");
-  const match = t.matches.find((row) => row.id === matchId);
-  if (!match) throw new Error("Match not found.");
-  if (!(await canReport(t, actor, match))) {
-    throw new Error("Only the organizer or a playing captain can report this match.");
-  }
-  const scores = cleanScores(t, rawScores);
-  const wins = seriesWins(scores);
-  const winnerId = wins.a > wins.b ? match.teamAId : match.teamBId;
-  if (!winnerId) throw new Error("That match has no winner.");
-  applyResult(t.matches, match.id, winnerId, scores);
-  if (bracketFinished(t.matches, t.bracket)) t.status = "completed";
-  await writeTournament(t);
-  if (t.status === "completed") return payout(t.id);
-  return t;
+  const pre = await mustGet(id);
+  const organizer = await isOrganizer(pre, actor);
+  return mutate(id, (t) => {
+    const match = liveMatch(t, matchId);
+    const scores = cleanScores(t, rawScores);
+    const side = sideOf(t, match, actor.discordId);
+    if (!side && (organizer || actor.staff)) return { coins: applyScores(t, match, scores) };
+    if (!side) throw new Error("Only the organizer or a playing captain can report this match.");
+    const theirs = match.report;
+    if (theirs && theirs.teamId !== side) {
+      if (sameScores(theirs.scores, scores)) return { coins: applyScores(t, match, scores) };
+      match.dispute = {
+        by: actor.discordId,
+        reason: "The captains reported different scores.",
+        at: Date.now(),
+      };
+      return;
+    }
+    match.report = { teamId: side, by: actor.discordId, scores, at: Date.now() };
+    match.dispute = null;
+  });
+}
+
+/** The other captain accepts the pending report; the result becomes final. */
+export async function confirmMatch(
+  id: string,
+  actor: TournamentActor,
+  matchId: string
+): Promise<Tournament> {
+  return mutate(id, (t) => {
+    const match = liveMatch(t, matchId);
+    const side = sideOf(t, match, actor.discordId);
+    if (!side) throw new Error("Only a captain in this match can confirm.");
+    const report = match.report;
+    if (!report) throw new Error("There's no reported result to confirm.");
+    if (report.teamId === side) throw new Error("The other captain has to confirm your report.");
+    return { coins: applyScores(t, match, report.scores) };
+  });
+}
+
+/** The other captain rejects the pending report; the organizer decides. */
+export async function disputeMatch(
+  id: string,
+  actor: TournamentActor,
+  matchId: string,
+  reason: string
+): Promise<Tournament> {
+  return mutate(id, (t) => {
+    const match = liveMatch(t, matchId);
+    const side = sideOf(t, match, actor.discordId);
+    if (!side) throw new Error("Only a captain in this match can dispute.");
+    if (!match.report) throw new Error("There's no reported result to dispute.");
+    if (match.report.teamId === side) throw new Error("You reported this result — report again to change it.");
+    match.dispute = {
+      by: actor.discordId,
+      reason: reason.trim().slice(0, 300) || "Disputed.",
+      at: Date.now(),
+    };
+  });
 }
 
 export async function cancelTournament(id: string, actor: TournamentActor): Promise<Tournament> {
-  const t = await mustGet(id);
-  if (t.status === "completed" || t.status === "cancelled" || t.paidOut) {
-    throw new Error("This cup can no longer be cancelled.");
-  }
-  await assertOrganizer(t, actor);
-  const credits: SqlStmt[] = [];
-  for (const request of t.requests) {
-    if (request.status !== "pending") continue;
-    const paid = Number(request.paidAmount) || 0;
-    if (paid > 0 && request.paidBy) credits.push(coinCredit(request.paidBy, paid));
-    request.paidAmount = 0;
-    request.status = "denied";
-  }
-  for (const team of t.teams) {
-    const credit = refundTeamCredit(t, team);
-    if (credit) credits.push(credit);
-  }
-  t.status = "cancelled";
-  t.pot = 0;
-  return writeTournament(t, credits);
+  const pre = await mustGet(id);
+  await assertOrganizer(pre, actor);
+  return mutate(id, (t) => {
+    if (t.status === "completed" || t.status === "cancelled" || t.paidOut) {
+      throw new Error("This cup can no longer be cancelled.");
+    }
+    const moves: CoinMove[] = [];
+    for (const request of t.requests) {
+      if (request.status !== "pending") continue;
+      const paid = Number(request.paidAmount) || 0;
+      if (paid > 0 && request.paidBy) {
+        moves.push({
+          key: `cup:${t.id}:reqrefund:${request.id}`,
+          playerName: request.paidBy,
+          delta: paid,
+          reason: `Cup cancelled: ${t.name}`,
+        });
+      }
+      request.paidAmount = 0;
+      request.status = "denied";
+    }
+    for (const team of t.teams) {
+      const move = refundTeam(t, team, `Cup cancelled: ${t.name}`);
+      if (move) moves.push(move);
+    }
+    t.status = "cancelled";
+    t.pot = 0;
+    return { coins: moves };
+  });
 }
 
 export function summarizeTournament(t: Tournament) {

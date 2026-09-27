@@ -56,6 +56,22 @@ export interface MapScore {
   scoreB: number;
 }
 
+/** A captain's score report waiting for the other captain (docs/WEBSITE_SECURITY_PLAN.md 1.4). */
+export interface PendingReport {
+  /** Tournament team id of the reporting side. */
+  teamId: string;
+  /** Discord id of the captain who reported. */
+  by: string;
+  scores: MapScore[];
+  at: number;
+}
+
+export interface MatchDispute {
+  by: string;
+  reason: string;
+  at: number;
+}
+
 export interface BracketMatch {
   id: string;
   side: MatchSide;
@@ -72,6 +88,10 @@ export interface BracketMatch {
   nextSlot: "A" | "B" | null;
   loserMatchId: string | null;
   loserSlot: "A" | "B" | null;
+  /** One captain's result, until the other confirms or the organizer decides. */
+  report?: PendingReport | null;
+  /** The other captain disputed the report; the organizer decides. */
+  dispute?: MatchDispute | null;
 }
 
 export interface Tournament {

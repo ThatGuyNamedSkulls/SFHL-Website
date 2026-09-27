@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { applyWebsiteMapBan } from "@/lib/lobby";
 
@@ -8,6 +9,8 @@ export async function POST(req: Request) {
   if (!session) {
     return NextResponse.json({ error: "You must be logged in" }, { status: 401 });
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
 
   let map = "";
   try {

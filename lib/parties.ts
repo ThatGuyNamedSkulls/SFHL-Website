@@ -16,7 +16,6 @@
 import { randomUUID } from "crypto";
 import { client } from "@/lib/db";
 import { clearInvitesForParties } from "@/lib/social";
-import { MATCH_MODE_LABEL } from "@/lib/match-mode";
 import { partyMaxForMatchType } from "@/lib/queue-modes";
 import {
   createPartyVoiceChannel,
@@ -26,6 +25,7 @@ import {
   partyVoiceAppUrl,
 } from "@/lib/discord-party-voice";
 import { schemaOnce } from "@/lib/schema-once";
+import { cleanPartyFields } from "@/lib/party-rules";
 
 /** 30 minutes without any party operation (create/join/leave) before a party
  *  is auto-disbanded. */
@@ -204,24 +204,15 @@ async function dequeueMembers(members: PartyMember[]): Promise<void> {
 }
 
 export interface CreatePartyInput {
-  name?: string;
-  game?: string;
-  gameMode?: string;
-  matchType?: string;
-  region?: string;
-  maxSize?: number;
-  minSkill?: string;
-  maxSkill?: string;
-  language?: string;
-  countries?: string;
-  verifiedOnly?: boolean;
-  voiceRequired?: boolean;
-  isPrivate?: boolean;
-  vibe?: string;
+  /** Untrusted request fields — normalized by cleanPartyFields. */
+  fields: Record<string, unknown>;
   leader: PartyMember;
 }
 
 export async function createParty(input: CreatePartyInput): Promise<Party> {
+  // Validate before touching the leader's current party (a rejected name must
+  // not dissolve it).
+  const fields = cleanPartyFields(input.fields);
   const parties = await getParties();
 
   // A user can only lead / belong to one party at a time — remove them elsewhere.
@@ -237,6 +228,7 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
         /* ignore */
       }
       await remove(p.id);
+      await clearInvitesForParties([p.id]).catch(() => undefined);
     } else {
       await upsert({ ...p, members, updatedAt: Date.now() });
       if (p.voiceChannelId) {
@@ -254,24 +246,12 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
   }
 
   const now = Date.now();
-  let party: Party = {
+  const party: Party = {
     id: randomUUID().slice(0, 8),
-    name: (input.name ?? "").trim().slice(0, 40) || "New Party",
-    game: input.game || "Strike Force",
-    gameMode: input.gameMode || MATCH_MODE_LABEL,
-    matchType: input.matchType || "Standard",
-    region: input.region || "EU",
+    ...fields,
     leaderId: input.leader.discordId,
     members: [input.leader],
-    maxSize: partyMaxForMatchType(input.matchType),
-    minSkill: input.minSkill || "D",
-    maxSkill: input.maxSkill || "STAR",
-    language: input.language || "Any",
-    countries: input.countries || "Any",
-    verifiedOnly: !!input.verifiedOnly,
-    voiceRequired: !!input.voiceRequired,
-    isPrivate: !!input.isPrivate,
-    vibe: input.vibe || "Balanced",
+    maxSize: partyMaxForMatchType(fields.matchType),
     createdAt: now,
     updatedAt: now,
     voiceChannelId: null,
@@ -279,21 +259,10 @@ export async function createParty(input: CreatePartyInput): Promise<Party> {
     guildId: null,
   };
 
+  // No Discord voice channel yet: joinParty creates it when a second member
+  // arrives. Creating one per party let a create/leave loop spam Discord
+  // channel creation with the bot token (docs/WEBSITE_SECURITY_REPORT.md M1).
   await upsert(party);
-  try {
-    const voice = await createPartyVoiceChannel(
-      party.id,
-      input.leader.username || input.leader.playerName || "hl",
-      [input.leader.discordId]
-    );
-    if (voice) {
-      party = { ...party, ...voice, updatedAt: Date.now() };
-      await upsert(party);
-      await promptJoinPartyVoice(input.leader.playerName, voice);
-    }
-  } catch (err) {
-    console.error("Failed to create party voice channel", err);
-  }
   return party;
 }
 

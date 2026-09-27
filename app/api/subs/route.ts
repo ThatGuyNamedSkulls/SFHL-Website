@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession, isUserInGuildCached } from "@/lib/auth";
 import { listSubRequests, withdrawSubClaim, Claimer } from "@/lib/subs";
 
@@ -40,6 +41,8 @@ export async function DELETE(request: Request) {
   if (!claimer) {
     return NextResponse.json({ error: "You must be logged in" }, { status: 401 });
   }
+  const limitHit = await limited(`general:${claimer.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
 
   const { searchParams } = new URL(request.url);
   const id = Number(searchParams.get("id"));

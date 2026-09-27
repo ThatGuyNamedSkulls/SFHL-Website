@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { getInventory, setEquipped, MAX_EQUIPPED_BADGES } from "@/lib/cosmetics";
 
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "You must be logged in" }, { status: 401 });
   }
+  const limitHit = await limited(`general:${session.discordId}`, LIMITS.general);
+  if (limitHit) return limitHit;
   if (!session.playerName) {
     return NextResponse.json(
       { error: "Your Discord account is not linked to a HyperLeague player." },

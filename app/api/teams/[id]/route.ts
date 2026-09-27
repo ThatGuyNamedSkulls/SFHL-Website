@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { publicErrorMessage } from "@/lib/route-errors";
+import { LIMITS, limited } from "@/lib/rate-limit";
 import { titlesForTeam } from "@/lib/team-titles";
 import { accessLabel, teamAccessMap, teamLeagueHistory, teamLeagueStatus } from "@/lib/league";
 import { isMatchStaff } from "@/lib/discord-party-voice";
@@ -70,6 +72,8 @@ export async function POST(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Log in first." }, { status: 401 });
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const { id } = await params;
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const action = String(body.action || "");
@@ -112,7 +116,7 @@ export async function POST(
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed." },
+      { error: publicErrorMessage(error, "Failed.") },
       { status: 400 }
     );
   }
@@ -124,6 +128,8 @@ export async function PATCH(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Log in first." }, { status: 401 });
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const { id } = await params;
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const name = body.name == null ? undefined : String(body.name);
@@ -148,7 +154,7 @@ export async function PATCH(
     return NextResponse.json({ team });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed." },
+      { error: publicErrorMessage(error, "Failed.") },
       { status: 400 }
     );
   }
@@ -160,13 +166,15 @@ export async function DELETE(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Log in first." }, { status: 401 });
+  const limitHit = await limited(`groupWrite:${session.discordId}`, LIMITS.groupWrite);
+  if (limitHit) return limitHit;
   const { id } = await params;
   try {
     await deleteTeam(id, session.discordId);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed." },
+      { error: publicErrorMessage(error, "Failed.") },
       { status: 400 }
     );
   }
