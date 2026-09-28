@@ -26,7 +26,7 @@ export function defaultDiscordAvatar(discordId: string | number | bigint): strin
 function localAvatarExists(url: string): boolean {
   const file = decodeURIComponent(url.replace(/^\/api\/avatar\//, ""));
   const dir =
-    process.env.AVATARS_PATH || path.resolve(process.cwd(), "..", "..", "avatars");
+    process.env.AVATARS_PATH || path.resolve(process.cwd(), "..", "..", "SFHL discord bot", "avatars");
   try {
     return existsSync(path.join(dir, file));
   } catch {
