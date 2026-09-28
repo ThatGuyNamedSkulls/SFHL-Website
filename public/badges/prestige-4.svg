@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Prestige 4">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffb07a"/>
-      <stop offset="0.55" stop-color="#ff5500"/>
-      <stop offset="1" stop-color="#8a2a00"/>
+      <stop offset="0" stop-color="#6ee7b7"/>
+      <stop offset="0.55" stop-color="#10b981"/>
+      <stop offset="1" stop-color="#065f46"/>
     </linearGradient>
     <linearGradient id="i" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#2a2a2a"/>
@@ -12,8 +12,8 @@
   </defs>
   <polygon points="64.0,6.0 110.8,33.0 110.8,87.0 64.0,114.0 17.2,87.0 17.2,33.0" fill="url(#g)"/>
   <polygon points="64.0,16.0 102.1,38.0 102.1,82.0 64.0,104.0 25.9,82.0 25.9,38.0" fill="url(#i)"/>
-  <polygon points="64.0,16.0 102.1,38.0 102.1,82.0 64.0,104.0 25.9,82.0 25.9,38.0" fill="none" stroke="#ff5500" stroke-opacity="0.55" stroke-width="2"/>
-  <path d="M44 38 L64 28 L84 38" fill="none" stroke="#ffb07a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="64" y="73" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="34" fill="#ffb07a">IV</text>
-  <circle cx="47.5" cy="105" r="3.2" fill="#ffb07a"/><circle cx="58.5" cy="105" r="3.2" fill="#ffb07a"/><circle cx="69.5" cy="105" r="3.2" fill="#ffb07a"/><circle cx="80.5" cy="105" r="3.2" fill="#ffb07a"/>
+  <polygon points="64.0,16.0 102.1,38.0 102.1,82.0 64.0,104.0 25.9,82.0 25.9,38.0" fill="none" stroke="#10b981" stroke-opacity="0.55" stroke-width="2"/>
+  <path d="M44 38 L64 28 L84 38" fill="none" stroke="#6ee7b7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="64" y="73" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="34" fill="#6ee7b7">IV</text>
+  <circle cx="47.5" cy="105" r="3.2" fill="#6ee7b7"/><circle cx="58.5" cy="105" r="3.2" fill="#6ee7b7"/><circle cx="69.5" cy="105" r="3.2" fill="#6ee7b7"/><circle cx="80.5" cy="105" r="3.2" fill="#6ee7b7"/>
 </svg>
