@@ -61,7 +61,7 @@ function GameChip() {
         <Swords className="w-7 h-7 text-white" strokeWidth={2.25} />
       </span>
       <div className="leading-tight text-left">
-        <div className="text-[17px] font-bold text-white">Strike Force</div>
+        <div className="text-[17px] font-bold text-white">Counter Blox</div>
         <div className="flex items-center gap-1.5 text-[12px] text-[#8a8a8a] mt-0.5">
           <Globe className="w-3.5 h-3.5" />
           <span className="uppercase tracking-wide">{MATCH_MODE_LABEL}</span>
@@ -71,7 +71,7 @@ function GameChip() {
   );
 }
 
-/** FACEIT hub game strip: large skill box centered, Strike Force on the right. */
+/** FACEIT hub game strip: large skill box centered, Counter Blox on the right. */
 export function GameSkillBar({
   rank,
   elo,

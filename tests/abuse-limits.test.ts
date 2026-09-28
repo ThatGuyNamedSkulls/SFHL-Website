@@ -63,7 +63,7 @@ describe("party fields", () => {
       verifiedOnly: "yes",
     });
     assert.equal(f.name, "New Party");
-    assert.equal(f.game, "Strike Force");
+    assert.equal(f.game, "Counter Blox");
     assert.equal(f.matchType, "Standard");
     assert.equal(f.region, "EU");
     assert.equal(f.minSkill, "D");

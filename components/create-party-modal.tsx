@@ -37,7 +37,7 @@ const MATCH_TYPE_OPTIONS = [
   {
     id: "Standard",
     label: `${MATCH_MODE_LABEL} Match`,
-    desc: `Ranked Strike Force matchmaking. Party of ${PARTY_MAX_SIZE}.`,
+    desc: `Ranked Counter Blox matchmaking. Party of ${PARTY_MAX_SIZE}.`,
     green: false,
     icon: Swords,
     maxSize: PARTY_MAX_SIZE,
@@ -75,7 +75,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 export function CreatePartyModal({ open, onOpenChange, session, onCreated }: CreatePartyModalProps) {
   const [name, setName] = useState("");
-  const [game] = useState("Strike Force");
+  const [game] = useState("Counter Blox");
   const [gameMode, setGameMode] = useState(MATCH_MODE_LABEL);
   const [matchType, setMatchType] = useState("Standard");
   const [matchTypeOpen, setMatchTypeOpen] = useState(false);
@@ -157,7 +157,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
               <div>
                 <label className={LABEL_CLS}>Game</label>
                 <select className={SELECT_CLS} value={game} disabled>
-                  <option>Strike Force</option>
+                  <option>Counter Blox</option>
                 </select>
               </div>
             </div>

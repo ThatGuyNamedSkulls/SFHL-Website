@@ -455,7 +455,7 @@ export async function createClub(input: {
     logoUrl,
     description: (input.description ?? "").trim().slice(0, 280),
     region,
-    game: "Strike Force",
+    game: "Counter Blox",
     ownerId: owner.discordId,
     ownerName: owner.playerName || owner.username,
     rules: (input.rules ?? "").trim().slice(0, 2000),

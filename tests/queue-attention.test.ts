@@ -17,7 +17,7 @@ describe("formatElapsed", () => {
 });
 
 describe("tab titles", () => {
-  const t = "HyperLeague — Strike Force Matchmaking";
+  const t = "HyperLeague — Counter Blox Matchmaking";
   it("adds and strips the prefix", () => {
     const s = titleFor({ kind: "searching", since: 0 }, t, 84_000);
     assert.equal(s, `▶ 1:24 · ${t}`);

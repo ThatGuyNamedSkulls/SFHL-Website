@@ -66,7 +66,7 @@ export async function GET(request: Request) {
     });
     const userData = await userRes.json();
 
-    // Determine SFHL membership by Discord user ID via the bot token. If they
+    // Determine CBL membership by Discord user ID via the bot token. If they
     // aren't in the guild yet, add them with the guilds.join OAuth grant.
     let presence = await getGuildPresence(userData.id);
     if (presence === null) {

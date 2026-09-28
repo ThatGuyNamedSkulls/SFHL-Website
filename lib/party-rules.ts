@@ -49,7 +49,7 @@ export function cleanPartyFields(input: Record<string, unknown>): CleanPartyFiel
   const region = typeof input.region === "string" ? input.region.toUpperCase() : "";
   return {
     name,
-    game: "Strike Force",
+    game: "Counter Blox",
     gameMode: MATCH_MODE_LABEL,
     matchType: pick(input.matchType, PARTY_MATCH_TYPES, "Standard"),
     region: isQueueRegion(region) ? region : "EU",

@@ -553,7 +553,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
               <div>
                 <div className="mb-3 text-sm font-bold text-white">Join requirements</div>
                 <div className="text-[11px] font-bold uppercase tracking-wide text-[#8a8a8a]">Game</div>
-                <div className="mt-1 font-semibold text-white">Strike Force</div>
+                <div className="mt-1 font-semibold text-white">Counter Blox</div>
               </div>
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wide text-[#8a8a8a]">Skill level</div>

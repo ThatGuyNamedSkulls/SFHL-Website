@@ -228,7 +228,7 @@ export default function ShopPage() {
                   />
                   <div className="relative flex h-full flex-col justify-end p-6 md:p-8">
                     <div className="text-[11px] font-bold uppercase tracking-wide text-[#ff5500]">
-                      Strike Force Cosmetics
+                      Counter Blox Cosmetics
                     </div>
                     <h2 className="mt-2 max-w-md text-2xl font-black text-white md:text-3xl">
                       Fresh looks for your HyperLeague profile
@@ -270,7 +270,7 @@ export default function ShopPage() {
                   type="button"
                   className="rounded-lg border border-[#ff5500] bg-[#ff5500]/10 px-3 py-1.5 text-xs font-bold text-white"
                 >
-                  SF
+                  CB
                 </button>
                 <span className="text-xs text-hl-muted">HyperLeague store · cosmetics only</span>
               </div>

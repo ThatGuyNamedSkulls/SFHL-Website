@@ -18,7 +18,7 @@ const outsider = { discordId: "299", username: "out", playerName: "out", avatar:
 function partyRow(members: { discordId: string; username: string }[]) {
   const now = Date.now();
   return JSON.stringify({
-    id: PARTY, name: "Test", game: "SF", gameMode: "5v5", matchType: "Standard",
+    id: PARTY, name: "Test", game: "CB", gameMode: "5v5", matchType: "Standard",
     region: "EU", leaderId: leader.discordId, maxSize: 5, minSkill: "", maxSkill: "",
     language: "", countries: "", verifiedOnly: false, voiceRequired: false,
     isPrivate: true, createdAt: now, updatedAt: now,

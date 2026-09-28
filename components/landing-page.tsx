@@ -99,7 +99,7 @@ export function LandingPage() {
               <span className="text-white">Rise.</span>
             </h1>
             <p className="text-lg md:text-xl text-hl-muted max-w-xl mb-8 leading-relaxed">
-              HyperLeague competitive Strike Force. Ranked 5v5 matchmaking, ELO tracking, leaderboards, and full match
+              HyperLeague competitive Counter Blox. Ranked 5v5 matchmaking, ELO tracking, leaderboards, and full match
               history — synced live with the HyperLeague Discord.
             </p>
             <div className="flex flex-wrap gap-4">

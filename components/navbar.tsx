@@ -43,7 +43,7 @@ export function Navbar() {
           <Link href="/" className="flex items-center gap-3 group shrink-0">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gold-gradient shadow-[0_0_15px_rgba(255,85,0,0.35)] group-hover:shadow-[0_0_25px_rgba(255,85,0,0.55)] transition-shadow">
               <span className="font-black text-hl-base tracking-tighter text-lg">
-                SF
+                CB
               </span>
             </div>
             <span className="text-xl font-black text-white tracking-tight hidden sm:block">

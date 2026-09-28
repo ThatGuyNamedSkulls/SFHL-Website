@@ -409,7 +409,7 @@ export default function SettingsPage() {
           <Gamepad2 className="w-4 h-4 text-hl-gold" /> Roblox login
         </h2>
         <p className="text-sm text-hl-muted">
-          Discord is the current login. Roblox OAuth will link your Strike Force account
+          Discord is the current login. Roblox OAuth will link your Counter Blox account
           once you create the app — steps are in the repo at{" "}
           <code className="text-hl-gold">docs/ROBLOX_OAUTH.md</code>.
         </p>

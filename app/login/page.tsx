@@ -47,7 +47,7 @@ function LoginContent() {
             Welcome to HyperLeague
           </h1>
           <p className="text-hl-muted">
-            Sign in with Discord to queue, view your profile, and play Strike Force 5v5.
+            Sign in with Discord to queue, view your profile, and play Counter Blox 5v5.
           </p>
         </div>
 

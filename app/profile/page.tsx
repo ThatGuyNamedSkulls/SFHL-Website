@@ -309,7 +309,7 @@ function ProfileContent() {
           if (liveName) {
             target = liveName;
           } else if (session) {
-            // Logged in but Discord account isn't linked to an SFHL player yet.
+            // Logged in but Discord account isn't linked to a CBL player yet.
             setError("Your Discord account isn't linked to a HyperLeague player yet. Join the Discord server and verify with Bloxlink first.");
             setLoading(false);
             return;
@@ -599,7 +599,7 @@ function ProfileContent() {
               <Swords className="w-4 h-4 text-white" />
             </span>
             <div>
-              <div className="text-sm font-semibold text-white">Strike Force</div>
+              <div className="text-sm font-semibold text-white">Counter Blox</div>
               <div className="text-[12px] text-[#8a8a8a]">
                 {player.careerMatchesPlayed ?? s.matchesPlayed} matches
               </div>
@@ -669,7 +669,7 @@ function ProfileContent() {
                 <span className="flex items-center justify-center w-5 h-5 rounded bg-[#ff5500]">
                   <Swords className="w-3 h-3 text-white" />
                 </span>
-                <span className="text-sm font-semibold text-white">Strike Force</span>
+                <span className="text-sm font-semibold text-white">Counter Blox</span>
               </div>
               <div className="flex items-center gap-1 rounded-md bg-[#1c1c1c] border border-white/[0.08] p-1">
                 {(["summary", "matches", "stats"] as SubTab[]).map((t) => (

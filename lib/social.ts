@@ -2,7 +2,7 @@
  * Social layer for HyperLeague: friends + friend requests, party invites,
  * website notifications, and a Discord-DM outbox the bot drains.
  *
- * Identity is the **player name** (unique in the `players` table). Every SFHL
+ * Identity is the **player name** (unique in the `players` table). Every CBL
  * player has one, profiles are addressed by it, and — because the bot links
  * Discord members by display name — the bot can resolve a player name back to a
  * guild member to DM them. That means friends work against the real player base

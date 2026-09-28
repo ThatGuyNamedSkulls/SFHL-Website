@@ -60,7 +60,7 @@ interface PartyAvatar {
   avatar: string | null;
 }
 
-/** FACEIT-home inspired dashboard for HyperLeague / Strike Force. */
+/** FACEIT-home inspired dashboard for HyperLeague / Counter Blox. */
 export function Dashboard({ session }: DashboardProps) {
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
   const [partyCount, setPartyCount] = useState(0);
@@ -120,7 +120,7 @@ export function Dashboard({ session }: DashboardProps) {
     {
       href: "/queue",
       title: "Matchmaking",
-      desc: "Ranked 5v5 Strike Force",
+      desc: "Ranked 5v5 Counter Blox",
       icon: Swords,
       glow: "from-hl-gold/35",
       soon: false,
@@ -187,7 +187,7 @@ export function Dashboard({ session }: DashboardProps) {
         <div className="relative z-10 px-6 sm:px-8 py-8 md:py-10 flex flex-wrap items-end justify-between gap-4">
           <div>
             <span className="inline-flex items-center gap-1.5 text-[11px] header-caps text-hl-gold bg-hl-base/50 border border-hl-gold/30 rounded-full px-3 py-1 mb-3">
-              <Zap className="w-3 h-3" /> Season 1 · Strike Force
+              <Zap className="w-3 h-3" /> Season 1 · Counter Blox
             </span>
             <h1 className="text-2xl md:text-4xl font-black text-white tracking-tight mb-2">
               Compete in <span className="text-hl-gold">HyperLeague</span> Matchmaking

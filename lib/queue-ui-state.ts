@@ -103,7 +103,7 @@ export function queueUiState(i: QueueUiInputs): QueueUi {
     return {
       ...base,
       state: "guest",
-      headline: "Ranked 5v5 Strike Force",
+      headline: "Ranked 5v5 Counter Blox",
       detail: "Log in with Discord to queue, climb the ranks and earn season rewards.",
       primary: { action: "login", label: "Log in with Discord", disabled: false },
     };

@@ -1,14 +1,14 @@
 import { Tournament } from "@/types";
 
 /**
- * Preview tournaments. SFHL does not yet run tournaments through the site,
+ * Preview tournaments. CBL does not yet run tournaments through the site,
  * so these illustrate how the feature will look. The Tournaments page marks
  * this section as a preview.
  */
 export const TOURNAMENTS: Tournament[] = [
   {
     id: "t1",
-    name: "SFHL Season 1 Cup",
+    name: "CBL Season 1 Cup",
     status: "live",
     prizePool: "5,000 SP",
     teams: 8,
@@ -20,7 +20,7 @@ export const TOURNAMENTS: Tournament[] = [
   },
   {
     id: "t2",
-    name: "SFHL Weekly #4",
+    name: "CBL Weekly #4",
     status: "upcoming",
     prizePool: "1,500 SP",
     teams: 6,
@@ -32,7 +32,7 @@ export const TOURNAMENTS: Tournament[] = [
   },
   {
     id: "t3",
-    name: "SFHL Newcomers Cup",
+    name: "CBL Newcomers Cup",
     status: "upcoming",
     prizePool: "Rank Rewards",
     teams: 4,
@@ -44,7 +44,7 @@ export const TOURNAMENTS: Tournament[] = [
   },
   {
     id: "t4",
-    name: "SFHL Preseason Invitational",
+    name: "CBL Preseason Invitational",
     status: "completed",
     prizePool: "3,000 SP",
     teams: 8,

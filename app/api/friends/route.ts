@@ -10,7 +10,7 @@ import {
   removeFriend,
 } from "@/lib/social";
 
-/** 403 unless the session is linked to an SFHL player (friends key on name). */
+/** 403 unless the session is linked to a CBL player (friends key on name). */
 function requireLinked(session: Awaited<ReturnType<typeof getSession>>) {
   if (!session) return { error: "You must be logged in", status: 401 as const };
   if (!session.playerName)

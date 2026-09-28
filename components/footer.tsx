@@ -12,11 +12,11 @@ export function Footer() {
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gold-gradient flex items-center justify-center">
               <span className="text-xs font-black text-hl-base tracking-tighter">
-                SF
+                CB
               </span>
             </div>
             <span className="text-sm font-semibold text-hl-muted">
-              HyperLeague &copy; {new Date().getFullYear()} — Strike Force League
+              HyperLeague &copy; {new Date().getFullYear()} — Counter Blox League
             </span>
           </div>
 

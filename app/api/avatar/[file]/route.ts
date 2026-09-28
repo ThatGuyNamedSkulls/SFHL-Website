@@ -2,7 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 
 /**
- * Serves the bot's Roblox avatar PNGs (stored in ../../SFHL discord bot/avatars relative to the
+ * Serves the bot's Roblox avatar PNGs (stored in ../../CBL discord bot/avatars relative to the
  * site root) so the website can display them. Read-only, cached.
  */
 export async function GET(
@@ -31,7 +31,7 @@ export async function GET(
 
   const avatarsDir =
     process.env.AVATARS_PATH ||
-    path.resolve(process.cwd(), "..", "..", "SFHL discord bot", "avatars");
+    path.resolve(process.cwd(), "..", "..", "CBL discord bot", "avatars");
   const filePath = path.join(avatarsDir, decoded);
 
   try {

@@ -60,7 +60,7 @@ export default function TrackPage() {
       <div className="hl-page py-16 text-center">
         <TrendingUp className="w-8 h-8 text-hl-gold mx-auto mb-3" />
         <h1 className="text-2xl font-black text-white mb-2">Track</h1>
-        <p className="text-sm text-hl-muted mb-6">Log in to see your Strike Force stats.</p>
+        <p className="text-sm text-hl-muted mb-6">Log in to see your Counter Blox stats.</p>
         <Link href="/login" className="inline-flex px-5 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-black text-sm header-caps">
           Log in
         </Link>
@@ -93,7 +93,7 @@ export default function TrackPage() {
     <div className="hl-page">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <div className="text-xs header-caps text-hl-gold mb-1">Strike Force</div>
+          <div className="text-xs header-caps text-hl-gold mb-1">Counter Blox</div>
           <h1 className="text-2xl font-black text-white">Track</h1>
           <p className="text-sm text-hl-muted mt-1">Your recorded matchmaking stats.</p>
         </div>

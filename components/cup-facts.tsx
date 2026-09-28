@@ -13,7 +13,7 @@ export function CupFacts({
   return (
     <div className="space-y-8 text-sm">
       <div className="grid gap-6 sm:grid-cols-3">
-        <Fact icon={Crosshair} label="Game" value="Strike Force" />
+        <Fact icon={Crosshair} label="Game" value="Counter Blox" />
         <Fact icon={MapPin} label="Region" value={regionMeta(region).label || region || "EU"} />
         <Fact icon={Gauge} label="Skill level" value="Any" />
       </div>

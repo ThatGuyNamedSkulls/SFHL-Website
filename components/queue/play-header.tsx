@@ -22,7 +22,7 @@ function StatsBlock({ me, signedIn }: { me: MeView | null; signedIn: boolean }) 
         <RankBadge rank="UNRANKED" size="lg" />
         <div className="min-w-0">
           <div className="flex gap-2">{me ? <span className={chip}>{me.season.label}</span> : null}</div>
-          <div className="mt-1.5 text-lg font-black text-white">{signedIn ? "Setting up your profile" : "Ranked 5v5 Strike Force"}</div>
+          <div className="mt-1.5 text-lg font-black text-white">{signedIn ? "Setting up your profile" : "Ranked 5v5 Counter Blox"}</div>
           <div className="text-xs text-white/60">
             {signedIn ? "Your rank shows here once your player profile exists." : "Log in to get a rank, climb and earn prestige."}
           </div>

@@ -320,7 +320,7 @@ function PartyFinderContent() {
       {/* Control bar (FACEIT-style) */}
       <div className="flex flex-wrap items-center gap-3 mb-8">
         <select className="bg-hl-panel border border-hl-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-hl-gold/50">
-          <option>Strike Force</option>
+          <option>Counter Blox</option>
         </select>
 
         <label className="flex items-center gap-2 text-sm text-white cursor-pointer bg-hl-panel border border-hl-border rounded-lg px-3 py-2">

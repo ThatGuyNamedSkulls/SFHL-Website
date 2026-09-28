@@ -16,7 +16,7 @@ let league: typeof import("@/lib/league");
 let modes: typeof import("@/lib/queue-modes");
 let client: typeof import("@/lib/db").client;
 
-const BOT_FILE = join(__dirname, "..", "..", "..", "SFHL discord bot", "core", "pro_league.py");
+const BOT_FILE = join(__dirname, "..", "..", "..", "CBL discord bot", "core", "pro_league.py");
 
 before(async () => {
   pro = await import("@/lib/pro-league");

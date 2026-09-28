@@ -26,9 +26,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HyperLeague — Strike Force Matchmaking",
+  title: "HyperLeague — Counter Blox Matchmaking",
   description:
-    "HyperLeague competitive Strike Force league. Ranked 5v5 matchmaking, ELO tracking, leaderboards, match history, and stats — synced live with the HyperLeague Discord.",
+    "HyperLeague competitive Counter Blox league. Ranked 5v5 matchmaking, ELO tracking, leaderboards, match history, and stats — synced live with the HyperLeague Discord.",
 };
 
 export const viewport = {

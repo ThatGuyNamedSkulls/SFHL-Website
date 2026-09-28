@@ -1,7 +1,7 @@
 import { RankTier, RankTierLetter } from "@/types";
 
 /**
- * 10 real SFHL rank tiers from counterstrike.toml, plus Unranked.
+ * 10 real CBL rank tiers from counterstrike.toml, plus Unranked.
  * Ordered low → high.
  */
 export const RANK_TIERS: RankTier[] = [
