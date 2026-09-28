@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { DISCORD_CONFIG } from "@/lib/auth";
 import { parseMentions, segmentsToText, type MentionSegment } from "@/lib/discord-mentions";
 
-const ANNOUNCEMENTS_CHANNEL_ID = "1275469567006740575";
+/** "│・📢・announcements" in CB Looters (the CBL bot's server). */
+const ANNOUNCEMENTS_CHANNEL_ID = "1513976031130816583";
 const DISCORD_API = "https://discord.com/api/v10";
 
 /** Simple in-memory cache to avoid hammering the Discord API / rate limits. */
@@ -10,7 +12,7 @@ const CACHE_TTL_MS = 60 * 1000;
 /** Role and channel names change rarely; refresh them every 10 minutes. */
 let guildCache: { at: number; roles: Map<string, { name: string; color: number }>; channels: Map<string, string> } | null = null;
 const GUILD_TTL_MS = 10 * 60 * 1000;
-const GUILD_ID = process.env.SFHL_GUILD_ID || "973987866336190484";
+const GUILD_ID = DISCORD_CONFIG.guildId;
 
 interface Announcement {
   id: string;

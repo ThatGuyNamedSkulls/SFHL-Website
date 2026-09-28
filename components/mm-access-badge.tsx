@@ -1,6 +1,6 @@
 "use client";
 
-/** Exact Get Matchmaking Access badge (role 1523016656161603584). */
+/** Exact Get Matchmaking Access badge (role MM_ACCESS_ROLE_ID in lib/auth.ts). */
 export function MmAccessBadge({ className = "" }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element

@@ -5,7 +5,7 @@
  */
 
 import { cache } from "react";
-import { DISCORD_CONFIG } from "@/lib/auth";
+import { DISCORD_CONFIG, MATCH_STAFF_ROLE_ID } from "@/lib/auth";
 import { remember } from "@/lib/server-cache";
 import { addNotification, enqueueDM } from "@/lib/social";
 
@@ -44,20 +44,13 @@ async function discordApi(path: string, init?: RequestInit): Promise<Response | 
 }
 
 /**
- * The Match Staff role id. Set MATCH_STAFF_ROLE_ID so it's pinned: looking it
- * up by name lets anyone who can create/rename a role called "[MS] Match Staff"
- * grant website staff powers (security report L6). The name lookup (10 min
- * cache; a failed lookup is retried) is only a fallback.
+ * The Match Staff role id, pinned (security report L6: a lookup by name let
+ * anyone who could create or rename a role with that name grant staff powers).
+ * MATCH_STAFF_ROLE_ID overrides the built-in CB Looters "Ranked Staff" id.
  */
 async function matchStaffRoleId(): Promise<string | null> {
   const pinned = (process.env.MATCH_STAFF_ROLE_ID || "").trim();
-  if (/^\d{15,22}$/.test(pinned)) return pinned;
-  return remember("match-staff-role", 10 * 60_000, async () => {
-    const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/roles`);
-    if (!res?.ok) throw new Error("Discord roles lookup failed");
-    const roles = (await res.json()) as { id: string; name: string }[];
-    return roles.find((r) => r.name === "[MS] Match Staff")?.id ?? null;
-  }).catch(() => null);
+  return /^\d{15,22}$/.test(pinned) ? pinned : MATCH_STAFF_ROLE_ID;
 }
 
 /** The league server's text + announcement channels, in sidebar order (empty without a bot token). */

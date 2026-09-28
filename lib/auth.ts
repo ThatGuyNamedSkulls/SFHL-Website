@@ -133,17 +133,23 @@ export const DISCORD_CONFIG = {
   clientId: process.env.DISCORD_CLIENT_ID || "",
   clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
   redirectUri: `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/auth/callback`,
-  guildId: process.env.SFHL_GUILD_ID || "973987866336190484",
+  // The CBL bot's server, "CB Looters" (the CBL bot's GUILD_ID). Read from
+  // DISCORD_GUILD_ID, not the old SFHL_GUILD_ID, so a stale SFHL value left
+  // in the hosting env can't point the site back at the SFHL server.
+  guildId: process.env.DISCORD_GUILD_ID || "1513293927950716998",
   // guilds.join lets login add the user to the HyperLeague Discord if they
   // aren't already in it (bot needs CREATE_INSTANT_INVITE in the guild).
   scopes: ["identify", "guilds", "guilds.join"],
-  inviteUrl: "https://discord.gg/4UTrW6xJ39",
+  inviteUrl: "https://discord.gg/GpvjJjhF3t",
 };
 
+// Role IDs in that server — the same values as the CBL bot's config/settings.py.
 /** Bloxlink assigns this after a member verifies their Roblox account. */
-export const BLOXLINK_VERIFIED_ROLE_ID = "1550436622544150548";
-/** Self-serve matchmaking access from the Discord /verifymessage button. */
-export const MM_ACCESS_ROLE_ID = "1523016656161603584";
+export const BLOXLINK_VERIFIED_ROLE_ID = "1554232318044930099";
+/** Self-serve matchmaking access from the Discord /verifymessage button ("MM Acess"). */
+export const MM_ACCESS_ROLE_ID = "1554232616603885638";
+/** Match Staff ("Ranked Staff" in CB Looters). MATCH_STAFF_ROLE_ID overrides it. */
+export const MATCH_STAFF_ROLE_ID = "1543883820879585343";
 const LEAGUE_ACCESS_ROLE_IDS = [BLOXLINK_VERIFIED_ROLE_ID, MM_ACCESS_ROLE_ID];
 
 export type GuildPresence = {
@@ -266,7 +272,7 @@ export async function addUserToGuild(userId: string, accessToken: string): Promi
 }
 
 /** Permanent Discord invite for users the website couldn't auto-add. */
-export const DISCORD_INVITE_URL = "https://discord.gg/4UTrW6xJ39";
+export const DISCORD_INVITE_URL = "https://discord.gg/GpvjJjhF3t";
 
 export async function getDiscordInviteUrl(): Promise<string | null> {
   return (
