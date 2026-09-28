@@ -14,6 +14,7 @@
 import { discordSafe } from "@/lib/discord-safe";
 import { client } from "@/lib/db";
 import { claim, logEvent, LeagueAdminError, type Actor } from "@/lib/league-admin";
+import { ensureTeamTitlesSchema } from "@/lib/team-titles";
 import {
   DIVISION_NAMES,
   divisionStandingRows,
@@ -245,9 +246,7 @@ export async function endSeason(seasonId: number, confirmName: string, actor: Ac
     "write"
   );
   // Champion titles — same table as /awardtitle (lib/team-titles.ts reads it).
-  await client.execute(`CREATE TABLE IF NOT EXISTS team_titles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT NOT NULL, title TEXT NOT NULL,
-    awarded_by TEXT, awarded_by_id TEXT, awarded_at INTEGER NOT NULL)`);
+  await ensureTeamTitlesSchema();
   const now = Date.now();
   await client.batch(
     plan.divisions.map((d) => ({

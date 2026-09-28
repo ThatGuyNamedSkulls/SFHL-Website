@@ -6,6 +6,7 @@
 
 import { client } from "@/lib/db";
 import { creditOnce } from "@/lib/coin-ledger";
+import { schemaOnce } from "@/lib/schema-once";
 import type {
   MissionDef,
   MissionMetric,
@@ -121,9 +122,11 @@ function endsInLabel(endsAt: number, now: number): string | null {
 
 let schemaReady: Promise<void> | null = null;
 
+/** Once per code version (schemaOnce): the backfill UPDATE below scans the
+ *  whole claims table, and used to re-run on every new server instance. */
 function ensureClaimsSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    schemaReady = schemaOnce("mission_claims", async () => {
       await client.execute(
         `CREATE TABLE IF NOT EXISTS web_mission_claims (
            player_name TEXT NOT NULL,

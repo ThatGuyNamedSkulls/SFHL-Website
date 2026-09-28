@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllPlayers, getModeLeaderboard, getPlacementGamesTotal, publicRating } from "@/lib/db";
+import { getAllPlayers, getModeLeaderboard, getPlacementGamesTotal, publicRating, searchPlayers } from "@/lib/db";
 import { getEquippedVisualsMap, EquippedVisuals } from "@/lib/cosmetics";
 import { pickAvatar } from "@/lib/avatar";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
@@ -12,6 +12,34 @@ import { proLeagueInfo, type ProLeagueView } from "@/lib/pro-ladder";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+
+    // ?q=<text> → the search box's suggestions: only the matching players, in
+    // the small shape the dropdown shows. Not cached server-side (a slot per
+    // typed query would grow without bound); the query is LIMIT 8.
+    const q = searchParams.get("q");
+    if (q !== null) {
+      const query = q.trim().slice(0, 40);
+      if (!query) return NextResponse.json([]);
+      const [rows, tags] = await Promise.all([
+        searchPlayers(query),
+        clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
+      ]);
+      return NextResponse.json(
+        rows.map((p) => {
+          const rating = publicRating(p);
+          return {
+            id: `p${p.id}`,
+            username: p.name,
+            discordUsername: p.discord_username ?? null,
+            avatarUrl: pickAvatar(p.roblox_avatar_image, p.discord_avatar, p.discord_id),
+            rank: rating.rank,
+            elo: rating.elo,
+            clubTag: lookupClubTag(tags, p.name, p.discord_id != null ? String(p.discord_id) : null),
+          };
+        })
+      );
+    }
+
     const cacheKey = searchParams.toString() || "all";
 
     // ?mode=1v1 → the own-ladder leaderboard for that gamemode (graduated

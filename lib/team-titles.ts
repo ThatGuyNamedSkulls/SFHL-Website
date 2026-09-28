@@ -14,8 +14,9 @@ export interface TeamTitle {
 
 let schemaReady: Promise<void> | null = null;
 
-/** Same definition as core/team_titles.py, so a fresh DB works either way. */
-function ensureSchema(): Promise<void> {
+/** Same definition as core/team_titles.py, so a fresh DB works either way.
+ *  Exported for the season end (lib/league-playoffs.ts), which writes titles. */
+export function ensureTeamTitlesSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = schemaOnce("team_titles", async () => {
       // One round trip (Turso is remote).
@@ -46,7 +47,7 @@ export async function titleCounts(teamIds: string[]): Promise<Map<string, number
   const out = new Map<string, number>();
   const ids = [...new Set(teamIds)].filter(Boolean);
   if (ids.length === 0) return out;
-  await ensureSchema();
+  await ensureTeamTitlesSchema();
   const rs = await client.execute({
     sql: `SELECT team_id, COUNT(*) AS n FROM team_titles
           WHERE team_id IN (${ids.map(() => "?").join(",")})
@@ -59,7 +60,7 @@ export async function titleCounts(teamIds: string[]): Promise<Map<string, number
 
 /** A team's titles, newest first. */
 export async function titlesForTeam(teamId: string): Promise<TeamTitle[]> {
-  await ensureSchema();
+  await ensureTeamTitlesSchema();
   const rs = await client.execute({
     sql: `SELECT id, title, awarded_by, awarded_at FROM team_titles
           WHERE team_id = ? ORDER BY awarded_at DESC, id DESC`,

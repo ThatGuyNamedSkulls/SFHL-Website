@@ -291,6 +291,33 @@ export async function getAllPlayers(limit?: number): Promise<DbPlayer[]> {
   return (rs.rows as unknown as DbPlayer[]).map(hidePlacementRating);
 }
 
+/** Up to `limit` players whose name or Discord @handle contains `query`
+ *  (case-insensitive): exact matches first, then names starting with it, then
+ *  the rest by public Elo. Backs the search box, which used to download every
+ *  player and filter in the browser. */
+export async function searchPlayers(query: string, limit = 8): Promise<DbPlayer[]> {
+  await ensurePlayerDiscordColumns();
+  const q = query.trim().replace(/^@/, "").toLowerCase();
+  if (!q) return [];
+  // Names often contain "_", which LIKE would treat as a wildcard.
+  const like = q.replace(/[\\%_]/g, (c) => `\\${c}`);
+  const handle = "lower(ltrim(COALESCE(discord_username, ''), '@'))";
+  const rs = await client.execute({
+    sql: `${PLAYER_SELECT}
+          WHERE lower(name) LIKE ? ESCAPE '\\' OR ${handle} LIKE ? ESCAPE '\\'
+          ORDER BY CASE
+                     WHEN lower(name) = ? OR ${handle} = ? THEN 0
+                     WHEN lower(name) LIKE ? ESCAPE '\\' THEN 1
+                     ELSE 2
+                   END,
+                   CASE WHEN COALESCE(placement_done, 0) = 1 THEN elo END DESC,
+                   lower(name) ASC
+          LIMIT ?`,
+    args: [`%${like}%`, `%${like}%`, q, q, `${like}%`, Math.min(Math.max(Math.floor(limit), 1), 20)],
+  });
+  return (rs.rows as unknown as DbPlayer[]).map(hidePlacementRating);
+}
+
 /** Resolve a player by website username or Discord @handle (case-insensitive). */
 export async function getPlayer(name: string): Promise<DbPlayer | undefined> {
   await ensurePlayerDiscordColumns();

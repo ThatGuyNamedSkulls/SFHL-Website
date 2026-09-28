@@ -14,6 +14,7 @@
  * league channel.
  */
 import { client } from "@/lib/db";
+import { schemaOnce } from "@/lib/schema-once";
 import {
   DIVISION_NAMES,
   STATUS_CODES,
@@ -605,6 +606,12 @@ export async function startSeason(seasonId: number, firstWeekText: string, actor
 
 // --- league channel ----------------------------------------------------------------------------
 
+// The bot creates bot_state at startup; this covers a database the bot hasn't
+// run against yet, once per code version (was a CREATE on every save).
+const ensureBotState = schemaOnce("bot_state", async () => {
+  await client.execute("CREATE TABLE IF NOT EXISTS bot_state (key TEXT PRIMARY KEY, value TEXT)");
+});
+
 export async function getLeagueChannelId(): Promise<string | null> {
   try {
     const rs = await client.execute({ sql: "SELECT value FROM bot_state WHERE key = ?", args: [LEAGUE_CHANNEL_KEY] });
@@ -616,7 +623,7 @@ export async function getLeagueChannelId(): Promise<string | null> {
 
 export async function setLeagueChannel(channelId: string, channelName: string, actor: Actor): Promise<void> {
   if (!/^\d{5,25}$/.test(channelId)) fail("Pick a channel from the list.");
-  await client.execute("CREATE TABLE IF NOT EXISTS bot_state (key TEXT PRIMARY KEY, value TEXT)");
+  await ensureBotState();
   await client.execute({
     sql: "INSERT OR REPLACE INTO bot_state (key, value) VALUES (?, ?)",
     args: [LEAGUE_CHANNEL_KEY, channelId],

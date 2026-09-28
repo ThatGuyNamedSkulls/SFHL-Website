@@ -4,6 +4,7 @@
 
 import { client } from "@/lib/db";
 import { discordSafe } from "@/lib/discord-safe";
+import { schemaOnce } from "@/lib/schema-once";
 
 export interface ChatMessage {
   id: number;
@@ -16,10 +17,11 @@ export interface ChatMessage {
 
 let schemaReady: Promise<void> | null = null;
 
+/** Once per code version (schemaOnce), not on every new server instance. */
 export function ensureLobbyChatSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = client
-      .execute(
+    schemaReady = schemaOnce("lobby_chat", async () => {
+      await client.execute(
         `CREATE TABLE IF NOT EXISTS web_lobby_messages (
            id INTEGER PRIMARY KEY AUTOINCREMENT,
            channel_id TEXT NOT NULL,
@@ -30,8 +32,11 @@ export function ensureLobbyChatSchema(): Promise<void> {
            source TEXT NOT NULL,
            created_at INTEGER NOT NULL
          )`
-      )
-      .then(() => undefined);
+      );
+    })().catch((e) => {
+      schemaReady = null;
+      throw e;
+    });
   }
   return schemaReady;
 }

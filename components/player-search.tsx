@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -31,9 +31,14 @@ interface PlayerSearchProps {
   autoFocus?: boolean;
 }
 
+/** Wait this long after the last keystroke before asking the server. */
+const DEBOUNCE_MS = 200;
+
 /**
  * FACEIT-style player search with an autocomplete suggestions dropdown.
- * Loads the (small) player list once and filters client-side.
+ * Asks the server for matches as you type (debounced), instead of loading
+ * every player up front. Answers are remembered per query, so backspacing
+ * doesn't refetch.
  */
 export function PlayerSearch({
   className = "",
@@ -43,18 +48,52 @@ export function PlayerSearch({
   onQueryChange,
   autoFocus = false,
 }: PlayerSearchProps) {
-  const [players, setPlayers] = useState<SearchPlayer[]>([]);
   const [query, setQuery] = useState("");
+  // The latest answer and the query it belongs to (it can lag the input).
+  const [results, setResults] = useState<{ q: string; players: SearchPlayer[] }>({ q: "", players: [] });
+  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef("");
+  const cache = useRef(new Map<string, SearchPlayer[]>());
 
-  useEffect(() => {
-    apiGetJson<SearchPlayer[]>("/api/players")
-      .then(({ json: data }) => setPlayers(Array.isArray(data) ? data : []))
-      .catch(() => {});
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
   }, []);
+
+  const lookup = (text: string) => {
+    const q = text.trim().toLowerCase();
+    latest.current = q;
+    if (timer.current) clearTimeout(timer.current);
+    const known = cache.current.get(q);
+    if (!q || known) {
+      setResults({ q, players: known ?? [] });
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    timer.current = setTimeout(() => {
+      apiGetJson<SearchPlayer[]>(`/api/players?q=${encodeURIComponent(q)}`)
+        .then(({ json }) => {
+          const players = Array.isArray(json) ? json : [];
+          cache.current.set(q, players);
+          if (latest.current !== q) return; // the input moved on
+          setResults({ q, players });
+          setLoading(false);
+        })
+        .catch(() => {
+          if (latest.current === q) setLoading(false);
+        });
+    }, DEBOUNCE_MS);
+  };
+
+  const changeQuery = (text: string) => {
+    setQuery(text);
+    lookup(text);
+  };
 
   // Close the dropdown when clicking outside.
   useEffect(() => {
@@ -67,28 +106,23 @@ export function PlayerSearch({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const suggestions = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return players
-      .filter((p) => {
-        const handle = (p.discordUsername || "").replace(/^@/, "").toLowerCase();
-        return p.username.toLowerCase().includes(q) || (handle && handle.includes(q));
-      })
-      .slice(0, 8);
-  }, [players, query]);
+  const current = query.trim().toLowerCase();
+  // Previous answers stay on screen while the next one loads (no flicker),
+  // but Enter only trusts an answer for exactly what's typed.
+  const suggestions = current ? results.players : [];
+  const upToDate = results.q === current && !loading;
 
   const go = (name: string) => {
     if (onPick) {
       onPick(name);
       onQueryChange?.(name);
-      setQuery(name);
+      changeQuery(name);
       setOpen(false);
       setActive(0);
       return;
     }
     router.push(`/profile?player=${encodeURIComponent(name)}`);
-    setQuery("");
+    changeQuery("");
     setOpen(false);
     setActive(0);
     onNavigate?.();
@@ -98,7 +132,7 @@ export function PlayerSearch({
     e.preventDefault();
     const q = query.trim();
     if (!q) return;
-    if (suggestions.length > 0) {
+    if (upToDate && suggestions.length > 0) {
       go(suggestions[Math.min(active, suggestions.length - 1)].username);
     } else {
       go(q);
@@ -126,7 +160,7 @@ export function PlayerSearch({
           <input
             value={query}
             onChange={(e) => {
-              setQuery(e.target.value);
+              changeQuery(e.target.value);
               setOpen(true);
               setActive(0);
               onQueryChange?.(e.target.value);
@@ -145,7 +179,7 @@ export function PlayerSearch({
         <div className="absolute top-full left-0 mt-2 w-full min-w-[15rem] bg-hl-panel border border-hl-border rounded-lg shadow-2xl overflow-hidden z-50">
           {suggestions.length === 0 ? (
             <div className="px-3 py-3 text-sm text-hl-muted">
-              No players found for &quot;{query.trim()}&quot;.
+              {upToDate ? <>No players found for &quot;{query.trim()}&quot;.</> : "Searching…"}
             </div>
           ) : (
             suggestions.map((p, idx) => (
