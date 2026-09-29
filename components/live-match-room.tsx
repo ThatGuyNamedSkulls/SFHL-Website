@@ -133,6 +133,8 @@ export function LiveMatchRoom({
 
   const team1 = lobby.members.filter((m) => m.team === 1);
   const team2 = lobby.members.filter((m) => m.team === 2);
+  const teamSize = Math.max(team1.length, team2.length);
+  const modeLabel = teamSize ? `${teamSize}v${teamSize}` : MATCH_MODE_LABEL;
   const veto = lobby.veto;
   const myTurn = !!selfId && veto?.currentTurnCaptainId === selfId && !veto.complete;
   const mapName = lobby.selectedMap || lobby.map;
@@ -302,7 +304,7 @@ export function LiveMatchRoom({
               </Link>
             </span>
           ) : (
-            <span>Matchmaking / {MATCH_MODE_LABEL} / {queueModeLabel(lobby.queueMode)}</span>
+            <span>Matchmaking / {modeLabel} / {queueModeLabel(lobby.queueMode)}</span>
           )}
           <div className="flex items-center gap-2">
             {lobby.server?.url && (

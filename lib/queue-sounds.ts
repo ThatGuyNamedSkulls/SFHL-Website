@@ -248,10 +248,16 @@ const SOUNDS: Record<QueueSound, (c: AudioContext, t: number) => void> = {
     voice(c, { freq: 329.6, type: "triangle", at: t + 0.01, decay: 0.3, gain: 0.12, filter: { freq: 2400 } });
     voice(c, { freq: 493.9, type: "triangle", at: t + 0.07, decay: 0.38, gain: 0.12, filter: { freq: 2800 } });
   },
+  // A queue opened on your server: a soft two-note chime rising a fifth.
+  open: (c, t) => {
+    voice(c, { freq: 587.3, type: "sine", at: t, attack: 0.005, decay: 0.35, gain: 0.14 });
+    voice(c, { freq: 880, type: "sine", at: t + 0.13, attack: 0.005, decay: 0.55, gain: 0.14 });
+    voice(c, { freq: 1760, type: "sine", at: t + 0.13, attack: 0.005, decay: 0.25, gain: 0.03 });
+  },
 };
 
 /** How long each built-in sound lasts (seconds), so ticks can wait for it. */
-const SYNTH_LENGTH: Record<QueueSound, number> = { start: 0.35, end: 0.4, found: 1.9, tick: 0.08, accepted: 0.55 };
+const SYNTH_LENGTH: Record<QueueSound, number> = { start: 0.35, end: 0.4, found: 1.9, tick: 0.08, accepted: 0.55, open: 0.75 };
 
 /** Until when (AudioContext time) a non-tick sound is playing. */
 let busyUntil = 0;

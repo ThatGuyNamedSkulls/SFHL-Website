@@ -10,6 +10,7 @@ import {
   getQueueGate,
   getPlayer,
   countWebQueueByRegion,
+  getPlayerLastQueueRegion,
 } from "@/lib/db";
 import { getPartyForMember } from "@/lib/parties";
 import { clubTagIndex, lookupClubTag } from "@/lib/clubs";
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
     const regionParam = (searchParams.get("region") || "").toUpperCase();
     const region = isQueueRegion(regionParam) ? regionParam : undefined;
     const session = await getSession();
-    const [queue, teamSize, gate, me, tags, proEligible, liveMatches, queuing] = await Promise.all([
+    const [queue, teamSize, gate, me, tags, proEligible, liveMatches, queuing, myRegion] = await Promise.all([
       getWebQueue(region),
       getQueueTeamSize(),
       getQueueGate(),
@@ -64,6 +65,7 @@ export async function GET(request: Request) {
       session ? hasProAccess(session.discordId).catch(() => false) : Promise.resolve(false),
       countLiveMatches(),
       countWebQueueByRegion(),
+      session ? getPlayerLastQueueRegion(session.playerName).catch(() => null) : Promise.resolve(null),
     ]);
     return queueJson({
       // Names are for signed-in players only (docs/QUEUE_UI_PLAN.md Q2):
@@ -85,6 +87,8 @@ export async function GET(request: Request) {
       openRegions: gate.openRegions,
       openModes: gate.openModes,
       me,
+      // The player's last picked server (the queue-opened chime listens for it).
+      myRegion,
       // Pro Matchmaking is only shown to players who can join it (S2+).
       proEligible: PRO_QUEUE_ENABLED && proEligible,
       // Footer counts (all servers).
@@ -258,6 +262,18 @@ export async function POST(request: Request) {
           { status: 403 }
         );
       }
+    }
+
+    // A party can't be split across the two teams (bot team balancing).
+    const teamSize = await getQueueTeamSize();
+    const groupSize = party ? party.members.length : 1;
+    if (groupSize > teamSize) {
+      return NextResponse.json(
+        {
+          error: `Your party has ${groupSize} players, but the queue is ${teamSize}v${teamSize}. A party can't be bigger than one team.`,
+        },
+        { status: 403 }
+      );
     }
 
     if (mode === QUEUE_MODE_PRO && !PRO_QUEUE_ENABLED) {

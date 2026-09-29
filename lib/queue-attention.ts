@@ -34,7 +34,17 @@ export function titleFor(state: AttentionState, title: string, now: number): str
   return base;
 }
 
-export type QueueSound = "start" | "end" | "found" | "tick" | "accepted";
+export type QueueSound = "start" | "end" | "found" | "tick" | "accepted" | "open";
+
+/**
+ * True when the player's server (their last picked region) has just gone from
+ * closed to open. `prevOpen` is null on the first answer after the page loads
+ * (never a sound then).
+ */
+export function queueJustOpened(prevOpen: string[] | null, nextOpen: string[], myRegion: string | null): boolean {
+  if (!prevOpen || !myRegion) return false;
+  return nextOpen.includes(myRegion) && !prevOpen.includes(myRegion);
+}
 
 /**
  * Which sound a change in queue state should make, or null.

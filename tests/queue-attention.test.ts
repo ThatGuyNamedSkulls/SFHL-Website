@@ -4,7 +4,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { baseTitle, formatElapsed, soundForTransition, titleFor } from "@/lib/queue-attention";
+import { baseTitle, formatElapsed, queueJustOpened, soundForTransition, titleFor } from "@/lib/queue-attention";
 
 describe("formatElapsed", () => {
   it("formats minutes and hours", () => {
@@ -54,5 +54,19 @@ describe("transition sounds", () => {
       null
     );
     assert.equal(soundForTransition(queued, queued), null);
+  });
+});
+
+describe("queue opened on my server", () => {
+  it("chimes only when my server goes from closed to open", () => {
+    assert.equal(queueJustOpened([], ["EU"], "EU"), true);
+    assert.equal(queueJustOpened(["NA"], ["NA", "EU"], "EU"), true);
+    assert.equal(queueJustOpened(["EU"], ["EU"], "EU"), false, "already open");
+    assert.equal(queueJustOpened([], ["NA"], "EU"), false, "another server");
+    assert.equal(queueJustOpened(["EU"], [], "EU"), false, "closing is silent");
+  });
+  it("never on the first answer or without a picked server", () => {
+    assert.equal(queueJustOpened(null, ["EU"], "EU"), false);
+    assert.equal(queueJustOpened([], ["EU"], null), false);
   });
 });

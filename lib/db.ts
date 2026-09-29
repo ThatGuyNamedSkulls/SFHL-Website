@@ -1,7 +1,7 @@
 import { createClient, type Client, type ResultSet, type InArgs } from "@libsql/client";
 import { isQueueRegion } from "@/lib/regions";
 import { countryToPlayRegion, countriesInPlayRegion } from "@/lib/country-regions";
-import { MATCH_TEAM_SIZE } from "@/lib/match-mode";
+import { GAMEMODE_TEAM_SIZES, MATCH_TEAM_SIZE } from "@/lib/match-mode";
 import { parseQueueMode, type QueueModeId } from "@/lib/queue-modes";
 import { ddlBatch, missingColumns, schemaOnce } from "@/lib/schema-once";
 
@@ -1172,9 +1172,15 @@ export async function leaveWebQueueMany(discordUserIds: string[]): Promise<void>
   }
 }
 
-/** Live queue format. */
+/** Live queue format: the team size the bot's /gamemode saved (bot_state.queue_mode). */
 export async function getQueueTeamSize(): Promise<number> {
-  return MATCH_TEAM_SIZE;
+  try {
+    const rs = await client.execute("SELECT value FROM bot_state WHERE key = 'queue_mode'");
+    const size = Number(rs.rows[0]?.value);
+    return GAMEMODE_TEAM_SIZES.includes(size) ? size : MATCH_TEAM_SIZE;
+  } catch {
+    return MATCH_TEAM_SIZE;
+  }
 }
 
 export async function isInWebQueue(discordUserId: string): Promise<boolean> {

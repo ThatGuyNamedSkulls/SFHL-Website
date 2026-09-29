@@ -6,15 +6,18 @@
  * - plays the queue sounds on transitions (start / end / match found / last 5 s),
  * - puts the search timer, or a flashing MATCH FOUND, in the tab title,
  * - dots the favicon (green searching, orange match found),
- * - sends a desktop notification for a match found in a background tab.
+ * - sends a desktop notification for a match found in a background tab,
+ * - chimes when a queue opens on the player's last picked server.
  */
 import { useEffect, useRef } from "react";
 import { useSession } from "@/components/session-provider";
 import { useMyParty } from "@/components/use-my-party";
 import { usePolling } from "@/components/use-polling";
+import { STATUS_TTL_MS } from "@/components/status-poller";
 import { refreshReadyCheck, resetReadyCheck, useReadyCheck, type ReadyCheck } from "@/components/use-ready-check";
+import { apiGetJson } from "@/lib/client-api";
 import { QUEUE_EVENT } from "@/lib/queue-signal";
-import { baseTitle, soundForTransition, titleFor } from "@/lib/queue-attention";
+import { baseTitle, queueJustOpened, soundForTransition, titleFor } from "@/lib/queue-attention";
 import { playQueueSound, unlockQueueAudio } from "@/lib/queue-sounds";
 
 /** A check is on screen: follow it closely. */
@@ -23,6 +26,8 @@ const PENDING_POLL_MS = 1500;
 const QUEUED_POLL_MS = 3000;
 /** Otherwise just a slow safety poll. */
 const IDLE_POLL_MS = 30_000;
+/** Open-queue watch. Visible tabs read the status poller's cached /api/queue; hidden tabs fetch it. */
+const QUEUE_OPEN_POLL_MS = 20_000;
 
 /** Ask for desktop notifications — call from the first Find match click (owner Q3). */
 export function askNotificationPermission() {
@@ -111,6 +116,22 @@ export function QueueAttention() {
   useEffect(() => {
     if (!session?.discordId) resetReadyCheck();
   }, [session?.discordId]);
+
+  // A queue opened on this player's server: chime, even from a background tab.
+  const openBefore = useRef<string[] | null>(null);
+  usePolling(
+    async () => {
+      const { ok, json } = await apiGetJson<{ openRegions?: string[]; myRegion?: string | null }>("/api/queue", {
+        ttlMs: STATUS_TTL_MS,
+      });
+      if (!ok || !json) return;
+      const open = json.openRegions ?? [];
+      if (queueJustOpened(openBefore.current, open, json.myRegion ?? null)) playQueueSound("open");
+      openBefore.current = open;
+    },
+    session?.discordId ? QUEUE_OPEN_POLL_MS : null,
+    { keepWhenHidden: true, restartKey: session?.discordId ?? "" }
+  );
 
   // Browsers only play audio after a gesture: unlock on the first click / key.
   useEffect(() => {
