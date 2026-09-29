@@ -147,7 +147,7 @@ export async function GET(
       players.map((p) => {
         const info = playerInfo.get(p.player_name);
         // Counter Blox's own rounds-played count when the game came from
-        // /cbrmresult (subs played fewer), else the match's round total.
+        // /rankgame (subs played fewer), else the match's round total.
         const roundsPlayed = p.rounds_played == null ? null : Number(p.rounds_played);
         const damage = p.damage == null ? null : Number(p.damage);
         const rating = performanceRating({

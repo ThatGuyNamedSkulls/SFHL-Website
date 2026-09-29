@@ -151,7 +151,7 @@ function Num({
   );
 }
 
-/** Multi-kill round columns, in order (games ranked with /cbrmresult). */
+/** Multi-kill round columns, in order (games ranked with /rankgame). */
 const MULTI_KILLS = [
   { key: "k2", label: "2K" },
   { key: "k3", label: "3K" },
@@ -172,7 +172,7 @@ function StatsTable({
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
-  // DMG was entered for this match; FK / 2K-5K come only from /cbrmresult games.
+  // DMG was entered for this match; FK / 2K-5K come only from /rankgame games.
   const hasDamage = players.some((p) => p.damage != null);
   const hasCb = players.some((p) => p.multiKills != null);
   return (

@@ -586,7 +586,7 @@ export interface DbMatch {
   /** Counter Blox DMG column. Null when it wasn't entered. */
   damage?: number | null;
   /** Counter Blox's own stats, only on games ranked with the bot's
-   *  /cbrmresult (read from playcbrm.xyz). Null on every other game. */
+   *  /rankgame (read from playcbrm.xyz). Null on every other game. */
   first_kills?: number | null;
   rounds_2k?: number | null;
   rounds_3k?: number | null;
@@ -631,7 +631,7 @@ export async function getMatchesForPlayer(playerName: string, limit = 100): Prom
   // graph — the graph then starts at the player's post-placement ELO instead of
   // reconstructing the 0 → 0 → 0 → <graduation ELO> placement climb. COALESCE
   // covers legacy rows written before the column existed. Mirrors the bot's
-  // /matchhistory + /checkperformance filters. Dummy /rankdummies rows are
+  // /matchhistory + /checkperformance filters. Dummy /testrankdummies rows are
   // hidden unless staff passed history=True (is_test=0).
   // Matches by player_id when the row has one, falling back to player_name —
   // see docs/DATABASE_PK_FK_RELATIONSHIPS.docx.
@@ -815,7 +815,7 @@ export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
   throw lastErr;
 }
 
-/** A player's totals from games ranked with /cbrmresult (Counter Blox's own
+/** A player's totals from games ranked with /rankgame (Counter Blox's own
  *  scoreboard). */
 export interface CbStats {
   matches: number;

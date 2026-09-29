@@ -1,7 +1,7 @@
 /**
  * Substitute slots — the website half of a flow the bot owns.
  *
- * The bot writes `sub_requests` when Match Staff run `/sub` (see the project's
+ * The bot writes `sub_requests` when Match Staff run `/opensubslot` (see the project's
  * `cogs/subs.py` and `core/sub_requests.py`). The site lists the open ones and
  * can claim one, which is a single conditional UPDATE — `WHERE status = 'open'`
  * — so two people clicking at the same instant can never both win the slot.
@@ -388,7 +388,7 @@ export async function claimSubRequest(
 /**
  * Give a slot back, only while the bot hasn't acted on it yet. Once access has
  * been granted and the match channel knows about the sub, withdrawing is a
- * staff decision (`/cancelsub`), not a self-service one.
+ * staff decision (`/closesubslot`), not a self-service one.
  */
 export async function withdrawSubClaim(
   claimer: Claimer,

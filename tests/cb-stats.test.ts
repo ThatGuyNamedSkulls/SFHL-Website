@@ -1,6 +1,6 @@
 /**
  * Counter Blox's own stats (first kills, 2K-5K rounds, rounds played) that the
- * bot's /cbrmresult saves on match_history: the match page reads them back
+ * bot's /rankgame saves on match_history: the match page reads them back
  * per row, and the profile sums them for the season.
  */
 import { after, before, describe, it } from "node:test";
@@ -37,7 +37,7 @@ before(async () => {
   await row(3, "2026-09-29 21:00:00", [1500, 1, 2, 0, 1, 1, 22]);
   await row(4, "2026-09-29 22:00:00", [1800, null, null, null, null, null, null]); // ranked by hand
   await row(5, "2026-09-29 23:00:00", [900, 1, 1, 0, 0, 0, 13], 1); // placement
-  await row(6, "2026-09-29 23:30:00", [900, 1, 1, 0, 0, 0, 13], 0, 1); // /rankdummies test
+  await row(6, "2026-09-29 23:30:00", [900, 1, 1, 0, 0, 0, 13], 0, 1); // /testrankdummies test
 });
 
 after(async () => {
@@ -54,7 +54,7 @@ describe("damagePerRound", () => {
 });
 
 describe("getCbStats", () => {
-  it("sums this season's /cbrmresult games only", async () => {
+  it("sums this season's /rankgame games only", async () => {
     assert.deepEqual(await db.getCbStats("yvvt", "2026-09-10 00:00:00"), {
       matches: 2,
       roundsPlayed: 51,
