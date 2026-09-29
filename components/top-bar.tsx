@@ -61,7 +61,7 @@ export function TopBar() {
               if (queueLocked) return;
               setRegionOpen((v) => !v);
             }}
-            className={`flex items-center gap-1 text-[13px] font-bold px-1.5 py-1 rounded-md ${
+            className={`flex items-center gap-1 text-[0.875rem] font-bold px-1.5 py-1 rounded-md ${
               queueLocked
                 ? "text-hl-muted cursor-not-allowed"
                 : "text-hl-muted hover:text-white"
@@ -98,7 +98,7 @@ export function TopBar() {
             </>
           )}
         </div>
-        <span className="md:hidden text-[13px] font-black text-white header-caps truncate">
+        <span className="md:hidden text-[0.875rem] font-black text-white header-caps truncate">
           {mobileTitle}
         </span>
       </div>
@@ -116,7 +116,7 @@ export function TopBar() {
             <Link
               key={tab.id}
               href={tab.href}
-              className={`pointer-events-auto h-full flex items-center text-[14px] font-bold header-caps border-b-2 ${
+              className={`pointer-events-auto h-full flex items-center text-[0.875rem] font-bold header-caps border-b-2 ${
                 active
                   ? "text-white border-[#ff5500]"
                   : "text-[#8a8a8a] border-transparent hover:text-white"

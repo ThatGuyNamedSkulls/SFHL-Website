@@ -11,17 +11,7 @@ import path from "path";
 import { avatarUrl } from "@/lib/format";
 import { getDiscordIdForPlayer } from "@/lib/social";
 import { getDiscordAvatarById } from "@/lib/auth";
-
-/** Discord's default embed avatar when we have an id but no custom hash. */
-export function defaultDiscordAvatar(discordId: string | number | bigint): string {
-  try {
-    const id = BigInt(discordId);
-    const idx = Number((id >> BigInt(22)) % BigInt(6));
-    return `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
-  } catch {
-    return "https://cdn.discordapp.com/embed/avatars/0.png";
-  }
-}
+import { defaultDiscordAvatar } from "@/lib/avatar-fallback";
 
 function localAvatarExists(url: string): boolean {
   const file = decodeURIComponent(url.replace(/^\/api\/avatar\//, ""));

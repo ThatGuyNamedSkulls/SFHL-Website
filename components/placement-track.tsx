@@ -34,7 +34,7 @@ export function PlacementTrack({
 
   return (
     <div className="pt-2 pb-1">
-      <div className="text-[11px] font-bold tracking-[0.18em] text-[#6a6a6a] uppercase mb-4">
+      <div className="text-[0.75rem] font-bold tracking-[0.18em] text-[#6a6a6a] uppercase mb-4">
         Season 1 placements
       </div>
       <div className="flex items-start overflow-x-auto pb-2">
@@ -42,12 +42,12 @@ export function PlacementTrack({
           <span className="w-9 h-9 rounded-full border border-white/15 bg-[#161616] flex items-center justify-center text-[#8a8a8a]">
             <RotateCcw className="w-4 h-4" />
           </span>
-          <span className="mt-2 text-[10px] font-semibold text-[#8a8a8a]">Reset</span>
+          <span className="mt-2 text-[0.6875rem] font-semibold text-[#8a8a8a]">Reset</span>
         </div>
 
         {nodes.map((n) => (
           <div key={n.i} className="flex items-start min-w-0">
-            <span className="w-6 sm:w-10 h-px bg-white/10 mt-[18px]" />
+            <span className="w-6 sm:w-10 h-px bg-white/10 mt-[1.125rem]" />
             <div className="flex flex-col items-center shrink-0 w-12">
               <span
                 className={cn(
@@ -59,7 +59,7 @@ export function PlacementTrack({
               >
                 {n.done ? <Check className="w-4 h-4" /> : null}
               </span>
-              <span className="mt-2 text-[11px] font-semibold text-[#c8c8c8]">{n.i + 1}</span>
+              <span className="mt-2 text-[0.75rem] font-semibold text-[#c8c8c8]">{n.i + 1}</span>
               {n.done && n.game ? (
                 n.win ? (
                   <ChevronUp className="w-4 h-4 text-[#2ecc71] mt-0.5" />
@@ -74,7 +74,7 @@ export function PlacementTrack({
         ))}
 
         <div className="flex items-start min-w-0">
-          <span className="w-6 sm:w-10 h-px bg-white/10 mt-[18px]" />
+          <span className="w-6 sm:w-10 h-px bg-white/10 mt-[1.125rem]" />
           <div className="flex flex-col items-center shrink-0 w-14">
         {ranked && rank && rank !== "UNRANKED" ? (
           <RankBadge rank={rank} size="sm" showGlow className="!w-9 !h-9" />
@@ -83,7 +83,7 @@ export function PlacementTrack({
                 ?
               </span>
             )}
-            <span className="mt-2 text-[10px] font-semibold text-[#8a8a8a]">Rank</span>
+            <span className="mt-2 text-[0.6875rem] font-semibold text-[#8a8a8a]">Rank</span>
           </div>
         </div>
       </div>

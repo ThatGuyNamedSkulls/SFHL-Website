@@ -72,7 +72,7 @@ export default function RanksPage() {
                   {tier.minElo}
                   {tier.letter === "STAR" ? "+" : ` – ${tier.maxElo}`}
                 </div>
-                <div className="text-[10px] text-hl-muted header-caps">Elo</div>
+                <div className="text-[0.6875rem] text-hl-muted header-caps">Elo</div>
               </div>
             </div>
           ))}

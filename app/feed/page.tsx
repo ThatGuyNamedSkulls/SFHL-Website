@@ -58,7 +58,7 @@ export default function FeedPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-white">{p.author}</span>
-                    <span className="text-[11px] text-hl-muted">
+                    <span className="text-[0.75rem] text-hl-muted">
                       {new Date(p.timestamp).toLocaleString()}
                     </span>
                   </div>

@@ -1,3 +1,4 @@
+import { AvatarImg } from "@/components/avatar-img";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BadgeCheck, CalendarDays, Crown, Lock, Swords, Trophy } from "lucide-react";
@@ -54,7 +55,7 @@ function Form({ results }: { results: ("W" | "L")[] }) {
       {results.map((r, i) => (
         <span
           key={i}
-          className={`grid h-6 w-6 place-items-center rounded text-[11px] font-black ${r === "W" ? "bg-hl-green/15 text-hl-green" : "bg-hl-red/15 text-hl-red"}`}
+          className={`grid h-6 w-6 place-items-center rounded text-[0.75rem] font-black ${r === "W" ? "bg-hl-green/15 text-hl-green" : "bg-hl-red/15 text-hl-red"}`}
         >
           {r}
         </span>
@@ -66,7 +67,7 @@ function Form({ results }: { results: ("W" | "L")[] }) {
 function Tile({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-white/[0.08] bg-[#121212] px-4 py-3.5">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50">{label}</div>
+      <div className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/50">{label}</div>
       <div className="mt-1.5 text-xl font-black text-white">{children}</div>
     </div>
   );
@@ -77,13 +78,12 @@ function MemberRow({ m }: { m: MemberCard }) {
   return (
     <li className="flex items-center gap-3 py-2">
       <span
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-full p-[2px]"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-full p-[0.125rem]"
         style={{ background: `conic-gradient(${m.ringColor} ${Math.round(m.progress * 360)}deg, rgba(255,255,255,0.12) 0deg)` }}
       >
-        <span className="grid h-full w-full place-items-center overflow-hidden rounded-full border-2 border-[#121212] bg-[#222] text-[10px] font-black text-white/70">
+        <span className="grid h-full w-full place-items-center overflow-hidden rounded-full border-2 border-[#121212] bg-[#222] text-[0.6875rem] font-black text-white/70">
           {m.avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element -- Roblox/Discord avatar CDNs
-            <img src={m.avatar} alt="" className="h-full w-full object-cover" />
+            <AvatarImg src={m.avatar} alt="" className="h-full w-full object-cover" />
           ) : (
             m.name.slice(0, 2).toUpperCase()
           )}
@@ -101,7 +101,7 @@ function MemberRow({ m }: { m: MemberCard }) {
           {m.verified ? <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-hl-green" aria-label="Linked HyperLeague player" /> : null}
           {m.country ? <Flag src={flagPath(m.country)} name={countryName(m.country)} className="h-3 w-4 shrink-0" /> : null}
         </span>
-        <span className="text-[11px] text-white/50">{m.coach ? "Coach" : "Substitute"}</span>
+        <span className="text-[0.75rem] text-white/50">{m.coach ? "Coach" : "Substitute"}</span>
       </span>
       <span className="flex items-center gap-2">
         <RankBadge rank={m.rank} size="sm" showGlow={false} className="!h-6 !w-6" />
@@ -115,10 +115,10 @@ function MemberRow({ m }: { m: MemberCard }) {
 
 function MatchRows({ matches }: { matches: TeamMatch[] }) {
   if (!matches.length) return <p className="py-6 text-center text-sm text-white/50">No league matches yet.</p>;
-  const th = "px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50";
+  const th = "px-3 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/50";
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm md:min-w-[720px]">
+      <table className="w-full text-sm md:min-w-[45rem]">
         <thead>
           <tr className="border-b border-white/[0.08] text-left">
             <th className={`${th} hidden pl-0 sm:table-cell`}>Date</th>
@@ -147,14 +147,14 @@ function MatchRows({ matches }: { matches: TeamMatch[] }) {
               <td className="px-2 py-2.5 text-center">
                 {m.result ? (
                   <span
-                    className={`inline-flex rounded px-2 py-0.5 text-[11px] font-black ${
+                    className={`inline-flex rounded px-2 py-0.5 text-[0.75rem] font-black ${
                       m.result === "W" ? "bg-hl-green/15 text-hl-green" : "bg-hl-red/15 text-hl-red"
                     }`}
                   >
                     {m.result === "W" ? "Win" : "Loss"}
                   </span>
                 ) : (
-                  <span className="text-[11px] font-bold text-white/45">Upcoming</span>
+                  <span className="text-[0.75rem] font-bold text-white/45">Upcoming</span>
                 )}
               </td>
               <td className="px-2 py-2.5 text-center tabular-nums">
@@ -230,7 +230,7 @@ export default async function TeamPage({
               style={{ background: `radial-gradient(circle at 75% 30%, ${team.accentColor}66, transparent 60%), linear-gradient(120deg, #1a1a1a, #0b0b0b 70%)` }}
             >
               <span
-                className="absolute -bottom-6 right-4 select-none whitespace-nowrap text-[96px] font-black uppercase leading-none tracking-tight text-transparent sm:text-[150px]"
+                className="absolute -bottom-6 right-4 select-none whitespace-nowrap text-[6rem] font-black uppercase leading-none tracking-tight text-transparent sm:text-[9.375rem]"
                 style={{ WebkitTextStroke: "2px rgba(255,255,255,0.08)" }}
               >
                 {team.tag || team.name}
@@ -256,19 +256,19 @@ export default async function TeamPage({
               {data.country ? <Flag src={flagPath(data.country)} name={countryName(data.country)} className="h-4 w-6" /> : null}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-md border border-[#ff5500]/40 bg-[#ff5500]/10 px-2 py-0.5 text-[11px] font-black text-[#ff8a4d]">
+              <span className="inline-flex items-center gap-1 rounded-md border border-[#ff5500]/40 bg-[#ff5500]/10 px-2 py-0.5 text-[0.75rem] font-black text-[#ff8a4d]">
                 <Swords className="h-3 w-3" /> HyperLeague
               </span>
-              <span className="rounded-md border border-white/15 px-2 py-0.5 text-[11px] font-bold text-white/75">{regionMeta(team.region).label}</span>
+              <span className="rounded-md border border-white/15 px-2 py-0.5 text-[0.75rem] font-bold text-white/75">{regionMeta(team.region).label}</span>
               {data.status ? (
-                <span className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-0.5 text-[11px] font-bold text-white/75">
+                <span className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-0.5 text-[0.75rem] font-bold text-white/75">
                   {data.status.bySkill ? null : <Lock className="h-3 w-3 text-[#ff5500]" />}
                   {data.status.name}
                   {data.status.bySkill ? " (by skill)" : " status"}
                 </span>
               ) : null}
               {data.titles.length ? (
-                <span className="inline-flex items-center gap-1 rounded-md border border-hl-gold/30 px-2 py-0.5 text-[11px] font-bold text-hl-gold">
+                <span className="inline-flex items-center gap-1 rounded-md border border-hl-gold/30 px-2 py-0.5 text-[0.75rem] font-bold text-hl-gold">
                   <Trophy className="h-3 w-3" /> {data.titles.length} title{data.titles.length === 1 ? "" : "s"}
                 </span>
               ) : null}
@@ -297,7 +297,7 @@ export default async function TeamPage({
       </section>
 
       {tab === "overview" ? (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_21.25rem]">
           <div className="min-w-0 space-y-5">
             <Panel title="Game">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-3 py-2.5">
@@ -307,7 +307,7 @@ export default async function TeamPage({
                   </span>
                   <span>
                     <span className="block text-sm font-black text-white">HyperLeague · Team League</span>
-                    <span className="block text-[11px] text-white/55">
+                    <span className="block text-[0.75rem] text-white/55">
                       {summary.played ? `${summary.won}W – ${summary.played - summary.won}L · ${summary.winRate}% win rate` : "No league matches yet"}
                     </span>
                   </span>
@@ -317,7 +317,7 @@ export default async function TeamPage({
             </Panel>
 
             <Panel title="Team members" aside={`${roster.starters.length + roster.subs.length + (roster.coach ? 1 : 0)} of ${ROLE_LIMITS.starter + ROLE_LIMITS.sub + ROLE_LIMITS.coach}`}>
-              <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">
+              <div className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/45">
                 Main roster · {roster.starters.length}/{ROLE_LIMITS.starter}
               </div>
               <div className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-2">
@@ -333,7 +333,7 @@ export default async function TeamPage({
               </div>
               <div className="mt-3 grid gap-x-6 sm:grid-cols-2">
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">
+                  <div className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/45">
                     Substitutes · {roster.subs.length}/{ROLE_LIMITS.sub}
                   </div>
                   {roster.subs.length ? (
@@ -343,7 +343,7 @@ export default async function TeamPage({
                   )}
                 </div>
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">Coach · {roster.coach ? 1 : 0}/{ROLE_LIMITS.coach}</div>
+                  <div className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/45">Coach · {roster.coach ? 1 : 0}/{ROLE_LIMITS.coach}</div>
                   {roster.coach ? <ul><MemberRow m={roster.coach} /></ul> : <p className="py-2 text-xs text-white/45">No coach.</p>}
                 </div>
               </div>
@@ -355,7 +355,7 @@ export default async function TeamPage({
               <p className="whitespace-pre-line text-sm leading-relaxed text-white/70">
                 {team.description || (captain ? "Tell players about your team in Settings." : "This team hasn't written anything yet.")}
               </p>
-              <p className="mt-3 flex items-center gap-1.5 text-[11px] text-white/45">
+              <p className="mt-3 flex items-center gap-1.5 text-[0.75rem] text-white/45">
                 <Crown className="h-3 w-3 text-hl-gold" /> Captain: {team.captainName}
               </p>
             </Panel>
@@ -396,7 +396,7 @@ export default async function TeamPage({
                       <Trophy className="mt-0.5 h-4 w-4 shrink-0 text-hl-gold" />
                       <span>
                         {t.title}
-                        <span className="block text-[11px] font-semibold text-white/45">{day(t.awardedAt)}</span>
+                        <span className="block text-[0.75rem] font-semibold text-white/45">{day(t.awardedAt)}</span>
                       </span>
                     </li>
                   ))}

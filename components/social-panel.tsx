@@ -1,5 +1,6 @@
 "use client";
 
+import { AvatarImg } from "@/components/avatar-img";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -78,10 +79,9 @@ function StatusAvatar({ name, avatar, online }: { name: string; avatar: string |
   return (
     <span className="relative inline-flex shrink-0">
       {avatar ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={avatar} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-full object-cover" />
+        <AvatarImg src={avatar} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-full object-cover" />
       ) : (
-        <span className="w-8 h-8 rounded-full bg-[#2a2a2a] text-[10px] font-bold text-[#c8c8c8] flex items-center justify-center">
+        <span className="w-8 h-8 rounded-full bg-[#2a2a2a] text-[0.6875rem] font-bold text-[#c8c8c8] flex items-center justify-center">
           {name.slice(0, 2).toUpperCase()}
         </span>
       )}
@@ -97,7 +97,7 @@ function StatusAvatar({ name, avatar, online }: { name: string; avatar: string |
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-4 pt-3 pb-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#9a9a9a]">
+    <p className="px-4 pt-3 pb-1 text-[0.75rem] font-black uppercase tracking-[0.12em] text-[#9a9a9a]">
       {children}
     </p>
   );
@@ -137,12 +137,12 @@ export function SocialRail({
         }`}
       >
         {open ? (
-          <span className="absolute -left-[10px] top-2 bottom-2 w-[3px] rounded-r-full bg-white" />
+          <span className="absolute -left-[0.625rem] top-2 bottom-2 w-[0.1875rem] rounded-r-full bg-white" />
         ) : null}
         <span className="relative">
           <Users className="w-5 h-5" strokeWidth={1.75} />
           {onlineCount > 0 ? (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] px-[3px] rounded-full bg-hl-green text-[#0c1a10] text-[9px] font-black leading-[15px] text-center pointer-events-none">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[0.9375rem] h-[0.9375rem] px-[0.1875rem] rounded-full bg-hl-green text-[#0c1a10] text-[0.6875rem] font-black leading-[0.9375rem] text-center pointer-events-none">
               {onlineBadgeCount(onlineCount)}
             </span>
           ) : null}
@@ -235,7 +235,7 @@ function SocialDrawer({
         <StatusAvatar name={f.name} avatar={f.avatar} online={on} />
         <Link
           href={`/profile?player=${encodeURIComponent(f.name)}`}
-          className={`min-w-0 flex-1 truncate text-[13px] font-semibold hover:underline ${on ? "text-white" : "text-[#bdbdbd]"}`}
+          className={`min-w-0 flex-1 truncate text-[0.875rem] font-semibold hover:underline ${on ? "text-white" : "text-[#bdbdbd]"}`}
         >
           {f.name}
         </Link>
@@ -349,7 +349,7 @@ function SocialDrawer({
                         onChange={(e) => setFilter(e.target.value)}
                         placeholder="Search"
                         aria-label="Search friends"
-                        className="w-full bg-[#1f1f1f] border border-white/10 rounded-md pl-8 pr-2 py-2 text-[13px] text-white placeholder:text-[#8a8a8a] focus:outline-none focus:border-[#ff5500]/50"
+                        className="w-full bg-[#1f1f1f] border border-white/10 rounded-md pl-8 pr-2 py-2 text-[0.875rem] text-white placeholder:text-[#8a8a8a] focus:outline-none focus:border-[#ff5500]/50"
                       />
                     </div>
                   </div>
@@ -366,7 +366,7 @@ function SocialDrawer({
                             avatar={r.friend.avatar}
                             online={isOnline({ name: r.name })}
                           />
-                          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-white">
+                          <span className="min-w-0 flex-1 truncate text-[0.875rem] font-semibold text-white">
                             {r.name}
                           </span>
                           <button
@@ -406,7 +406,7 @@ function SocialDrawer({
                   </p>
                 ) : null}
                 <div className="px-4 pt-4">
-                  <Link href="/friends" className="text-[12px] font-bold text-[#8a8a8a] hover:text-white">
+                  <Link href="/friends" className="text-[0.8125rem] font-bold text-[#8a8a8a] hover:text-white">
                     Manage friends →
                   </Link>
                 </div>
@@ -483,10 +483,10 @@ function AddFriend({
           }}
           placeholder="Find players to add"
           aria-label="Find players to add as friends"
-          className="w-full bg-[#1f1f1f] border border-[#f5c518]/40 rounded-md pl-8 pr-2 py-2 text-[13px] text-white placeholder:text-[#8a8a8a] focus:outline-none focus:border-[#f5c518]"
+          className="w-full bg-[#1f1f1f] border border-[#f5c518]/40 rounded-md pl-8 pr-2 py-2 text-[0.875rem] text-white placeholder:text-[#8a8a8a] focus:outline-none focus:border-[#f5c518]"
         />
       </div>
-      {error ? <p className="pt-2 text-[11px] text-hl-red">{error}</p> : null}
+      {error ? <p className="pt-2 text-[0.75rem] text-hl-red">{error}</p> : null}
       {query.trim().length >= 2 ? (
         <ul className="mt-2 rounded-md border border-white/10 overflow-hidden">
           {hits.length === 0 ? (
@@ -497,14 +497,14 @@ function AddFriend({
               return (
                 <li key={h.name} className="flex items-center gap-2 px-3 py-2">
                   <StatusAvatar name={h.name} avatar={h.avatar} online={false} />
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-white">{h.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[0.875rem] text-white">{h.name}</span>
                   {state ? (
-                    <span className="text-[11px] text-[#8a8a8a]">{state}</span>
+                    <span className="text-[0.75rem] text-[#8a8a8a]">{state}</span>
                   ) : (
                     <button
                       type="button"
                       onClick={() => add(h.name)}
-                      className="rounded-md px-2 py-1 text-[11px] font-black uppercase text-[#ff5500] hover:bg-white/5"
+                      className="rounded-md px-2 py-1 text-[0.75rem] font-black uppercase text-[#ff5500] hover:bg-white/5"
                     >
                       Add
                     </button>
@@ -583,8 +583,8 @@ function ChatList({
           {icon}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-semibold text-white">{title}</span>
-          <span className="block truncate text-[11px] text-[#8a8a8a]">{subtitle}</span>
+          <span className="block truncate text-[0.875rem] font-semibold text-white">{title}</span>
+          <span className="block truncate text-[0.75rem] text-[#8a8a8a]">{subtitle}</span>
         </span>
         <MessageSquare className="w-3.5 h-3.5 text-[#6a6a6a]" />
       </button>
@@ -635,7 +635,7 @@ function ChatList({
           No chats yet. Join a party, a clan or a match to start one.
         </p>
       )}
-      <p className="px-4 pt-3 text-[11px] text-[#6a6a6a]">
+      <p className="px-4 pt-3 text-[0.75rem] text-[#6a6a6a]">
         Each chat shows its last {RAIL_CHAT_MESSAGES} messages.
       </p>
     </div>

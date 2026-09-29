@@ -126,7 +126,7 @@ export default function AlertsPage() {
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-white leading-snug">{n.message}</p>
-                  <span className="text-[11px] text-hl-muted">{timeAgo(n.createdAt)}</span>
+                  <span className="text-[0.75rem] text-hl-muted">{timeAgo(n.createdAt)}</span>
                 </div>
               </div>
               {n.type === "friend_request" && n.actorId && (

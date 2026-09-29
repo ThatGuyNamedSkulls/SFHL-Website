@@ -1,5 +1,6 @@
 "use client";
 
+import { AvatarImg } from "@/components/avatar-img";
 import Link from "next/link";
 import { AvatarFrame } from "@/components/avatar-frame";
 import { RankBadge } from "@/components/rank-badge";
@@ -83,9 +84,9 @@ function LobbyCard({ member, center }: { member: LobbyMember; center: boolean })
       </div>
 
       {/* Banner space the avatar overlaps, plus the corner markers. */}
-      <div className={`relative w-full shrink-0 ${center ? "h-[92px]" : "h-[80px]"}`}>
+      <div className={`relative w-full shrink-0 ${center ? "h-[5.75rem]" : "h-[5rem]"}`}>
         {member.self ? (
-          <span className="absolute left-2 top-2 rounded bg-[#ff5500] px-1.5 text-[9px] font-black leading-4 text-white">YOU</span>
+          <span className="absolute left-2 top-2 rounded bg-[#ff5500] px-1.5 text-[0.6875rem] font-black leading-4 text-white">YOU</span>
         ) : null}
         {member.canQueue === false ? (
           <span
@@ -114,8 +115,7 @@ function LobbyCard({ member, center }: { member: LobbyMember; center: boolean })
           >
             <span className="grid h-full w-full place-items-center overflow-hidden rounded-full border-2 border-[#141414] bg-[#222]">
               {member.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element -- Roblox/Discord avatar CDNs
-                <img src={member.avatar} alt="" className="h-full w-full object-cover" />
+                <AvatarImg src={member.avatar} alt="" className="h-full w-full object-cover" />
               ) : (
                 <UserRound className="h-1/2 w-1/2 text-[#ff5500]/80" strokeWidth={1.5} />
               )}
@@ -139,14 +139,14 @@ function LobbyCard({ member, center }: { member: LobbyMember; center: boolean })
           ) : null}
         </div>
         {member.country ? (
-          <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase text-white/55">
+          <span className="mt-0.5 inline-flex items-center gap-1 text-[0.6875rem] font-bold uppercase text-white/55">
             <Flag src={flagPath(member.country)} name={countryName(member.country)} className="h-3 w-4" />
             {member.country}
           </span>
         ) : null}
         <div className="mt-auto flex flex-col items-center gap-0.5 pt-2">
           <RankBadge rank={rank} size="md" showGlow={false} />
-          <span className="text-[11px] tabular-nums text-white/60">
+          <span className="text-[0.75rem] tabular-nums text-white/60">
             {rank === "UNRANKED" ? "Unranked" : typeof member.elo === "number" && member.elo > 0 ? `${member.elo.toLocaleString("en-US")} Elo` : rank}
           </span>
         </div>
@@ -180,7 +180,7 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
     positions[idx] = rest.shift();
   }
 
-  const slot = "h-[272px] w-[170px] shrink-0 snap-start lg:w-[164px]";
+  const slot = "h-[17rem] w-[10.625rem] shrink-0 snap-start lg:w-[10.25rem]";
   const empty = `${slot} flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.015]`;
 
   return (
@@ -204,7 +204,7 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
               key={i}
               // Phones scroll this row sideways: your card comes first there, so it's
               // never off-screen (desktop keeps it raised in the center).
-              className={`${slot} ${size === 1 ? "!w-[220px]" : ""} ${isCenter && size > 1 ? "z-10 lg:-my-3 lg:h-[296px] lg:w-[188px]" : ""} ${member.self ? "max-lg:order-first" : ""}`}
+              className={`${slot} ${size === 1 ? "!w-[13.75rem]" : ""} ${isCenter && size > 1 ? "z-10 lg:-my-3 lg:h-[18.5rem] lg:w-[11.75rem]" : ""} ${member.self ? "max-lg:order-first" : ""}`}
             >
               <LobbyCard member={member} center={isCenter} />
             </div>
@@ -226,7 +226,7 @@ export function LobbySlots({ members, size = 5, findPartiesHref = "/party-finder
         return (
           <div key={i} className={empty} aria-label="Open party slot">
             <Plus className="h-8 w-8 text-white/25" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/30">Open slot</span>
+            <span className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-white/30">Open slot</span>
           </div>
         );
       })}

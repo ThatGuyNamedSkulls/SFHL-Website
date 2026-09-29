@@ -167,7 +167,7 @@ export function OnlineBadge({
 /** Small "Online" / "Offline" label for profile headers and lists. */
 export function OnlineLabel({ online: isOnline }: { online: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${isOnline ? "text-hl-green" : "text-hl-muted"}`}>
+    <span className={`inline-flex items-center gap-1 text-[0.75rem] font-semibold ${isOnline ? "text-hl-green" : "text-hl-muted"}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-hl-green" : "bg-hl-muted/60"}`} />
       {isOnline ? "Online" : "Offline"}
     </span>

@@ -68,7 +68,7 @@ export function SearchStatus({
         </span>
       </Ring>
       <div>
-        <div className="text-[11px] font-black uppercase tracking-[0.14em] text-hl-green">Searching</div>
+        <div className="text-[0.75rem] font-black uppercase tracking-[0.14em] text-hl-green">Searching</div>
         <div className="stat-number text-4xl font-black leading-none text-white">{elapsed}</div>
         <div className="mt-1 text-xs text-white/60">
           {regionLabel} · {modeLabel} · {found} of {needed} players

@@ -1,5 +1,6 @@
 "use client";
 
+import { AvatarImg } from "@/components/avatar-img";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -34,10 +35,9 @@ interface SearchHit {
 
 function MemberAvatar({ m, size = "sm" }: { m: PartyMemberLite; size?: "sm" | "md" }) {
   const label = m.playerName || m.username;
-  const cls = size === "md" ? "w-8 h-8 text-[10px]" : "w-6 h-6 text-[8px]";
+  const cls = size === "md" ? "w-8 h-8 text-[0.6875rem]" : "w-6 h-6 text-[0.6875rem]";
   return m.avatar ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={m.avatar} alt="" referrerPolicy="no-referrer" className={`${cls} rounded-full object-cover`} />
+    <AvatarImg src={m.avatar} alt="" referrerPolicy="no-referrer" className={`${cls} rounded-full object-cover`} />
   ) : (
     <span className={`${cls} rounded-full bg-[#2a2a2a] font-bold text-[#c8c8c8] flex items-center justify-center`}>
       {label.slice(0, 2).toUpperCase()}
@@ -198,10 +198,10 @@ export function MyPartyRail({
           className={`${railBtn} ${open ? "text-white bg-white/[0.06]" : ""}`}
         >
           {open ? (
-            <span className="absolute -left-[3px] top-2 bottom-2 w-[3px] rounded-r-full bg-white" />
+            <span className="absolute -left-[0.1875rem] top-2 bottom-2 w-[0.1875rem] rounded-r-full bg-white" />
           ) : null}
           <span className="relative">
-            <UsersRound className="w-[18px] h-[18px]" strokeWidth={1.75} />
+            <UsersRound className="w-[1.125rem] h-[1.125rem]" strokeWidth={1.75} />
             {party ? <RailBadge count={party.members.length} /> : null}
             {chat.unread > 0 ? (
               <span
@@ -333,7 +333,7 @@ export function MyPartyRail({
                           <MemberAvatar m={m} />
                         </OnlineBadge>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1 text-[13px] font-semibold text-white">
+                          <div className="flex items-center gap-1 text-[0.875rem] font-semibold text-white">
                             <span className="truncate">
                               {m.clubTag ? <span className="text-hl-gold mr-1">[{m.clubTag}]</span> : null}
                               {label}
@@ -341,7 +341,7 @@ export function MyPartyRail({
                             {m.discordId === party.leaderId ? (
                               <Crown className="w-3 h-3 text-[#f5c518] shrink-0" />
                             ) : null}
-                            {self ? <span className="text-[10px] text-[#8a8a8a]">(you)</span> : null}
+                            {self ? <span className="text-[0.6875rem] text-[#8a8a8a]">(you)</span> : null}
                           </div>
                           {isLeader && !self ? (
                             <div className="flex gap-2">
@@ -349,7 +349,7 @@ export function MyPartyRail({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => makeCaptain(m.discordId)}
-                                className="text-[11px] text-hl-gold hover:underline"
+                                className="text-[0.75rem] text-hl-gold hover:underline"
                               >
                                 Make captain
                               </button>
@@ -357,7 +357,7 @@ export function MyPartyRail({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => kick(m.discordId)}
-                                className="text-[11px] text-hl-red hover:underline"
+                                className="text-[0.75rem] text-hl-red hover:underline"
                               >
                                 Kick
                               </button>
@@ -382,13 +382,13 @@ export function MyPartyRail({
             {/* voice card */}
             <div className="mx-4 mt-2 mb-3 flex items-center gap-2 rounded-lg border border-white/[0.08] bg-[#1b1b1b] px-3 py-2">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 text-[13px] font-bold text-white">
+                <div className="flex items-center gap-1.5 text-[0.875rem] font-bold text-white">
                   Voice
-                  <span className="rounded bg-[#ff5500] px-1 text-[9px] font-black uppercase leading-[14px] text-[#111]">
+                  <span className="rounded bg-[#ff5500] px-1 text-[0.6875rem] font-black uppercase leading-[0.875rem] text-[#111]">
                     Beta
                   </span>
                 </div>
-                <div className="text-[11px] text-[#8a8a8a]">
+                <div className="text-[0.75rem] text-[#8a8a8a]">
                   {party.voiceChannelUrl ? "Ready to start" : "Not available"}
                 </div>
               </div>
@@ -396,7 +396,7 @@ export function MyPartyRail({
                 <a
                   href={party.voiceChannelUrl}
                   title="Opens the Discord app"
-                  className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-black uppercase text-[#ff5500] hover:bg-white/5"
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[0.8125rem] font-black uppercase text-[#ff5500] hover:bg-white/5"
                 >
                   <Headphones className="w-4 h-4" />
                   Join
@@ -411,18 +411,18 @@ export function MyPartyRail({
                 {
                   id: "chat",
                   label: "Party chat",
-                  icon: <MessageSquare className="w-[18px] h-[18px]" strokeWidth={1.75} />,
+                  icon: <MessageSquare className="w-[1.125rem] h-[1.125rem]" strokeWidth={1.75} />,
                   dot: chat.unread > 0,
                 },
                 {
                   id: "invite",
                   label: "Find players",
-                  icon: <UserSearch className="w-[18px] h-[18px]" strokeWidth={1.75} />,
+                  icon: <UserSearch className="w-[1.125rem] h-[1.125rem]" strokeWidth={1.75} />,
                 },
                 {
                   id: "voice",
                   label: "Voice",
-                  icon: <Headphones className="w-[18px] h-[18px]" strokeWidth={1.75} />,
+                  icon: <Headphones className="w-[1.125rem] h-[1.125rem]" strokeWidth={1.75} />,
                 },
               ]}
               trailing={
@@ -432,14 +432,14 @@ export function MyPartyRail({
                       type="button"
                       disabled={busy}
                       onClick={leave}
-                      className="rounded px-2 py-1 text-[11px] font-black uppercase text-hl-red hover:bg-hl-red/10"
+                      className="rounded px-2 py-1 text-[0.75rem] font-black uppercase text-hl-red hover:bg-hl-red/10"
                     >
                       Leave
                     </button>
                     <button
                       type="button"
                       onClick={() => setConfirmLeave(false)}
-                      className="rounded px-2 py-1 text-[11px] text-[#8a8a8a] hover:text-white"
+                      className="rounded px-2 py-1 text-[0.75rem] text-[#8a8a8a] hover:text-white"
                     >
                       Cancel
                     </button>
@@ -452,7 +452,7 @@ export function MyPartyRail({
                     onClick={() => setConfirmLeave(true)}
                     className="w-11 h-10 flex items-center justify-center text-hl-red hover:bg-hl-red/10"
                   >
-                    <LogOut className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                    <LogOut className="w-[1.125rem] h-[1.125rem]" strokeWidth={1.75} />
                   </button>
                 )
               }
@@ -502,15 +502,14 @@ export function MyPartyRail({
                             className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/[0.05] disabled:opacity-50"
                           >
                             {h.avatar ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={h.avatar} alt="" referrerPolicy="no-referrer" className="w-6 h-6 rounded-full object-cover" />
+                              <AvatarImg src={h.avatar} alt="" referrerPolicy="no-referrer" className="w-6 h-6 rounded-full object-cover" />
                             ) : (
-                              <span className="w-6 h-6 rounded-full bg-[#2a2a2a] text-[9px] font-bold text-[#c8c8c8] flex items-center justify-center">
+                              <span className="w-6 h-6 rounded-full bg-[#2a2a2a] text-[0.6875rem] font-bold text-[#c8c8c8] flex items-center justify-center">
                                 {h.name.slice(0, 2).toUpperCase()}
                               </span>
                             )}
                             <span className="text-sm text-white truncate flex-1">{h.name}</span>
-                            <span className="text-[11px] font-bold text-[#ff5500]">
+                            <span className="text-[0.75rem] font-bold text-[#ff5500]">
                               {inParty ? "In party" : invited ? "Invited" : "Invite"}
                             </span>
                           </button>
@@ -525,7 +524,7 @@ export function MyPartyRail({
                 )}
                 {(party.invitedNames ?? []).length > 0 ? (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7a7a7a] mb-1">
+                    <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#7a7a7a] mb-1">
                       Pending invites
                     </p>
                     <p className="text-xs text-[#bdbdbd]">{party.invitedNames!.join(", ")}</p>

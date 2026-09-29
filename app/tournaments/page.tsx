@@ -67,12 +67,12 @@ function FeaturedCard({ cup }: { cup: CupCard }) {
   return (
     <Link
       href={`/tournaments/${cup.id}`}
-      className="relative min-h-[168px] overflow-hidden rounded-xl border border-white/10 p-4 transition-colors hover:border-white/25"
+      className="relative min-h-[10.5rem] overflow-hidden rounded-xl border border-white/10 p-4 transition-colors hover:border-white/25"
       style={{ backgroundImage: tone }}
     >
       <div className="relative z-10 flex h-full flex-col justify-between">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-white/70">
+          <div className="text-[0.6875rem] font-bold uppercase tracking-wide text-white/70">
             {cup.kind === "official" ? "Official" : "Clan cup"} · {statusLabel(cup.status)}
           </div>
           <h3 className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white">{cup.name}</h3>
@@ -84,7 +84,7 @@ function FeaturedCard({ cup }: { cup: CupCard }) {
               <Coins className="h-3.5 w-3.5" />
               {cup.pot.toLocaleString()}
             </div>
-            <div className="text-[10px] text-white/50">Prize pool</div>
+            <div className="text-[0.6875rem] text-white/50">Prize pool</div>
           </div>
           <div className="text-right text-xs text-white/70">
             <div>5v5 · BO{cup.bo}</div>
@@ -102,9 +102,9 @@ function CupRow({ cup }: { cup: CupCard }) {
   return (
     <Link
       href={`/tournaments/${cup.id}`}
-      className="grid grid-cols-1 items-center gap-2 rounded-lg px-3 py-3 transition-colors hover:bg-white/[0.04] md:grid-cols-[140px_minmax(0,1.4fr)_110px_110px_100px_70px]"
+      className="grid grid-cols-1 items-center gap-2 rounded-lg px-3 py-3 transition-colors hover:bg-white/[0.04] md:grid-cols-[8.75rem_minmax(0,1.4fr)_6.875rem_6.875rem_6.25rem_4.375rem]"
     >
-      <div className={`text-[11px] font-bold uppercase tracking-wide ${statusTone(cup.status)}`}>
+      <div className={`text-[0.75rem] font-bold uppercase tracking-wide ${statusTone(cup.status)}`}>
         {statusLabel(cup.status)}
         <div className="mt-0.5 font-semibold normal-case tracking-normal text-[#8a8a8a]">
           {regionMeta(cup.region).short}
@@ -292,7 +292,7 @@ export default function TournamentsPage() {
 
       {tab === "browse" && featured.length > 0 ? (
         <section className="mb-6">
-          <h2 className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[#8a8a8a]">Featured</h2>
+          <h2 className="mb-3 text-[0.75rem] font-bold uppercase tracking-wide text-[#8a8a8a]">Featured</h2>
           <div className="grid gap-3 md:grid-cols-3">
             {featured.map((cup) => (
               <FeaturedCard key={cup.id} cup={cup} />
@@ -320,7 +320,7 @@ export default function TournamentsPage() {
                 setJoinableOnly(false);
                 setStatus(f.id);
               }}
-              className={`rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+              className={`rounded-full border px-3 py-1.5 text-[0.75rem] font-bold ${
                 active
                   ? "border-white bg-white text-black"
                   : "border-white/10 text-[#a0a0a0] hover:text-white"
@@ -333,7 +333,7 @@ export default function TournamentsPage() {
         <button
           type="button"
           onClick={() => setFiltersOpen((v) => !v)}
-          className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+          className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[0.75rem] font-bold ${
             filtersOpen || kind !== "all" || bracket !== "all"
               ? "border-[#ff5500]/50 text-[#ff5500]"
               : "border-white/10 text-[#a0a0a0] hover:text-white"
@@ -354,7 +354,7 @@ export default function TournamentsPage() {
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#8a8a8a]">Type</div>
+              <div className="mb-2 text-[0.75rem] font-bold uppercase tracking-wide text-[#8a8a8a]">Type</div>
               <div className="flex flex-wrap gap-1.5">
                 {(
                   [
@@ -367,7 +367,7 @@ export default function TournamentsPage() {
                     key={id}
                     type="button"
                     onClick={() => setKind(id)}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-bold ${
+                    className={`rounded-full border px-3 py-1 text-[0.75rem] font-bold ${
                       kind === id ? "border-white bg-white text-black" : "border-white/10 text-[#a0a0a0]"
                     }`}
                   >
@@ -377,7 +377,7 @@ export default function TournamentsPage() {
               </div>
             </div>
             <div>
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#8a8a8a]">Bracket</div>
+              <div className="mb-2 text-[0.75rem] font-bold uppercase tracking-wide text-[#8a8a8a]">Bracket</div>
               <div className="flex flex-wrap gap-1.5">
                 {(
                   [
@@ -390,7 +390,7 @@ export default function TournamentsPage() {
                     key={id}
                     type="button"
                     onClick={() => setBracket(id)}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-bold ${
+                    className={`rounded-full border px-3 py-1 text-[0.75rem] font-bold ${
                       bracket === id ? "border-white bg-white text-black" : "border-white/10 text-[#a0a0a0]"
                     }`}
                   >
@@ -431,7 +431,7 @@ export default function TournamentsPage() {
         <div className="space-y-6">
           {grouped.map((group) => (
             <section key={group.label}>
-              <h2 className="mb-1 px-3 text-[11px] font-bold uppercase tracking-wide text-[#8a8a8a]">
+              <h2 className="mb-1 px-3 text-[0.75rem] font-bold uppercase tracking-wide text-[#8a8a8a]">
                 {group.label}
               </h2>
               <div className="divide-y divide-white/[0.04] rounded-xl border border-white/[0.06] bg-[#121212]">

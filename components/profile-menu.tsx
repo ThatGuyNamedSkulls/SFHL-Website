@@ -40,7 +40,7 @@ export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
       >
         <Avatar className="w-9 h-9 border border-hl-border">
           {session?.avatar ? <AvatarImage src={session.avatar} /> : null}
-          <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
+          <AvatarFallback className="bg-hl-panel-light text-[0.6875rem] font-bold text-hl-gold">
             {(session?.username ?? "?").slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
@@ -72,7 +72,7 @@ export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-bold text-white truncate">{label}</div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-hl-muted">
+                  <div className="flex items-center gap-1.5 text-[0.75rem] text-hl-muted">
                     <span className="w-1.5 h-1.5 rounded-full bg-hl-green" />
                     Online
                   </div>
@@ -93,7 +93,7 @@ export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
                   onClick={() => setOpen(false)}
                   className="rounded-lg border border-hl-border bg-hl-base/60 px-3 py-2 hover:border-hl-gold/40"
                 >
-                  <div className="flex items-center gap-1 text-[10px] header-caps text-hl-muted">
+                  <div className="flex items-center gap-1 text-[0.6875rem] header-caps text-hl-muted">
                     <Coins className="w-3 h-3 text-hl-gold" /> Shop
                   </div>
                   <div className="stat-number text-white font-black mt-0.5">{coins.toLocaleString()}</div>
@@ -103,7 +103,7 @@ export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
                   onClick={() => setOpen(false)}
                   className="rounded-lg border border-hl-border bg-hl-base/60 px-3 py-2 hover:border-hl-gold/40"
                 >
-                  <div className="text-[10px] header-caps text-hl-muted">HL Coins</div>
+                  <div className="text-[0.6875rem] header-caps text-hl-muted">HL Coins</div>
                   <div className="text-xs font-bold text-hl-gold mt-0.5">Buy</div>
                 </Link>
               </div>

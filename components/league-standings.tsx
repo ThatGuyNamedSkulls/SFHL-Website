@@ -59,7 +59,7 @@ export function TeamCell({ team, mine, size = 28 }: { team: TeamBadge; mine?: bo
       <span className={`truncate text-sm font-bold group-hover:underline ${mine ? "text-[#ff5500]" : "text-white"}`}>
         {team.name}
       </span>
-      {team.tag ? <span className="hidden shrink-0 text-[11px] text-white/45 sm:inline">[{team.tag}]</span> : null}
+      {team.tag ? <span className="hidden shrink-0 text-[0.75rem] text-white/45 sm:inline">[{team.tag}]</span> : null}
     </Link>
   );
 }
@@ -142,7 +142,7 @@ export function StageStepper({
               href={hrefFor(s.key)}
               scroll={false}
               aria-current={on ? "step" : undefined}
-              className={`flex min-w-0 flex-1 items-center gap-3 border-b-2 px-2.5 py-3 transition-colors sm:min-w-[150px] sm:px-4 ${
+              className={`flex min-w-0 flex-1 items-center gap-3 border-b-2 px-2.5 py-3 transition-colors sm:min-w-[9.375rem] sm:px-4 ${
                 on ? "border-[#ff5500] bg-white/[0.03]" : "border-transparent hover:bg-white/[0.03]"
               }`}
             >
@@ -153,7 +153,7 @@ export function StageStepper({
                 <span className={`block truncate text-xs font-black sm:text-sm ${on ? "text-white" : "text-white/80"}`}>
                   {s.label}
                 </span>
-                <span className="block truncate text-[11px] text-white/55">{stageNote(s)}</span>
+                <span className="block truncate text-[0.75rem] text-white/55">{stageNote(s)}</span>
               </span>
             </Link>
           </li>
@@ -197,7 +197,7 @@ export function StageOutcomes({ outcomes }: { outcomes: Outcome[] }) {
             <div className="min-w-0">
               <div className="text-sm font-black leading-tight text-white">{o.title}</div>
               <div className="mt-0.5 text-xs font-bold text-white/70">{o.places}</div>
-              {o.note ? <div className="mt-0.5 text-[11px] leading-snug text-white/50">{o.note}</div> : null}
+              {o.note ? <div className="mt-0.5 text-[0.75rem] leading-snug text-white/50">{o.note}</div> : null}
             </div>
           </div>
         );
@@ -225,7 +225,7 @@ function ZoneBand({ zone, moves, cols }: { zone: Exclude<Zone, null>; moves: Div
   return (
     <tr className="border-t border-white/[0.06] first:border-t-0">
       <td colSpan={cols} className={`px-4 py-1.5 sm:px-5 ${cls}`}>
-        <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em]">
+        <div className="flex items-center justify-between gap-3 text-[0.6875rem] font-black uppercase tracking-[0.14em]">
           <span className="inline-flex items-center gap-1.5">
             {zone === "promotion" ? <ChevronsUp className="h-3.5 w-3.5" /> : zone === "relegation" ? <ChevronsDown className="h-3.5 w-3.5" /> : <Trophy className="h-3 w-3" />}
             {label}
@@ -251,14 +251,14 @@ export function RegularTable({
   const tied = tiebrokenTeams(div.standings);
   const n = div.standings.length;
   const zones = div.standings.map((_, i) => regularZone(i, n, moves));
-  const th = "px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50";
+  const th = "px-3 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/50";
   return (
     <section>
       <SectionTitle aside={`${div.standings.length} teams · ${div.format === "swiss" ? "Swiss · " : ""}win = 3 pts`}>
         Regular season
       </SectionTitle>
       <div className="overflow-x-auto rounded-xl border border-white/[0.08] bg-[#121212]">
-        <table className="w-full text-sm sm:min-w-[640px]">
+        <table className="w-full text-sm sm:min-w-[40rem]">
           <thead>
             <tr className="border-b border-white/[0.08] text-left">
               <th className={`${th} w-10 pl-4 sm:w-12 sm:pl-5`}>#</th>
@@ -285,7 +285,7 @@ export function RegularTable({
                   <td className="relative py-2.5 pl-5 pr-3">
                     <span
                       aria-hidden
-                      className={`absolute inset-y-1 left-0 w-[3px] rounded-r ${zone ? ZONE_BAR[zone] : "bg-white/10"}`}
+                      className={`absolute inset-y-1 left-0 w-[0.1875rem] rounded-r ${zone ? ZONE_BAR[zone] : "bg-white/10"}`}
                     />
                     <span className={`font-black tabular-nums ${zone && zone !== "relegation" ? "text-white" : "text-white/55"}`}>{i + 1}</span>
                   </td>
@@ -295,7 +295,7 @@ export function RegularTable({
                       {tied.has(row.teamId) ? (
                         <span
                           title="Level on points: ordered by head-to-head, then round difference, then rounds won."
-                          className="shrink-0 cursor-help rounded border border-white/15 px-1 text-[9px] font-black leading-[14px] text-white/60"
+                          className="shrink-0 cursor-help rounded border border-white/15 px-1 text-[0.6875rem] font-black leading-[0.875rem] text-white/60"
                         >
                           TB
                         </span>
@@ -322,9 +322,9 @@ export function RegularTable({
           </tbody>
         </table>
       </div>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-white/55">
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-[0.75rem] text-white/55">
         <span className="inline-flex items-center gap-1.5">
-          <span className="rounded border border-white/15 px-1 text-[9px] font-black leading-[14px] text-white/60">TB</span>
+          <span className="rounded border border-white/15 px-1 text-[0.6875rem] font-black leading-[0.875rem] text-white/60">TB</span>
           {div.format === "swiss"
             ? "Placed by tiebreak (opponents' points → round difference → rounds won)"
             : "Placed by tiebreak (head-to-head → round difference → rounds won)"}
@@ -348,7 +348,7 @@ function ScheduleLine({ m }: { m: MatchSummary }) {
   else if (!over && m.scheduledAt) sub = <LocalTime ts={m.scheduledAt} />;
   return (
     <div
-      className={`grid grid-cols-[minmax(0,1fr)_84px_minmax(0,1fr)] items-center gap-2 rounded-lg border px-3 py-2 ${
+      className={`grid grid-cols-[minmax(0,1fr)_5.25rem_minmax(0,1fr)] items-center gap-2 rounded-lg border px-3 py-2 ${
         m.mine ? "border-[#ff5500]/35 bg-[#ff5500]/[0.06]" : "border-white/[0.06] bg-[#181818]"
       }`}
     >
@@ -357,7 +357,7 @@ function ScheduleLine({ m }: { m: MatchSummary }) {
       </div>
       <Link href={`/league/match/${m.id}`} className="rounded-md py-0.5 text-center hover:bg-white/[0.05]" title="Match page">
         <div className={`text-sm font-black tabular-nums ${over ? "text-white" : "text-white/55"}`}>{middle}</div>
-        <div className="text-[10px] text-white/50">{sub}</div>
+        <div className="text-[0.6875rem] text-white/50">{sub}</div>
       </Link>
       <div className={aWon ? "opacity-50" : ""}>
         <TeamCell team={m.teamB} size={22} />
@@ -389,7 +389,7 @@ export function RegularSchedule({ div }: { div: DivisionView }) {
                   ) : null}
                 </span>
                 {w.defaultSlot ? (
-                  <span className="text-[10px] text-white/45">
+                  <span className="text-[0.6875rem] text-white/45">
                     No agreed time → <LocalTime ts={w.defaultSlot} />
                   </span>
                 ) : null}
@@ -404,7 +404,7 @@ export function RegularSchedule({ div }: { div: DivisionView }) {
                     className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-white/[0.1] px-3 py-2"
                   >
                     <TeamCell team={b.team} size={22} />
-                    <span className="shrink-0 text-[11px] font-bold text-white/50">Bye · counts as a win</span>
+                    <span className="shrink-0 text-[0.75rem] font-bold text-white/50">Bye · counts as a win</span>
                   </div>
                 ))}
               </div>
@@ -463,7 +463,7 @@ function BracketCard({
 
   const body = (
     <>
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white/50">
+      <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-white/50">
         <span>{title}</span>
         <span>BO{match?.bo ?? 3}</span>
       </div>
@@ -474,7 +474,7 @@ function BracketCard({
             r.won ? "bg-[#ff5500]/[0.08]" : ""
           } ${r.lost ? "opacity-50" : ""}`}
         >
-          <span className="w-5 shrink-0 text-center text-[11px] font-bold tabular-nums text-white/45">{r.seed ?? ""}</span>
+          <span className="w-5 shrink-0 text-center text-[0.75rem] font-bold tabular-nums text-white/45">{r.seed ?? ""}</span>
           {r.team ? (
             <>
               <ClubMark tag={r.team.tag} accentColor={r.team.accentColor} logoUrl={r.team.logoUrl} size={22} />
@@ -494,10 +494,10 @@ function BracketCard({
           </span>
         </div>
       ))}
-      <div className="border-t border-white/[0.06] px-3 py-1.5 text-[10px] text-white/50">{footer}</div>
+      <div className="border-t border-white/[0.06] px-3 py-1.5 text-[0.6875rem] text-white/50">{footer}</div>
     </>
   );
-  const cls = `block w-[260px] shrink-0 overflow-hidden rounded-lg border bg-[#181818] ${
+  const cls = `block w-[16.25rem] shrink-0 overflow-hidden rounded-lg border bg-[#181818] ${
     match?.mine ? "border-[#ff5500]/45" : "border-white/[0.1]"
   }`;
   return match ? (
@@ -521,9 +521,9 @@ function Connector() {
 
 function RoundHeader({ title, sub }: { title: string; sub: string }) {
   return (
-    <div className="mb-3 w-[260px]">
+    <div className="mb-3 w-[16.25rem]">
       <div className="text-sm font-black text-white">{title}</div>
-      <div className="text-[11px] text-white/50">{sub}</div>
+      <div className="text-[0.75rem] text-white/50">{sub}</div>
     </div>
   );
 }
@@ -551,7 +551,7 @@ export function PlayoffBracket({
       <div className="overflow-x-auto rounded-xl border border-white/[0.08] bg-[#121212] p-5">
         {/* Row 1: round headers. Row 2: cards; each semi sits in an equal half, so the
             connector's 25% / 75% marks meet their middles exactly. */}
-        <div className="grid w-max grid-cols-[260px_40px_260px_81px_260px] grid-rows-[auto_1fr]">
+        <div className="grid w-max grid-cols-[16.25rem_2.5rem_16.25rem_5.0625rem_16.25rem] grid-rows-[auto_1fr]">
           <RoundHeader title="Semi-finals" sub="2 matches · Best of 3" />
           <span />
           <RoundHeader title="Final" sub="1 match · Best of 3" />
@@ -589,7 +589,7 @@ export function PlayoffBracket({
         </div>
       </div>
       {!div.playoffs ? (
-        <p className="mt-2.5 text-[11px] text-white/55">
+        <p className="mt-2.5 text-[0.75rem] text-white/55">
           The bracket fills in when Match Staff start the playoffs after the regular season.
         </p>
       ) : null}
@@ -618,7 +618,7 @@ export function FinalResults({
     { title: "Playoffs", sub: `1st–${ordinal(PLAYOFF_LINE)}`, rows: div.places.filter((p) => p.place <= PLAYOFF_LINE) },
     { title: "Regular season", sub: `${ordinal(PLAYOFF_LINE + 1)} and below`, rows: div.places.filter((p) => p.place > PLAYOFF_LINE) },
   ].filter((g) => g.rows.length);
-  const th = "px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50";
+  const th = "px-3 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/50";
 
   return (
     <section className="space-y-6">
@@ -628,8 +628,8 @@ export function FinalResults({
             key={p.team.id}
             className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#121212] px-4 py-4"
           >
-            <span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: PODIUM[p.place - 1] }} />
-            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.12em]" style={{ color: PODIUM[p.place - 1] }}>
+            <span aria-hidden className="absolute inset-x-0 top-0 h-[0.1875rem]" style={{ background: PODIUM[p.place - 1] }} />
+            <div className="mb-2 flex items-center gap-1.5 text-[0.75rem] font-black uppercase tracking-[0.12em]" style={{ color: PODIUM[p.place - 1] }}>
               <Trophy className="h-3.5 w-3.5" /> {p.place === 1 ? "Champion" : `${ordinal(p.place)} place`}
             </div>
             <TeamCell team={p.team} mine={myTeamIds.includes(p.team.id)} size={32} />
@@ -642,7 +642,7 @@ export function FinalResults({
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/[0.08] bg-[#121212]">
-        <table className="w-full text-sm sm:min-w-[560px]">
+        <table className="w-full text-sm sm:min-w-[35rem]">
           <thead>
             <tr className="border-b border-white/[0.08] text-left">
               <th className={`${th} w-16 pl-5`}>Place</th>
@@ -654,7 +654,7 @@ export function FinalResults({
           {groups.map((g) => (
             <tbody key={g.title}>
               <tr className="border-t border-white/[0.08] bg-white/[0.02]">
-                <td colSpan={4} className="px-5 py-2 text-[11px] font-black uppercase tracking-[0.1em] text-white/70">
+                <td colSpan={4} className="px-5 py-2 text-[0.75rem] font-black uppercase tracking-[0.1em] text-white/70">
                   {g.title} <span className="ml-1 font-semibold normal-case tracking-normal text-white/45">{g.sub}</span>
                 </td>
               </tr>
@@ -666,7 +666,7 @@ export function FinalResults({
                       {p.movement ? (
                         <span
                           aria-hidden
-                          className={`absolute inset-y-1 left-0 w-[3px] rounded-r ${p.movement === "up" ? "bg-hl-green" : "bg-hl-red"}`}
+                          className={`absolute inset-y-1 left-0 w-[0.1875rem] rounded-r ${p.movement === "up" ? "bg-hl-green" : "bg-hl-red"}`}
                         />
                       ) : null}
                       {ordinal(p.place)}

@@ -1,5 +1,6 @@
 "use client";
 
+import { AvatarImg } from "@/components/avatar-img";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronsRight, SendHorizontal, Trash2 } from "lucide-react";
@@ -149,10 +150,9 @@ export function ChatThread({
       <div key={m.id} className="group flex items-start gap-2.5 px-4 py-1.5 hover:bg-white/[0.02]">
         <OnlineBadge online={isOnline({ id: m.authorId })} size="xs" className="mt-0.5">
           {m.avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={m.avatar} alt="" referrerPolicy="no-referrer" className="w-7 h-7 rounded-full object-cover" />
+            <AvatarImg src={m.avatar} alt="" referrerPolicy="no-referrer" className="w-7 h-7 rounded-full object-cover" />
           ) : (
-            <span className="w-7 h-7 rounded-full bg-[#2a2a2a] text-[9px] font-bold text-[#c8c8c8] flex items-center justify-center">
+            <span className="w-7 h-7 rounded-full bg-[#2a2a2a] text-[0.6875rem] font-bold text-[#c8c8c8] flex items-center justify-center">
               {m.name.slice(0, 2).toUpperCase()}
             </span>
           )}
@@ -162,16 +162,16 @@ export function ChatThread({
             {m.profileName ? (
               <Link
                 href={`/profile?player=${encodeURIComponent(m.profileName)}`}
-                className={`text-[12px] font-bold truncate hover:underline ${mine ? "text-[#ff5500]" : "text-white"}`}
+                className={`text-[0.8125rem] font-bold truncate hover:underline ${mine ? "text-[#ff5500]" : "text-white"}`}
               >
                 {m.name}
               </Link>
             ) : (
-              <span className={`text-[12px] font-bold truncate ${mine ? "text-[#ff5500]" : "text-white"}`}>
+              <span className={`text-[0.8125rem] font-bold truncate ${mine ? "text-[#ff5500]" : "text-white"}`}>
                 {m.name}
               </span>
             )}
-            <span className="text-[10px] text-[#6a6a6a] shrink-0">
+            <span className="text-[0.6875rem] text-[#6a6a6a] shrink-0">
               {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
             {onDelete && canDelete?.(m) ? (
@@ -186,7 +186,7 @@ export function ChatThread({
               </button>
             ) : null}
           </div>
-          <p className="text-[13px] leading-snug text-[#d6d6d6] whitespace-pre-wrap break-words">{m.text}</p>
+          <p className="text-[0.875rem] leading-snug text-[#d6d6d6] whitespace-pre-wrap break-words">{m.text}</p>
         </div>
       </div>
     );
@@ -195,7 +195,7 @@ export function ChatThread({
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto py-3">
-        <p className="text-center text-[10px] font-semibold tracking-[0.18em] uppercase text-[#6a6a6a] py-3">
+        <p className="text-center text-[0.6875rem] font-semibold tracking-[0.18em] uppercase text-[#6a6a6a] py-3">
           {shown.length >= RAIL_CHAT_MESSAGES
             ? `Last ${RAIL_CHAT_MESSAGES} messages`
             : "Beginning of conversation"}
@@ -223,7 +223,7 @@ export function ChatThread({
             onChange={(e) => setText(e.target.value.slice(0, MAX_LENGTH))}
             placeholder={placeholder}
             aria-label={placeholder}
-            className="h-9 flex-1 min-w-0 bg-transparent text-[13px] text-white placeholder:text-[#6a6a6a] focus:outline-none"
+            className="h-9 flex-1 min-w-0 bg-transparent text-[0.875rem] text-white placeholder:text-[#6a6a6a] focus:outline-none"
           />
           <button
             type="submit"
@@ -235,7 +235,7 @@ export function ChatThread({
             <SendHorizontal className="w-4 h-4" />
           </button>
         </div>
-        {error ? <p className="pt-2 text-[11px] text-hl-red">{error}</p> : null}
+        {error ? <p className="pt-2 text-[0.75rem] text-hl-red">{error}</p> : null}
       </form>
     </div>
   );
@@ -243,7 +243,7 @@ export function ChatThread({
 
 function DayDivider({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2 text-[10px] font-semibold tracking-[0.16em] uppercase text-[#7a7a7a]">
+    <div className="flex items-center gap-3 px-4 py-2 text-[0.6875rem] font-semibold tracking-[0.16em] uppercase text-[#7a7a7a]">
       <span className="h-px flex-1 bg-white/[0.07]" />
       {label}
       <span className="h-px flex-1 bg-white/[0.07]" />
@@ -253,7 +253,7 @@ function DayDivider({ label }: { label: string }) {
 
 function SafetyNotice() {
   return (
-    <div className="flex items-start gap-2 px-4 py-2 text-[13px] leading-snug text-[#cfcfcf]">
+    <div className="flex items-start gap-2 px-4 py-2 text-[0.875rem] leading-snug text-[#cfcfcf]">
       <ChevronsRight className="w-3.5 h-3.5 mt-1 shrink-0 text-[#7a7a7a]" />
       <p>
         Beware of scams in chat: don&apos;t share login details or codes, and don&apos;t click

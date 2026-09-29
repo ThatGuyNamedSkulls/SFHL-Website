@@ -76,7 +76,7 @@ function FiltersModal({
 
         <div className="space-y-5">
           <div>
-            <div className="text-[11px] header-caps text-hl-muted mb-2">Specifics</div>
+            <div className="text-[0.75rem] header-caps text-hl-muted mb-2">Specifics</div>
             <div className="flex items-center gap-2 flex-wrap">
               <button className={chip(draft.verified)} onClick={() => setDraft({ ...draft, verified: !draft.verified })}>
                 <ShieldCheck className="w-3.5 h-3.5" /> Verified
@@ -88,7 +88,7 @@ function FiltersModal({
           </div>
 
           <div>
-            <div className="text-[11px] header-caps text-hl-muted mb-2">Vibe</div>
+            <div className="text-[0.75rem] header-caps text-hl-muted mb-2">Vibe</div>
             <div className="flex items-center gap-2 flex-wrap">
               {PARTY_VIBES.map((v) => (
                 <button
@@ -104,7 +104,7 @@ function FiltersModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <div className="text-[11px] header-caps text-hl-muted mb-2">Min skill level</div>
+              <div className="text-[0.75rem] header-caps text-hl-muted mb-2">Min skill level</div>
               <select
                 className={SELECT_CLS}
                 value={draft.minSkill}
@@ -116,7 +116,7 @@ function FiltersModal({
               </select>
             </div>
             <div>
-              <div className="text-[11px] header-caps text-hl-muted mb-2">Max skill level</div>
+              <div className="text-[0.75rem] header-caps text-hl-muted mb-2">Max skill level</div>
               <select
                 className={SELECT_CLS}
                 value={draft.maxSkill}
@@ -130,7 +130,7 @@ function FiltersModal({
           </div>
 
           <div>
-            <div className="text-[11px] header-caps text-hl-muted mb-2">Language</div>
+            <div className="text-[0.75rem] header-caps text-hl-muted mb-2">Language</div>
             <select
               className={SELECT_CLS}
               value={draft.language}
@@ -146,7 +146,7 @@ function FiltersModal({
           </div>
 
           <div>
-            <div className="text-[11px] header-caps text-hl-muted mb-2">Country</div>
+            <div className="text-[0.75rem] header-caps text-hl-muted mb-2">Country</div>
             <select
               className={SELECT_CLS}
               value={draft.country}
@@ -337,7 +337,7 @@ function PartyFinderContent() {
             }`}
           >
             Joinable
-            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-gold-gradient text-hl-base stat-number">
+            <span className="ml-1.5 text-[0.6875rem] px-1.5 py-0.5 rounded bg-gold-gradient text-hl-base stat-number">
               {joinableCount}
             </span>
           </button>

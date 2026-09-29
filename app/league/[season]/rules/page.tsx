@@ -30,7 +30,7 @@ export default async function SeasonRulesPage({ params }: { params: Promise<{ se
         <LeagueRulesEditor seasonId={season.id} rules={season.rules ?? null} standardText={rulesToText(standard)} />
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[13.75rem_minmax(0,1fr)]">
         {toc.length > 1 ? (
           <nav aria-label="Rules sections" className="hidden lg:block">
             <div className="sticky top-24 space-y-0.5 border-l border-white/[0.08]">
@@ -52,7 +52,7 @@ export default async function SeasonRulesPage({ params }: { params: Promise<{ se
         <article className="rounded-xl border border-white/[0.08] bg-[#121212] p-6">
           <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2 border-b border-white/[0.06] pb-4">
             <h2 className="text-xl font-black text-white">Rules</h2>
-            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/45">
+            <span className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-white/45">
               {season.rules ? `${season.name} rules` : "Standard league rules"}
             </span>
           </div>

@@ -56,19 +56,19 @@ export function SubRequestCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-base font-black text-white">{request.map}</span>
-            <Badge className="bg-hl-panel-light text-hl-muted border-hl-border text-[10px]">
+            <Badge className="bg-hl-panel-light text-hl-muted border-hl-border text-[0.6875rem]">
               {request.mode ?? "5v5"}
             </Badge>
             {region && (
-              <Badge className="bg-hl-panel-light text-hl-muted border-hl-border text-[10px]">
+              <Badge className="bg-hl-panel-light text-hl-muted border-hl-border text-[0.6875rem]">
                 {region.flag} {region.label}
               </Badge>
             )}
           </div>
 
           <div className="text-sm text-hl-muted mt-1">
-            Replacing <b className="text-white">{request.leaver}</b> on Team{" "}
-            {request.team}
+            Replacing <b className="text-white">{request.leaver}</b> on{" "}
+            <b className="text-white">{request.side ?? `Team ${request.team}`}</b>
             {request.targetElo ? (
               <>
                 {" "}
@@ -77,7 +77,7 @@ export function SubRequestCard({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-4 mt-2 text-[11px] text-hl-muted flex-wrap">
+          <div className="flex items-center gap-4 mt-2 text-[0.75rem] text-hl-muted flex-wrap">
             {request.swapScore && (
               <span className="inline-flex items-center gap-1">
                 <Swords className="w-3.5 h-3.5" />
@@ -120,7 +120,7 @@ export function SubRequestCard({
             )}
           </button>
           {countdown !== null && countdown > 0 && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-hl-gold">
+            <span className="inline-flex items-center gap-1 text-[0.75rem] text-hl-gold">
               <Timer className="w-3.5 h-3.5" /> Eligible in {duration(countdown)}
             </span>
           )}

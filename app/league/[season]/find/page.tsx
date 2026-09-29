@@ -89,7 +89,7 @@ export default async function FindTeammatesPage({
               }`}
             >
               {t.label}
-              <span className={`rounded px-1.5 text-[10px] ${on ? "bg-[#ff5500]/20 text-[#ff5500]" : "bg-white/10 text-white/60"}`}>
+              <span className={`rounded px-1.5 text-[0.6875rem] ${on ? "bg-[#ff5500]/20 text-[#ff5500]" : "bg-white/10 text-white/60"}`}>
                 {t.count}
               </span>
             </Link>
@@ -154,7 +154,7 @@ export default async function FindTeammatesPage({
             >
               <div className="min-w-0">
                 <TeamCell team={t.team} mine={t.mine} size={26} />
-                <div className="mt-0.5 pl-9 text-[11px] text-white/50">
+                <div className="mt-0.5 pl-9 text-[0.75rem] text-white/50">
                   {t.access} · {t.players.length} players
                 </div>
               </div>

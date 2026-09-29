@@ -26,7 +26,7 @@ function SkillLevelBox({
           style={{ boxShadow: `inset 0 0 28px ${color}32` }}
         />
       )}
-      <span className="relative hidden sm:inline text-[12px] font-bold tracking-[0.18em] text-[#9a9a9a] uppercase whitespace-nowrap">
+      <span className="relative hidden sm:inline text-[0.8125rem] font-bold tracking-[0.18em] text-[#9a9a9a] uppercase whitespace-nowrap">
         Skill level
       </span>
       {hasSkill ? (
@@ -38,7 +38,7 @@ function SkillLevelBox({
             />
             <RankBadge rank={letter} size="md" showGlow={false} className="relative !w-12 !h-12" />
           </span>
-          <span className="relative text-[28px] md:text-[42px] leading-none font-black tabular-nums text-[#ff5500]">
+          <span className="relative text-[1.75rem] md:text-[2.625rem] leading-none font-black tabular-nums text-[#ff5500]">
             {elo}
           </span>
         </>
@@ -47,7 +47,7 @@ function SkillLevelBox({
           <span className="relative flex items-center justify-center w-14 h-14 shrink-0">
             <RankBadge rank="UNRANKED" size="md" showGlow={false} className="relative !w-12 !h-12" />
           </span>
-          <span className="relative text-[28px] leading-none font-black text-white">Unranked</span>
+          <span className="relative text-[1.75rem] leading-none font-black text-white">Unranked</span>
         </>
       )}
     </div>
@@ -61,8 +61,8 @@ function GameChip() {
         <Swords className="w-7 h-7 text-white" strokeWidth={2.25} />
       </span>
       <div className="leading-tight text-left">
-        <div className="text-[17px] font-bold text-white">Counter Blox</div>
-        <div className="flex items-center gap-1.5 text-[12px] text-[#8a8a8a] mt-0.5">
+        <div className="text-[1.0625rem] font-bold text-white">Counter Blox</div>
+        <div className="flex items-center gap-1.5 text-[0.8125rem] text-[#8a8a8a] mt-0.5">
           <Globe className="w-3.5 h-3.5" />
           <span className="uppercase tracking-wide">{MATCH_MODE_LABEL}</span>
         </div>
@@ -104,7 +104,7 @@ export function GameSkillBar({
         <div className="relative flex items-start justify-between gap-3 px-4 md:px-6 pt-5">{header}</div>
       )}
 
-      <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 md:px-6 min-h-0 md:min-h-[168px] py-5 md:py-6">
+      <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 md:px-6 min-h-0 md:min-h-[10.5rem] py-5 md:py-6">
         <div className="hidden md:block" />
         <div className="flex justify-center">
           <SkillLevelBox rank={rank} elo={elo} />

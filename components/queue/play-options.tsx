@@ -120,7 +120,7 @@ export function ModePicker({
             tabIndex={on ? 0 : -1}
             disabled={disabled}
             onClick={() => onChange(m.id)}
-            className={`relative w-full overflow-hidden rounded-xl border text-left transition-colors sm:w-[340px] ${
+            className={`relative w-full overflow-hidden rounded-xl border text-left transition-colors sm:w-[21.25rem] ${
               on ? "border-white/85 bg-hl-surface-3" : "border-white/[0.09] bg-hl-surface-2 hover:border-white/30"
             } ${disabled ? "cursor-not-allowed opacity-45 hover:border-white/[0.09]" : ""}`}
           >
@@ -130,7 +130,7 @@ export function ModePicker({
             <div className="relative flex items-center justify-between gap-2 px-4 pb-3 pt-3.5">
               <span className="flex min-w-0 items-center gap-2">
                 <Icon className={`h-4 w-4 shrink-0 ${title}`} />
-                <span className={`truncate text-[15px] font-black ${title}`}>{m.label}</span>
+                <span className={`truncate text-[0.9375rem] font-black ${title}`}>{m.label}</span>
                 <span className="shrink-0 text-xs text-white/50">
                   · {teamSize}v{teamSize}
                 </span>
@@ -141,7 +141,7 @@ export function ModePicker({
                 </span>
               ) : (
                 <span
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[0.6875rem] font-black uppercase ${
                     open ? "border-hl-green/30 text-hl-green" : "border-white/10 text-white/45"
                   }`}
                 >
@@ -152,9 +152,9 @@ export function ModePicker({
             </div>
             <div className="relative grid grid-cols-2 gap-2 px-4 pb-4">
               {m.features.map(({ icon: FeatureIcon, text, check }) => (
-                <span key={text} className="flex min-h-[38px] items-center gap-2 rounded-md bg-white/[0.045] px-2.5 py-2">
+                <span key={text} className="flex min-h-[2.375rem] items-center gap-2 rounded-md bg-white/[0.045] px-2.5 py-2">
                   <FeatureIcon className="h-3.5 w-3.5 shrink-0 text-white/55" />
-                  <span className="min-w-0 flex-1 text-[11px] font-semibold leading-tight text-white/85">{text}</span>
+                  <span className="min-w-0 flex-1 text-[0.75rem] font-semibold leading-tight text-white/85">{text}</span>
                   {check ? (
                     <span className="grid h-4 w-4 shrink-0 place-items-center rounded-sm bg-hl-green text-hl-surface-2">
                       <Star className="h-2.5 w-2.5 fill-current" />
@@ -163,7 +163,7 @@ export function ModePicker({
                 </span>
               ))}
             </div>
-            {reason ? <div className="relative px-4 pb-3 text-[11px] font-bold text-hl-warn">{reason}</div> : null}
+            {reason ? <div className="relative px-4 pb-3 text-[0.75rem] font-bold text-hl-warn">{reason}</div> : null}
           </button>
         );
       })}
@@ -206,15 +206,15 @@ export function ServerPicker({
             tabIndex={on ? 0 : -1}
             disabled={disabled}
             onClick={() => onChange(r.id)}
-            className={`w-[calc(50%-6px)] rounded-xl border px-4 py-3 text-left transition-colors sm:w-[190px] ${
+            className={`w-[calc(50%-6px)] rounded-xl border px-4 py-3 text-left transition-colors sm:w-[11.875rem] ${
               on ? "border-white/85 bg-hl-surface-3" : "border-white/[0.09] bg-hl-surface-2 hover:border-white/30"
             } ${disabled ? "cursor-not-allowed opacity-45" : ""}`}
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-black text-white">{r.label}</span>
-              <span className="text-[11px] font-bold text-white/50">{r.short}</span>
+              <span className="text-[0.75rem] font-bold text-white/50">{r.short}</span>
             </div>
-            <div className={`mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-bold ${open ? "text-hl-green" : "text-white/45"}`}>
+            <div className={`mt-1.5 inline-flex items-center gap-1.5 text-[0.75rem] font-bold ${open ? "text-hl-green" : "text-white/45"}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${open ? "animate-pulse bg-hl-green" : "bg-white/30"}`} />
               {open ? `Open · ${counts[r.id] ?? 0} queuing` : "Closed right now"}
             </div>

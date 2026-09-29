@@ -35,14 +35,14 @@ export function StatusLine({ ui, error }: { ui: QueueUi; error: string | null })
         <StatusIcon ui={ui} />
         <span className="text-white">{ui.headline}</span>
       </div>
-      {ui.detail ? <div className="max-w-xl text-[13px] text-white/60">{ui.detail}</div> : null}
+      {ui.detail ? <div className="max-w-xl text-[0.875rem] text-white/60">{ui.detail}</div> : null}
       {ui.secondary ? (
-        <Link href={ui.secondary.href} className="text-[13px] font-bold text-white underline-offset-2 hover:underline">
+        <Link href={ui.secondary.href} className="text-[0.875rem] font-bold text-white underline-offset-2 hover:underline">
           {ui.secondary.label} →
         </Link>
       ) : null}
       {error ? (
-        <div role="alert" className="mt-1 inline-flex items-start gap-2 rounded-lg border border-hl-red/30 bg-hl-red/10 px-3 py-1.5 text-[13px] text-hl-red">
+        <div role="alert" className="mt-1 inline-flex items-start gap-2 rounded-lg border border-hl-red/30 bg-hl-red/10 px-3 py-1.5 text-[0.875rem] text-hl-red">
           <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
@@ -98,7 +98,7 @@ export function PrimaryButton({
   onCancel: () => void;
   size: "bar" | "panel";
 }) {
-  const dims = size === "bar" ? "px-5 py-3 text-sm" : "min-w-[240px] px-10 py-3.5 text-lg tracking-wide";
+  const dims = size === "bar" ? "px-5 py-3 text-sm" : "min-w-[15rem] px-10 py-3.5 text-lg tracking-wide";
   const base = `header-caps inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-black transition-all ${dims}`;
   const { action, label, disabled } = ui.primary;
 

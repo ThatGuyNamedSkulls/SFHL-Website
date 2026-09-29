@@ -92,7 +92,7 @@ export default async function SeasonStandingsPage({
           <LeagueDivisionPicker base={base} keep={{ stage: asked }} picker={picker} />
         ) : (
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">Division</div>
+            <div className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">Division</div>
             <div className="mt-1 text-lg font-black text-white">{div.name}</div>
           </div>
         )}

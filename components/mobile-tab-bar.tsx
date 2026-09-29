@@ -73,7 +73,7 @@ export function MobileTabBar() {
                 key={tab.label}
                 href={tab.href}
                 onClick={() => setMoreOpen(false)}
-                className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold ${
+                className={`flex flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-bold ${
                   active ? "text-[#ff5500]" : "text-[#8b8b8b]"
                 }`}
               >
@@ -89,7 +89,7 @@ export function MobileTabBar() {
           <button
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
-            className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold ${
+            className={`flex flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-bold ${
               moreOpen ? "text-[#ff5500]" : "text-[#8b8b8b]"
             }`}
           >

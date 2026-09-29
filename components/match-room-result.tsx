@@ -41,17 +41,17 @@ function PlayerCard({
     >
       <Avatar className="w-8 h-8 shrink-0">
         {player.avatarUrl ? <AvatarImage src={player.avatarUrl} alt={player.username} /> : null}
-        <AvatarFallback className="bg-[#2a2a2a] text-[10px] font-bold text-white">
+        <AvatarFallback className="bg-[#2a2a2a] text-[0.6875rem] font-bold text-white">
           {initials(player.username)}
         </AvatarFallback>
       </Avatar>
       <span className="text-sm font-semibold text-white truncate flex-1">{player.username}</span>
       <SubRolePill isSub={player.isSub} leftEarly={player.leftEarly} share={player.subShare} compact />
       {player.rank !== "UNRANKED" && typeof player.elo === "number" && (
-        <span className="text-[12px] tabular-nums text-[#8a8a8a] shrink-0">{player.elo}</span>
+        <span className="text-[0.8125rem] tabular-nums text-[#8a8a8a] shrink-0">{player.elo}</span>
       )}
       <span
-        className="text-[12px] font-bold tabular-nums shrink-0"
+        className="text-[0.8125rem] font-bold tabular-nums shrink-0"
         style={{ color: eloChangeColor(player.eloChange ?? 0) }}
       >
         {formatSigned(player.eloChange ?? 0)}
@@ -78,9 +78,9 @@ function Overview({ match }: { match: MatchDetail }) {
   }
 
   return (
-    <div className="grid lg:grid-cols-[1fr_240px_1fr] gap-4 items-start">
+    <div className="grid lg:grid-cols-[1fr_15rem_1fr] gap-4 items-start">
       <div>
-        <div className="text-[12px] text-[#8a8a8a] mb-2">Players</div>
+        <div className="text-[0.8125rem] text-[#8a8a8a] mb-2">Players</div>
         <div className="space-y-1.5">
           {teamA.map((p) => (
             <PlayerCard key={p.playerId} player={p} />
@@ -90,29 +90,29 @@ function Overview({ match }: { match: MatchDetail }) {
 
       <div className="space-y-3">
         <div className="rounded-lg bg-[#1c1c1c] border border-white/[0.06] p-3">
-          <div className="text-[11px] text-[#8a8a8a] mb-1">Server</div>
+          <div className="text-[0.75rem] text-[#8a8a8a] mb-1">Server</div>
           <div className="text-sm font-semibold text-white">{match.region || "Unknown"}</div>
         </div>
         <div className="rounded-lg bg-[#1c1c1c] border border-white/[0.06] p-3 text-center">
-          <div className="text-[11px] text-[#8a8a8a] mb-2 flex items-center justify-center gap-1">
+          <div className="text-[0.75rem] text-[#8a8a8a] mb-2 flex items-center justify-center gap-1">
             Map
           </div>
-          <MapThumb map={match.map} className="w-full h-[72px] mx-auto" />
+          <MapThumb map={match.map} className="w-full h-[4.5rem] mx-auto" />
           <div className="text-sm font-bold text-white mt-2">{match.map}</div>
         </div>
         <Link
           href="/queue"
-          className="flex items-center justify-center h-10 rounded-md bg-[#ff5500] text-white text-[12px] font-black uppercase tracking-wide hover:brightness-110"
+          className="flex items-center justify-center h-10 rounded-md bg-[#ff5500] text-white text-[0.8125rem] font-black uppercase tracking-wide hover:brightness-110"
         >
           Back to matchmaking
         </Link>
-        <div className="text-center text-[11px] text-[#6a6a6a] flex items-center justify-center gap-1.5">
+        <div className="text-center text-[0.75rem] text-[#6a6a6a] flex items-center justify-center gap-1.5">
           <Calendar className="w-3 h-3" /> {when}
         </div>
       </div>
 
       <div>
-        <div className="text-[12px] text-[#8a8a8a] mb-2 lg:text-right">Players</div>
+        <div className="text-[0.8125rem] text-[#8a8a8a] mb-2 lg:text-right">Players</div>
         <div className="space-y-1.5">
           {teamB.map((p) => (
             <PlayerCard key={p.playerId} player={p} align="right" />
@@ -170,7 +170,7 @@ function StatsTable({
         <span className="text-sm font-bold text-white">{title}</span>
         <span
           className={cn(
-            "text-[10px] font-black uppercase tracking-wide",
+            "text-[0.6875rem] font-black uppercase tracking-wide",
             won ? "text-[#2ecc71]" : "text-[#e74c3c]"
           )}
         >
@@ -178,9 +178,9 @@ function StatsTable({
         </span>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-[0.8125rem]">
           <thead>
-            <tr className="text-[#6a6a6a] text-[10px] uppercase tracking-wide border-b border-white/[0.06]">
+            <tr className="text-[#6a6a6a] text-[0.6875rem] uppercase tracking-wide border-b border-white/[0.06]">
               <th className="text-left font-semibold px-3 py-2">Player</th>
               <th className="font-semibold px-2 py-2">Rank</th>
               <th className="font-semibold px-2 py-2">Elo</th>
@@ -223,11 +223,11 @@ function StatsTable({
                     >
                       <Avatar className="w-6 h-6">
                         {p.avatarUrl ? <AvatarImage src={p.avatarUrl} /> : null}
-                        <AvatarFallback className="bg-[#2a2a2a] text-[9px] font-bold">
+                        <AvatarFallback className="bg-[#2a2a2a] text-[0.6875rem] font-bold">
                           {initials(p.username)}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-white font-semibold truncate max-w-[140px]">
+                      <span className="text-white font-semibold truncate max-w-[8.75rem]">
                         {p.username}
                       </span>
                       <SubRolePill isSub={p.isSub} leftEarly={p.leftEarly} share={p.subShare} />
@@ -316,9 +316,9 @@ function Stats({ match }: { match: MatchDetail }) {
           >
             <Avatar className="w-6 h-6">
               {p.avatarUrl ? <AvatarImage src={p.avatarUrl} /> : null}
-              <AvatarFallback className="bg-[#2a2a2a] text-[9px]">{initials(p.username)}</AvatarFallback>
+              <AvatarFallback className="bg-[#2a2a2a] text-[0.6875rem]">{initials(p.username)}</AvatarFallback>
             </Avatar>
-            <span className="text-[12px] font-semibold text-white max-w-[90px] truncate">
+            <span className="text-[0.8125rem] font-semibold text-white max-w-[5.625rem] truncate">
               {p.username}
             </span>
             <SubRolePill isSub={p.isSub} leftEarly={p.leftEarly} compact />
@@ -327,7 +327,7 @@ function Stats({ match }: { match: MatchDetail }) {
       </div>
 
       {selected && (
-        <div className="grid lg:grid-cols-[minmax(260px,340px)_1fr] gap-4">
+        <div className="grid lg:grid-cols-[minmax(16.25rem,21.25rem)_1fr] gap-4">
           <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-4">
             <div className="flex items-center gap-3 mb-4">
               <Avatar className="w-14 h-14">
@@ -350,7 +350,7 @@ function Stats({ match }: { match: MatchDetail }) {
                     share={selected.subShare}
                   />
                 {selected.mvp && (
-                  <div className="text-[11px] font-black text-[#ff5500] uppercase tracking-wide">
+                  <div className="text-[0.75rem] font-black text-[#ff5500] uppercase tracking-wide">
                     ★ MVP
                   </div>
                 )}
@@ -364,12 +364,12 @@ function Stats({ match }: { match: MatchDetail }) {
             >
               {(selected.rating ?? 0).toFixed(2)}
             </div>
-            <div className="text-[12px] text-[#8a8a8a] mb-4 cursor-help" title={STAT_ESTIMATE_HINT}>
+            <div className="text-[0.8125rem] text-[#8a8a8a] mb-4 cursor-help" title={STAT_ESTIMATE_HINT}>
               Rating
             </div>
-            <div className="grid grid-cols-2 gap-3 text-[13px]">
+            <div className="grid grid-cols-2 gap-3 text-[0.875rem]">
               <div>
-                <div className="text-[#8a8a8a] text-[11px]">Elo</div>
+                <div className="text-[#8a8a8a] text-[0.75rem]">Elo</div>
                 <div
                   className="font-bold tabular-nums"
                   style={{ color: eloChangeColor(selected.eloChange ?? 0) }}
@@ -381,7 +381,7 @@ function Stats({ match }: { match: MatchDetail }) {
                 </div>
               </div>
               <div>
-                <div className="text-[#8a8a8a] text-[11px] cursor-help" title={STAT_ESTIMATE_HINT}>
+                <div className="text-[#8a8a8a] text-[0.75rem] cursor-help" title={STAT_ESTIMATE_HINT}>
                   Swing
                 </div>
                 <div
@@ -398,17 +398,17 @@ function Stats({ match }: { match: MatchDetail }) {
                 </div>
               </div>
               <div>
-                <div className="text-[#8a8a8a] text-[11px]">Score</div>
+                <div className="text-[#8a8a8a] text-[0.75rem]">Score</div>
                 <div className="font-bold text-white tabular-nums">{selected.score}</div>
               </div>
               <div>
-                <div className="text-[#8a8a8a] text-[11px]">K/D/A</div>
+                <div className="text-[#8a8a8a] text-[0.75rem]">K/D/A</div>
                 <div className="font-bold text-white tabular-nums">
                   {selected.kills}/{selected.deaths}/{selected.assists}
                 </div>
               </div>
               <div>
-                <div className="text-[#8a8a8a] text-[11px]">Headshot %</div>
+                <div className="text-[#8a8a8a] text-[0.75rem]">Headshot %</div>
                 <div className="font-bold text-white tabular-nums">
                   {(selected.headshotPercent || 0).toFixed(1)}%
                 </div>
@@ -432,12 +432,12 @@ function Stats({ match }: { match: MatchDetail }) {
                 <div className="flex items-center gap-2 min-w-0">
                   <Avatar className="w-8 h-8">
                     {row.player?.avatarUrl ? <AvatarImage src={row.player.avatarUrl} /> : null}
-                    <AvatarFallback className="bg-[#2a2a2a] text-[10px]">
+                    <AvatarFallback className="bg-[#2a2a2a] text-[0.6875rem]">
                       {initials(row.player?.username || "?")}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <div className="text-[11px] text-[#8a8a8a]">{row.label}</div>
+                    <div className="text-[0.75rem] text-[#8a8a8a]">{row.label}</div>
                     <div className="text-sm font-semibold text-white truncate">
                       {row.player?.username}
                     </div>
@@ -457,7 +457,7 @@ function Stats({ match }: { match: MatchDetail }) {
           type="button"
           onClick={() => setSort("team")}
           className={cn(
-            "h-7 px-3 rounded text-[11px] font-semibold",
+            "h-7 px-3 rounded text-[0.75rem] font-semibold",
             sort === "team" ? "bg-[#ff5500] text-white" : "bg-[#1c1c1c] text-[#8a8a8a]"
           )}
         >
@@ -467,7 +467,7 @@ function Stats({ match }: { match: MatchDetail }) {
           type="button"
           onClick={() => setSort("players")}
           className={cn(
-            "h-7 px-3 rounded text-[11px] font-semibold",
+            "h-7 px-3 rounded text-[0.75rem] font-semibold",
             sort === "players" ? "bg-[#ff5500] text-white" : "bg-[#1c1c1c] text-[#8a8a8a]"
           )}
         >
@@ -528,7 +528,7 @@ export function MatchRoomResult({ match }: { match: MatchDetail }) {
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`text-[12px] font-bold uppercase tracking-wide pb-1 border-b-2 ${
+              className={`text-[0.8125rem] font-bold uppercase tracking-wide pb-1 border-b-2 ${
                 tab === t
                   ? "text-[#ff5500] border-[#ff5500]"
                   : "text-[#8a8a8a] border-transparent hover:text-white"
@@ -536,7 +536,7 @@ export function MatchRoomResult({ match }: { match: MatchDetail }) {
             >
               {t === "overview" ? "Overview" : (
                 <span className="inline-flex items-center gap-1">
-                  Stats <span className="text-[9px] font-black bg-[#ff5500] text-white px-1 rounded-sm">NEW</span>
+                  Stats <span className="text-[0.6875rem] font-black bg-[#ff5500] text-white px-1 rounded-sm">NEW</span>
                 </span>
               )}
             </button>
@@ -550,7 +550,7 @@ export function MatchRoomResult({ match }: { match: MatchDetail }) {
           <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/70 to-[#111]" />
         </div>
         <div className="relative z-10 px-5 pt-4 pb-5">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#c8c8c8] mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[0.8125rem] text-[#c8c8c8] mb-6">
             <span className="inline-flex items-center gap-1.5">
               <Swords className="w-3.5 h-3.5" />
               Matchmaking / {match.region} / Standard {mode}
@@ -566,7 +566,7 @@ export function MatchRoomResult({ match }: { match: MatchDetail }) {
               <div className="text-right min-w-0">
                 <div className="text-lg sm:text-xl font-bold text-white truncate">{match.teamAName}</div>
                 {aWon && (
-                  <div className="text-[10px] font-black uppercase tracking-wide text-[#2ecc71]">Winner</div>
+                  <div className="text-[0.6875rem] font-black uppercase tracking-wide text-[#2ecc71]">Winner</div>
                 )}
               </div>
               <Avatar className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 ring-2 ring-white/10">
@@ -597,7 +597,7 @@ export function MatchRoomResult({ match }: { match: MatchDetail }) {
               <div className="min-w-0">
                 <div className="text-lg sm:text-xl font-bold text-white truncate">{match.teamBName}</div>
                 {bWon && (
-                  <div className="text-[10px] font-black uppercase tracking-wide text-[#2ecc71]">Winner</div>
+                  <div className="text-[0.6875rem] font-black uppercase tracking-wide text-[#2ecc71]">Winner</div>
                 )}
               </div>
             </div>

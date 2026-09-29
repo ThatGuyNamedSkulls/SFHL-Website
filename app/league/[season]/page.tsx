@@ -159,7 +159,7 @@ export default async function SeasonOverviewPage({ params }: { params: Promise<{
       {next ? (
         <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#ff5500]/40 bg-[#1a120d] px-5 py-4">
           <div className="min-w-0">
-            <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#ff5500]">
+            <div className="text-[0.75rem] font-black uppercase tracking-[0.12em] text-[#ff5500]">
               Your next match · {next.round ? ROUND_LABEL[next.round] : `Week ${next.week}`}
               {next.division ? ` · ${next.division}` : ""}
             </div>
@@ -209,7 +209,7 @@ export default async function SeasonOverviewPage({ params }: { params: Promise<{
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm font-black text-white">{d.name}</div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-white/55">
+                    <div className="mt-0.5 flex items-center gap-2 text-[0.75rem] text-white/55">
                       <span className="inline-flex items-center gap-1">
                         <Users className="h-3 w-3" /> {teams} teams
                       </span>

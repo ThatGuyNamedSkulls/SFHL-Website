@@ -149,7 +149,7 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
         <span className="relative shrink-0">
           <Bell className={variant === "rail" ? "w-5 h-5" : "w-5 h-5"} />
           {unread > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-hl-red text-white text-[10px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 rounded-full bg-hl-red text-white text-[0.6875rem] font-bold flex items-center justify-center">
               {unread > 9 ? "9+" : unread}
             </span>
           )}

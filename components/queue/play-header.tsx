@@ -11,7 +11,7 @@ import { levelOf } from "@/lib/league-find-rules";
 import type { MeView } from "@/components/queue/use-queue-state";
 import type { MissionView } from "@/lib/mission-types";
 
-const chip = "rounded-md bg-white/[0.07] px-2 py-0.5 text-[11px] font-bold text-white/75";
+const chip = "rounded-md bg-white/[0.07] px-2 py-0.5 text-[0.75rem] font-bold text-white/75";
 
 /** Left block: rank, Elo, progress through the current rank (FACEIT's level bar). */
 function StatsBlock({ me, signedIn }: { me: MeView | null; signedIn: boolean }) {
@@ -61,7 +61,7 @@ function StatsBlock({ me, signedIn }: { me: MeView | null; signedIn: boolean }) 
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
               <div className="h-full rounded-full bg-gradient-to-r from-[#cc4400] to-hl-gold" style={{ width: `${fill * 100}%` }} />
             </div>
-            <div className="mt-1 flex justify-between text-[11px] text-white/50">
+            <div className="mt-1 flex justify-between text-[0.75rem] text-white/50">
               <span className="stat-number">{tier?.minElo.toLocaleString("en-US")}</span>
               <span>{next && !top ? `+${Math.max(0, next.minElo - p.elo)} to ${next.name}` : "Top rank"}</span>
               <span className="stat-number">{top ? `peak ${p.peakElo.toLocaleString("en-US")}` : tier?.maxElo.toLocaleString("en-US")}</span>
@@ -75,7 +75,7 @@ function StatsBlock({ me, signedIn }: { me: MeView | null; signedIn: boolean }) 
                 <span key={i} className={`h-1.5 flex-1 rounded-full ${i < p.placementPlayed ? "bg-hl-gold" : "bg-white/[0.1]"}`} />
               ))}
             </div>
-            <div className="mt-1 text-[11px] text-white/55">
+            <div className="mt-1 text-[0.75rem] text-white/55">
               {Math.max(0, total - p.placementPlayed)} placement {total - p.placementPlayed === 1 ? "match" : "matches"} left to get your rank
             </div>
           </>
@@ -91,7 +91,7 @@ function PrestigeCard({ me }: { me: MeView }) {
   if (!pr) return null;
   return (
     <div className="relative overflow-hidden rounded-xl border border-hl-gold/25 bg-[linear-gradient(120deg,#2a1206,#151515_70%)] p-3.5">
-      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[#ff8a4d]">
+      <div className="text-[0.6875rem] font-black uppercase tracking-[0.14em] text-[#ff8a4d]">
         {me.season.label} prestige path
       </div>
       <div className="mt-2 flex items-center justify-between gap-3">
@@ -109,7 +109,7 @@ function PrestigeCard({ me }: { me: MeView }) {
         </div>
         <div className="text-right">
           <div className="text-sm font-black text-white">{pr.level ? `Prestige ${pr.level}` : "Prestige 0"}</div>
-          <div className="text-[11px] text-white/55">
+          <div className="text-[0.75rem] text-white/55">
             {pr.maxed ? "Max this season" : `${pr.winsIntoLevel}/${pr.winsPerLevel} wins`}
           </div>
         </div>
@@ -119,7 +119,7 @@ function PrestigeCard({ me }: { me: MeView }) {
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.08]">
             <div className="h-full rounded-full bg-hl-gold" style={{ width: `${(pr.winsIntoLevel / pr.winsPerLevel) * 100}%` }} />
           </div>
-          <div className="mt-1.5 flex items-center gap-1 text-[11px] text-white/60">
+          <div className="mt-1.5 flex items-center gap-1 text-[0.75rem] text-white/60">
             Next: badge +<Coins className="h-3 w-3 text-[#f5c518]" />
             <b className="text-white">{pr.coinsPerLevel}</b>
           </div>
@@ -183,7 +183,7 @@ function MissionCard({ season }: { season: number }) {
     return (
       <Link href="/missions" className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-[#151515] p-3.5 hover:border-white/25">
         <div>
-          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-white/55">Missions</div>
+          <div className="text-[0.6875rem] font-black uppercase tracking-[0.14em] text-white/55">Missions</div>
           <div className="mt-1 text-sm font-black text-white">{note ?? "All caught up"}</div>
         </div>
         <span className="text-xs font-bold text-white/60">View →</span>
@@ -193,13 +193,13 @@ function MissionCard({ season }: { season: number }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-[#151515] p-3.5">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/55">
+        <div className="truncate text-[0.6875rem] font-black uppercase tracking-[0.14em] text-white/55">
           {/* "S1 Monthly mission: Weekly Grind" — no repeat when the title already says it. */}
           S{season} {mission.category} mission
           {/mission/i.test(mission.title) ? "" : `: ${mission.title}`}
         </div>
         <div className="mt-1 truncate text-sm font-black text-white">{mission.description}</div>
-        {mission.endsInLabel ? <div className="text-[11px] text-white/50">{mission.endsInLabel}</div> : null}
+        {mission.endsInLabel ? <div className="text-[0.75rem] text-white/50">{mission.endsInLabel}</div> : null}
         {mission.claimable ? (
           <button type="button" onClick={claim} disabled={busy} className="mt-1 text-xs font-black uppercase tracking-wide text-hl-gold hover:text-[#ff7733]">
             {busy ? "Claiming…" : "Claim reward"}

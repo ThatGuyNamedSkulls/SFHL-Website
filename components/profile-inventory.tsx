@@ -180,13 +180,13 @@ export function ProfileInventory({ items: initial, isOwn, onChange }: ProfileInv
               <div className="relative aspect-[3/4] bg-gradient-to-b from-hl-panel-light to-hl-base">
                 <ItemPreview item={item} />
                 {item.equipped && (
-                  <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-hl-base/80 border border-hl-gold/40 text-hl-gold text-[10px] font-bold px-2 py-0.5">
+                  <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-hl-base/80 border border-hl-gold/40 text-hl-gold text-[0.6875rem] font-bold px-2 py-0.5">
                     <Check className="w-3 h-3" /> Equipped
                   </span>
                 )}
               </div>
               <div className="p-3 border-t border-hl-border">
-                <div className={`text-[9px] header-caps ${RARITY_COLORS[item.rarity] || RARITY_COLORS.common}`}>
+                <div className={`text-[0.6875rem] header-caps ${RARITY_COLORS[item.rarity] || RARITY_COLORS.common}`}>
                   {TYPE_LABEL[item.type]} · {item.rarity}
                 </div>
                 <div className="text-sm font-bold text-white truncate mt-0.5">{item.name}</div>

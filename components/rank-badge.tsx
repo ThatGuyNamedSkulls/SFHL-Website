@@ -91,7 +91,7 @@ export function RankBadgeInline({ rank }: { rank: RankTierLetter }) {
   const displayLabel = rank === "STAR" ? "★" : rank === "UNRANKED" ? "?" : rank;
   return (
     <span
-      className="inline-flex items-center justify-center min-w-[1.75rem] h-6 rounded-full text-[10px] font-bold border px-1"
+      className="inline-flex items-center justify-center min-w-[1.75rem] h-6 rounded-full text-[0.6875rem] font-bold border px-1"
       style={{
         borderColor: tier.color,
         color: tier.color,

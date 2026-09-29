@@ -37,7 +37,7 @@ export function EloChart({ eloHistory, className = "" }: EloChartProps) {
 
   return (
     <div className={className}>
-      <div className="w-full h-[220px]">
+      <div className="w-full h-[13.75rem]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
             <defs>

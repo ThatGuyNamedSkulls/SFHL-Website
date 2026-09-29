@@ -27,8 +27,8 @@ function LoginContent() {
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-hl-base py-12 px-4 sm:px-6 lg:px-8">
       <div className="absolute inset-0 bg-hero-radial opacity-30 pointer-events-none" />
-      <div className="absolute right-0 top-0 w-[500px] h-[500px] bg-hl-gold/5 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-      <div className="absolute left-0 bottom-0 w-[500px] h-[500px] bg-hl-panel-light/30 blur-3xl rounded-full -translate-x-1/2 translate-y-1/2 pointer-events-none" />
+      <div className="absolute right-0 top-0 w-[31.25rem] h-[31.25rem] bg-hl-gold/5 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+      <div className="absolute left-0 bottom-0 w-[31.25rem] h-[31.25rem] bg-hl-panel-light/30 blur-3xl rounded-full -translate-x-1/2 translate-y-1/2 pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-md">
         <Link

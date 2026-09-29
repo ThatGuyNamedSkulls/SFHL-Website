@@ -26,7 +26,7 @@ interface CreatePartyModalProps {
 const SELECT_CLS =
   "w-full bg-hl-base border border-hl-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-hl-gold/50 transition-colors";
 
-const LABEL_CLS = "text-[11px] header-caps text-hl-muted mb-1.5 block";
+const LABEL_CLS = "text-[0.75rem] header-caps text-hl-muted mb-1.5 block";
 
 const SKILL_TIERS = RANK_TIERS.filter((t) => t.letter !== "UNRANKED");
 
@@ -66,7 +66,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
     >
       <span
         className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
-          checked ? "left-[18px]" : "left-0.5"
+          checked ? "left-[1.125rem]" : "left-0.5"
         }`}
       />
     </button>
@@ -205,7 +205,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
                             <span className={`block text-sm font-bold ${t.green ? "text-hl-green" : "text-white"}`}>
                               {t.label}
                             </span>
-                            <span className="block text-[11px] text-hl-muted leading-snug mt-0.5">{t.desc}</span>
+                            <span className="block text-[0.75rem] text-hl-muted leading-snug mt-0.5">{t.desc}</span>
                           </span>
                           {active && <Check className="w-4 h-4 text-white shrink-0 mt-0.5" />}
                         </button>
@@ -227,7 +227,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
                       {session.username.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-[9px] font-bold text-white max-w-full truncate px-1">
+                  <span className="text-[0.6875rem] font-bold text-white max-w-full truncate px-1">
                     {session.playerName || session.username}
                   </span>
                   <RankBadge rank="UNRANKED" size="sm" showGlow={false} className="!w-4 !h-4" />
@@ -235,7 +235,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
                 {Array.from({ length: selectedType.maxSize - 1 }).map((_, i) => (
                   <div
                     key={i}
-                    className="rounded-lg border border-dashed border-hl-border/70 min-h-[92px]"
+                    className="rounded-lg border border-dashed border-hl-border/70 min-h-[5.75rem]"
                   />
                 ))}
               </div>
@@ -317,7 +317,7 @@ export function CreatePartyModal({ open, onOpenChange, session, onCreated }: Cre
                 <div>
                   <div className="text-sm font-bold text-white flex items-center gap-2">
                     Voice required
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-gold-gradient text-hl-base header-caps">New</span>
+                    <span className="text-[0.6875rem] font-black px-1.5 py-0.5 rounded bg-gold-gradient text-hl-base header-caps">New</span>
                   </div>
                   <div className="text-xs text-hl-muted mt-0.5">
                     Party members automatically join voice chat when joining the party

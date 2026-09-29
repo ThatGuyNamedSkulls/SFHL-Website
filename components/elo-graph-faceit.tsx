@@ -186,10 +186,10 @@ export function EloGraphFaceit({
   }, [results]);
 
   return (
-    <div className="grid lg:grid-cols-[1fr_200px] gap-6">
+    <div className="grid lg:grid-cols-[1fr_12.5rem] gap-6">
       <div>
         {values.length > 0 ? (
-          <div className="flex h-[260px] items-stretch">
+          <div className="flex h-[16.25rem] items-stretch">
             {prevPoints.length > 0 && (
               <div className="min-w-0 h-full" style={{ flex: showCut ? 1 : Math.max(prevPoints.length, 2) }}>
                 <SegmentChart
@@ -212,7 +212,7 @@ export function EloGraphFaceit({
                   showGlow
                   className="!w-10 !h-10 my-1"
                 />
-                <span className="text-[9px] font-bold uppercase tracking-wide text-[#8a8a8a] mt-0.5">
+                <span className="text-[0.6875rem] font-bold uppercase tracking-wide text-[#8a8a8a] mt-0.5">
                   Placed
                 </span>
                 <span className="flex-1 w-0 border-l border-dashed border-white/30" />
@@ -242,7 +242,7 @@ export function EloGraphFaceit({
               <span
                 key={m.id}
                 title={`${m.map} — ${m.result} (${m.eloChange > 0 ? "+" : ""}${m.eloChange})`}
-                className={`h-[3px] flex-1 min-w-[2px] ${m.result === "W" ? "bg-[#2ecc71]" : "bg-[#e74c3c]"}`}
+                className={`h-[0.1875rem] flex-1 min-w-[0.125rem] ${m.result === "W" ? "bg-[#2ecc71]" : "bg-[#e74c3c]"}`}
               />
             ))}
           </div>

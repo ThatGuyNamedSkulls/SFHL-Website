@@ -18,7 +18,7 @@ function BracketMatchCard({ match }: { match: BracketMatch }) {
   return (
     <div
       className={`
-        relative w-[220px] rounded-lg border overflow-hidden
+        relative w-[13.75rem] rounded-lg border overflow-hidden
         transition-all duration-300
         ${isLive
           ? "border-hl-red/50 bg-hl-panel shadow-[0_0_15px_rgba(255,83,83,0.15)]"
@@ -28,7 +28,7 @@ function BracketMatchCard({ match }: { match: BracketMatch }) {
     >
       {/* LIVE badge */}
       {isLive && (
-        <div className="absolute top-0 right-0 px-2 py-0.5 bg-hl-red text-white text-[10px] font-bold rounded-bl-lg flex items-center gap-1">
+        <div className="absolute top-0 right-0 px-2 py-0.5 bg-hl-red text-white text-[0.6875rem] font-bold rounded-bl-lg flex items-center gap-1">
           <Flame className="w-2.5 h-2.5" /> LIVE
         </div>
       )}
@@ -104,7 +104,7 @@ function BracketMatchCard({ match }: { match: BracketMatch }) {
       {/* Map tag */}
       {match.map && (
         <div className="px-3 py-1 border-t border-hl-border/50 bg-hl-base/30">
-          <span className="text-[10px] text-hl-muted">{match.map}</span>
+          <span className="text-[0.6875rem] text-hl-muted">{match.map}</span>
         </div>
       )}
     </div>

@@ -304,7 +304,7 @@ export default function FriendsPage() {
         <h2 className="text-sm font-bold text-white header-caps mb-2 flex items-center gap-2">
           <Users className="w-4 h-4 text-hl-gold" /> Friends ({friends.length})
           {friends.length > 0 ? (
-            <span className="text-[11px] font-semibold normal-case text-hl-green">{onlineCount} online</span>
+            <span className="text-[0.75rem] font-semibold normal-case text-hl-green">{onlineCount} online</span>
           ) : null}
         </h2>
         {friends.length === 0 ? (

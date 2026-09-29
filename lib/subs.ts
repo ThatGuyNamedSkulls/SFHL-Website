@@ -17,7 +17,7 @@
  */
 
 import { client, getPlayer, mapRank } from "@/lib/db";
-import { getActiveLobbyMemberIds } from "@/lib/lobby";
+import { getActiveLobbyMemberIds, resolveTeamSides, type TeamSides } from "@/lib/lobby";
 import { prettyMap } from "@/lib/format";
 import { SubRequestView } from "@/types";
 
@@ -266,7 +266,27 @@ function claimBlocker(ctx: ViewerContext, row: SubRequestRow): Blocker | null {
   return null;
 }
 
-function toView(row: SubRequestRow, blocker: Blocker | null): SubRequestView {
+/** Each match's team sides, for the slots' "on CT" / "on T" labels. */
+async function sidesByChannel(channelIds: string[]): Promise<Map<string, TeamSides>> {
+  const ids = [...new Set(channelIds.map(String))];
+  const out = new Map<string, TeamSides>();
+  if (!ids.length) return out;
+  try {
+    const rs = await client.execute({
+      sql: `SELECT id, data FROM web_lobbies WHERE id IN (${ids.map(() => "?").join(",")})`,
+      args: ids,
+    });
+    for (const r of rs.rows) {
+      const sides = resolveTeamSides(JSON.parse(String(r.data)));
+      if (sides) out.set(String(r.id), sides);
+    }
+  } catch {
+    /* no lobby rows: the slots just say "Team 1/2" */
+  }
+  return out;
+}
+
+function toView(row: SubRequestRow, blocker: Blocker | null, sides?: TeamSides): SubRequestView {
   const openSeconds = Math.max(0, (Date.now() - Number(row.created_at)) / 1000);
   return {
     id: Number(row.id),
@@ -275,6 +295,7 @@ function toView(row: SubRequestRow, blocker: Blocker | null): SubRequestView {
     region: row.region,
     mode: row.mode,
     team: Number(row.team),
+    side: sides ? (Number(row.team) === 1 ? sides.team1 : sides.team2) : null,
     map: prettyMap(row.map_name),
     leaver: row.leaver_name,
     targetElo: row.target_elo === null ? null : Number(row.target_elo),
@@ -298,8 +319,11 @@ export async function listSubRequests(
 ): Promise<SubRequestView[]> {
   const rows = await loadOpenRows();
   if (rows.length === 0) return [];  // nothing open: no viewer lookups at all
-  const ctx = await viewerContext(claimer);
-  return rows.map((row) => toView(row, claimBlocker(ctx, row)));
+  const [ctx, sides] = await Promise.all([
+    viewerContext(claimer),
+    sidesByChannel(rows.map((row) => row.channel_id)),
+  ]);
+  return rows.map((row) => toView(row, claimBlocker(ctx, row), sides.get(String(row.channel_id))));
 }
 
 export type ClaimResult =
@@ -357,7 +381,8 @@ export async function claimSubRequest(
   }
 
   const claimed = (await loadRow(requestId)) ?? row;
-  return { ok: true, request: toView(claimed, null) };
+  const sides = await sidesByChannel([claimed.channel_id]);
+  return { ok: true, request: toView(claimed, null, sides.get(String(claimed.channel_id))) };
 }
 
 /**

@@ -85,7 +85,7 @@ export function Navbar() {
                       {session.username.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm font-semibold text-white max-w-[120px] truncate">
+                  <span className="text-sm font-semibold text-white max-w-[7.5rem] truncate">
                     {session.username}
                   </span>
                 </DropdownMenuTrigger>

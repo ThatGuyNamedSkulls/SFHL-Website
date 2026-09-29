@@ -25,14 +25,14 @@ interface Team {
 const kd = (k: number, d: number) => (d ? (k / d).toFixed(2) : k.toFixed(2));
 
 function TeamTable({ team, rows, won }: { team: Team; rows: StatLine[]; won: boolean }) {
-  const th = "px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-white/45";
+  const th = "px-2 py-2 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-white/45";
   return (
     <div className="min-w-0">
       <div className={`mb-1.5 text-xs font-black ${won ? "text-hl-green" : "text-white/80"}`}>
         {team.name} {won ? "· won" : ""}
       </div>
       <div className="overflow-x-auto rounded-lg border border-white/[0.06]">
-        <table className="w-full min-w-[420px] text-sm">
+        <table className="w-full min-w-[26.25rem] text-sm">
           <thead>
             <tr className="bg-white/[0.03] text-right">
               <th className={`${th} text-left`}>Player</th>
@@ -73,7 +73,7 @@ function ProLadderStrip({ proElo, teamA, teamB }: { proElo: MatchProElo; teamA: 
   }
   return (
     <div className="rounded-xl border border-[#a855f7]/30 bg-[#a855f7]/[0.06] px-4 py-3">
-      <div className="text-[11px] font-black uppercase tracking-wide text-[#d8b4fe]">
+      <div className="text-[0.75rem] font-black uppercase tracking-wide text-[#d8b4fe]">
         Pro ladder · ×{proElo.weight.toFixed(1)}
       </div>
       {proElo.deltas.length === 0 ? (
@@ -91,7 +91,7 @@ function ProLadderStrip({ proElo, teamA, teamB }: { proElo: MatchProElo; teamA: 
                     <span
                       key={d.playerName}
                       title={`${d.before.toLocaleString()} → ${d.after.toLocaleString()} Pro Elo`}
-                      className="rounded-md bg-black/30 px-2 py-0.5 text-[11px] font-bold text-white/85"
+                      className="rounded-md bg-black/30 px-2 py-0.5 text-[0.75rem] font-bold text-white/85"
                     >
                       {d.playerName}{" "}
                       <span className={diff > 0 ? "text-hl-green" : diff < 0 ? "text-hl-red" : "text-white/45"}>
@@ -297,7 +297,7 @@ function MapEditor({
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
         <div>
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">
+          <label className="mb-1 block text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">
             Paste /ocr2rank output (optional)
           </label>
           <div className="flex gap-2">
@@ -320,11 +320,11 @@ function MapEditor({
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <label>
-            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">Map</span>
+            <span className="mb-1 block text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">Map</span>
             <input value={d.mapName} onChange={(e) => setD({ ...d, mapName: e.target.value.slice(0, 40) })} placeholder="e.g. Dust II" className={`${box} w-32`} />
           </label>
           <label>
-            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">Rounds</span>
+            <span className="mb-1 block text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">Rounds</span>
             <span className="flex items-center gap-1">
               <input inputMode="numeric" aria-label={`${teamA.name} rounds`} value={d.roundsA} onChange={(e) => setD({ ...d, roundsA: e.target.value.replace(/\D/g, "").slice(0, 2) })} placeholder={teamA.tag || "A"} className={`${box} w-12 text-center`} />
               <span className="text-white/40">–</span>
@@ -340,9 +340,9 @@ function MapEditor({
           <div key={t.id} className="min-w-0">
             <div className="mb-1.5 text-xs font-black text-white">{t.name}</div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[460px] text-sm">
+              <table className="w-full min-w-[28.75rem] text-sm">
                 <thead>
-                  <tr className="text-[10px] uppercase tracking-[0.1em] text-white/45">
+                  <tr className="text-[0.6875rem] uppercase tracking-[0.1em] text-white/45">
                     <th className="w-8 py-1 text-left" title="Played this map">✓</th>
                     <th className="py-1 text-left">Player</th>
                     {CELLS.map(([, label]) => (
@@ -386,7 +386,7 @@ function MapEditor({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[11px] text-white/50">
+        <span className="text-[0.75rem] text-white/50">
           {bo > 1 ? `Best of ${bo}: save each map separately. ` : ""}League stats never change ranked stats.
         </span>
         <div className="flex gap-2">

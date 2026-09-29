@@ -63,7 +63,7 @@ function MemberSlot({
 }) {
   const rank = (member.rank || "UNRANKED") as RankTierLetter;
   return (
-    <div className="lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center py-4 px-2 gap-2 min-h-[160px] rounded-xl">
+    <div className="lobby-slot filled relative overflow-hidden flex flex-col items-center justify-center py-4 px-2 gap-2 min-h-[10rem] rounded-xl">
       {/* Queue-requirement warning */}
       {member.canQueue === false && (
         <span
@@ -127,7 +127,7 @@ function MemberSlot({
 }
 
 const CHIP_CLS =
-  "inline-flex items-center gap-1 rounded-md bg-hl-panel-light/60 border border-hl-border/60 px-2 py-1 text-[11px] text-hl-muted";
+  "inline-flex items-center gap-1 rounded-md bg-hl-panel-light/60 border border-hl-border/60 px-2 py-1 text-[0.75rem] text-hl-muted";
 
 export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onInvite, busy }: PartyCardProps) {
   const inParty = !!currentUserId && party.members.some((m) => m.discordId === currentUserId);
@@ -148,7 +148,7 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onIn
     <div className="party-card relative p-4 pt-5">
       {/* Avg skill level chip, floating on the card edge (FACEIT-style) */}
       <span
-        className="absolute -top-3 right-4 z-10 inline-flex items-center gap-1.5 rounded-full bg-hl-base px-2 py-0.5 text-[10px] header-caps text-white border"
+        className="absolute -top-3 right-4 z-10 inline-flex items-center gap-1.5 rounded-full bg-hl-base px-2 py-0.5 text-[0.6875rem] header-caps text-white border"
         style={{ borderColor: avgColor }}
       >
         <RankBadge rank={avg} size="sm" showGlow={false} className="!w-4 !h-4" />
@@ -170,7 +170,7 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onIn
             key={`e${i}`}
             onClick={() => !inParty && !busy && onJoin?.(party.id)}
             disabled={inParty || busy}
-            className="lobby-slot empty flex items-center justify-center min-h-[160px] rounded-xl hover:border-hl-gold/40 transition-colors disabled:cursor-default"
+            className="lobby-slot empty flex items-center justify-center min-h-[10rem] rounded-xl hover:border-hl-gold/40 transition-colors disabled:cursor-default"
             title={inParty ? "Open slot" : "Join this party"}
           >
             <Plus className="w-8 h-8 text-hl-muted/60" />
@@ -232,12 +232,12 @@ export function PartyCard({ party, currentUserId, onJoin, onLeave, friends, onIn
                         >
                           <Avatar className="w-6 h-6 border border-hl-border">
                             {f.avatar ? <AvatarImage src={f.avatar} /> : null}
-                            <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
+                            <AvatarFallback className="bg-hl-panel-light text-[0.6875rem] font-bold text-hl-gold">
                               {f.name.slice(0, 2).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                           <span className="truncate flex-1">{f.name}</span>
-                          {invited && <span className="text-[10px] text-hl-muted shrink-0">Invited</span>}
+                          {invited && <span className="text-[0.6875rem] text-hl-muted shrink-0">Invited</span>}
                         </button>
                       );
                     })

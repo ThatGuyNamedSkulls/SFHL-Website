@@ -5,6 +5,7 @@
  * linked tick, the flag, and the level badge with Elo. "lg" on the upcoming
  * Overview, "sm" on the Find pages. Server-safe (no hooks).
  */
+import { AvatarImg } from "@/components/avatar-img";
 import { BadgeCheck, Crown, UserRound } from "lucide-react";
 import { Flag } from "@/components/flag";
 import { RankBadge } from "@/components/rank-badge";
@@ -13,15 +14,15 @@ import type { PlayerCardData } from "@/lib/player-card";
 import { optimizedAsset } from "@/lib/optimized-asset";
 
 const SIZES = {
-  lg: { card: "w-[136px] h-[228px]", banner: "h-[78px]", ring: 70, pad: 3, name: "text-[12px]", badge: "md" as const, elo: "text-[11px]" },
-  md: { card: "w-[118px] h-[198px]", banner: "h-[64px]", ring: 58, pad: 3, name: "text-[11px]", badge: "md" as const, elo: "text-[10px]" },
-  sm: { card: "w-[96px] h-[158px]", banner: "h-[50px]", ring: 48, pad: 2, name: "text-[10px]", badge: "sm" as const, elo: "text-[10px]" },
+  lg: { card: "w-[8.5rem] h-[14.25rem]", banner: "h-[4.875rem]", ring: 70, pad: 3, name: "text-[0.8125rem]", badge: "md" as const, elo: "text-[0.75rem]" },
+  md: { card: "w-[7.375rem] h-[12.375rem]", banner: "h-[4rem]", ring: 58, pad: 3, name: "text-[0.75rem]", badge: "md" as const, elo: "text-[0.6875rem]" },
+  sm: { card: "w-[6rem] h-[9.875rem]", banner: "h-[3.125rem]", ring: 48, pad: 2, name: "text-[0.6875rem]", badge: "sm" as const, elo: "text-[0.6875rem]" },
 };
 
 function Chip({ children, tone }: { children: React.ReactNode; tone: "orange" | "dark" }) {
   return (
     <span
-      className={`rounded px-1.5 text-[9px] font-black leading-4 ${tone === "orange" ? "bg-[#ff5500] text-white" : "bg-black/70 text-white/85"}`}
+      className={`rounded px-1.5 text-[0.6875rem] font-black leading-4 ${tone === "orange" ? "bg-[#ff5500] text-white" : "bg-black/70 text-white/85"}`}
     >
       {children}
     </span>
@@ -84,8 +85,7 @@ export function PlayerCard({
         >
           <span className="grid h-full w-full place-items-center overflow-hidden rounded-full border-2 border-[#141414] bg-[#222]">
             {card?.avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element -- Roblox/Discord avatar CDNs
-              <img src={card.avatar} alt="" className="h-full w-full object-cover" />
+              <AvatarImg src={card.avatar} alt="" className="h-full w-full object-cover" />
             ) : (
               <UserRound className={`h-1/2 w-1/2 ${card ? "text-[#ff5500]/80" : "text-white/15"}`} strokeWidth={1.5} />
             )}
@@ -102,7 +102,7 @@ export function PlayerCard({
           {card?.verified ? <BadgeCheck className="h-3 w-3 shrink-0 text-hl-green" aria-label="Linked HyperLeague player" /> : null}
         </div>
         {card?.country ? (
-          <span className="mt-0.5 inline-flex items-center gap-1 text-[9px] font-bold uppercase text-white/55">
+          <span className="mt-0.5 inline-flex items-center gap-1 text-[0.6875rem] font-bold uppercase text-white/55">
             <Flag src={flagPath(card.country)} name={countryName(card.country)} className="h-2.5 w-3.5" />
             {card.country}
           </span>

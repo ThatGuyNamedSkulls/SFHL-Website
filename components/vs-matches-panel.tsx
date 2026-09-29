@@ -75,9 +75,9 @@ function PastMatchCard({ match }: { match: RecentMatch }) {
   const title = match.matchId ? `match_${match.matchId}` : `match_${match.id}`;
 
   return (
-    <Link href={href} className="relative overflow-hidden rounded-lg bg-[#1c1c1c] block h-[88px]">
+    <Link href={href} className="relative overflow-hidden rounded-lg bg-[#1c1c1c] block h-[5.5rem]">
       <span
-        className="absolute inset-y-0 left-0 w-[3px]"
+        className="absolute inset-y-0 left-0 w-[0.1875rem]"
         style={{ background: gold ? WASH_GOLD : win ? WASH_WIN : WASH_LOSS }}
       />
       <span
@@ -86,16 +86,16 @@ function PastMatchCard({ match }: { match: RecentMatch }) {
       />
       <span className="absolute inset-y-0 right-0 w-[46%] bg-gradient-to-l from-black/25 to-[#1c1c1c] pointer-events-none" />
       <div className="relative h-full flex flex-col justify-center pl-3.5 pr-4 py-2">
-        <div className="text-[10px] font-semibold tracking-wide text-[#8a8a8a] uppercase">
+        <div className="text-[0.6875rem] font-semibold tracking-wide text-[#8a8a8a] uppercase">
           {formatPastWhen(match.date)}
         </div>
         <div className="text-sm font-bold text-white truncate">{title}</div>
-        <div className="text-[11px] text-[#8a8a8a]">
+        <div className="text-[0.75rem] text-[#8a8a8a]">
           {match.map} · {match.mode}
         </div>
         <div className="flex items-center gap-2 mt-0.5">
           <span
-            className={`inline-flex items-center justify-center min-w-[18px] h-[16px] px-1 rounded text-[10px] font-black ${
+            className={`inline-flex items-center justify-center min-w-[1.125rem] h-[1rem] px-1 rounded text-[0.6875rem] font-black ${
               gold
                 ? "bg-[#ffc44d] text-[#1a1400]"
                 : win
@@ -106,7 +106,7 @@ function PastMatchCard({ match }: { match: RecentMatch }) {
             {match.result}
           </span>
           {match.rounds ? (
-            <span className="text-[12px] font-bold tabular-nums text-white">
+            <span className="text-[0.8125rem] font-bold tabular-nums text-white">
               {formatScoreDisplay(match.rounds)}
             </span>
           ) : null}
@@ -196,7 +196,7 @@ export function VsMatchesPanel() {
         onClick={() => setOpen((v) => !v)}
         className={`${icon} ${active ? "text-[#ff5500]" : ""}`}
       >
-        <span className="text-[10px] font-black tracking-widest leading-none">VS</span>
+        <span className="text-[0.6875rem] font-black tracking-widest leading-none">VS</span>
       </button>
 
       {mounted &&
@@ -204,7 +204,7 @@ export function VsMatchesPanel() {
         createPortal(
           <div
             ref={panelRef}
-            className="fixed z-[80] top-2 bottom-2 right-[calc(var(--hl-sidebar-w)+8px)] w-[340px] flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#161616] shadow-2xl"
+            className="fixed z-[80] top-2 bottom-2 right-[calc(var(--hl-sidebar-w)+8px)] w-[21.25rem] flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#161616] shadow-2xl"
           >
             <div className="flex items-center justify-between px-4 py-3 shrink-0">
               <span className="text-lg font-bold text-white">Matches</span>
@@ -249,7 +249,7 @@ export function VsMatchesPanel() {
                 )}
 
                 <div>
-                  <div className="text-[12px] text-[#8a8a8a] mb-2">Past</div>
+                  <div className="text-[0.8125rem] text-[#8a8a8a] mb-2">Past</div>
                   {past.length === 0 ? (
                     <p className="text-sm text-[#8a8a8a] py-6 text-center">No matches recorded yet.</p>
                   ) : (

@@ -37,6 +37,7 @@ export interface LiveLobby {
   status: string;
   side?: { name: string; team: number } | null;
   sidePick?: { captainId: string; team: number; options: string[] } | null;
+  teamSides?: { team1: string; team2: string } | null;
   firstVetoCaptainId?: string | null;
   captains: { team1: string | null; team2: string | null };
   veto: {
@@ -79,6 +80,75 @@ function teamHandle(members: LiveLobbyMember[], captainId: string | null) {
   return `team_${slug}`;
 }
 
+const SIDE_NAMES: Record<string, string> = { CT: "Counter-Terrorists", T: "Terrorists" };
+
+function sideStyle(side: string) {
+  return side.toUpperCase() === "CT"
+    ? { box: "bg-[#1e2a3d] border-[#5d79ae]/60", text: "text-[#9eb6d9]", solid: "bg-[#5d79ae] text-white" }
+    : { box: "bg-[#2a1f14] border-[#de9b35]/60", text: "text-[#e8b86a]", solid: "bg-[#de9b35] text-[#1a1208]" };
+}
+
+function SideChip({ side }: { side: string | null }) {
+  if (!side) return null;
+  return (
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-black tracking-wide ${sideStyle(side).solid}`}>
+      {side}
+    </span>
+  );
+}
+
+/** Tells this player which team they're on and which side to pick in game. */
+function YourTeamBanner({
+  side,
+  teamName,
+  teamNo,
+  voiceUrl,
+}: {
+  side: string | null;
+  teamName: string;
+  teamNo: number;
+  voiceUrl: string | null;
+}) {
+  if (!side) {
+    return (
+      <div className="mb-4 rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 md:px-5 md:py-4">
+        <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#8a8a8a]">Your team</div>
+        <div className="mt-1 text-lg md:text-xl font-black text-white">
+          Team {teamNo} · {teamName}
+        </div>
+        <p className="mt-1 text-sm text-[#b0b0b0]">
+          Your side (CT or T) is picked after the map veto. It shows here as soon as it&apos;s chosen.
+        </p>
+      </div>
+    );
+  }
+  const style = sideStyle(side);
+  const full = SIDE_NAMES[side.toUpperCase()] ?? side;
+  return (
+    <div className={`mb-4 flex flex-wrap items-center gap-4 rounded-xl border-2 px-4 py-3 md:px-5 md:py-4 ${style.box}`}>
+      <div className={`flex h-14 w-14 md:h-16 md:w-16 shrink-0 items-center justify-center rounded-xl text-2xl md:text-3xl font-black ${style.solid}`}>
+        {side}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-bold uppercase tracking-[0.14em] text-white/60">Your team</div>
+        <div className={`text-xl md:text-2xl font-black ${style.text}`}>You&apos;re on {full}</div>
+        <p className="mt-0.5 text-sm text-white/75">
+          Join the <strong className="text-white">{full}</strong> in game ({teamName}).
+        </p>
+      </div>
+      {voiceUrl && (
+        <a
+          href={voiceUrl}
+          title="Opens the Discord app"
+          className="inline-flex items-center gap-2 h-11 px-4 rounded-lg bg-[#57F287] text-hl-base text-sm font-black"
+        >
+          <Mic className="w-4 h-4" /> Join {side} voice
+        </a>
+      )}
+    </div>
+  );
+}
+
 function PlayerRow({
   member,
   captain,
@@ -90,7 +160,7 @@ function PlayerRow({
     <div className={`flex items-center gap-2.5 rounded-lg bg-[#1c1c1c] border border-white/[0.06] px-2.5 py-2 ${member.left ? "opacity-50" : ""}`}>
       <Avatar className="w-8 h-8 shrink-0">
         {member.avatar ? <AvatarImage src={member.avatar} /> : null}
-        <AvatarFallback className="bg-[#2a2a2a] text-[10px] font-bold text-white">
+        <AvatarFallback className="bg-[#2a2a2a] text-[0.6875rem] font-bold text-white">
           {member.name.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
@@ -98,7 +168,7 @@ function PlayerRow({
       <SubRolePill isSub={member.sub} leftEarly={member.left} compact />
       {captain && <Crown className="w-3.5 h-3.5 text-[#ff5500] shrink-0" />}
       {member.placementDone !== false && typeof member.elo === "number" && member.elo > 0 && (
-        <span className="text-[12px] tabular-nums text-[#8a8a8a] shrink-0">{member.elo}</span>
+        <span className="text-[0.8125rem] tabular-nums text-[#8a8a8a] shrink-0">{member.elo}</span>
       )}
       <RankBadge
         rank={(member.rank || "UNRANKED") as RankTierLetter}
@@ -155,6 +225,11 @@ export function LiveMatchRoom({
   const name2 = lobby.teamNames?.team2 ?? teamHandle(team2, lobby.captains.team2);
   const av1 = team1.find((m) => m.discordId === lobby.captains.team1) ?? team1[0];
   const av2 = team2.find((m) => m.discordId === lobby.captains.team2) ?? team2[0];
+  const side1 = lobby.teamSides?.team1 ?? null;
+  const side2 = lobby.teamSides?.team2 ?? null;
+  const me = selfId ? lobby.members.find((m) => m.discordId === selfId) : undefined;
+  const mySide = me ? (me.team === 1 ? side1 : side2) : null;
+  const voiceLabel = mySide ? `Join ${mySide} voice` : "Join team voice";
   const dateLabel = lobby.createdAt
     ? new Date(lobby.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
     : null;
@@ -285,7 +360,7 @@ export function LiveMatchRoom({
                 key={t}
                 type="button"
                 onClick={() => setTab(t)}
-                className={`text-[12px] font-bold uppercase tracking-wide pb-1 border-b-2 ${
+                className={`text-[0.8125rem] font-bold uppercase tracking-wide pb-1 border-b-2 ${
                   tab === t ? "text-[#ff5500] border-[#ff5500]" : "text-[#8a8a8a] border-transparent hover:text-white"
                 }`}
               >
@@ -295,7 +370,7 @@ export function LiveMatchRoom({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#8a8a8a] mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[0.8125rem] text-[#8a8a8a] mb-4">
           {lobby.leagueMatchId ? (
             <span>
               <Link href="/league" className="hover:text-white">League</Link> /{" "}
@@ -312,7 +387,7 @@ export function LiveMatchRoom({
                 href={lobby.server.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-gold-gradient text-hl-base text-[11px] font-black"
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-gold-gradient text-hl-base text-[0.75rem] font-black"
               >
                 <Gamepad2 className="w-3.5 h-3.5" /> Join server
               </a>
@@ -321,9 +396,9 @@ export function LiveMatchRoom({
               <a
                 href={lobby.voiceChannelUrl}
                 title="Opens the Discord app"
-                className="xl:hidden inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-[#57F287] text-hl-base text-[11px] font-black"
+                className="xl:hidden inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-[#57F287] text-hl-base text-[0.75rem] font-black"
               >
-                <Mic className="w-3.5 h-3.5" /> Team voice
+                <Mic className="w-3.5 h-3.5" /> {voiceLabel}
               </a>
             )}
             {dateLabel && (
@@ -334,7 +409,17 @@ export function LiveMatchRoom({
           </div>
         </div>
 
+        {me && (
+          <YourTeamBanner
+            side={mySide}
+            teamName={me.team === 1 ? name1 : name2}
+            teamNo={me.team}
+            voiceUrl={lobby.voiceChannelUrl}
+          />
+        )}
+
         <div className="rounded-xl bg-[#1a1a1a] border border-white/[0.06] px-3 py-3 md:px-5 md:py-4 mb-4 flex items-center justify-center gap-2 md:gap-4">
+          <SideChip side={side1} />
           <span className="text-sm md:text-lg font-bold text-white truncate max-w-[28%] md:max-w-[36%] text-right">{name1}</span>
           <Avatar className="w-12 h-12 shrink-0">
             {av1?.avatar ? <AvatarImage src={av1.avatar} /> : null}
@@ -350,6 +435,7 @@ export function LiveMatchRoom({
             </AvatarFallback>
           </Avatar>
           <span className="text-sm md:text-lg font-bold text-white truncate max-w-[28%] md:max-w-[36%]">{name2}</span>
+          <SideChip side={side2} />
         </div>
         {lobby.winChance && (
           <div className="mb-4">
@@ -360,9 +446,11 @@ export function LiveMatchRoom({
         {tab === "stats" ? (
           <p className="text-sm text-[#8a8a8a] text-center py-16">Stats appear after the match ends.</p>
         ) : (
-          <div className="grid lg:grid-cols-[1fr_220px_1fr] gap-4 items-start">
+          <div className="grid lg:grid-cols-[1fr_13.75rem_1fr] gap-4 items-start">
             <div>
-              <div className="text-[12px] text-[#8a8a8a] mb-2">Players</div>
+              <div className="flex items-center gap-2 text-[0.8125rem] text-[#8a8a8a] mb-2">
+                <SideChip side={side1} /> {side1 ? SIDE_NAMES[side1.toUpperCase()] ?? "Players" : "Players"}
+              </div>
               <div className="space-y-1.5">
                 {team1.map((m) => (
                   <PlayerRow key={m.discordId} member={m} captain={lobby.captains.team1 === m.discordId} />
@@ -372,7 +460,7 @@ export function LiveMatchRoom({
 
             <div className="px-1">
               <div className="text-center mb-3">
-                <div className="text-[13px] font-semibold text-white">{vetoStatus}</div>
+                <div className="text-[0.875rem] font-semibold text-white">{vetoStatus}</div>
                 {veto && !veto.complete && (
                   <div className="text-xl font-black tabular-nums text-white mt-1">
                     {formatClock((turnEndsAt - now) / 1000)}
@@ -388,8 +476,8 @@ export function LiveMatchRoom({
                       <div className="text-sm font-bold text-white mt-2">{prettyMap(mapName)}</div>
                     </>
                   )}
-                  <div className="text-[11px] text-[#8a8a8a] mt-2 mb-2">
-                    Team {lobby.sidePick?.team || picker?.team || 1} starting side
+                  <div className="text-[0.75rem] text-[#8a8a8a] mt-2 mb-2">
+                    {picker ? `${picker.name}'s team` : `Team ${lobby.sidePick?.team || 1}`} picks the starting side
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {sideOptions.map((side) => {
@@ -417,15 +505,20 @@ export function LiveMatchRoom({
                   <MapThumb map={mapName} className="w-full h-16 mx-auto" />
                   <div className="text-sm font-bold text-white mt-2">{prettyMap(mapName)}</div>
                   {lobby.seriesMaps?.length ? (
-                    <div className="text-[11px] text-[#8a8a8a] mt-1">
+                    <div className="text-[0.75rem] text-[#8a8a8a] mt-1">
                       Best of 3: {lobby.seriesMaps.map((m, i) => `${i + 1}. ${prettyMap(m)}`).join(" → ")}
                     </div>
                   ) : null}
-                  {lobby.side && (
-                    <div className="text-[11px] text-[#8a8a8a] mt-1">
+                  {side1 && side2 ? (
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-[#b0b0b0]">
+                      <span className="inline-flex items-center gap-1.5"><SideChip side={side1} /> {name1}</span>
+                      <span className="inline-flex items-center gap-1.5"><SideChip side={side2} /> {name2}</span>
+                    </div>
+                  ) : lobby.side ? (
+                    <div className="text-[0.75rem] text-[#8a8a8a] mt-1">
                       Team {lobby.side.team} starts {lobby.side.name}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               ) : veto ? (
                 <div className="space-y-1.5">
@@ -443,7 +536,7 @@ export function LiveMatchRoom({
                     >
                       <MapThumb map={map} />
                       <span className="text-sm font-semibold text-white truncate">{prettyMap(map)}</span>
-                      {busy === map && <span className="ml-auto text-[11px] text-[#8a8a8a]">…</span>}
+                      {busy === map && <span className="ml-auto text-[0.75rem] text-[#8a8a8a]">…</span>}
                     </button>
                   ))}
                 </div>
@@ -456,7 +549,9 @@ export function LiveMatchRoom({
             </div>
 
             <div>
-              <div className="text-[12px] text-[#8a8a8a] mb-2 text-right lg:text-left">Players</div>
+              <div className="flex items-center justify-end lg:justify-start gap-2 text-[0.8125rem] text-[#8a8a8a] mb-2">
+                <SideChip side={side2} /> {side2 ? SIDE_NAMES[side2.toUpperCase()] ?? "Players" : "Players"}
+              </div>
               <div className="space-y-1.5">
                 {team2.map((m) => (
                   <PlayerRow key={m.discordId} member={m} captain={lobby.captains.team2 === m.discordId} />
@@ -468,7 +563,7 @@ export function LiveMatchRoom({
 
         <div className="xl:hidden mt-6 rounded-xl border border-white/[0.06] bg-[#141414] overflow-hidden">
           <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-            <span className="text-[12px] font-bold uppercase tracking-wide text-[#8a8a8a]">Room chat</span>
+            <span className="text-[0.8125rem] font-bold uppercase tracking-wide text-[#8a8a8a]">Room chat</span>
             <a
               href={lobby.channelUrl}
               target="_blank"
@@ -481,12 +576,12 @@ export function LiveMatchRoom({
           </div>
           <div ref={chatListMobileRef} className="max-h-48 overflow-y-auto overscroll-contain px-3 py-3 space-y-2">
             {messages.length === 0 ? (
-              <p className="text-[12px] text-[#8a8a8a]">No messages yet. Chat here or in Discord.</p>
+              <p className="text-[0.8125rem] text-[#8a8a8a]">No messages yet. Chat here or in Discord.</p>
             ) : (
               messages.map((m) => (
-                <div key={m.id} className="text-[12px] leading-snug">
+                <div key={m.id} className="text-[0.8125rem] leading-snug">
                   <span className="font-semibold text-white">{m.authorName}</span>
-                  <span className="ml-1 text-[10px] uppercase tracking-wide text-[#6a6a6a]">
+                  <span className="ml-1 text-[0.6875rem] uppercase tracking-wide text-[#6a6a6a]">
                     {m.source === "website" ? "web" : "dc"}
                   </span>
                   <p className="text-[#d0d0d0] whitespace-pre-wrap break-words">{m.content}</p>
@@ -506,7 +601,7 @@ export function LiveMatchRoom({
               onChange={(e) => setDraft(e.target.value)}
               maxLength={400}
               placeholder="Message match chat…"
-              className="flex-1 min-w-0 h-8 rounded-md bg-[#1c1c1c] border border-white/10 px-2 text-[12px] text-white placeholder:text-[#6a6a6a] focus:outline-none focus:border-[#ff5500]/50"
+              className="flex-1 min-w-0 h-8 rounded-md bg-[#1c1c1c] border border-white/10 px-2 text-[0.8125rem] text-white placeholder:text-[#6a6a6a] focus:outline-none focus:border-[#ff5500]/50"
             />
             <button
               type="submit"
@@ -520,9 +615,9 @@ export function LiveMatchRoom({
         </div>
       </div>
 
-      <aside className="hidden xl:flex w-[300px] shrink-0 flex-col min-h-0 h-full border-l border-white/[0.06] bg-[#141414]">
+      <aside className="hidden xl:flex w-[18.75rem] shrink-0 flex-col min-h-0 h-full border-l border-white/[0.06] bg-[#141414]">
         <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0">
-          <span className="text-[12px] font-bold uppercase tracking-wide text-[#8a8a8a]">Room chat</span>
+          <span className="text-[0.8125rem] font-bold uppercase tracking-wide text-[#8a8a8a]">Room chat</span>
           <a
             href={lobby.channelUrl}
             target="_blank"
@@ -535,12 +630,12 @@ export function LiveMatchRoom({
         </div>
         <div ref={chatListRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3 space-y-2">
           {messages.length === 0 ? (
-            <p className="text-[12px] text-[#8a8a8a]">No messages yet. Chat here or in Discord.</p>
+            <p className="text-[0.8125rem] text-[#8a8a8a]">No messages yet. Chat here or in Discord.</p>
           ) : (
             messages.map((m) => (
-              <div key={m.id} className="text-[12px] leading-snug">
+              <div key={m.id} className="text-[0.8125rem] leading-snug">
                 <span className="font-semibold text-white">{m.authorName}</span>
-                <span className="ml-1 text-[10px] uppercase tracking-wide text-[#6a6a6a]">
+                <span className="ml-1 text-[0.6875rem] uppercase tracking-wide text-[#6a6a6a]">
                   {m.source === "website" ? "web" : "dc"}
                 </span>
                 <p className="text-[#d0d0d0] whitespace-pre-wrap break-words">{m.content}</p>
@@ -560,7 +655,7 @@ export function LiveMatchRoom({
             onChange={(e) => setDraft(e.target.value)}
             maxLength={400}
             placeholder="Message match chat…"
-            className="flex-1 min-w-0 h-8 rounded-md bg-[#1c1c1c] border border-white/10 px-2 text-[12px] text-white placeholder:text-[#6a6a6a] focus:outline-none focus:border-[#ff5500]/50"
+            className="flex-1 min-w-0 h-8 rounded-md bg-[#1c1c1c] border border-white/10 px-2 text-[0.8125rem] text-white placeholder:text-[#6a6a6a] focus:outline-none focus:border-[#ff5500]/50"
           />
           <button
             type="submit"
@@ -571,7 +666,7 @@ export function LiveMatchRoom({
             <Send className="w-3.5 h-3.5" />
           </button>
         </form>
-        <div className="px-4 py-3 border-t border-b border-white/[0.06] text-[12px] font-bold uppercase tracking-wide text-[#8a8a8a] shrink-0">
+        <div className="px-4 py-3 border-t border-b border-white/[0.06] text-[0.8125rem] font-bold uppercase tracking-wide text-[#8a8a8a] shrink-0">
           Connect
         </div>
         <div className="p-4 space-y-2 shrink-0">
@@ -585,7 +680,7 @@ export function LiveMatchRoom({
               <Gamepad2 className="w-3.5 h-3.5" /> Join server
             </a>
           ) : (
-            <p className="text-[12px] text-[#8a8a8a]">Staff will post the game server link here.</p>
+            <p className="text-[0.8125rem] text-[#8a8a8a]">Staff will post the game server link here.</p>
           )}
           {lobby.voiceChannelUrl ? (
             <a
@@ -593,10 +688,10 @@ export function LiveMatchRoom({
               title="Opens the Discord app"
               className="inline-flex items-center gap-2 w-full justify-center h-9 rounded-md bg-[#57F287] text-hl-base text-xs font-black"
             >
-              <Mic className="w-3.5 h-3.5" /> Join team voice
+              <Mic className="w-3.5 h-3.5" /> {voiceLabel}
             </a>
           ) : (
-            <p className="text-[12px] text-[#8a8a8a]">Voice opens when the match channel is ready.</p>
+            <p className="text-[0.8125rem] text-[#8a8a8a]">Voice opens when the match channel is ready.</p>
           )}
         </div>
       </aside>

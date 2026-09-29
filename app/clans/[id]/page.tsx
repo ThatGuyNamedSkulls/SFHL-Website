@@ -195,7 +195,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
         ← All clans
       </Link>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[240px_1fr] items-start">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[15rem_1fr] items-start">
         <div>
           <div className="mb-4 px-1">
             <h1 className="mb-3 text-xl font-black tracking-[0.12em] text-white">{club.name}</h1>
@@ -203,10 +203,10 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
               <ClubMark tag={club.tag} accentColor={club.accentColor} logoUrl={club.logoUrl} size={28} className="!rounded-full" />
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-white">{club.name}</div>
-                <div className="truncate text-[11px] text-[#8a8a8a]">Organized by {club.ownerName}</div>
+                <div className="truncate text-[0.75rem] text-[#8a8a8a]">Organized by {club.ownerName}</div>
               </div>
             </div>
-            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[#8a8a8a]">
+            <div className="mt-2 flex items-center gap-1.5 text-[0.75rem] text-[#8a8a8a]">
               <Users className="w-3.5 h-3.5" />
               {club.members.length} {club.members.length === 1 ? "member" : "members"}
               {club.private ? <Lock className="w-3 h-3" /> : null}
@@ -344,7 +344,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
         <div>
       {editing && (canEdit || owner) ? (
         <Card className="bg-hl-panel border-hl-border p-4 mb-6 space-y-3">
-          <div className="grid gap-3 md:grid-cols-[1fr_120px]">
+          <div className="grid gap-3 md:grid-cols-[1fr_7.5rem]">
             <input
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 40))}
@@ -390,12 +390,12 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
             Private (invite only)
           </label>
           <div>
-            <div className="text-[11px] header-caps text-hl-muted mb-2">Banner color</div>
+            <div className="text-[0.75rem] header-caps text-hl-muted mb-2">Banner color</div>
             <ClubColorPicker value={accentColor} onChange={setAccentColor} />
           </div>
           {owner ? (
             <div className="space-y-2 border-t border-hl-border pt-3">
-              <div className="text-[11px] header-caps text-hl-muted">Roles (Owner & Member are defaults, max 7)</div>
+              <div className="text-[0.75rem] header-caps text-hl-muted">Roles (Owner & Member are defaults, max 7)</div>
               {club.roles.map((role) => (
                 <div key={role.id} className="flex flex-wrap items-center gap-2 text-xs text-hl-muted">
                   <span className="w-28 font-bold text-white">{role.name}</span>
@@ -552,11 +552,11 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
             <div className="space-y-6 text-sm">
               <div>
                 <div className="mb-3 text-sm font-bold text-white">Join requirements</div>
-                <div className="text-[11px] font-bold uppercase tracking-wide text-[#8a8a8a]">Game</div>
+                <div className="text-[0.75rem] font-bold uppercase tracking-wide text-[#8a8a8a]">Game</div>
                 <div className="mt-1 font-semibold text-white">Counter Blox</div>
               </div>
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-wide text-[#8a8a8a]">Skill level</div>
+                <div className="text-[0.75rem] font-bold uppercase tracking-wide text-[#8a8a8a]">Skill level</div>
                 <div className="mt-1 font-semibold text-white">Any</div>
               </div>
               <div>
@@ -582,7 +582,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                   setMemberPage(1);
                 }}
                 placeholder="Filter by nickname"
-                className="h-9 min-w-[160px] flex-1 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white placeholder:text-hl-muted"
+                className="h-9 min-w-[10rem] flex-1 rounded-lg border border-hl-border bg-hl-base px-3 text-sm text-white placeholder:text-hl-muted"
               />
               <select
                 value={roleFilter}
@@ -628,7 +628,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                   <div key={row.discordId} className="flex items-center gap-3 px-4 py-3">
                     <Avatar className="h-8 w-8 border border-hl-border">
                       {row.avatar ? <AvatarImage src={row.avatar} alt="" /> : null}
-                      <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
+                      <AvatarFallback className="bg-hl-panel-light text-[0.6875rem] font-bold text-hl-gold">
                         {label.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -648,7 +648,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                       <div className="text-xs text-hl-muted">{roleName(row.role)}</div>
                     </div>
                     {row.role === "owner" ? (
-                      <span className="rounded-full border border-hl-gold/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl-gold">
+                      <span className="rounded-full border border-hl-gold/40 px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-hl-gold">
                         Owner
                       </span>
                     ) : null}
@@ -735,7 +735,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                     </span>
                     <Avatar className="h-8 w-8 border border-hl-border">
                       {row.avatar ? <AvatarImage src={row.avatar} alt="" /> : null}
-                      <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
+                      <AvatarFallback className="bg-hl-panel-light text-[0.6875rem] font-bold text-hl-gold">
                         {label.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -879,7 +879,7 @@ function ClubChat({
   };
 
   return (
-    <Card className="bg-hl-panel border-hl-border overflow-hidden p-0 flex flex-col min-h-[320px] max-h-[480px]">
+    <Card className="bg-hl-panel border-hl-border overflow-hidden p-0 flex flex-col min-h-[20rem] max-h-[30rem]">
       <div className="border-b border-hl-border px-4 py-3 text-sm font-bold text-white flex items-center gap-2">
         <MessageSquare className="w-4 h-4 text-hl-gold" />
         Clan chat
@@ -900,7 +900,7 @@ function ClubChat({
                   <div key={row.id} className="flex items-start gap-2">
                     <Avatar className="h-7 w-7 border border-hl-border mt-0.5">
                       {row.avatar ? <AvatarImage src={row.avatar} alt="" /> : null}
-                      <AvatarFallback className="bg-hl-panel-light text-[9px] font-bold text-hl-gold">
+                      <AvatarFallback className="bg-hl-panel-light text-[0.6875rem] font-bold text-hl-gold">
                         {label.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -916,7 +916,7 @@ function ClubChat({
                         ) : (
                           <span className="text-xs font-bold text-white truncate">{label}</span>
                         )}
-                        <span className="text-[10px] text-hl-muted shrink-0">
+                        <span className="text-[0.6875rem] text-hl-muted shrink-0">
                           {new Date(row.createdAt).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -926,7 +926,7 @@ function ClubChat({
                           <button
                             type="button"
                             onClick={() => remove(row.id)}
-                            className="text-[10px] text-hl-muted hover:text-hl-red"
+                            className="text-[0.6875rem] text-hl-muted hover:text-hl-red"
                           >
                             Delete
                           </button>

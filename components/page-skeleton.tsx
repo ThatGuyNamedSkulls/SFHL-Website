@@ -48,7 +48,7 @@ export function TeamPageSkeleton() {
           <Bar className="h-5 w-16" />
         </div>
       </div>
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_21.25rem]">
         <Bar className="h-80" />
         <Bar className="h-64" />
       </div>

@@ -65,8 +65,8 @@ export function MetricChart({ matches }: MetricChartProps) {
           </button>
         ))}
       </div>
-      <div className="grid lg:grid-cols-[1fr_180px] gap-5">
-        <div className="w-full h-[200px]">
+      <div className="grid lg:grid-cols-[1fr_11.25rem] gap-5">
+        <div className="w-full h-[12.5rem]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={series} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />

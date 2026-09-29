@@ -103,7 +103,7 @@ export default function TrackPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {tiles.map((t) => (
           <Card key={t.label} className="bg-hl-panel border-hl-border p-4">
-            <div className="text-[11px] header-caps text-hl-muted">{t.label}</div>
+            <div className="text-[0.75rem] header-caps text-hl-muted">{t.label}</div>
             <div className="stat-number text-2xl text-white mt-1">{t.value}</div>
           </Card>
         ))}

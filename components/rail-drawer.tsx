@@ -56,11 +56,11 @@ export function RailDrawer({
       ref={panelRef}
       role="dialog"
       aria-label={label}
-      className="fixed z-[80] top-2 bottom-2 w-[300px] max-w-[calc(100vw-var(--hl-sidebar-w)-16px)] flex flex-col rounded-xl border border-white/[0.08] bg-[#161616] shadow-2xl overflow-hidden"
+      className="fixed z-[80] top-2 bottom-2 w-[18.75rem] max-w-[calc(100vw-var(--hl-sidebar-w)-16px)] flex flex-col rounded-xl border border-white/[0.08] bg-[#161616] shadow-2xl overflow-hidden"
       style={{ right: "calc(var(--hl-sidebar-w) + 8px)" }}
     >
       <div className="flex items-center gap-2 px-4 pt-4 pb-3 shrink-0">
-        <div className="min-w-0 flex-1 text-[17px] font-black text-white truncate">{title}</div>
+        <div className="min-w-0 flex-1 text-[1.0625rem] font-black text-white truncate">{title}</div>
         {actions}
         <button
           type="button"
@@ -109,7 +109,7 @@ export function IconTabs<T extends string>({
             <span className="absolute top-2 right-2.5 w-1.5 h-1.5 rounded-full bg-[#ff5500]" />
           ) : null}
           {value === t.id ? (
-            <span className="absolute left-2.5 right-2.5 bottom-0 h-[2px] rounded-full bg-[#ff5500]" />
+            <span className="absolute left-2.5 right-2.5 bottom-0 h-[0.125rem] rounded-full bg-[#ff5500]" />
           ) : null}
         </button>
       ))}
@@ -138,18 +138,18 @@ export function TextTabs<T extends string>({
           role="tab"
           aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
-          className={`relative py-2.5 text-[12px] font-black uppercase tracking-[0.08em] transition-colors ${
+          className={`relative py-2.5 text-[0.8125rem] font-black uppercase tracking-[0.08em] transition-colors ${
             value === t.id ? "text-[#ff5500]" : "text-[#9a9a9a] hover:text-white"
           }`}
         >
           {t.label}
           {t.badge ? (
-            <span className="ml-1.5 inline-flex min-w-[16px] h-4 px-1 rounded-full bg-[#ff5500] text-[#111] text-[9px] leading-4 align-middle">
+            <span className="ml-1.5 inline-flex min-w-[1rem] h-4 px-1 rounded-full bg-[#ff5500] text-[#111] text-[0.6875rem] leading-4 align-middle">
               {t.badge > 9 ? "9+" : t.badge}
             </span>
           ) : null}
           {value === t.id ? (
-            <span className="absolute left-1 right-1 bottom-0 h-[2px] rounded-full bg-[#ff5500]" />
+            <span className="absolute left-1 right-1 bottom-0 h-[0.125rem] rounded-full bg-[#ff5500]" />
           ) : null}
         </button>
       ))}

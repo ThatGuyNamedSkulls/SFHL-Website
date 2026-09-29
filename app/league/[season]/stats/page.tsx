@@ -65,7 +65,7 @@ export default async function SeasonStatsPage({
     if (a) p.set("dir", "asc");
     return p.size ? `${base}?${p}` : base;
   };
-  const th = "px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.1em]";
+  const th = "px-2.5 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.1em]";
 
   return (
     <div className="space-y-5">
@@ -84,7 +84,7 @@ export default async function SeasonStatsPage({
         </Empty>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-white/[0.08] bg-[#121212]">
-          <table className="w-full min-w-[1040px] text-sm">
+          <table className="w-full min-w-[65rem] text-sm">
             <thead>
               <tr className="border-b border-white/[0.08] text-white/50">
                 <th className={`${th} hidden w-12 pl-5 text-left sm:table-cell`}>#</th>
@@ -125,7 +125,7 @@ export default async function SeasonStatsPage({
                       </span>
                     </td>
                     <td className="hidden px-2.5 py-2.5 md:table-cell">
-                      <Link href={`/teams/${r.team.id}`} className="inline-flex max-w-[180px] items-center gap-2 text-xs font-bold text-white/75 hover:text-white">
+                      <Link href={`/teams/${r.team.id}`} className="inline-flex max-w-[11.25rem] items-center gap-2 text-xs font-bold text-white/75 hover:text-white">
                         <ClubMark tag={r.team.tag} accentColor={r.team.accentColor} logoUrl={r.team.logoUrl} size={20} />
                         <span className="truncate">{r.team.name}</span>
                       </Link>
@@ -145,7 +145,7 @@ export default async function SeasonStatsPage({
           </table>
         </div>
       )}
-      <p className="text-[11px] text-white/45">
+      <p className="text-[0.75rem] text-white/45">
         From the scoreboards Match Staff enter for each league match. League stats never change ranked stats or Elo.
       </p>
     </div>

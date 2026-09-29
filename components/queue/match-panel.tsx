@@ -71,7 +71,7 @@ export function MatchPanel({
         </button>
         <button type="button" role="tab" aria-selected={tab === "servers"} onClick={() => setTab("servers")} className={tabClass(tab === "servers")}>
           <Server className="h-4 w-4" /> Servers
-          <span className="rounded bg-white/[0.08] px-1.5 py-0.5 text-[10px] text-white/80">{regionShort}</span>
+          <span className="rounded bg-white/[0.08] px-1.5 py-0.5 text-[0.6875rem] text-white/80">{regionShort}</span>
           {tab === "servers" ? <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-hl-gold" /> : null}
         </button>
       </div>

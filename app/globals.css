@@ -160,6 +160,21 @@
   html {
     @apply font-sans;
   }
+
+  /* Bigger screens get a bigger UI: every size is rem-based, so raising the
+     root font scales text, spacing and layout together. */
+  @media (min-width: 1536px) {
+    html { font-size: 106.25%; }
+  }
+  @media (min-width: 1800px) {
+    html { font-size: 112.5%; }
+  }
+  @media (min-width: 2200px) {
+    html { font-size: 125%; }
+  }
+  @media (min-width: 2800px) {
+    html { font-size: 137.5%; }
+  }
 }
 
 /* ============================================================
@@ -330,8 +345,8 @@
     padding: 1.5rem 1.5rem 2.5rem;
   }
 }
-.hl-page { max-width: 1100px; }
-.hl-page-wide { max-width: 1280px; }
+.hl-page { max-width: 68.75rem; }
+.hl-page-wide { max-width: 80rem; }
 
 /* Phone bottom tabs sit over the scrollport — keep page content above them */
 .hl-main {
@@ -428,7 +443,7 @@
 .heat-4 { background: rgba(236, 72, 153, 1); }
 
 /* Larger leaderboard rows */
-.lb-row td { height: 64px; }
+.lb-row td { height: 4rem; }
 
 /* Thin animated find-match glow */
 .find-match-btn {

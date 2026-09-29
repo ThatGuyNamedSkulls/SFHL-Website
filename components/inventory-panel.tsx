@@ -167,7 +167,7 @@ export function InventoryPanel() {
           </button>
         ))}
         {tab === "badge" && (
-          <span className="ml-auto text-[11px] text-hl-muted">
+          <span className="ml-auto text-[0.75rem] text-hl-muted">
             Equipped {equippedBadges}/{MAX_BADGES}
           </span>
         )}
@@ -209,7 +209,7 @@ export function InventoryPanel() {
                   {item.type !== "title" && (
                     <div className="text-sm font-bold text-white truncate">{item.name}</div>
                   )}
-                  <div className="text-[11px] text-hl-muted truncate">
+                  <div className="text-[0.75rem] text-hl-muted truncate">
                     <span
                       className={`inline-block px-1.5 rounded border mr-1.5 header-caps ${
                         RARITY_COLORS[item.rarity] || RARITY_COLORS.common

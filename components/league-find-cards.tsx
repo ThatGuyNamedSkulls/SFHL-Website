@@ -4,6 +4,7 @@
  * 6 subs, 1 coach) next to the post; a player row shows the player's card,
  * the post, and MESSAGE. Server-safe; the buttons are client components.
  */
+import { AvatarImg } from "@/components/avatar-img";
 import Link from "next/link";
 import { Check, Globe2, Lock, Moon, Sun, Sunrise, Sunset, type LucideIcon } from "lucide-react";
 import { ClubMark } from "@/components/club-identity";
@@ -22,7 +23,7 @@ const ago = (ts: number) => `${shortSpan(ts)} ago`;
 
 function Heading({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) {
   return (
-    <div className="mb-1.5 flex items-baseline justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">
+    <div className="mb-1.5 flex items-baseline justify-between gap-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/45">
       <span>{children}</span>
       {aside ? <span className="tabular-nums text-white/40">{aside}</span> : null}
     </div>
@@ -38,7 +39,7 @@ function RoleGrid({ roles, tone }: { roles: string[]; tone: "want" | "play" }) {
         return (
           <span
             key={code}
-            className={`rounded-md border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+            className={`rounded-md border px-2 py-0.5 text-[0.6875rem] font-black uppercase tracking-wide ${
               on
                 ? tone === "want"
                   ? "border-[#ff5500]/50 bg-[#ff5500]/15 text-[#ff8a4d]"
@@ -62,7 +63,7 @@ function Schedule({ days, times }: { days: string[]; times: string[] }) {
           <span
             key={c}
             title={c.toUpperCase()}
-            className={`grid h-6 w-6 place-items-center rounded text-[10px] font-black ${
+            className={`grid h-6 w-6 place-items-center rounded text-[0.6875rem] font-black ${
               days.includes(c) ? "bg-[#ff5500] text-white" : "bg-white/[0.06] text-white/35"
             }`}
           >
@@ -90,7 +91,7 @@ function Schedule({ days, times }: { days: string[]; times: string[] }) {
 }
 
 function Meta({ children }: { children: React.ReactNode }) {
-  return <span className="inline-flex items-center gap-1 text-[11px] text-white/60">{children}</span>;
+  return <span className="inline-flex items-center gap-1 text-[0.75rem] text-white/60">{children}</span>;
 }
 
 /** A bench / coach slot: the avatar in its rank ring, or an empty dashed circle. */
@@ -99,13 +100,12 @@ function MiniSlot({ card }: { card: PlayerCardData | null }) {
   return (
     <span
       title={`${card.name} · ${card.elo !== null ? `${card.elo.toLocaleString("en-US")} Elo` : "Unranked"}`}
-      className="grid h-9 w-9 shrink-0 place-items-center rounded-full p-[2px]"
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-full p-[0.125rem]"
       style={{ background: `conic-gradient(${card.ringColor} ${Math.round(card.progress * 360)}deg, rgba(255,255,255,0.12) 0deg)` }}
     >
-      <span className="grid h-full w-full place-items-center overflow-hidden rounded-full border-2 border-[#0f0f0f] bg-[#222] text-[10px] font-black text-white/70">
+      <span className="grid h-full w-full place-items-center overflow-hidden rounded-full border-2 border-[#0f0f0f] bg-[#222] text-[0.6875rem] font-black text-white/70">
         {card.avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element -- Roblox/Discord avatar CDNs
-          <img src={card.avatar} alt="" className="h-full w-full object-cover" />
+          <AvatarImg src={card.avatar} alt="" className="h-full w-full object-cover" />
         ) : (
           card.name.slice(0, 2).toUpperCase()
         )}
@@ -121,7 +121,7 @@ export function TeamPostCard({ post: p, seasonId, loggedIn }: { post: TeamPostVi
   while (subs.length < ROLE_LIMITS.sub) subs.push(null);
   return (
     <article
-      className={`overflow-hidden rounded-xl border bg-[#121212] lg:grid lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)] ${
+      className={`overflow-hidden rounded-xl border bg-[#121212] lg:grid lg:grid-cols-[minmax(0,35rem)_minmax(0,1fr)] ${
         p.mine ? "border-[#ff5500]/40" : "border-white/[0.08]"
       }`}
     >
@@ -135,12 +135,12 @@ export function TeamPostCard({ post: p, seasonId, loggedIn }: { post: TeamPostVi
               {p.country ? <Flag src={flagPath(p.country)} name={countryName(p.country)} className="h-3.5 w-5 shrink-0" /> : null}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/[0.05] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white/80">
+              <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/[0.05] px-2 py-0.5 text-[0.6875rem] font-black uppercase tracking-wide text-white/80">
                 {p.inviteOnly ? <Lock className="h-3 w-3 text-[#ff5500]" /> : null}
                 {p.divisionLabel}
               </span>
               {p.signedUp ? (
-                <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-hl-green">
+                <span className="inline-flex items-center gap-0.5 text-[0.75rem] font-bold text-hl-green">
                   <Check className="h-3 w-3" /> Signed up
                 </span>
               ) : null}
@@ -199,7 +199,7 @@ export function TeamPostCard({ post: p, seasonId, loggedIn }: { post: TeamPostVi
         </div>
         <div className="flex-1" />
         <footer className="mt-4 flex items-center justify-between gap-2">
-          <span className="text-[11px] text-white/40">Updated {ago(p.updatedAt)}</span>
+          <span className="text-[0.75rem] text-white/40">Updated {ago(p.updatedAt)}</span>
           <ApplyButton seasonId={seasonId} post={p} loggedIn={loggedIn} />
         </footer>
       </div>
@@ -225,24 +225,24 @@ export function PlayerPostCard({ post: p, seasonId, loggedIn }: { post: PlayerPo
         {p.body ? <p className="mt-1 line-clamp-4 whitespace-pre-line text-sm leading-relaxed text-white/65">{p.body}</p> : null}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {p.language ? (
-            <span className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white/75">
+            <span className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-0.5 text-[0.6875rem] font-black uppercase tracking-wide text-white/75">
               <Globe2 className="h-3 w-3" /> {labelOf(LANGUAGES, p.language)}
             </span>
           ) : null}
           {shown.map((d) => (
-            <span key={d} className="rounded-md border border-[#ff5500]/35 bg-[#ff5500]/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#ff8a4d]">
+            <span key={d} className="rounded-md border border-[#ff5500]/35 bg-[#ff5500]/10 px-2 py-0.5 text-[0.6875rem] font-black uppercase tracking-wide text-[#ff8a4d]">
               {labelOf(TARGET_DIVISIONS, d)}
             </span>
           ))}
           {more > 0 ? (
             <span
               title={p.divisions.slice(2).map((d) => labelOf(TARGET_DIVISIONS, d)).join(", ")}
-              className="rounded-md border border-white/10 px-2 py-0.5 text-[10px] font-black text-white/55"
+              className="rounded-md border border-white/10 px-2 py-0.5 text-[0.6875rem] font-black text-white/55"
             >
               +{more} more
             </span>
           ) : null}
-          {p.signedUpWith ? <span className="text-[11px] font-bold text-hl-green">On {p.signedUpWith}</span> : null}
+          {p.signedUpWith ? <span className="text-[0.75rem] font-bold text-hl-green">On {p.signedUpWith}</span> : null}
         </div>
         <div className="mt-3 space-y-3">
           <div>
@@ -258,7 +258,7 @@ export function PlayerPostCard({ post: p, seasonId, loggedIn }: { post: PlayerPo
 
       <div className="flex items-center justify-between gap-2 sm:col-span-2 xl:col-span-1 xl:flex-col xl:items-end">
         <MessageButton seasonId={seasonId} post={p} loggedIn={loggedIn} />
-        <span className="text-[11px] text-white/40">Updated {ago(p.updatedAt)}</span>
+        <span className="text-[0.75rem] text-white/40">Updated {ago(p.updatedAt)}</span>
       </div>
     </article>
   );

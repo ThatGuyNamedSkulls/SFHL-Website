@@ -32,7 +32,7 @@ export function BackgroundSwatch({
       }
     >
       {isProfileBackgroundColor(color) ? null : (
-        <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-hl-muted header-caps">
+        <div className="w-full h-full flex items-center justify-center text-[0.6875rem] font-bold text-hl-muted header-caps">
           Background
         </div>
       )}

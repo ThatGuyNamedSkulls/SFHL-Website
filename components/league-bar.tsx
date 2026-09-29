@@ -13,14 +13,14 @@ import type { LeagueTab, SeasonLink } from "@/lib/league-shell";
 function Badge({ badge }: { badge: SeasonLink["badge"] }) {
   if (badge === "live") {
     return (
-      <span className="rounded-[4px] border border-[#ff5500] bg-[#ff5500]/15 px-1 text-[9px] font-black leading-[14px] text-[#ff5500]">
+      <span className="rounded-[0.25rem] border border-[#ff5500] bg-[#ff5500]/15 px-1 text-[0.6875rem] font-black leading-[0.875rem] text-[#ff5500]">
         LIVE
       </span>
     );
   }
   if (badge === "upcoming") {
     return (
-      <span className="rounded-[4px] bg-white/10 px-1 text-[9px] font-black leading-[14px] text-white/80">UPCOMING</span>
+      <span className="rounded-[0.25rem] bg-white/10 px-1 text-[0.6875rem] font-black leading-[0.875rem] text-white/80">UPCOMING</span>
     );
   }
   return null;
@@ -58,7 +58,7 @@ export function LeagueBar({
             <Link
               key={s.id}
               href={`/league/${s.id}`}
-              className={`flex items-center gap-1.5 border-b-2 py-3 text-[13px] font-black uppercase tracking-wide ${
+              className={`flex items-center gap-1.5 border-b-2 py-3 text-[0.875rem] font-black uppercase tracking-wide ${
                 on ? "border-[#ff5500] text-[#ff5500]" : "border-transparent text-white/80 hover:text-white"
               }`}
             >
@@ -113,13 +113,13 @@ export function LeagueBar({
           <Link
             key={t.key}
             href={t.href}
-            className={`flex items-center gap-1.5 border-b-2 py-3 text-[13px] font-black uppercase tracking-wide ${
+            className={`flex items-center gap-1.5 border-b-2 py-3 text-[0.875rem] font-black uppercase tracking-wide ${
               active === t.key ? "border-[#ff5500] text-[#ff5500]" : "border-transparent text-white/80 hover:text-white"
             }`}
           >
             {t.label}
             {t.count !== undefined ? (
-              <span className="rounded-full bg-white/10 px-1.5 text-[10px] leading-4 text-white/80">
+              <span className="rounded-full bg-white/10 px-1.5 text-[0.6875rem] leading-4 text-white/80">
                 {t.count.toLocaleString()}
               </span>
             ) : null}
@@ -130,7 +130,7 @@ export function LeagueBar({
       {staff ? (
         <Link
           href={`/league/manage?season=${seasonId}`}
-          className="ml-auto flex shrink-0 items-center gap-1.5 py-3 pl-4 text-[12px] font-bold uppercase tracking-wide text-hl-gold hover:text-white"
+          className="ml-auto flex shrink-0 items-center gap-1.5 py-3 pl-4 text-[0.8125rem] font-bold uppercase tracking-wide text-hl-gold hover:text-white"
         >
           <Settings2 className="h-4 w-4" /> Manage
         </Link>

@@ -9,7 +9,7 @@ export function SetupChecklist({ ui }: { ui: QueueUi }) {
   return (
     <section className="rounded-xl border border-hl-warn/30 bg-hl-warn/[0.05] p-4 md:p-5">
       <h2 className="text-base font-black text-white">{ui.headline}</h2>
-      <p className="mt-0.5 text-[13px] text-white/70">{ui.detail}</p>
+      <p className="mt-0.5 text-[0.875rem] text-white/70">{ui.detail}</p>
       <ol className="mt-3 space-y-2">
         {ui.steps.map((s) => (
           <li key={s.id} className="flex items-start gap-3">

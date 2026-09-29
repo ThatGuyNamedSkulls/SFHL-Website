@@ -48,12 +48,12 @@ function TeamOption({
           <div className="flex items-center gap-2">
             <span className="truncate text-sm font-black text-white">{team.name}</span>
             {team.signedUp ? (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-hl-green/15 px-2 py-0.5 text-[10px] font-black text-hl-green">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-hl-green/15 px-2 py-0.5 text-[0.6875rem] font-black text-hl-green">
                 <Check className="h-3 w-3" /> Signed up
               </span>
             ) : null}
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-white/55">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[0.75rem] text-white/55">
             <span>{team.memberCount} members</span>
             {team.seedElo ? <span>· {team.seedElo.toLocaleString()} avg Elo (top 5)</span> : null}
             {team.inviteOnly || team.seedElo ? (
@@ -74,7 +74,7 @@ function TeamOption({
         </span>
       </div>
       {blocked ? (
-        <ul className="mt-2 space-y-0.5 border-t border-white/[0.06] pt-2 text-[11px] text-hl-red">
+        <ul className="mt-2 space-y-0.5 border-t border-white/[0.06] pt-2 text-[0.75rem] text-hl-red">
           {team.problems.map((p) => (
             <li key={p} className="flex gap-1.5">
               <AlertTriangle className="mt-px h-3 w-3 shrink-0" /> {p}
@@ -205,7 +205,7 @@ function JoinDialog({ seasonId, onClose }: { seasonId: number; onClose: () => vo
             </span>
             <span className="flex-1">
               Create a new team
-              <span className="block text-[11px] font-normal text-white/50">Invite your players, then come back to sign up.</span>
+              <span className="block text-[0.75rem] font-normal text-white/50">Invite your players, then come back to sign up.</span>
             </span>
             <ChevronRight className="h-4 w-4 text-white/40" />
           </Link>

@@ -68,7 +68,7 @@ function Dialog({ title, onClose, children }: { title: string; onClose: () => vo
 const field =
   "rounded-lg border border-white/[0.12] bg-[#1b1b1b] px-3 py-2 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#ff5500]";
 const input = `w-full ${field}`;
-const label = "mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55";
+const label = "mb-1.5 block text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55";
 const primary =
   "find-match-btn inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-5 text-xs font-black uppercase tracking-wide text-hl-base disabled:opacity-40";
 const ghost =
@@ -86,7 +86,7 @@ export function FindFilterBar({ base, filters }: { base: string; filters: FindFi
     router.push(s ? `${base}?${s}` : base, { scroll: false });
   };
   const select = (key: "division" | "language" | "role", all: string, list: readonly (readonly [string, string])[]) => (
-    <label className="min-w-[150px] flex-1 sm:flex-none">
+    <label className="min-w-[9.375rem] flex-1 sm:flex-none">
       <span className={label}>{key}</span>
       <select value={filters[key] ?? ""} onChange={(e) => go({ [key]: e.target.value || null })} className={`${input} h-10`}>
         <option value="">{all}</option>
@@ -138,7 +138,7 @@ export function ApplyButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (p.mine) return <span className="text-[11px] font-black uppercase tracking-wide text-[#ff5500]">Your post</span>;
+  if (p.mine) return <span className="text-[0.75rem] font-black uppercase tracking-wide text-[#ff5500]">Your post</span>;
   if (p.applied === "pending") return <span className="text-xs font-bold text-white/60">Applied · waiting</span>;
   if (p.applied === "accepted")
     return (
@@ -219,7 +219,7 @@ export function MessageButton({
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
-  if (p.mine) return <span className="text-[11px] font-black uppercase tracking-wide text-[#ff5500]">Your post</span>;
+  if (p.mine) return <span className="text-[0.75rem] font-black uppercase tracking-wide text-[#ff5500]">Your post</span>;
   if (!loggedIn)
     return (
       <Link href="/login" className={ghost}>
@@ -417,7 +417,7 @@ function PostEditor({
           <span className={label}>Practice days</span>
           <Chips list={DAYS} value={d.days} onChange={(v) => set("days", v)} wide={false} />
         </div>
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11.25rem]">
           <div>
             <span className={label}>Time of day</span>
             <Chips list={TIMES} value={d.times} onChange={(v) => set("times", v)} />
@@ -548,7 +548,7 @@ function StatusPill({ status }: { status: ApplicationView["status"] }) {
     declined: "border-hl-red/40 text-hl-red",
     withdrawn: "border-white/10 text-white/40",
   }[status];
-  return <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${style}`}>{status}</span>;
+  return <span className={`rounded-full border px-2 py-0.5 text-[0.6875rem] font-black uppercase ${style}`}>{status}</span>;
 }
 
 export function MyRecruitingPanel({ seasonId, data }: { seasonId: number; data: MyRecruiting }) {
@@ -584,7 +584,7 @@ export function MyRecruitingPanel({ seasonId, data }: { seasonId: number; data: 
                 <ClubMark tag={team.tag} accentColor={team.accentColor} logoUrl={team.logoUrl} size={32} />
                 <div className="min-w-0">
                   <div className="truncate text-sm font-black text-white">{team.name}</div>
-                  <div className="text-[11px] text-white/55">{tp ? `Recruiting: ${tp.title}` : "Not recruiting"}</div>
+                  <div className="text-[0.75rem] text-white/55">{tp ? `Recruiting: ${tp.title}` : "Not recruiting"}</div>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -609,7 +609,7 @@ export function MyRecruitingPanel({ seasonId, data }: { seasonId: number; data: 
             </div>
             {applications.length ? (
               <div className="mt-3 space-y-2 border-t border-white/[0.06] pt-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">
+                <div className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">
                   Applications ({applications.length})
                 </div>
                 {applications.map((a) => (
@@ -617,7 +617,7 @@ export function MyRecruitingPanel({ seasonId, data }: { seasonId: number; data: 
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-sm font-bold text-white">
                         {a.playerName}
-                        {a.elo ? <span className="ml-1.5 text-[11px] font-semibold text-white/50">{a.elo.toLocaleString()} Elo</span> : null}
+                        {a.elo ? <span className="ml-1.5 text-[0.75rem] font-semibold text-white/50">{a.elo.toLocaleString()} Elo</span> : null}
                       </span>
                       <div className="flex gap-1.5">
                         <button
@@ -650,7 +650,7 @@ export function MyRecruitingPanel({ seasonId, data }: { seasonId: number; data: 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <div className="text-sm font-black text-white">Looking for a team</div>
-              <div className="truncate text-[11px] text-white/55">
+              <div className="truncate text-[0.75rem] text-white/55">
                 {data.playerPost ? data.playerPost.title : data.linked ? "Post so captains can find you" : "Link your player to post"}
               </div>
             </div>
@@ -674,7 +674,7 @@ export function MyRecruitingPanel({ seasonId, data }: { seasonId: number; data: 
           </div>
           {pendingApps.length ? (
             <div className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">Your applications</div>
+              <div className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">Your applications</div>
               {pendingApps.map((a) => (
                 <div key={a.id} className="flex items-center justify-between gap-2 text-sm">
                   <Link href={`/teams/${a.teamId}`} className="truncate font-bold text-white hover:underline">
@@ -687,7 +687,7 @@ export function MyRecruitingPanel({ seasonId, data }: { seasonId: number; data: 
                         type="button"
                         disabled={busy === `wd-${a.id}`}
                         onClick={() => run(`wd-${a.id}`, { action: "withdraw", applicationId: a.id })}
-                        className="text-[11px] font-bold text-white/55 hover:text-white"
+                        className="text-[0.75rem] font-bold text-white/55 hover:text-white"
                       >
                         Withdraw
                       </button>

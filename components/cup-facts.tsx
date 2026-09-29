@@ -40,7 +40,7 @@ function Fact({ icon: Icon, label, value }: { icon: LucideIcon; label: string; v
     <div className="flex items-start gap-3">
       <Icon className="mt-0.5 h-5 w-5 shrink-0 text-white" strokeWidth={1.75} />
       <div>
-        <div className="text-[11px] font-bold uppercase tracking-wide text-[#8a8a8a]">{label}</div>
+        <div className="text-[0.75rem] font-bold uppercase tracking-wide text-[#8a8a8a]">{label}</div>
         <div className="mt-0.5 font-semibold text-white">{value}</div>
       </div>
     </div>

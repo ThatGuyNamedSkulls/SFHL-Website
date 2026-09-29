@@ -28,7 +28,7 @@ export function LeagueDivisionSelect({
   const router = useRouter();
   return (
     <label className="block">
-      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">{label}</span>
+      <span className="mb-1 block text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">{label}</span>
       <span className="relative block">
         <select
           value={value}
@@ -39,7 +39,7 @@ export function LeagueDivisionSelect({
             const s = q.toString();
             router.push(s ? `${base}?${s}` : base, { scroll: false });
           }}
-          className={`h-10 w-full ${narrow ? "min-w-[150px]" : "min-w-[220px]"} appearance-none rounded-lg border border-white/[0.12] bg-[#181818] pl-3 pr-9 text-sm font-bold text-white outline-none hover:border-white/25 focus:border-[#ff5500]`}
+          className={`h-10 w-full ${narrow ? "min-w-[9.375rem]" : "min-w-[13.75rem]"} appearance-none rounded-lg border border-white/[0.12] bg-[#181818] pl-3 pr-9 text-sm font-bold text-white outline-none hover:border-white/25 focus:border-[#ff5500]`}
         >
           {options.map((o) => (
             <option key={o.value} value={o.value}>

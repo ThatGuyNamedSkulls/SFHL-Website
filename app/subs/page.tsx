@@ -130,7 +130,7 @@ export default function SubsPage() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-base font-black text-white">
-                You&apos;re in — subbing for {claimed.leaver} on Team {claimed.team}
+                You&apos;re in — subbing for {claimed.leaver} on {claimed.side ?? `Team ${claimed.team}`}
               </div>
               <div className="text-sm text-hl-muted mt-0.5">
                 Getting you access to the match channels. Your matchroom opens

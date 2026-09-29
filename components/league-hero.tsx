@@ -10,7 +10,7 @@ import { STATUS_HEADLINE, seasonNumber } from "@/lib/league-shell";
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="sm:border-l sm:border-white/15 sm:pl-3 sm:first:border-l-0 sm:first:pl-0">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">{label}</div>
+      <div className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">{label}</div>
       <div className="mt-0.5 text-sm font-black text-white">{children}</div>
     </div>
   );
@@ -27,7 +27,7 @@ export function LeagueHeroCompact({ season }: { season: Season }) {
   return (
     <section className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-[radial-gradient(circle_at_85%_50%,rgba(255,85,0,0.2),transparent_60%),#0d0d0d] px-4 py-3">
       <h1 className="min-w-0 truncate text-base font-black text-white">HyperLeague — {season.name}</h1>
-      <span className={`shrink-0 text-[10px] font-black uppercase tracking-[0.12em] ${tone}`}>{STATUS_HEADLINE[season.status]}</span>
+      <span className={`shrink-0 text-[0.6875rem] font-black uppercase tracking-[0.12em] ${tone}`}>{STATUS_HEADLINE[season.status]}</span>
     </section>
   );
 }
@@ -55,13 +55,13 @@ export function LeagueHero({
           <div className="absolute -right-6 top-1/2 hidden -translate-y-1/2 select-none md:block">
             <div className="flex items-center gap-4">
               <span
-                className="text-[110px] font-black uppercase leading-none tracking-tight text-transparent lg:text-[140px]"
+                className="text-[6.875rem] font-black uppercase leading-none tracking-tight text-transparent lg:text-[8.75rem]"
                 style={{ WebkitTextStroke: "2px rgba(255,255,255,0.14)" }}
               >
                 {number ? "Season" : "League"}
               </span>
               {number ? (
-                <span className="grid h-[150px] w-[150px] place-items-center rounded-full border-[10px] border-[#ff5500]/35 text-[84px] font-black leading-none text-[#ff5500]/45 lg:h-[180px] lg:w-[180px] lg:text-[100px]">
+                <span className="grid h-[9.375rem] w-[9.375rem] place-items-center rounded-full border-[10px] border-[#ff5500]/35 text-[5.25rem] font-black leading-none text-[#ff5500]/45 lg:h-[11.25rem] lg:w-[11.25rem] lg:text-[6.25rem]">
                   {number}
                 </span>
               ) : null}
@@ -72,7 +72,7 @@ export function LeagueHero({
       <div className="absolute inset-0 bg-gradient-to-r from-[#0d0d0d] via-[#0d0d0d]/85 to-transparent" />
 
       <div className="relative px-5 py-7 sm:px-8 sm:py-9">
-        <div className={`text-[12px] font-black uppercase tracking-[0.14em] ${headlineTone}`}>
+        <div className={`text-[0.8125rem] font-black uppercase tracking-[0.14em] ${headlineTone}`}>
           {STATUS_HEADLINE[season.status]}
         </div>
         <h1 className="mt-1 text-2xl font-black tracking-tight text-white sm:text-4xl">

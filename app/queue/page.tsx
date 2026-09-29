@@ -57,7 +57,7 @@ export default function QueuePage() {
       <div className="flex flex-col items-center gap-1">
         <div className="flex items-center gap-2">
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.1em] ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[0.75rem] font-black uppercase tracking-[0.1em] ${
               searching
                 ? "border-hl-green/40 bg-hl-green/10 text-hl-green"
                 : live
@@ -74,7 +74,7 @@ export default function QueuePage() {
           {q.session ? <SoundToggle /> : null}
         </div>
         {q.autoPicked && q.autoPicked === q.region && !ui.lockSelection ? (
-          <span className="text-[11px] text-white/50">
+          <span className="text-[0.75rem] text-white/50">
             We picked {QUEUE_REGIONS.find((r) => r.id === q.autoPicked)?.label} for you · change it in Servers
           </span>
         ) : null}

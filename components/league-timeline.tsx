@@ -34,7 +34,7 @@ function Item({ m, compact }: { m: Milestone; compact?: boolean }) {
         <Clock className="mt-0.5 h-5 w-5 shrink-0 text-white/60" />
       )}
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold tracking-[0.08em] text-white/55" suppressHydrationWarning>
+        <div className="text-[0.6875rem] font-semibold tracking-[0.08em] text-white/55" suppressHydrationWarning>
           {m.at ? fmt(m.at) : "TO BE ANNOUNCED"}
         </div>
         <div className="text-sm font-black text-white">{m.label}</div>

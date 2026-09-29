@@ -82,7 +82,7 @@ export function ActivityHeatmap({ dates, days = 91 }: ActivityHeatmapProps) {
           </div>
         ))}
       </div>
-      <div className="flex items-center justify-between mt-2 text-[10px] text-hl-muted">
+      <div className="flex items-center justify-between mt-2 text-[0.6875rem] text-hl-muted">
         <span>{total} matches in the last {days} days</span>
         <span className="flex items-center gap-1">
           Less

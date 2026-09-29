@@ -50,12 +50,12 @@ export function MapStatsTable({ matches }: { matches: Match[] }) {
       <Table>
         <TableHeader>
           <TableRow className="border-hl-border hover:bg-transparent">
-            <TableHead className="text-hl-muted text-[10px] header-caps">Map</TableHead>
-            <TableHead className="text-hl-muted text-[10px] header-caps text-right">Games</TableHead>
-            <TableHead className="text-hl-muted text-[10px] header-caps text-right">Win %</TableHead>
-            <TableHead className="text-hl-muted text-[10px] header-caps text-right">K/D</TableHead>
-            <TableHead className="text-hl-muted text-[10px] header-caps text-right">HS %</TableHead>
-            <TableHead className="text-hl-muted text-[10px] header-caps text-right">Avg Score</TableHead>
+            <TableHead className="text-hl-muted text-[0.6875rem] header-caps">Map</TableHead>
+            <TableHead className="text-hl-muted text-[0.6875rem] header-caps text-right">Games</TableHead>
+            <TableHead className="text-hl-muted text-[0.6875rem] header-caps text-right">Win %</TableHead>
+            <TableHead className="text-hl-muted text-[0.6875rem] header-caps text-right">K/D</TableHead>
+            <TableHead className="text-hl-muted text-[0.6875rem] header-caps text-right">HS %</TableHead>
+            <TableHead className="text-hl-muted text-[0.6875rem] header-caps text-right">Avg Score</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

@@ -22,7 +22,7 @@ export function LeagueRulesView({ sections, compact = false }: { sections: Rules
                 <ul key={i} className="space-y-1.5 text-sm leading-relaxed text-white/80">
                   {b.lines.map((line, j) => (
                     <li key={j} className="flex gap-2.5">
-                      <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-white/40" />
+                      <span className="mt-[0.5625rem] h-1 w-1 shrink-0 rounded-full bg-white/40" />
                       <span>{line}</span>
                     </li>
                   ))}

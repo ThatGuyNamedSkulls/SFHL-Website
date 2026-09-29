@@ -79,7 +79,7 @@ export function LeagueRulesEditor({
     <section className="rounded-xl border border-[#ff5500]/35 bg-[#141414] p-4" aria-label="Edit rules">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-black text-white">Editing the rules</h3>
-        <p className="text-[11px] text-white/55">
+        <p className="text-[0.75rem] text-white/55">
           <code className="rounded bg-white/10 px-1"># Title</code> starts a section ·{" "}
           <code className="rounded bg-white/10 px-1">- item</code> is a bullet · other lines are paragraphs
         </p>
@@ -92,14 +92,14 @@ export function LeagueRulesEditor({
             onChange={(e) => setText(e.target.value.slice(0, RULES_MAX))}
             rows={22}
             spellCheck
-            className="h-full min-h-[420px] w-full resize-y rounded-lg border border-white/[0.12] bg-[#1b1b1b] px-3 py-2 font-mono text-[13px] leading-relaxed text-white outline-none focus:border-[#ff5500]"
+            className="h-full min-h-[26.25rem] w-full resize-y rounded-lg border border-white/[0.12] bg-[#1b1b1b] px-3 py-2 font-mono text-[0.875rem] leading-relaxed text-white outline-none focus:border-[#ff5500]"
           />
-          <span className="mt-1 block text-right text-[10px] text-white/40">
+          <span className="mt-1 block text-right text-[0.6875rem] text-white/40">
             {text.length.toLocaleString()} / {RULES_MAX.toLocaleString()}
           </span>
         </label>
-        <div className="max-h-[520px] overflow-y-auto rounded-lg border border-white/[0.08] bg-[#101010] p-4">
-          <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">Preview</div>
+        <div className="max-h-[32.5rem] overflow-y-auto rounded-lg border border-white/[0.08] bg-[#101010] p-4">
+          <div className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/45">Preview</div>
           <LeagueRulesView sections={preview} compact />
         </div>
       </div>

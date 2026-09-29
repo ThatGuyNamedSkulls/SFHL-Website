@@ -54,7 +54,7 @@ export default async function SeasonTeamsPage({
   const chips = (["all", "active", "signed_up", "ineligible"] as TeamsFilter[]).filter(
     (s) => s === "all" || counts[s] > 0 || s === status
   );
-  const th = "px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50";
+  const th = "px-3 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/50";
 
   return (
     <div className="space-y-5">
@@ -109,7 +109,7 @@ export default async function SeasonTeamsPage({
         </Empty>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-white/[0.08] bg-[#121212]">
-          <table className="w-full text-sm md:min-w-[760px]">
+          <table className="w-full text-sm md:min-w-[47.5rem]">
             <thead>
               <tr className="border-b border-white/[0.08] text-left">
                 <th className={`${th} pl-4 sm:pl-5`}>Team</th>
@@ -130,7 +130,7 @@ export default async function SeasonTeamsPage({
                     <div className="flex min-w-0 items-center gap-2">
                       <TeamCell team={r.team} mine={r.mine} />
                       {r.mine ? (
-                        <span className="shrink-0 text-[10px] font-black uppercase tracking-wide text-[#ff5500]">
+                        <span className="shrink-0 text-[0.6875rem] font-black uppercase tracking-wide text-[#ff5500]">
                           Your team
                         </span>
                       ) : null}
@@ -168,12 +168,12 @@ export default async function SeasonTeamsPage({
                   </td>
                   <td className="py-2.5 pl-3 pr-4 text-right sm:pr-5">
                     <span
-                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-black ${STATUS_STYLE[r.status]}`}
+                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-[0.75rem] font-black ${STATUS_STYLE[r.status]}`}
                     >
                       {STATUS_LABEL[r.status]}
                     </span>
                     {r.status === "ineligible" && r.note ? (
-                      <div className="mt-1 text-[11px] text-hl-red/90 first-letter:uppercase">{r.note}</div>
+                      <div className="mt-1 text-[0.75rem] text-hl-red/90 first-letter:uppercase">{r.note}</div>
                     ) : null}
                   </td>
                 </tr>

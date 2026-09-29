@@ -51,7 +51,7 @@ export function ConsistencyDonut({
           </span>
         </div>
       </div>
-      <span className="text-[11px] text-hl-muted header-caps mt-2">{label}</span>
+      <span className="text-[0.75rem] text-hl-muted header-caps mt-2">{label}</span>
     </div>
   );
 }

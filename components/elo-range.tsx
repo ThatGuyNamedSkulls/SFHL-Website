@@ -54,7 +54,7 @@ function EloBox({
   };
   return (
     <label className="block min-w-0 flex-1">
-      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50">{label}</span>
+      <span className="mb-1 block text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/50">{label}</span>
       <input
         type="number"
         inputMode="numeric"
@@ -136,7 +136,7 @@ export function EloRangeFields({ value, onChange }: { value: EloRange; onChange:
               title={`Level ${l.level}: ${l.min.toLocaleString("en-US")}–${l.max.toLocaleString("en-US")} Elo`}
             >
               <RankBadge rank={l.letter as RankTierLetter} size="sm" showGlow={false} className="!h-5 !w-5" />
-              <span className="text-[9px] font-bold tabular-nums text-white/55">{l.level}</span>
+              <span className="text-[0.6875rem] font-bold tabular-nums text-white/55">{l.level}</span>
             </span>
           ))}
         </div>
@@ -171,7 +171,7 @@ export function EloRangeFilter({ value, onApply }: { value: EloRange; onApply: (
   const active = value.minElo !== null || value.maxElo !== null;
   return (
     <div ref={ref} className="relative">
-      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">Skill level</span>
+      <span className="mb-1.5 block text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">Skill level</span>
       <button
         type="button"
         aria-expanded={open}

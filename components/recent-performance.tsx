@@ -105,11 +105,11 @@ function GraphTooltip({
   const skill = getRankForElo(p.elo ?? 0);
 
   return (
-    <div className="w-[220px] rounded-xl bg-[#1a1a1a] border border-white/10 shadow-2xl p-3 text-[12px]">
-      <div className="text-[10px] font-semibold tracking-wide text-[#8a8a8a] uppercase">
+    <div className="w-[13.75rem] rounded-xl bg-[#1a1a1a] border border-white/10 shadow-2xl p-3 text-[0.8125rem]">
+      <div className="text-[0.6875rem] font-semibold tracking-wide text-[#8a8a8a] uppercase">
         {formatWhen(m.date)}
       </div>
-      <div className="mt-1 flex items-center gap-2 text-[13px] font-bold">
+      <div className="mt-1 flex items-center gap-2 text-[0.875rem] font-bold">
         <span className={win ? "text-[#2ecc71]" : "text-[#e74c3c]"}>{win ? "W" : "L"}</span>
         {score ? <span className="text-white tabular-nums">{score}</span> : null}
         <span className="text-[#8a8a8a] truncate">{m.map}</span>
@@ -361,9 +361,9 @@ export function RecentPerformance({
   return (
     <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-5">
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-[15px] font-bold text-white">Recent performance</h2>
+        <h2 className="text-[0.9375rem] font-bold text-white">Recent performance</h2>
         {!placing && windowCount > 0 && (
-          <span className="text-[13px] text-[#8a8a8a] flex items-center gap-3">
+          <span className="text-[0.875rem] text-[#8a8a8a] flex items-center gap-3">
             Last {windowCount} Matches
             {avgSkill > 0 && (
               <span className="inline-flex items-center gap-1">
@@ -377,7 +377,7 @@ export function RecentPerformance({
 
       {placing ? (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-[#8a8a8a] mb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[0.875rem] text-[#8a8a8a] mb-2">
             <span>
               {placementGamesPlayed}/{placementGamesTotal} placement matches
             </span>
@@ -399,7 +399,7 @@ export function RecentPerformance({
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-[#8a8a8a] mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[0.875rem] text-[#8a8a8a] mb-3">
             <span>
               Elo change{" "}
               <b className={eloChange >= 0 ? "text-[#2ecc71]" : "text-[#e74c3c]"}>
@@ -451,7 +451,7 @@ export function RecentPerformance({
           )}
 
           {values.length > 0 ? (
-            <div className="flex h-[220px] items-stretch">
+            <div className="flex h-[13.75rem] items-stretch">
               {prevPoints.length > 0 && (
                 <div
                   className="min-w-0 h-full"
@@ -477,7 +477,7 @@ export function RecentPerformance({
                     showGlow
                     className="!w-9 !h-9 my-1"
                   />
-                  <span className="text-[9px] font-bold uppercase tracking-wide text-[#8a8a8a]">
+                  <span className="text-[0.6875rem] font-bold uppercase tracking-wide text-[#8a8a8a]">
                     Placed
                   </span>
                   <span className="flex-1 w-0 border-l border-dashed border-white/30" />
@@ -552,7 +552,7 @@ function StatCard({
 }) {
   const path = useMemoPath(series);
   return (
-    <div className="rounded-xl bg-[#161616] border border-white/[0.06] p-3.5 min-h-[92px] flex flex-col justify-between">
+    <div className="rounded-xl bg-[#161616] border border-white/[0.06] p-3.5 min-h-[5.75rem] flex flex-col justify-between">
       <div className="flex items-start justify-between gap-2">
         <span
           className="text-2xl font-black tabular-nums leading-none"
@@ -561,7 +561,7 @@ function StatCard({
           {value}
         </span>
         {path ? (
-          <svg viewBox="0 0 72 28" className="w-[72px] h-7 shrink-0" preserveAspectRatio="none">
+          <svg viewBox="0 0 72 28" className="w-[4.5rem] h-7 shrink-0" preserveAspectRatio="none">
             <path
               d={path}
               fill="none"
@@ -573,7 +573,7 @@ function StatCard({
           </svg>
         ) : null}
       </div>
-      <div className="text-[11px] text-[#8a8a8a] mt-2">{label}</div>
+      <div className="text-[0.75rem] text-[#8a8a8a] mt-2">{label}</div>
     </div>
   );
 }

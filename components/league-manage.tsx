@@ -266,7 +266,7 @@ export function LeagueManage({
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 40))}
               placeholder="Season name (optional, e.g. Season 2)"
-              className={`${input} min-w-[240px]`}
+              className={`${input} min-w-[15rem]`}
             />
             <button type="button" disabled={busy} className={primary} onClick={() => run("create", { name }, "Season created.")}>
               Create season
@@ -548,7 +548,7 @@ export function LeagueManage({
                   <Link href={`/teams/${e.teamId}`} className="text-sm font-bold text-white hover:underline">
                     {e.name} {e.tag ? <span className="text-hl-muted">[{e.tag}]</span> : null}
                   </Link>
-                  <div className="text-[11px] text-hl-muted" title={e.roster.join(", ")}>
+                  <div className="text-[0.75rem] text-hl-muted" title={e.roster.join(", ")}>
                     {e.roster.length} players{e.seedElo ? ` · ${e.seedElo} Elo` : ""}
                     {e.status === "ineligible" ? <span className="text-hl-red"> · not placed: {e.note}</span> : null}
                   </div>
@@ -560,7 +560,7 @@ export function LeagueManage({
                       onChange={(ev) =>
                         run("setAccess", { teamId: e.teamId, access: ev.target.value }, `${e.name}: league status updated.`)
                       }
-                      className="h-7 rounded-md border border-hl-border bg-hl-base px-2 text-[11px] text-white"
+                      className="h-7 rounded-md border border-hl-border bg-hl-base px-2 text-[0.75rem] text-white"
                     >
                       {ACCESS_OPTIONS.map(([value, label]) => (
                         <option key={value} value={value}>
@@ -670,7 +670,7 @@ export function LeagueManage({
                 rows={6}
                 className="w-full rounded-lg border border-hl-border bg-hl-base px-3 py-2 text-sm text-white placeholder:text-hl-muted"
               />
-              <p className="text-[11px] text-hl-muted">
+              <p className="text-[0.75rem] text-hl-muted">
                 Easier with a live preview:{" "}
                 <Link href={`/league/${season.id}/rules`} className="font-bold text-hl-gold hover:underline">
                   edit on the Rules tab

@@ -186,7 +186,7 @@ export function Dashboard({ session }: DashboardProps) {
         <div className="absolute inset-0 bg-hero-radial" />
         <div className="relative z-10 px-6 sm:px-8 py-8 md:py-10 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <span className="inline-flex items-center gap-1.5 text-[11px] header-caps text-hl-gold bg-hl-base/50 border border-hl-gold/30 rounded-full px-3 py-1 mb-3">
+            <span className="inline-flex items-center gap-1.5 text-[0.75rem] header-caps text-hl-gold bg-hl-base/50 border border-hl-gold/30 rounded-full px-3 py-1 mb-3">
               <Zap className="w-3 h-3" /> Season 1 · Counter Blox
             </span>
             <h1 className="text-2xl md:text-4xl font-black text-white tracking-tight mb-2">
@@ -196,7 +196,7 @@ export function Dashboard({ session }: DashboardProps) {
               {["5v5 only", "Discord synced", "Verified matching", "Map veto"].map((t) => (
                 <span
                   key={t}
-                  className="text-[11px] text-hl-muted bg-hl-base/50 border border-hl-border rounded-full px-2.5 py-1"
+                  className="text-[0.75rem] text-hl-muted bg-hl-base/50 border border-hl-border rounded-full px-2.5 py-1"
                 >
                   {t}
                 </span>
@@ -217,7 +217,7 @@ export function Dashboard({ session }: DashboardProps) {
 
       <GameSkillBar rank={player?.rank} elo={player?.elo} className="mb-5" />
 
-      <div className="grid lg:grid-cols-[1fr_300px] gap-5">
+      <div className="grid lg:grid-cols-[1fr_18.75rem] gap-5">
         {/* Left: mode cards stacked like FACEIT */}
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -237,7 +237,7 @@ export function Dashboard({ session }: DashboardProps) {
                       <div className="font-black text-white text-sm group-hover:text-hl-gold transition-colors">
                         {c.title}
                       </div>
-                      <div className="text-[11px] text-hl-muted mt-0.5">{c.desc}</div>
+                      <div className="text-[0.75rem] text-hl-muted mt-0.5">{c.desc}</div>
                     </div>
                   </Card>
               );
@@ -277,7 +277,7 @@ export function Dashboard({ session }: DashboardProps) {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-white">{announcement.author}</span>
-                    <span className="text-[10px] text-hl-muted">
+                    <span className="text-[0.6875rem] text-hl-muted">
                       {new Date(announcement.timestamp).toLocaleDateString()}
                     </span>
                   </div>
@@ -341,7 +341,7 @@ export function Dashboard({ session }: DashboardProps) {
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-black text-white header-caps flex items-center gap-2">
                 Parties
-                <span className="text-[10px] font-bold text-hl-muted bg-hl-base border border-hl-border rounded px-1.5 py-0.5">
+                <span className="text-[0.6875rem] font-bold text-hl-muted bg-hl-base border border-hl-border rounded px-1.5 py-0.5">
                   {partyCount}
                 </span>
               </h2>
@@ -352,7 +352,7 @@ export function Dashboard({ session }: DashboardProps) {
                   {partyAvatars.map((m) => (
                     <Avatar key={m.discordId} className="w-8 h-8 border-2 border-hl-panel">
                       {m.avatar ? <AvatarImage src={m.avatar} /> : null}
-                      <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
+                      <AvatarFallback className="bg-hl-panel-light text-[0.6875rem] font-bold text-hl-gold">
                         {m.username.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>

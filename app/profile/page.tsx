@@ -163,13 +163,13 @@ function MatchHistoryRow({
   return (
     <Link
       href={match.matchId ? `/match/${match.matchId}` : "#"}
-      className={`grid grid-cols-[64px_1fr_auto] md:grid-cols-[100px_1fr_64px_80px_110px] gap-2 md:gap-3 items-center px-3 md:px-4 py-3 hover:bg-white/[0.03] border-l-2 ${
+      className={`grid grid-cols-[4rem_1fr_auto] md:grid-cols-[6.25rem_1fr_4rem_5rem_6.875rem] gap-2 md:gap-3 items-center px-3 md:px-4 py-3 hover:bg-white/[0.03] border-l-2 ${
         win ? "border-l-[#2ecc71]" : "border-l-[#e74c3c]"
       }`}
     >
       <span className="leading-tight min-w-0">
-        <span className="block text-[13px] text-white truncate">{day}</span>
-        {time ? <span className="block text-[11px] text-[#8a8a8a]">{time}</span> : null}
+        <span className="block text-[0.875rem] text-white truncate">{day}</span>
+        {time ? <span className="block text-[0.75rem] text-[#8a8a8a]">{time}</span> : null}
       </span>
       <span className="flex items-center gap-2 min-w-0">
         <Swords className="w-3.5 h-3.5 text-[#8a8a8a] shrink-0" />
@@ -211,8 +211,8 @@ const LADDER_COLORS: Record<string, string> = {
 
 function ProfileSkeleton() {
   return (
-    <div className="hl-page-wide grid lg:grid-cols-[300px_1fr] gap-6">
-      <Skeleton className="h-[520px] rounded-xl" />
+    <div className="hl-page-wide grid lg:grid-cols-[18.75rem_1fr] gap-6">
+      <Skeleton className="h-[32.5rem] rounded-xl" />
       <div className="space-y-4">
         <Skeleton className="h-10 w-72 rounded-lg" />
         <Skeleton className="h-40 w-full rounded-xl" />
@@ -469,7 +469,7 @@ function ProfileContent() {
       {statTiles.map((stat) => (
         <div key={stat.label} className="bg-[#1c1c1c] border border-white/[0.08] rounded-xl p-4">
           <div className="stat-number text-2xl text-white">{stat.value}</div>
-          <div className="text-[12px] text-[#8a8a8a] mt-1">{stat.label}</div>
+          <div className="text-[0.8125rem] text-[#8a8a8a] mt-1">{stat.label}</div>
         </div>
       ))}
     </div>
@@ -478,11 +478,11 @@ function ProfileContent() {
   return (
     <div className="relative min-h-full">
       <ProfilePageBackdrop color={bgColor} />
-      <div className="hl-page-wide grid lg:grid-cols-[300px_1fr] gap-6 items-start relative">
+      <div className="hl-page-wide grid lg:grid-cols-[18.75rem_1fr] gap-6 items-start relative">
       {/* ================= LEFT SIDEBAR ================= */}
       <div className="space-y-5">
         <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] overflow-hidden">
-          <div className="relative aspect-[4/5] max-h-[380px] lg:max-h-none">
+          <div className="relative aspect-[4/5] max-h-[23.75rem] lg:max-h-none">
             {cardArt ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -502,7 +502,7 @@ function ProfileContent() {
             <div className="relative h-full flex flex-col items-center justify-center px-5 text-center">
               <OnlineBadge online={isOnline({ name: player.username })} size="md" className="[&>span:last-child]:bottom-2 [&>span:last-child]:right-2 [&>span:last-child]:w-5 [&>span:last-child]:h-5">
                 <AvatarFrame frame={player.cosmetics?.frame?.asset}>
-                  <Avatar className="w-[120px] h-[120px] border-0">
+                  <Avatar className="w-[7.5rem] h-[7.5rem] border-0">
                     {player.avatarUrl ? <AvatarImage src={player.avatarUrl} alt={player.username} /> : null}
                     <AvatarFallback className="bg-[#2a2a2a] text-2xl font-bold text-white">
                       {(player.username || "?").slice(0, 2).toUpperCase()}
@@ -532,23 +532,23 @@ function ProfileContent() {
             {isOwn ? (
               <Link
                 href="/settings"
-                className="flex items-center justify-center gap-2 py-3 text-[12px] font-semibold text-[#c8c8c8] hover:text-white hover:bg-white/[0.03]"
+                className="flex items-center justify-center gap-2 py-3 text-[0.8125rem] font-semibold text-[#c8c8c8] hover:text-white hover:bg-white/[0.03]"
               >
                 <Pencil className="w-3.5 h-3.5" /> Edit profile
               </Link>
             ) : friendState === "friends" ? (
-              <span className="flex items-center justify-center gap-2 py-3 text-[12px] font-semibold text-[#2ecc71]">
+              <span className="flex items-center justify-center gap-2 py-3 text-[0.8125rem] font-semibold text-[#2ecc71]">
                 <UserPlus className="w-3.5 h-3.5" /> Friends
               </span>
             ) : friendState === "pending" ? (
-              <span className="flex items-center justify-center gap-2 py-3 text-[12px] font-semibold text-[#8a8a8a]">
+              <span className="flex items-center justify-center gap-2 py-3 text-[0.8125rem] font-semibold text-[#8a8a8a]">
                 Requested
               </span>
             ) : (
               <button
                 type="button"
                 onClick={() => addFriendByName(player.username, true)}
-                className="flex items-center justify-center gap-2 py-3 text-[12px] font-semibold text-[#c8c8c8] hover:text-white hover:bg-white/[0.03]"
+                className="flex items-center justify-center gap-2 py-3 text-[0.8125rem] font-semibold text-[#c8c8c8] hover:text-white hover:bg-white/[0.03]"
               >
                 <UserPlus className="w-3.5 h-3.5" /> Add friend
               </button>
@@ -561,7 +561,7 @@ function ProfileContent() {
                   () => setFriendMsg("Could not copy link")
                 );
               }}
-              className="flex items-center justify-center gap-2 py-3 text-[12px] font-semibold text-[#c8c8c8] hover:text-white hover:bg-white/[0.03] border-l border-white/[0.08]"
+              className="flex items-center justify-center gap-2 py-3 text-[0.8125rem] font-semibold text-[#c8c8c8] hover:text-white hover:bg-white/[0.03] border-l border-white/[0.08]"
             >
               <Share2 className="w-3.5 h-3.5" /> Share
             </button>
@@ -600,7 +600,7 @@ function ProfileContent() {
             </span>
             <div>
               <div className="text-sm font-semibold text-white">Counter Blox</div>
-              <div className="text-[12px] text-[#8a8a8a]">
+              <div className="text-[0.8125rem] text-[#8a8a8a]">
                 {player.careerMatchesPlayed ?? s.matchesPlayed} matches
               </div>
             </div>
@@ -620,7 +620,7 @@ function ProfileContent() {
                   <div className="flex items-center gap-2 min-w-0">
                     <Avatar className="w-7 h-7">
                       {p.avatar ? <AvatarImage src={p.avatar} alt={p.name} /> : null}
-                      <AvatarFallback className="bg-[#2a2a2a] text-[10px] font-bold text-white">
+                      <AvatarFallback className="bg-[#2a2a2a] text-[0.6875rem] font-bold text-white">
                         {(p.name || "?").slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -651,7 +651,7 @@ function ProfileContent() {
             <button
               key={t.id}
               onClick={() => setMainTab(t.id)}
-              className={`shrink-0 pb-3 text-[13px] font-bold uppercase tracking-wide border-b-2 transition-colors ${
+              className={`shrink-0 pb-3 text-[0.875rem] font-bold uppercase tracking-wide border-b-2 transition-colors ${
                 mainTab === t.id ? "text-[#ff5500] border-[#ff5500]" : "text-[#8a8a8a] border-transparent hover:text-white"
               }`}
             >
@@ -676,7 +676,7 @@ function ProfileContent() {
                   <button
                     key={t}
                     onClick={() => setTab(t)}
-                    className={`px-3 h-7 rounded text-[13px] font-semibold ${
+                    className={`px-3 h-7 rounded text-[0.875rem] font-semibold ${
                       tab === t ? "bg-[#2a2a2a] text-white" : "text-[#8a8a8a] hover:text-white"
                     }`}
                   >
@@ -695,10 +695,10 @@ function ProfileContent() {
                   header={
                     <>
                       <div>
-                        <div className="text-[13px] font-semibold text-white">Season 1</div>
-                        <div className="text-[12px] text-[#8a8a8a]">Matchmaking</div>
+                        <div className="text-[0.875rem] font-semibold text-white">Season 1</div>
+                        <div className="text-[0.8125rem] text-[#8a8a8a]">Matchmaking</div>
                       </div>
-                      <div className="text-right text-[13px] text-[#8a8a8a]">
+                      <div className="text-right text-[0.875rem] text-[#8a8a8a]">
                         <b className="text-white">{player.seasonMatchesPlayed ?? s.matchesPlayed}</b> Matches ·{" "}
                         <b className="text-white">
                           {(player.seasonWinPercent ?? s.winPercent).toFixed(1)}%
@@ -724,7 +724,7 @@ function ProfileContent() {
                             className="flex items-center gap-1.5 text-sm text-[#8a8a8a]"
                             title={`#${regionRank} in ${player.region}`}
                           >
-                            <span className="text-[11px] font-bold text-white">{player.region}</span>
+                            <span className="text-[0.75rem] font-bold text-white">{player.region}</span>
                             <b className="text-white stat-number">{regionRank.toLocaleString()}</b>
                           </span>
                         )}
@@ -749,7 +749,7 @@ function ProfileContent() {
                   const losses = Math.max(0, pro.matchesPlayed - pro.matchesWon);
                   return (
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-[#a855f7]/30 bg-[#a855f7]/[0.06] px-4 py-3">
-                      <span className="text-[12px] font-black uppercase tracking-wide text-[#d8b4fe]">
+                      <span className="text-[0.8125rem] font-black uppercase tracking-wide text-[#d8b4fe]">
                         Pro Ladder
                       </span>
                       <span className="text-sm text-white">
@@ -759,7 +759,7 @@ function ProfileContent() {
                       <span className="text-sm text-[#bdbdbd] stat-number">
                         {pro.matchesWon}W · {losses}L
                       </span>
-                      <span className="text-[12px] text-[#8a8a8a]">
+                      <span className="text-[0.8125rem] text-[#8a8a8a]">
                         Peak {pro.peakElo.toLocaleString()}
                       </span>
                     </div>
@@ -783,10 +783,10 @@ function ProfileContent() {
                 {/* Recent matches */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-[15px] font-bold text-white">Recent matches</h2>
+                    <h2 className="text-[0.9375rem] font-bold text-white">Recent matches</h2>
                     <button
                       onClick={() => setTab("matches")}
-                      className="text-[12px] text-[#ff5500] hover:underline"
+                      className="text-[0.8125rem] text-[#ff5500] hover:underline"
                     >
                       Full match history
                     </button>
@@ -796,7 +796,7 @@ function ProfileContent() {
                       <EmptyState icon={ListChecks} title="No match history" hint="This player hasn't played any recorded matches yet." />
                     ) : (
                       <div>
-                        <div className="hidden md:grid grid-cols-[100px_1fr_64px_80px_110px] gap-3 px-4 py-2.5 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+                        <div className="hidden md:grid grid-cols-[6.25rem_1fr_4rem_5rem_6.875rem] gap-3 px-4 py-2.5 text-[0.75rem] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
                           <span>Date</span>
                           <span />
                           <span>Elo</span>
@@ -824,7 +824,7 @@ function ProfileContent() {
                     <EmptyState icon={ListChecks} title="No matches match your filters" hint="Try widening the map, result, or time-range filters." />
                   ) : (
                     <div>
-                      <div className="hidden md:grid grid-cols-[100px_1fr_64px_80px_110px] gap-3 px-4 py-2.5 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+                      <div className="hidden md:grid grid-cols-[6.25rem_1fr_4rem_5rem_6.875rem] gap-3 px-4 py-2.5 text-[0.75rem] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
                         <span>Date</span>
                         <span />
                         <span>Elo</span>
@@ -886,7 +886,7 @@ function ProfileContent() {
                             showGlow={isCurrent}
                             className={!achieved && !isCurrent ? "opacity-30 grayscale" : ""}
                           />
-                          <span className={`text-[10px] stat-number ${isCurrent ? "text-white font-bold" : "text-hl-muted"}`}>
+                          <span className={`text-[0.6875rem] stat-number ${isCurrent ? "text-white font-bold" : "text-hl-muted"}`}>
                             {tier.minElo}
                           </span>
                           <span className="h-1 w-full rounded-full bg-hl-border overflow-hidden">
@@ -912,7 +912,7 @@ function ProfileContent() {
                   ].map((c) => (
                     <Card key={c.label} className="bg-hl-panel border-hl-border p-4 text-center">
                       <div className="stat-number text-2xl text-hl-gold">{c.value}</div>
-                      <div className="text-[10px] text-hl-muted header-caps mt-1">{c.label}</div>
+                      <div className="text-[0.6875rem] text-hl-muted header-caps mt-1">{c.label}</div>
                     </Card>
                   ))}
                 </div>
@@ -979,7 +979,7 @@ function ProfileContent() {
                     <Link href={`/profile?player=${encodeURIComponent(f.name)}`} className="flex items-center gap-3 flex-1 min-w-0">
                       <Avatar className="w-9 h-9">
                         {f.avatar ? <AvatarImage src={f.avatar} /> : null}
-                        <AvatarFallback className="bg-[#2a2a2a] text-[11px] font-bold text-white">
+                        <AvatarFallback className="bg-[#2a2a2a] text-[0.75rem] font-bold text-white">
                           {(f.name || "?").slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -1097,7 +1097,7 @@ function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost
             className="w-full bg-hl-base border border-hl-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-hl-muted focus:outline-none focus:border-hl-gold/50"
           />
           <div className="flex items-center justify-between mt-2">
-            <span className="text-[11px] text-hl-muted">{message.length}/250</span>
+            <span className="text-[0.75rem] text-hl-muted">{message.length}/250</span>
             <button
               type="button"
               onClick={post}
@@ -1132,7 +1132,7 @@ function GuestbookPanel({ profileName, canPost }: { profileName: string; canPost
                   />
                   <span className="truncate">{e.fromName}</span>
                 </Link>
-                <span className="flex items-center gap-2 text-[11px] text-hl-muted">
+                <span className="flex items-center gap-2 text-[0.75rem] text-hl-muted">
                   {new Date(e.createdAt).toLocaleDateString()}
                   {ownProfile || e.fromName.toLowerCase() === me ? (
                     <button
@@ -1218,7 +1218,7 @@ function ProfileClubsPanel({ playerName }: { playerName: string }) {
                 {club.description || "No description yet."}
               </p>
             </div>
-            <span className="text-[11px] text-hl-muted shrink-0">
+            <span className="text-[0.75rem] text-hl-muted shrink-0">
               {club.memberCount} {club.memberCount === 1 ? "member" : "members"}
             </span>
           </div>

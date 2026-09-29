@@ -79,17 +79,17 @@ function NavRow({
   onSearch: () => void;
 }) {
   const Icon = item.icon;
-  const className = `hl-nav-item flex items-center gap-3 h-12 w-full px-[21px] ${
+  const className = `hl-nav-item flex items-center gap-3 h-12 w-full px-[1.3125rem] ${
     active ? "text-[#ff5500]" : "text-[#8b8b8b] hover:text-white"
   }`;
 
   const icon = item.create ? (
-    <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full border border-current shrink-0">
+    <span className="flex items-center justify-center w-[1.375rem] h-[1.375rem] rounded-full border border-current shrink-0">
       <Plus className="w-3.5 h-3.5" strokeWidth={2.2} />
     </span>
   ) : (
     <Icon
-      className={`w-[22px] h-[22px] shrink-0 ${item.label === "Play" && active ? "fill-current" : ""}`}
+      className={`w-[1.375rem] h-[1.375rem] shrink-0 ${item.label === "Play" && active ? "fill-current" : ""}`}
       strokeWidth={1.75}
       fill={item.label === "Play" && active ? "currentColor" : "none"}
     />
@@ -101,7 +101,7 @@ function NavRow({
         {icon}
         {item.href === "/queue" && <PlaySubBadge />}
       </span>
-      <span className="hl-nav-label text-[13px] font-semibold">{item.label}</span>
+      <span className="hl-nav-label text-[0.875rem] font-semibold">{item.label}</span>
     </>
   );
 
@@ -131,7 +131,7 @@ function PlaySubBadge() {
   }, 30_000);
   if (count <= 0) return null;
   return (
-    <span className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] px-[3px] rounded-full bg-[#ffc44d] text-[#1a1400] text-[9px] font-black leading-[14px] text-center">
+    <span className="absolute -top-1.5 -right-2 min-w-[0.875rem] h-[0.875rem] px-[0.1875rem] rounded-full bg-[#ffc44d] text-[#1a1400] text-[0.6875rem] font-black leading-[0.875rem] text-center">
       {count > 9 ? "9+" : count}
     </span>
   );
@@ -147,7 +147,7 @@ function ClubLink({ club, lines }: { club: SidebarClub; lines: string[] }) {
     >
       <Link
         href={`/clans/${club.id}`}
-        className="hl-nav-item flex items-center gap-3 h-12 w-full px-[18px] text-white"
+        className="hl-nav-item flex items-center gap-3 h-12 w-full px-[1.125rem] text-white"
       >
         <span className="relative shrink-0">
           <ClubMark tag={club.tag} accentColor={club.accentColor} logoUrl={club.logoUrl} size={26} className="!rounded-full" />
@@ -155,12 +155,12 @@ function ClubLink({ club, lines }: { club: SidebarClub; lines: string[] }) {
             <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#ff5500]" />
           )}
         </span>
-        <span className="hl-nav-label text-[13px] font-semibold truncate">{club.name}</span>
+        <span className="hl-nav-label text-[0.875rem] font-semibold truncate">{club.name}</span>
       </Link>
       {box &&
         createPortal(
           <div
-            className="pointer-events-none fixed z-[80] min-w-[180px] rounded-lg border border-white/10 bg-[#2a2a2a] px-3 py-2 shadow-xl"
+            className="pointer-events-none fixed z-[80] min-w-[11.25rem] rounded-lg border border-white/10 bg-[#2a2a2a] px-3 py-2 shadow-xl"
             style={{ left: box.right + 8, top: box.top }}
           >
             <div className="flex items-center gap-2">
@@ -168,7 +168,7 @@ function ClubLink({ club, lines }: { club: SidebarClub; lines: string[] }) {
               <span className="text-sm font-bold text-white">{club.name}</span>
             </div>
             {lines.map((line) => (
-              <div key={line} className="mt-1 text-[12px] text-[#c8c8c8]">
+              <div key={line} className="mt-1 text-[0.8125rem] text-[#c8c8c8]">
                 {line}
               </div>
             ))}
@@ -266,7 +266,7 @@ export function Sidebar() {
       <aside className="hl-sidebar hidden md:flex shrink-0 h-dvh flex-col z-40">
         <Link
           href="/"
-          className="flex items-center gap-3 h-[var(--hl-topbar-h)] shrink-0 px-[21px]"
+          className="flex items-center gap-3 h-[var(--hl-topbar-h)] shrink-0 px-[1.3125rem]"
           title="HyperLeague"
         >
           <Play className="w-5 h-5 text-[#ff5500] fill-[#ff5500] -rotate-[20deg] shrink-0" />

@@ -103,7 +103,7 @@ function TeamSide({ team, won, lost, right }: { team: TeamView; won: boolean; lo
         <div className={`line-clamp-2 break-words text-sm font-black group-hover:underline sm:text-xl ${won ? "text-hl-green" : "text-white"}`}>
           {team.name}
         </div>
-        <div className="text-[11px] text-white/45">{team.tag ? `[${team.tag}]` : ""}</div>
+        <div className="text-[0.75rem] text-white/45">{team.tag ? `[${team.tag}]` : ""}</div>
       </div>
     </Link>
   );
@@ -216,7 +216,7 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,85,0,0.22),transparent_65%)]" />
         <div className="relative px-4 py-5 sm:px-8 sm:py-7">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[11px] font-black uppercase tracking-[0.12em] text-white/55">
+            <span className="text-[0.75rem] font-black uppercase tracking-[0.12em] text-white/55">
               {match.stage === "playoff"
                 ? `Playoffs · ${
                     { semi1: "Semi-final", semi2: "Semi-final", final: "Final", third: "Third place" }[
@@ -225,7 +225,7 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
                   }`
                 : `Week ${match.week} · Regular season`}
             </span>
-            <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide ${PILL[match.status] ?? PILL.unscheduled}`}>
+            <span className={`rounded-full border px-2.5 py-0.5 text-[0.75rem] font-black uppercase tracking-wide ${PILL[match.status] ?? PILL.unscheduled}`}>
               {statusText}
             </span>
           </div>
@@ -239,7 +239,7 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
               >
                 {middle}
               </div>
-              <div className="mt-1 text-[11px] font-bold uppercase tracking-wide text-white/45">
+              <div className="mt-1 text-[0.75rem] font-bold uppercase tracking-wide text-white/45">
                 {match.status === "reported" ? <span className="text-[#ff5500]">Unconfirmed</span> : `Best of ${match.bo}`}
               </div>
             </div>
@@ -519,7 +519,7 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
                     Move match
                   </button>
                 </div>
-                <p className="mt-1 text-[11px] text-white/55">Both rosters get a DM with the new time.</p>
+                <p className="mt-1 text-[0.75rem] text-white/55">Both rosters get a DM with the new time.</p>
               </div>
             ) : null}
           </div>
@@ -537,9 +537,9 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
               />
             </div>
           ) : done ? (
-            <p className="mt-4 text-[11px] text-white/55">Forfeits have no scoreboard.</p>
+            <p className="mt-4 text-[0.75rem] text-white/55">Forfeits have no scoreboard.</p>
           ) : (
-            <p className="mt-4 text-[11px] text-white/55">The scoreboard can be entered once the result is final.</p>
+            <p className="mt-4 text-[0.75rem] text-white/55">The scoreboard can be entered once the result is final.</p>
           )}
         </section>
       ) : null}
@@ -554,7 +554,7 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
               <div className="mb-3 flex items-center gap-2.5">
                 <ClubMark tag={t.tag} accentColor={t.accentColor} logoUrl={t.logoUrl} size={28} />
                 <span className="truncate text-sm font-black text-white">{t.name}</span>
-                <span className="ml-auto text-[11px] text-white/45">{t.roster.length} players</span>
+                <span className="ml-auto text-[0.75rem] text-white/45">{t.roster.length} players</span>
               </div>
               <div className="space-y-1">
                 {t.roster.map((p) => (

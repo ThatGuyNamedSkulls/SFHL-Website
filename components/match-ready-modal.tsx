@@ -57,7 +57,7 @@ function Shell({ children, glow, label }: { children: React.ReactNode; glow: "or
       aria-label={label}
       className="hl-fade-in fixed inset-0 z-[90] grid place-items-center bg-black/75 p-4 backdrop-blur-[3px]"
     >
-      <div className={`hl-pop-in relative w-full max-w-[520px] overflow-hidden rounded-2xl border bg-hl-surface-1 ${border} ${shadow}`}>
+      <div className={`hl-pop-in relative w-full max-w-[32.5rem] overflow-hidden rounded-2xl border bg-hl-surface-1 ${border} ${shadow}`}>
         {glow === "orange" ? (
           <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(ellipse_at_top,rgba(255,85,0,0.38),transparent_70%)]" />
         ) : null}
@@ -136,7 +136,7 @@ export function MatchReadyModal() {
     return (
       <Shell glow="none" label={check.iWasRemoved ? "You didn't accept" : "Back in the queue"}>
         <div className="px-6 py-8 text-center sm:px-8">
-          <div className="text-[11px] font-black uppercase tracking-[0.3em] text-white/50">{subtitle}</div>
+          <div className="text-[0.75rem] font-black uppercase tracking-[0.3em] text-white/50">{subtitle}</div>
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide text-white">
             {check.iWasRemoved ? "Match declined" : "Back in the queue"}
           </h2>
@@ -149,7 +149,7 @@ export function MatchReadyModal() {
             type="button"
             onClick={close}
             autoFocus
-            className="header-caps mt-6 h-11 min-w-[160px] rounded-lg border border-white/15 px-6 text-sm font-black text-white hover:bg-white/[0.06]"
+            className="header-caps mt-6 h-11 min-w-[10rem] rounded-lg border border-white/15 px-6 text-sm font-black text-white hover:bg-white/[0.06]"
           >
             OK
           </button>
@@ -162,7 +162,7 @@ export function MatchReadyModal() {
     return (
       <Shell glow="green" label="Everyone accepted">
         <div className="px-6 py-9 text-center sm:px-8">
-          <div className="text-[11px] font-black uppercase tracking-[0.3em] text-hl-green">{subtitle}</div>
+          <div className="text-[0.75rem] font-black uppercase tracking-[0.3em] text-hl-green">{subtitle}</div>
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide text-white">Match ready</h2>
           <p className="mt-2 text-sm text-white/65">Everyone accepted. Opening the match room…</p>
           <Loader2 className="mx-auto mt-5 h-7 w-7 animate-spin text-hl-green" />
@@ -177,20 +177,20 @@ export function MatchReadyModal() {
   return (
     <Shell glow="orange" label="Match found">
       <div className="relative px-6 pb-7 pt-7 text-center sm:px-8">
-        <div className="text-[11px] font-black uppercase tracking-[0.3em] text-hl-teal">{subtitle}</div>
+        <div className="text-[0.75rem] font-black uppercase tracking-[0.3em] text-hl-teal">{subtitle}</div>
         <h2 className="mt-1 text-4xl font-black uppercase tracking-wide text-white sm:text-5xl">Match found</h2>
 
         <div className="mt-5 flex justify-center">
           <Ring value={remaining / ACCEPT_WINDOW_MS} size={116} stroke={8} color={urgent ? "#e74c3c" : "#ff5500"}>
             <div>
               <div className={`stat-number text-4xl font-black leading-none ${urgent ? "text-hl-red" : "text-white"}`}>{secs}</div>
-              <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-white/55">seconds</div>
+              <div className="mt-0.5 text-[0.6875rem] font-bold uppercase tracking-wider text-white/55">seconds</div>
             </div>
           </Ring>
         </div>
 
         {/* Ten slots that fill as players accept. */}
-        <div className="mx-auto mt-5 grid max-w-[300px] grid-cols-5 gap-2" aria-label={`${check.accepted} of ${check.total} accepted`}>
+        <div className="mx-auto mt-5 grid max-w-[18.75rem] grid-cols-5 gap-2" aria-label={`${check.accepted} of ${check.total} accepted`}>
           {Array.from({ length: check.total }).map((_, i) => {
             const ok = i < check.accepted;
             return (

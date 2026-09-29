@@ -18,7 +18,7 @@ export function SubRolePill({
     return (
       <span
         title={isSub ? `Substitute${pct}` : `Left early${pct}`}
-        className={`inline-flex items-center justify-center min-w-[14px] h-[14px] px-0.5 rounded text-[9px] font-black ${
+        className={`inline-flex items-center justify-center min-w-[0.875rem] h-[0.875rem] px-0.5 rounded text-[0.6875rem] font-black ${
           isSub ? "bg-hl-gold/20 text-hl-gold" : "bg-white/10 text-[#8a8a8a]"
         }`}
       >
@@ -28,7 +28,7 @@ export function SubRolePill({
   }
   return (
     <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide shrink-0 ${
+      className={`inline-flex items-center rounded px-1.5 py-0.5 text-[0.6875rem] font-black uppercase tracking-wide shrink-0 ${
         isSub
           ? "bg-hl-gold/15 text-hl-gold border border-hl-gold/30"
           : "bg-white/[0.06] text-[#8a8a8a] border border-white/10"

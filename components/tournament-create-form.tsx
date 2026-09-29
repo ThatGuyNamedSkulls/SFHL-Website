@@ -122,7 +122,7 @@ export function TournamentCreateForm({
         ))}
       </div>
       <div>
-        <div className="text-[11px] header-caps text-hl-muted mb-2">Map pool</div>
+        <div className="text-[0.75rem] header-caps text-hl-muted mb-2">Map pool</div>
         <div className="flex flex-wrap gap-2">
           {MAPS.map((map) => {
             const on = maps.includes(map.name);

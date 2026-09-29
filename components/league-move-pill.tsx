@@ -9,7 +9,7 @@ export function MovePill({ movement, to, compact = false }: { movement: "up" | "
   return (
     <span
       title={compact ? label : undefined}
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] font-black ${
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[0.75rem] font-black ${
         up ? "border-hl-green/40 bg-hl-green/10 text-hl-green" : "border-hl-red/40 bg-hl-red/10 text-hl-red"
       }`}
     >

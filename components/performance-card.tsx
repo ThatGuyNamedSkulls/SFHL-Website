@@ -47,16 +47,16 @@ export function PerformanceCard({
 
   return (
     <div className="bg-hl-panel border border-hl-border rounded-xl p-4 flex flex-col justify-between">
-      <div className="text-[11px] text-hl-muted header-caps">{label}</div>
+      <div className="text-[0.75rem] text-hl-muted header-caps">{label}</div>
       <div className="flex items-end justify-between gap-3 mt-2">
         <div>
           <div className="text-2xl font-black stat-number text-white" style={{ color }}>
             {value}
           </div>
-          {sub && <div className="text-[10px] text-hl-muted mt-0.5">{sub}</div>}
+          {sub && <div className="text-[0.6875rem] text-hl-muted mt-0.5">{sub}</div>}
         </div>
         {path && (
-          <svg viewBox="0 0 120 36" className="w-[120px] h-9 shrink-0" preserveAspectRatio="none">
+          <svg viewBox="0 0 120 36" className="w-[7.5rem] h-9 shrink-0" preserveAspectRatio="none">
             <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           </svg>
         )}

@@ -21,7 +21,7 @@ export function Flag({ src, name, className = "w-5 h-3.5" }: FlagProps) {
       src={src}
       alt={name || "flag"}
       title={name || undefined}
-      className={`${className} object-cover rounded-[2px] inline-block align-middle shadow-sm`}
+      className={`${className} object-cover rounded-[0.125rem] inline-block align-middle shadow-sm`}
     />
   );
 }

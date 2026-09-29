@@ -174,16 +174,16 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusPill}`}>
+                <span className={`rounded-full border px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide ${statusPill}`}>
                   {tournament.status}
                 </span>
-                <span className="rounded-full border border-hl-border bg-hl-base px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl-muted">
+                <span className="rounded-full border border-hl-border bg-hl-base px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-hl-muted">
                   {tournament.kind === "official" ? "Official" : "Clan cup"}
                 </span>
                 {tournament.clubId && clubName ? (
                   <Link
                     href={`/clans/${tournament.clubId}`}
-                    className="rounded-full border border-hl-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl-gold hover:border-hl-gold/40"
+                    className="rounded-full border border-hl-border px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-hl-gold hover:border-hl-gold/40"
                   >
                     {clubName}
                   </Link>
@@ -198,9 +198,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               </p>
             </div>
             <div className="rounded-xl border border-hl-border bg-hl-base px-4 py-3 text-right min-w-[9rem]">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-hl-muted">Pot</div>
+              <div className="text-[0.75rem] font-bold uppercase tracking-wide text-hl-muted">Pot</div>
               <div className="text-2xl font-black text-hl-gold tabular-nums">{tournament.pot.toLocaleString()}</div>
-              <div className="text-[11px] text-hl-muted">
+              <div className="text-[0.75rem] text-hl-muted">
                 Entry {tournament.entryFee.toLocaleString()} · {tournament.teams.length}/{tournament.size}
               </div>
             </div>
@@ -283,7 +283,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           {myTeams.length > 0 ? (
             <div className="flex flex-wrap items-end gap-2">
               <label className="flex-1 min-w-[12rem]">
-                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-hl-muted">
+                <span className="mb-1 block text-[0.75rem] font-bold uppercase tracking-wide text-hl-muted">
                   Entering team
                 </span>
                 <select
@@ -306,7 +306,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               >
                 {tournament.entryFee > 0 ? `Pay ${tournament.entryFee.toLocaleString()} & request` : "Request"}
               </button>
-              <Link href="/teams" className="basis-full text-[11px] font-bold text-hl-gold hover:underline">
+              <Link href="/teams" className="basis-full text-[0.75rem] font-bold text-hl-gold hover:underline">
                 Manage teams
               </Link>
             </div>
@@ -430,7 +430,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 {team.members.map((m) => (
                   <div key={m.discordId} className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="text-white">{m.playerName || m.username}</span>
-                    <span className="text-[10px] font-bold uppercase text-hl-muted">
+                    <span className="text-[0.6875rem] font-bold uppercase text-hl-muted">
                       {m.role}
                       {m.status === "invited" ? " · invited" : ""}
                     </span>

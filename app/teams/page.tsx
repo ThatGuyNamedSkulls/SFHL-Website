@@ -119,7 +119,7 @@ export default function TeamsPage() {
           <div className="text-sm font-bold text-white">
             New team · {ownedCount}/{maxOwned} captained
           </div>
-          <div className="grid gap-3 md:grid-cols-[1fr_120px]">
+          <div className="grid gap-3 md:grid-cols-[1fr_7.5rem]">
             <input
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 32))}
@@ -151,7 +151,7 @@ export default function TeamsPage() {
             />
           </div>
           <div>
-            <div className="mb-2 text-[11px] header-caps text-hl-muted">Accent</div>
+            <div className="mb-2 text-[0.75rem] header-caps text-hl-muted">Accent</div>
             <ClubColorPicker value={accentColor} onChange={setAccentColor} />
           </div>
           {error ? <p className="text-sm text-hl-red">{error}</p> : null}

@@ -373,6 +373,8 @@ export interface SubRequestView {
   mode: string | null;
   /** Which side is short-handed (1 or 2). */
   team: number;
+  /** That team's side ("CT" / "T") once sides are picked, else null. */
+  side: string | null;
   map: string;
   /** The player being replaced. */
   leaver: string;

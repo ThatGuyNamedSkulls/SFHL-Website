@@ -32,7 +32,7 @@ const primary =
   "find-match-btn inline-flex h-9 items-center gap-1.5 rounded-lg px-4 text-xs font-black uppercase tracking-wide text-hl-base disabled:opacity-40";
 const field =
   "h-10 w-full rounded-lg border border-white/[0.12] bg-[#1b1b1b] px-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#ff5500]";
-const label = "mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55";
+const label = "mb-1.5 block text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55";
 
 export function TeamHeaderActions({
   teamId,
@@ -180,7 +180,7 @@ export function TeamSettings({
         <>
           <section className={card}>
             <h2 className="mb-3 text-base font-black text-white">Team details</h2>
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px_160px]">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7.5rem_10rem]">
               <label>
                 <span className={label}>Name</span>
                 <input value={f.name} maxLength={32} onChange={(e) => setF({ ...f, name: e.target.value })} className={field} />
@@ -267,7 +267,7 @@ export function TeamSettings({
               </span>
             </div>
             <div className="mb-4 flex flex-wrap items-end gap-2">
-              <label className="min-w-[180px] flex-1">
+              <label className="min-w-[11.25rem] flex-1">
                 <span className={label}>Invite a player</span>
                 <input
                   value={invite.name}
@@ -307,7 +307,7 @@ export function TeamSettings({
                       {m.captain ? <Crown className="h-3.5 w-3.5 text-hl-gold" /> : null}
                       <span className="truncate">{m.name}</span>
                     </span>
-                    <span className="text-[11px] text-white/50">
+                    <span className="text-[0.75rem] text-white/50">
                       {m.captain ? "Captain · main roster" : SLOT_LABEL[m.role as RosterSlot] ?? m.role}
                       {m.invited ? " · invited" : ""}
                     </span>

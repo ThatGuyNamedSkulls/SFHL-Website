@@ -16,7 +16,7 @@ import { STATUS_HEADLINE, seasonNumber } from "@/lib/league-shell";
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">{label}</div>
+      <div className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">{label}</div>
       <div className="mt-0.5 text-sm font-black text-white">{children}</div>
     </div>
   );
@@ -45,7 +45,7 @@ function FannedCard({ card, index }: { card: LineupCard | null; index: number })
 function PlayerCards({ lineup }: { lineup: Lineup | null }) {
   const slots = lineup?.cards ?? [null, null, null, null, null];
   return (
-    <div className="relative flex h-[300px] items-end justify-center" aria-label={lineup ? `${lineup.team.name} lineup` : undefined}>
+    <div className="relative flex h-[18.75rem] items-end justify-center" aria-label={lineup ? `${lineup.team.name} lineup` : undefined}>
       {slots.map((card, i) => (
         <FannedCard key={i} card={card} index={i} />
       ))}
@@ -53,11 +53,11 @@ function PlayerCards({ lineup }: { lineup: Lineup | null }) {
         <div className="absolute left-1/2 top-0 z-10 flex -translate-x-1/2 flex-col items-center gap-0.5 whitespace-nowrap">
           <Link
             href={`/teams/${lineup.team.id}`}
-            className="rounded-full border border-[#ff5500]/50 bg-[#1a120d] px-3 py-1 text-[11px] font-black uppercase tracking-wide text-[#ff5500] hover:bg-[#2a170c]"
+            className="rounded-full border border-[#ff5500]/50 bg-[#1a120d] px-3 py-1 text-[0.75rem] font-black uppercase tracking-wide text-[#ff5500] hover:bg-[#2a170c]"
           >
             {lineup.team.name}
           </Link>
-          {!lineup.signedUp ? <span className="text-[10px] font-bold text-white/50">Not signed up yet</span> : null}
+          {!lineup.signedUp ? <span className="text-[0.6875rem] font-bold text-white/50">Not signed up yet</span> : null}
         </div>
       ) : null}
     </div>
@@ -129,7 +129,7 @@ export function LeagueUpcomingHero({
         <div aria-hidden className="absolute inset-0">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_38%,rgba(255,85,0,0.26),transparent_58%),linear-gradient(180deg,#151515,#0b0b0b_70%)]" />
           <span
-            className="absolute left-1/2 top-[34%] -translate-x-1/2 -translate-y-1/2 select-none whitespace-nowrap text-[190px] font-black uppercase leading-none tracking-tight text-transparent lg:text-[300px]"
+            className="absolute left-1/2 top-[34%] -translate-x-1/2 -translate-y-1/2 select-none whitespace-nowrap text-[11.875rem] font-black uppercase leading-none tracking-tight text-transparent lg:text-[18.75rem]"
             style={{ WebkitTextStroke: "2px rgba(255,255,255,0.05)" }}
           >
             {number ? `Season ${number}` : "League"}
@@ -144,7 +144,7 @@ export function LeagueUpcomingHero({
 
       <div className="relative flex flex-col items-center px-5 pb-8 pt-7 text-center sm:px-9 sm:pb-10">
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.75rem] font-black uppercase tracking-[0.12em] ${
             open ? "border-[#ff5500]/50 bg-[#ff5500]/10 text-[#ff5500]" : "border-white/15 bg-white/[0.05] text-white/70"
           }`}
         >
@@ -153,13 +153,13 @@ export function LeagueUpcomingHero({
         </span>
         <span
           aria-hidden
-          className="mt-4 grid h-[76px] w-[76px] place-items-center rounded-full border-[6px] border-[#ff5500]/70 bg-[#0d0d0d]/60 text-[34px] font-black leading-none text-[#ff5500] shadow-[0_0_40px_rgba(255,85,0,0.25)] sm:h-[92px] sm:w-[92px] sm:text-[42px]"
+          className="mt-4 grid h-[4.75rem] w-[4.75rem] place-items-center rounded-full border-[6px] border-[#ff5500]/70 bg-[#0d0d0d]/60 text-[2.125rem] font-black leading-none text-[#ff5500] shadow-[0_0_40px_rgba(255,85,0,0.25)] sm:h-[5.75rem] sm:w-[5.75rem] sm:text-[2.625rem]"
         >
           {number ?? "HL"}
         </span>
 
         {/* Phones get the same cards, scaled down (the negative margin takes back the space scaling leaves). */}
-        <div className="-mb-[122px] mt-2 flex w-full min-w-0 justify-center overflow-hidden sm:mb-0 sm:overflow-visible">
+        <div className="-mb-[7.625rem] mt-2 flex w-full min-w-0 justify-center overflow-hidden sm:mb-0 sm:overflow-visible">
           <div className="origin-top scale-[0.58] sm:scale-100">
             <PlayerCards lineup={lineup} />
           </div>
@@ -193,7 +193,7 @@ export function LeagueUpcomingHero({
             className="inline-flex h-12 items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-6 text-sm font-black uppercase tracking-[0.08em] text-white hover:border-white/35"
           >
             <Users className="h-4 w-4" /> Find teammates
-            <span className="rounded bg-[#ff5500]/20 px-1.5 py-0.5 text-[11px] tracking-wide text-[#ff5500]">{findCount}</span>
+            <span className="rounded bg-[#ff5500]/20 px-1.5 py-0.5 text-[0.75rem] tracking-wide text-[#ff5500]">{findCount}</span>
           </Link>
         </div>
 

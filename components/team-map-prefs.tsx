@@ -16,7 +16,7 @@ function MapThumb({ map }: { map: string }) {
     .slice(0, 2)
     .toUpperCase();
   return (
-    <span className="grid h-8 w-12 shrink-0 place-items-center rounded-md bg-gradient-to-br from-[#2a2a2a] to-[#161616] text-[10px] font-black text-white/60">
+    <span className="grid h-8 w-12 shrink-0 place-items-center rounded-md bg-gradient-to-br from-[#2a2a2a] to-[#161616] text-[0.6875rem] font-black text-white/60">
       {initials}
     </span>
   );
@@ -47,7 +47,7 @@ export function TeamMapPrefs({ team, players }: { team: MapPref[]; players: Reco
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-[10px] uppercase tracking-[0.12em] text-white/45">
+            <tr className="text-left text-[0.6875rem] uppercase tracking-[0.12em] text-white/45">
               <th className="pb-2 font-semibold">Map</th>
               <th className="pb-2 text-right font-semibold">Matches</th>
               <th className="w-[45%] pb-2 pl-4 font-semibold">Win rate</th>

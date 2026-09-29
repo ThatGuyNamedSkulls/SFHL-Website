@@ -51,7 +51,7 @@ export function RoundTimeline({
                 <TooltipTrigger>
                   <div
                     className={`
-                      w-6 h-6 rounded-sm flex items-center justify-center text-[9px] font-bold cursor-default
+                      w-6 h-6 rounded-sm flex items-center justify-center text-[0.6875rem] font-bold cursor-default
                       transition-all duration-200 hover:scale-125 hover:z-10
                       ${isTeamA
                         ? "bg-hl-green/20 text-hl-green border border-hl-green/30"

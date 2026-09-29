@@ -218,7 +218,7 @@ export default function ShopPage() {
           {filter === "featured" ? (
             <>
               <div className="mb-6 grid gap-3 lg:grid-cols-[1.4fr_1fr]">
-                <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#151515] min-h-[220px]">
+                <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#151515] min-h-[13.75rem]">
                   <div
                     className="absolute inset-0 opacity-80"
                     style={{
@@ -227,7 +227,7 @@ export default function ShopPage() {
                     }}
                   />
                   <div className="relative flex h-full flex-col justify-end p-6 md:p-8">
-                    <div className="text-[11px] font-bold uppercase tracking-wide text-[#ff5500]">
+                    <div className="text-[0.75rem] font-bold uppercase tracking-wide text-[#ff5500]">
                       Counter Blox Cosmetics
                     </div>
                     <h2 className="mt-2 max-w-md text-2xl font-black text-white md:text-3xl">
@@ -258,7 +258,7 @@ export default function ShopPage() {
                       </div>
                       <div className="px-2.5 py-2">
                         <div className="truncate text-xs font-bold text-white">{item.name}</div>
-                        <div className="text-[10px] text-hl-muted">{TYPE_LABEL[item.type]}</div>
+                        <div className="text-[0.6875rem] text-hl-muted">{TYPE_LABEL[item.type]}</div>
                       </div>
                     </button>
                   ))}
@@ -320,18 +320,18 @@ export default function ShopPage() {
                   >
                     <div className="relative aspect-[3/4] bg-gradient-to-b from-hl-panel-light to-hl-base">
                       <ShopPreview item={item} />
-                      <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-bold text-hl-gold">
+                      <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[0.75rem] font-bold text-hl-gold">
                         <Coins className="h-3 w-3" />
                         {item.price.toLocaleString()}
                       </span>
                       {item.owned && (
-                        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-hl-gold/40 bg-hl-base/80 px-2 py-0.5 text-[10px] font-bold text-hl-gold">
+                        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-hl-gold/40 bg-hl-base/80 px-2 py-0.5 text-[0.6875rem] font-bold text-hl-gold">
                           <Check className="h-3 w-3" /> Owned
                         </span>
                       )}
                     </div>
                     <div className="border-t border-hl-border p-3">
-                      <div className={`text-[9px] header-caps ${RARITY_COLORS[item.rarity] || RARITY_COLORS.common}`}>
+                      <div className={`text-[0.6875rem] header-caps ${RARITY_COLORS[item.rarity] || RARITY_COLORS.common}`}>
                         {TYPE_LABEL[item.type]} · {item.rarity}
                       </div>
                       <div className="mt-0.5 truncate text-sm font-bold text-white">{item.name}</div>
@@ -423,7 +423,7 @@ function CategoryTile({
       <div className="px-4 py-3">
         <div className="font-bold text-white">{title}</div>
         <p className="mt-1 text-xs text-hl-muted">{copy}</p>
-        <div className="mt-2 text-[11px] font-bold text-[#ff5500]">{count} for sale</div>
+        <div className="mt-2 text-[0.75rem] font-bold text-[#ff5500]">{count} for sale</div>
       </div>
     </button>
   );

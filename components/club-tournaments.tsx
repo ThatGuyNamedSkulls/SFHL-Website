@@ -77,7 +77,7 @@ export function ClubTournaments({
                 <Link href={`/tournaments/${cup.id}`} className="font-bold text-white hover:text-hl-gold">
                   {cup.name}
                 </Link>
-                <span className="rounded-full border border-hl-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl-muted">
+                <span className="rounded-full border border-hl-border px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-hl-muted">
                   {cup.status} · {cup.teamCount}/{cup.size}
                 </span>
               </div>

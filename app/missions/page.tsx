@@ -162,7 +162,7 @@ export default function MissionsPage() {
                       key={f.id}
                       type="button"
                       onClick={() => setFilter(f.id)}
-                      className={`rounded-full px-3 py-1 text-[11px] font-bold border ${
+                      className={`rounded-full px-3 py-1 text-[0.75rem] font-bold border ${
                         filter === f.id
                           ? "border-transparent bg-white text-black"
                           : "border-hl-border text-hl-muted hover:text-white"
@@ -212,7 +212,7 @@ function ProgressCard({
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
           <div className="h-full bg-[#ff5500]" style={{ width: `${pct}%` }} />
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-hl-muted">
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-[0.75rem] text-hl-muted">
           <span>
             {mission.progress}/{mission.goal}
           </span>
@@ -265,7 +265,7 @@ function MissionCard({
         </div>
         <div className="absolute bottom-3 left-3 right-3">
           <div className="text-lg font-black text-white">{mission.title}</div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-[#c8c8c8]">
+          <div className="text-[0.6875rem] font-bold uppercase tracking-wide text-[#c8c8c8]">
             Organized by {mission.organizedBy}
           </div>
         </div>
@@ -273,7 +273,7 @@ function MissionCard({
       <div className="flex items-center justify-between gap-2 border-t border-hl-border px-3 py-3">
         <div>
           <div className="text-sm text-white">{mission.description}</div>
-          <div className="mt-1 text-[11px] text-hl-muted">
+          <div className="mt-1 text-[0.75rem] text-hl-muted">
             {mission.tab === "ongoing" ? (
               <>
                 <span className="font-bold text-[#7dff4f]">ACTIVE</span>

@@ -174,7 +174,7 @@ export default function ClubsPage() {
               </button>
             </div>
             <div className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-[1fr_120px_160px]">
+              <div className="grid gap-3 md:grid-cols-[1fr_7.5rem_10rem]">
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value.slice(0, 40))}
@@ -230,7 +230,7 @@ export default function ClubsPage() {
                 Private (invite only)
               </label>
               <div>
-                <div className="text-[11px] header-caps text-hl-muted mb-2">Banner color</div>
+                <div className="text-[0.75rem] header-caps text-hl-muted mb-2">Banner color</div>
                 <ClubColorPicker value={accentColor} onChange={setAccentColor} />
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -298,7 +298,7 @@ export default function ClubsPage() {
         <div className="space-y-6">
           {mine.length > 0 ? (
             <section>
-              <div className="mb-3 text-[11px] font-bold header-caps text-hl-gold">My clans</div>
+              <div className="mb-3 text-[0.75rem] font-bold header-caps text-hl-gold">My clans</div>
               <div className="grid gap-3 md:grid-cols-2">
                 {mine.map((club) => (
                   <ClubCard key={club.id} club={club} />
@@ -309,7 +309,7 @@ export default function ClubsPage() {
           {rest.length > 0 ? (
             <section>
               {mine.length > 0 ? (
-                <div className="mb-3 text-[11px] font-bold header-caps text-hl-muted">All clans</div>
+                <div className="mb-3 text-[0.75rem] font-bold header-caps text-hl-muted">All clans</div>
               ) : null}
               <div className="grid gap-3 md:grid-cols-2">
                 {rest.map((club) => (
@@ -343,7 +343,7 @@ function ClubCard({ club }: { club: ClubRow }) {
               <h2 className="text-base font-bold text-white truncate">{club.name}</h2>
               <div className="text-xs font-bold text-hl-gold tracking-wide">[{club.tag}]</div>
             </div>
-            <span className="text-[11px] font-bold header-caps text-hl-muted shrink-0 flex items-center gap-1">
+            <span className="text-[0.75rem] font-bold header-caps text-hl-muted shrink-0 flex items-center gap-1">
               {club.private ? <Lock className="w-3 h-3" /> : null}
               {regionMeta(club.region).short}
             </span>

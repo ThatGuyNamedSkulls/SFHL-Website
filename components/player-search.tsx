@@ -194,7 +194,7 @@ export function PlayerSearch({
               >
                 <Avatar className="w-7 h-7 border border-hl-border shrink-0">
                   {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.username} /> : null}
-                  <AvatarFallback className="bg-hl-panel-light text-[10px] font-bold text-hl-gold">
+                  <AvatarFallback className="bg-hl-panel-light text-[0.6875rem] font-bold text-hl-gold">
                     {p.username.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>

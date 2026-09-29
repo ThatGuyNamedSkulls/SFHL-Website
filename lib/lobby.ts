@@ -65,6 +65,8 @@ export interface LobbyView {
   status: string;
   side: { name: string; team: number } | null;
   sidePick: SidePickState | null;
+  /** Each team's side once a captain picked one ({ team1: "CT", team2: "T" }). */
+  teamSides: TeamSides | null;
   firstVetoCaptainId: string | null;
   captains: { team1: string | null; team2: string | null };
   veto: VetoState | null;
@@ -103,6 +105,8 @@ interface RawLobby {
     actionSource?: string;
   } | null;
   sidePick?: Partial<SidePickState> | null;
+  /** Written by the bot once sides are picked: { "1": "CT", "2": "T" }. */
+  teamSides?: Record<string, string> | null;
   firstVetoCaptainId?: string | null;
   captains?: { team1?: string; team2?: string };
   veto?: Partial<VetoState> | null;
@@ -163,6 +167,29 @@ function normalizeSidePick(raw: RawLobby): SidePickState | null {
     team: Number(s.team) || 1,
     options: Array.isArray(s.options) && s.options.length ? s.options.map(String) : DEFAULT_SIDES,
   };
+}
+
+export interface TeamSides {
+  team1: string;
+  team2: string;
+}
+
+/**
+ * Which side each team plays: the bot's stored teamSides, or worked out from
+ * the captain's pick straight away (so the website doesn't wait for the bot).
+ */
+export function resolveTeamSides(
+  raw: Pick<RawLobby, "teamSides" | "side" | "sidePick">
+): TeamSides | null {
+  const stored = raw.teamSides;
+  if (stored?.["1"] && stored?.["2"]) return { team1: String(stored["1"]), team2: String(stored["2"]) };
+  const name = raw.side?.name ? String(raw.side.name) : "";
+  const team = Number(raw.side?.team);
+  if (!name || (team !== 1 && team !== 2)) return null;
+  const options = raw.sidePick?.options?.length ? raw.sidePick.options.map(String) : DEFAULT_SIDES;
+  const other = options.find((s) => s !== name) ?? DEFAULT_SIDES.find((s) => s !== name);
+  if (!other) return null;
+  return team === 1 ? { team1: name, team2: other } : { team1: other, team2: name };
 }
 
 function resolveSidePicker(data: RawLobby): { captainId: string; team: number; options: string[] } | null {
@@ -283,6 +310,7 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
     status: raw.status || "veto",
     side: raw.side ?? null,
     sidePick: normalizeSidePick(raw),
+    teamSides: resolveTeamSides(raw),
     firstVetoCaptainId: raw.firstVetoCaptainId ?? null,
     captains: {
       team1: raw.captains?.team1 ?? null,

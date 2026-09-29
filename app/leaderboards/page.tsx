@@ -1,5 +1,6 @@
 "use client";
 
+import { AvatarImg } from "@/components/avatar-img";
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -50,10 +51,10 @@ interface ApiPlayer {
 function ProLadderIntro() {
   return (
     <div className="w-full rounded-xl border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-4 py-3">
-      <div className="flex items-center gap-2 text-[13px] font-black text-white">
+      <div className="flex items-center gap-2 text-[0.875rem] font-black text-white">
         <Swords className="h-4 w-4 text-[#d8b4fe]" /> Earned in league matches
       </div>
-      <p className="mt-1 text-[12px] leading-relaxed text-[#a0a0a0]">
+      <p className="mt-1 text-[0.8125rem] leading-relaxed text-[#a0a0a0]">
         Every league match in Open 10 and above counts, for the players on its saved scoreboard. Everyone starts at 0;
         higher divisions give more.{" "}
         <Link href="/league" className="font-bold text-[#d8b4fe] hover:underline">
@@ -62,7 +63,7 @@ function ProLadderIntro() {
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {Object.entries(PRO_DIVISION_WEIGHTS).map(([code, w]) => (
-          <span key={code} className="rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-[11px] font-bold text-white/80">
+          <span key={code} className="rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-[0.75rem] font-bold text-white/80">
             {LEVEL_NAMES[code]} <span className="text-[#d8b4fe]">×{w.toFixed(1)}</span>
           </span>
         ))}
@@ -74,7 +75,7 @@ function ProLadderIntro() {
 function DivisionChip({ name }: { name: string | null }) {
   if (!name) return <span className="text-[#6a6a6a]">—</span>;
   return (
-    <span className="inline-block max-w-full truncate rounded-md border border-[#a855f7]/30 bg-[#a855f7]/10 px-2 py-0.5 text-[11px] font-bold text-[#d8b4fe]">
+    <span className="inline-block max-w-full truncate rounded-md border border-[#a855f7]/30 bg-[#a855f7]/10 px-2 py-0.5 text-[0.75rem] font-bold text-[#d8b4fe]">
       {name}
     </span>
   );
@@ -90,9 +91,9 @@ function SkillPill({ position, rank }: { position: number; rank: RankTierLetter 
           ? "bg-[#e67e22] text-black"
           : "bg-[#b02a2a] text-white";
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full pl-2.5 pr-1 py-[3px] ${cls}`}>
-      <span className="text-[11px] font-black tabular-nums">#{position}</span>
-      <RankBadge rank={rank} size="sm" showGlow={false} className="!w-[18px] !h-[18px]" />
+    <span className={`inline-flex items-center gap-1 rounded-full pl-2.5 pr-1 py-[0.1875rem] ${cls}`}>
+      <span className="text-[0.75rem] font-black tabular-nums">#{position}</span>
+      <RankBadge rank={rank} size="sm" showGlow={false} className="!w-[1.125rem] !h-[1.125rem]" />
     </span>
   );
 }
@@ -111,7 +112,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="appearance-none bg-[#1a1a1a] border border-[#2a2a2a] rounded-md h-9 pl-3 pr-8 text-[13px] text-white focus:outline-none focus:border-white/30 w-full min-w-0 sm:w-auto sm:min-w-[140px]"
+        className="appearance-none bg-[#1a1a1a] border border-[#2a2a2a] rounded-md h-9 pl-3 pr-8 text-[0.875rem] text-white focus:outline-none focus:border-white/30 w-full min-w-0 sm:w-auto sm:min-w-[8.75rem]"
       >
         {children}
       </select>
@@ -224,12 +225,12 @@ function LeaderboardsInner() {
   return (
     <div className="hl-page">
       {loggedIn && (
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-5 text-[13px]">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-5 text-[0.875rem]">
           <span className="font-bold text-white">Your rankings</span>
           {me?.countryFlag ? (
             <span className="flex items-center gap-1.5 text-[#8a8a8a]">
               <span className="font-bold text-white">{me.country?.toUpperCase()}</span>
-              <Flag src={me.countryFlag} name={me.countryName} className="w-5 h-[14px]" />
+              <Flag src={me.countryFlag} name={me.countryName} className="w-5 h-[0.875rem]" />
               <b className="text-white tabular-nums">{myCountryRank}</b>
             </span>
           ) : null}
@@ -253,7 +254,7 @@ function LeaderboardsInner() {
               </>
             ) : (
               <>
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-[#3a3a3a] text-[10px] text-[#8a8a8a]">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-[#3a3a3a] text-[0.6875rem] text-[#8a8a8a]">
                   ?
                 </span>
                 <span className="text-[#8a8a8a]">Unranked</span>
@@ -277,7 +278,7 @@ function LeaderboardsInner() {
               role="tab"
               aria-selected={ladder === id}
               onClick={() => pickLadder(id)}
-              className={`h-7 rounded-md px-3 text-[12px] font-bold ${
+              className={`h-7 rounded-md px-3 text-[0.8125rem] font-bold ${
                 ladder === id
                   ? id === "pro"
                     ? "bg-[#a855f7]/20 text-[#d8b4fe]"
@@ -297,7 +298,7 @@ function LeaderboardsInner() {
           <button
             type="button"
             onClick={() => setRegion("GLOBAL")}
-            className="text-[12px] text-[#8a8a8a] hover:text-white"
+            className="text-[0.8125rem] text-[#8a8a8a] hover:text-white"
           >
             {unsetCountryCount} new {unsetCountryCount === 1 ? "player hasn’t" : "players haven’t"} set a
             country — view Global
@@ -327,7 +328,7 @@ function LeaderboardsInner() {
 
       <div className="w-full">
         {ladder === "pro" ? (
-          <div className="hidden md:grid grid-cols-[56px_1fr_160px_110px_70px_120px] gap-2 px-1 pb-2 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+          <div className="hidden md:grid grid-cols-[3.5rem_1fr_10rem_6.875rem_4.375rem_7.5rem] gap-2 px-1 pb-2 text-[0.75rem] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
             <span>Rank</span>
             <span>Player</span>
             <span>Last division</span>
@@ -336,7 +337,7 @@ function LeaderboardsInner() {
             <span className="text-right">Pro ELO</span>
           </div>
         ) : (
-          <div className="hidden md:grid grid-cols-[56px_1fr_90px_140px_88px] gap-2 px-1 pb-2 text-[11px] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
+          <div className="hidden md:grid grid-cols-[3.5rem_1fr_5.625rem_8.75rem_5.5rem] gap-2 px-1 pb-2 text-[0.75rem] font-semibold text-[#6a6a6a] border-b border-white/[0.06]">
             <span>Rank</span>
             <span>Player</span>
             <span className="text-center">Country</span>
@@ -371,15 +372,14 @@ function LeaderboardsInner() {
                 <Link
                   key={player.id}
                   href={`/profile?player=${encodeURIComponent(player.username)}`}
-                  className={`grid grid-cols-[32px_1fr_auto] md:grid-cols-[56px_1fr_160px_110px_70px_120px] gap-2 items-center px-1 min-h-14 py-2 md:h-16 md:py-0 border-b border-white/[0.04] ${
+                  className={`grid grid-cols-[2rem_1fr_auto] md:grid-cols-[3.5rem_1fr_10rem_6.875rem_4.375rem_7.5rem] gap-2 items-center px-1 min-h-14 py-2 md:h-16 md:py-0 border-b border-white/[0.04] ${
                     isMe ? "bg-[#ff5500]/10" : "hover:bg-white/[0.03]"
                   }`}
                 >
                   <span className="text-sm tabular-nums text-[#8a8a8a]">{boardRank}</span>
                   <span className="flex items-center gap-3 min-w-0">
                     {player.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <AvatarImg
                         src={player.avatarUrl}
                         alt=""
                         referrerPolicy="no-referrer"
@@ -393,13 +393,13 @@ function LeaderboardsInner() {
                     <span className="min-w-0">
                       <span className="flex items-center gap-2 min-w-0">
                         {player.countryFlag ? (
-                          <Flag src={player.countryFlag} name={player.countryName} className="w-5 h-[14px] shrink-0" />
+                          <Flag src={player.countryFlag} name={player.countryName} className="w-5 h-[0.875rem] shrink-0" />
                         ) : null}
-                        <span className="text-[15px] font-medium text-white truncate">
+                        <span className="text-[0.9375rem] font-medium text-white truncate">
                           <ClubTaggedName name={player.username} tag={player.clubTag} />
                         </span>
                       </span>
-                      <span className="block truncate text-[11px] text-[#8a8a8a]">
+                      <span className="block truncate text-[0.75rem] text-[#8a8a8a]">
                         {lg?.team ? `${lg.team.name} [${lg.team.tag}]` : "League player"}
                         <span className="md:hidden">
                           {lg?.division ? ` · ${lg.division}` : ""}
@@ -421,7 +421,7 @@ function LeaderboardsInner() {
                   </span>
                   <span className="flex items-center justify-end gap-2">
                     <RankBadge rank={displayRank} size="sm" showGlow={false} className="!w-6 !h-6" />
-                    <span className={`text-[15px] font-semibold tabular-nums ${placing ? "text-[#8a8a8a]" : "text-white"}`}>
+                    <span className={`text-[0.9375rem] font-semibold tabular-nums ${placing ? "text-[#8a8a8a]" : "text-white"}`}>
                       {placing ? "—" : player.elo.toLocaleString()}
                     </span>
                   </span>
@@ -432,15 +432,14 @@ function LeaderboardsInner() {
               <Link
                 key={player.id}
                 href={`/profile?player=${encodeURIComponent(player.username)}`}
-                className={`grid grid-cols-[32px_1fr_auto] md:grid-cols-[56px_1fr_90px_140px_88px] gap-2 items-center px-1 min-h-14 py-2 md:h-16 md:py-0 border-b border-white/[0.04] ${
+                className={`grid grid-cols-[2rem_1fr_auto] md:grid-cols-[3.5rem_1fr_5.625rem_8.75rem_5.5rem] gap-2 items-center px-1 min-h-14 py-2 md:h-16 md:py-0 border-b border-white/[0.04] ${
                   isMe ? "bg-[#ff5500]/10" : "hover:bg-white/[0.03]"
                 }`}
               >
                 <span className="text-sm tabular-nums text-[#8a8a8a]">{boardRank}</span>
                 <span className="flex items-center gap-3 min-w-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   {player.avatarUrl ? (
-                    <img
+                    <AvatarImg
                       src={player.avatarUrl}
                       alt=""
                       referrerPolicy="no-referrer"
@@ -451,7 +450,7 @@ function LeaderboardsInner() {
                       {player.username.slice(0, 2).toUpperCase()}
                     </span>
                   )}
-                  <span className="text-[15px] font-medium text-white truncate">
+                  <span className="text-[0.9375rem] font-medium text-white truncate">
                     <ClubTaggedName name={player.username} tag={player.clubTag} />
                   </span>
                   <span className="md:hidden shrink-0">
@@ -474,7 +473,7 @@ function LeaderboardsInner() {
                     <RankBadge rank={displayRank} size="sm" showGlow={false} className="!w-6 !h-6" />
                   )}
                 </span>
-                <span className={`text-right text-[15px] font-semibold tabular-nums ${placing ? "text-[#8a8a8a]" : "text-white"}`}>
+                <span className={`text-right text-[0.9375rem] font-semibold tabular-nums ${placing ? "text-[#8a8a8a]" : "text-white"}`}>
                   {placing ? "—" : player.elo.toLocaleString()}
                 </span>
               </Link>

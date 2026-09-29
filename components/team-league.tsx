@@ -36,7 +36,7 @@ function StatusLadder({ code }: { code: string }) {
           {i > 0 ? <ChevronRight aria-hidden className="h-3 w-3 text-white/25" /> : null}
           <span
             aria-current={i === at ? "step" : undefined}
-            className={`rounded-md px-2 py-0.5 text-[11px] font-black ${
+            className={`rounded-md px-2 py-0.5 text-[0.75rem] font-black ${
               i === at
                 ? "bg-[#ff5500] text-white"
                 : i < at
@@ -90,7 +90,7 @@ export function TeamLeague({
     <section className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#121212]">
       <div className={`flex flex-wrap items-start justify-between gap-4 p-4 sm:p-5 ${records ? "border-b border-white/[0.06]" : ""}`}>
         <div className="min-w-0 space-y-2.5">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50">League status · next season</div>
+          <div className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-white/50">League status · next season</div>
           {status ? (
             <>
               <div className="flex flex-wrap items-center gap-2">
@@ -104,7 +104,7 @@ export function TeamLeague({
               {climbing ? (
                 <StatusLadder code={status.code} />
               ) : (
-                <div className="text-[11px] text-white/45">
+                <div className="text-[0.75rem] text-white/45">
                   {status.name} is placed by skill each season and has no promotion. Teams reach Open 8-9 by skill, then climb.
                 </div>
               )}
@@ -118,7 +118,7 @@ export function TeamLeague({
 
       {records ? (
       <div className="p-4 sm:p-5">
-        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50">Season records</div>
+        <div className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-white/50">Season records</div>
         {seasons.length === 0 ? (
           <p className="text-xs text-white/50">No league seasons yet. The captain signs the team up on the League page.</p>
         ) : (
@@ -126,7 +126,7 @@ export function TeamLeague({
             {seasons.map((s) => (
               <li
                 key={s.seasonId}
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 sm:grid-cols-[minmax(0,1fr)_90px_120px_minmax(150px,auto)_80px]"
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 sm:grid-cols-[minmax(0,1fr)_5.625rem_7.5rem_minmax(9.375rem,auto)_5rem]"
               >
                 <div className="min-w-0">
                   <Link href={`/league/${s.seasonId}`} className="text-sm font-black text-white hover:underline">

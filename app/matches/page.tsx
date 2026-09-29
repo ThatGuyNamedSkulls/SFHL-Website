@@ -57,7 +57,7 @@ export default function MatchesPage() {
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-hl-muted" />
               <Select value={mapFilter} onValueChange={(v) => setMapFilter(v ?? "ALL")}>
-                <SelectTrigger className="w-[150px] bg-hl-panel border-hl-border text-white text-sm">
+                <SelectTrigger className="w-[9.375rem] bg-hl-panel border-hl-border text-white text-sm">
                   <SelectValue placeholder="Map" />
                 </SelectTrigger>
                 <SelectContent className="bg-hl-panel border-hl-border text-white">

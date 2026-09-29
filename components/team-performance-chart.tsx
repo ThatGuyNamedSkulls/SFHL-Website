@@ -149,9 +149,9 @@ export function TeamPerformanceChart({ data }: { data: TeamSummary["performance"
 
       {table ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[420px] text-xs">
+          <table className="w-full min-w-[26.25rem] text-xs">
             <thead>
-              <tr className="text-left text-[10px] uppercase tracking-[0.1em] text-white/45">
+              <tr className="text-left text-[0.6875rem] uppercase tracking-[0.1em] text-white/45">
                 <th className="py-2 pr-3 font-semibold">Match</th>
                 {series.map((p) => (
                   <th key={p} className="px-2 py-2 text-right font-semibold">
@@ -182,14 +182,14 @@ export function TeamPerformanceChart({ data }: { data: TeamSummary["performance"
             {ticks.map((t) => (
               <g key={t}>
                 <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} stroke="rgba(255,255,255,0.07)" />
-                <text x={PAD.left - 8} y={y(t) + 3} textAnchor="end" className="fill-white/40 text-[10px] tabular-nums">
+                <text x={PAD.left - 8} y={y(t) + 3} textAnchor="end" className="fill-white/40 text-[0.6875rem] tabular-nums">
                   {m.fmt(t)}
                 </text>
               </g>
             ))}
             {points.map((pt, i) =>
               i % labelEvery === 0 || i === points.length - 1 ? (
-                <text key={pt.matchId} x={x(i)} y={H - 8} textAnchor="middle" className="fill-white/40 text-[10px] tabular-nums">
+                <text key={pt.matchId} x={x(i)} y={H - 8} textAnchor="middle" className="fill-white/40 text-[0.6875rem] tabular-nums">
                   #{i + 1}
                 </text>
               ) : null
@@ -223,7 +223,7 @@ export function TeamPerformanceChart({ data }: { data: TeamSummary["performance"
                     x={l.x + 60 > width ? l.x - 6 : l.x + 6}
                     y={l.y}
                     textAnchor={l.x + 60 > width ? "end" : "start"}
-                    className="fill-white/70 text-[10px] font-bold"
+                    className="fill-white/70 text-[0.6875rem] font-bold"
                   >
                     {l.p}
                   </text>
@@ -241,14 +241,14 @@ export function TeamPerformanceChart({ data }: { data: TeamSummary["performance"
           </svg>
           {hp ? (
             <div
-              className="pointer-events-none absolute top-2 z-10 min-w-[150px] rounded-lg border border-white/10 bg-[#1b1b1b]/95 px-3 py-2 text-xs shadow-xl"
+              className="pointer-events-none absolute top-2 z-10 min-w-[9.375rem] rounded-lg border border-white/10 bg-[#1b1b1b]/95 px-3 py-2 text-xs shadow-xl"
               style={x(hover!) > width / 2 ? { right: width - x(hover!) + 12 } : { left: x(hover!) + 12 }}
             >
               <div className="mb-1 font-black text-white">
                 #{hover! + 1} {hp.label}
               </div>
               {hp.date ? (
-                <div className="mb-1.5 text-[10px] text-white/45">
+                <div className="mb-1.5 text-[0.6875rem] text-white/45">
                   {new Date(hp.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                 </div>
               ) : null}

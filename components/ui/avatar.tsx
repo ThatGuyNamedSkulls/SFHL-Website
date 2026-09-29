@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar"
 
+import { avatarFallbackFor } from "@/lib/avatar-fallback"
 import { cn } from "@/lib/utils"
 
 function Avatar({
@@ -25,7 +26,12 @@ function Avatar({
   )
 }
 
-function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
+/** A dead picture link falls back to the account's default Discord avatar
+ *  (then to AvatarFallback), so avatars never show as broken. */
+function AvatarImage({ className, src, onLoadingStatusChange, ...props }: AvatarPrimitive.Image.Props) {
+  const [failedSrc, setFailedSrc] = React.useState<string | null>(null)
+  const url = typeof src === "string" ? src : null
+  const current = url && failedSrc === url ? avatarFallbackFor(url) : src
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
@@ -34,6 +40,11 @@ function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
         "aspect-square size-full rounded-full object-cover",
         className
       )}
+      src={current}
+      onLoadingStatusChange={(status) => {
+        if (status === "error" && url && current === url) setFailedSrc(url)
+        onLoadingStatusChange?.(status)
+      }}
       {...props}
     />
   )
