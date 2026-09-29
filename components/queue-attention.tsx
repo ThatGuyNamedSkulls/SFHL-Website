@@ -17,7 +17,7 @@ import { STATUS_TTL_MS } from "@/components/status-poller";
 import { refreshReadyCheck, resetReadyCheck, useReadyCheck, type ReadyCheck } from "@/components/use-ready-check";
 import { apiGetJson } from "@/lib/client-api";
 import { QUEUE_EVENT } from "@/lib/queue-signal";
-import { baseTitle, queueJustOpened, soundForTransition, titleFor } from "@/lib/queue-attention";
+import { ACCEPT_WINDOW_SECONDS, baseTitle, queueJustOpened, soundForTransition, titleFor } from "@/lib/queue-attention";
 import { playQueueSound, unlockQueueAudio } from "@/lib/queue-sounds";
 
 /** A check is on screen: follow it closely. */
@@ -45,7 +45,7 @@ function notifyMatchFound(check: ReadyCheck) {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     if (document.visibilityState === "visible" && document.hasFocus()) return;
     const n = new Notification("Match found — accept!", {
-      body: "You have 20 seconds to accept on HyperLeague.",
+      body: `You have ${ACCEPT_WINDOW_SECONDS} seconds to accept on HyperLeague.`,
       tag: `hl-ready-${check.id}`,
       icon: "/favicon.ico",
     });
@@ -159,7 +159,7 @@ export function QueueAttention() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rc.loaded, rc.queued, checkId, checkStatus]);
 
-  // Tab title, favicon dot and the countdown ticks (every second of the 20 s).
+  // Tab title, favicon dot and the countdown ticks (every second of the accept window).
   const waitingForMe = pending && !rc.check?.iAccepted;
   const mode = waitingForMe ? "found" : rc.queued && rc.queuedSince ? "searching" : "idle";
   const since = rc.queuedSince;

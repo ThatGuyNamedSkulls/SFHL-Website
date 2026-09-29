@@ -25,7 +25,7 @@ export interface ReadyCheckState {
   /** False until the first answer arrives. */
   loaded: boolean;
   check: ReadyCheck | null;
-  /** When the check's 20 s window closes (local clock). */
+  /** When the check's accept window closes (local clock). */
   deadlineAt: number;
   queued: boolean;
   /** When you joined the queue (ms), for the search timer. */

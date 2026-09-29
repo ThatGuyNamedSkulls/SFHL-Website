@@ -3,6 +3,7 @@ import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { acceptReadyCheck, myReadyCheck } from "@/lib/ready-checks";
 import { getWebQueueJoinedAt } from "@/lib/db";
+import { ACCEPT_WINDOW_SECONDS } from "@/lib/queue-attention";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -30,7 +31,7 @@ export async function GET() {
 const MESSAGES: Record<string, string> = {
   not_in_check: "This match isn't yours.",
   closed: "This ready check is already over.",
-  expired: "Too late — the 20 seconds ran out.",
+  expired: `Too late — the ${ACCEPT_WINDOW_SECONDS} seconds ran out.`,
 };
 
 /** POST { id } — accept the match. */

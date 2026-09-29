@@ -4,6 +4,9 @@
  * sound to play. Tested in tests/queue-attention.test.ts.
  */
 
+/** Seconds to accept a found match. Must match ACCEPT_WINDOW_SECONDS in the bots' core/ready_checks.py. */
+export const ACCEPT_WINDOW_SECONDS = 40;
+
 /** "0:07", "1:24", "12:05", "1:02:09". */
 export function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));

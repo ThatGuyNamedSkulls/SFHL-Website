@@ -9,9 +9,10 @@ import { useSession } from "@/components/session-provider";
 import { acceptReadyCheck, useReadyCheck } from "@/components/use-ready-check";
 import { Ring } from "@/components/queue/ring";
 import { useNow } from "@/components/use-now";
+import { ACCEPT_WINDOW_SECONDS } from "@/lib/queue-attention";
 
 const STORAGE_PREFIX = "hl-match-accepted:";
-const ACCEPT_WINDOW_MS = 20_000;
+const ACCEPT_WINDOW_MS = ACCEPT_WINDOW_SECONDS * 1000;
 
 /** Remember that this player already opened a match room (kept for callers
  *  that mark a lobby as seen). */
@@ -68,7 +69,7 @@ function Shell({ children, glow, label }: { children: React.ReactNode; glow: "or
 
 /**
  * FACEIT-style "Match found" pop-up, on every page. When the queue fills,
- * every player must press Accept within 20 seconds. If everyone does, this
+ * every player must press Accept within ACCEPT_WINDOW_SECONDS. If everyone does, this
  * opens the match room; if not, players who didn't accept are removed from the
  * queue and everyone else keeps searching. State: components/use-ready-check.ts.
  */
@@ -141,7 +142,7 @@ export function MatchReadyModal() {
           </h2>
           <p className="mx-auto mt-2 max-w-sm text-sm text-white/65">
             {check.iWasRemoved
-              ? "The 20 seconds ran out, so you were removed from the queue. Find a match again when you're ready."
+              ? `The ${ACCEPT_WINDOW_SECONDS} seconds ran out, so you were removed from the queue. Find a match again when you're ready.`
               : "Not everyone accepted. You kept your place and are still searching."}
           </p>
           <button

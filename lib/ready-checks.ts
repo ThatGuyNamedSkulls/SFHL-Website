@@ -1,6 +1,6 @@
 /**
  * Queue ready checks (see the bot's core/ready_checks.py). When a queue fills,
- * the bot opens a check; players have 20 seconds to accept from Discord or
+ * the bot opens a check; players have 40 seconds to accept from Discord or
  * here. The website reads the check and records accepts; the bot decides.
  */
 import { client } from "@/lib/db";

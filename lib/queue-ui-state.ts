@@ -3,6 +3,7 @@
  * Every state has one headline, one line saying why, and one primary action.
  * Safe to import from client components; tested in tests/queue-ui-state.test.ts.
  */
+import { ACCEPT_WINDOW_SECONDS } from "@/lib/queue-attention";
 
 export type QueueUiStateId =
   | "loading"
@@ -150,7 +151,7 @@ export function queueUiState(i: QueueUiInputs): QueueUi {
       lockSelection: true,
       state: "match_found",
       headline: "Match found",
-      detail: "Accept it above within 20 seconds.",
+      detail: `Accept it above within ${ACCEPT_WINDOW_SECONDS} seconds.`,
       primary: { action: "none", label: "Match found", disabled: true },
     };
   }
