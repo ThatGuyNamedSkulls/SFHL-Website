@@ -75,6 +75,18 @@ export interface Player {
   eloResets?: { index: number; label: string }[];
   /** Lifetime match count (not reset with the season). */
   careerMatchesPlayed?: number;
+  /** This season's totals from games ranked with /cbrmresult (Counter Blox's
+   *  own scoreboard). Null until the player has one. */
+  cbStats?: {
+    matches: number;
+    roundsPlayed: number;
+    adr: number | null;
+    firstKills: number;
+    rounds2k: number;
+    rounds3k: number;
+    rounds4k: number;
+    rounds5k: number;
+  } | null;
   /** Ranked matches in the current season. */
   seasonMatchesPlayed?: number;
   seasonWinPercent?: number;
@@ -228,6 +240,14 @@ export interface MatchPlayerStats {
   leftEarly?: boolean;
   /** Fraction of the match this player was present for (drives the SUB · 58% tag). */
   subShare?: number | null;
+  /** Counter Blox DMG. Null when the match didn't record it. */
+  damage?: number | null;
+  /** Damage per round played. */
+  adr?: number | null;
+  /** Rounds played, from Counter Blox (games ranked with /cbrmresult only). */
+  roundsPlayed?: number | null;
+  /** Rounds with 2/3/4/5 kills (games ranked with /cbrmresult only). */
+  multiKills?: { k2: number; k3: number; k4: number; k5: number } | null;
 }
 
 /** Detailed match with full scoreboard and round-by-round data */

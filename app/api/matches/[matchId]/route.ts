@@ -6,6 +6,7 @@ import { isValidCountry, countryName, flagPath } from "@/lib/countries";
 import {
   performanceRating,
   killsPerRound,
+  damagePerRound,
   swingPercent,
   kdRatio,
   roundCount,
@@ -145,6 +146,10 @@ export async function GET(
     const buildPlayerStats = (players: typeof rows, team: "A" | "B") =>
       players.map((p) => {
         const info = playerInfo.get(p.player_name);
+        // Counter Blox's own rounds-played count when the game came from
+        // /cbrmresult (subs played fewer), else the match's round total.
+        const roundsPlayed = p.rounds_played == null ? null : Number(p.rounds_played);
+        const damage = p.damage == null ? null : Number(p.damage);
         const rating = performanceRating({
           kills: p.kills,
           deaths: p.deaths,
@@ -178,7 +183,19 @@ export async function GET(
           rating,
           swing: swingPercent(rating),
           kpr: killsPerRound(p.kills, rounds),
-          firstKills: 0,
+          damage,
+          adr: damagePerRound(damage, roundsPlayed ?? rounds),
+          roundsPlayed,
+          multiKills:
+            roundsPlayed == null
+              ? null
+              : {
+                  k2: Number(p.rounds_2k ?? 0),
+                  k3: Number(p.rounds_3k ?? 0),
+                  k4: Number(p.rounds_4k ?? 0),
+                  k5: Number(p.rounds_5k ?? 0),
+                },
+          firstKills: Number(p.first_kills ?? 0),
           clutches: 0,
           plants: 0,
           defuses: 0,

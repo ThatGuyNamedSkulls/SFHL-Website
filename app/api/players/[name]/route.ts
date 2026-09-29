@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, mapRank, publicRating } from "@/lib/db";
+import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, getCbStats, mapRank, publicRating } from "@/lib/db";
 import { buildEloTimeline } from "@/lib/elo-timeline";
+import { damagePerRound } from "@/lib/match-stats";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
 import { pickAvatar, resolveAvatarMap } from "@/lib/avatar";
@@ -115,6 +116,17 @@ export async function GET(
       ? matches.filter((m) => (m.timestamp || "") >= lastResetAt)
       : matches;
     const seasonMatchesPlayed = seasonRanked.length;
+    const cb = await getCbStats(playerName, lastResetAt);
+    const cbStats = cb && {
+      matches: cb.matches,
+      roundsPlayed: cb.roundsPlayed,
+      adr: damagePerRound(cb.damage, cb.roundsPlayed),
+      firstKills: cb.firstKills,
+      rounds2k: cb.rounds2k,
+      rounds3k: cb.rounds3k,
+      rounds4k: cb.rounds4k,
+      rounds5k: cb.rounds5k,
+    };
     const seasonWins = seasonRanked.filter((m) => m.result === "W").length;
     const seasonWinPercent =
       seasonMatchesPlayed > 0 ? (seasonWins / seasonMatchesPlayed) * 100 : 0;
@@ -165,6 +177,7 @@ export async function GET(
       /** Season boundaries in eloHistory (index of the break + season name). */
       eloResets,
       careerMatchesPlayed,
+      cbStats,
       seasonMatchesPlayed,
       seasonWinPercent,
       lastResetAt,

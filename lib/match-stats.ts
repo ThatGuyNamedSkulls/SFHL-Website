@@ -93,6 +93,15 @@ export function killsPerRound(kills: number, rounds: number | null): number | nu
   return round2(kills / rounds);
 }
 
+/** ADR: damage per round, whole number. Null when either number is missing. */
+export function damagePerRound(
+  damage: number | null | undefined,
+  rounds: number | null | undefined
+): number | null {
+  if (damage == null || !rounds || rounds <= 0) return null;
+  return Math.round(Number(damage) / rounds);
+}
+
 /** Signed percent vs the 1.10 baseline. A 1.40 game is +6.00%. */
 export function swingPercent(rating: number): number {
   return round2((rating - RATING_BASELINE) * SWING_SCALE);

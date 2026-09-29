@@ -151,6 +151,14 @@ function Num({
   );
 }
 
+/** Multi-kill round columns, in order (games ranked with /cbrmresult). */
+const MULTI_KILLS = [
+  { key: "k2", label: "2K" },
+  { key: "k3", label: "3K" },
+  { key: "k4", label: "4K" },
+  { key: "k5", label: "5K" },
+] as const;
+
 function StatsTable({
   title,
   players,
@@ -164,6 +172,9 @@ function StatsTable({
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
+  // DMG was entered for this match; FK / 2K-5K come only from /cbrmresult games.
+  const hasDamage = players.some((p) => p.damage != null);
+  const hasCb = players.some((p) => p.multiKills != null);
   return (
     <div className="rounded-xl border border-white/[0.08] overflow-hidden mb-3">
       <div className="flex items-center justify-between px-4 py-2.5 bg-[#161616]">
@@ -198,6 +209,30 @@ function StatsTable({
               <th className="font-semibold px-2 py-2">K/R</th>
               <th className="font-semibold px-2 py-2">HS%</th>
               <th className="font-semibold px-2 py-2">MVPs</th>
+              {hasDamage && (
+                <>
+                  <th className="font-semibold px-2 py-2">DMG</th>
+                  <th className="font-semibold px-2 py-2 cursor-help" title="Average damage per round">
+                    ADR
+                  </th>
+                </>
+              )}
+              {hasCb && (
+                <>
+                  <th className="font-semibold px-2 py-2 cursor-help" title="First kills (opening kill of a round)">
+                    FK
+                  </th>
+                  {MULTI_KILLS.map(({ key, label }) => (
+                    <th
+                      key={key}
+                      className="font-semibold px-2 py-2 cursor-help"
+                      title={`Rounds with ${label.slice(0, 1)} kills`}
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -264,6 +299,22 @@ function StatsTable({
                   <td className="px-2 py-2 text-white">{p.kpr != null ? p.kpr.toFixed(2) : "—"}</td>
                   <td className="px-2 py-2 text-white">{(p.headshotPercent || 0).toFixed(1)}</td>
                   <td className="px-2 py-2 text-white">{p.mvps ?? (p.mvp ? 1 : 0)}</td>
+                  {hasDamage && (
+                    <>
+                      <td className="px-2 py-2 text-white tabular-nums">{p.damage ?? "—"}</td>
+                      <td className="px-2 py-2 text-white tabular-nums">{p.adr ?? "—"}</td>
+                    </>
+                  )}
+                  {hasCb && (
+                    <>
+                      <td className="px-2 py-2 text-white tabular-nums">{p.multiKills ? p.firstKills : "—"}</td>
+                      {MULTI_KILLS.map(({ key }) => (
+                        <td key={key} className="px-2 py-2 text-white tabular-nums">
+                          {p.multiKills ? p.multiKills[key] : "—"}
+                        </td>
+                      ))}
+                    </>
+                  )}
                 </tr>
               );
             })}
@@ -292,6 +343,12 @@ function Stats({ match }: { match: MatchDetail }) {
   const mostScore = [...match.players].sort((a, b) => b.score - a.score)[0];
   const mostMvps = [...match.players].sort((a, b) => (b.mvps ?? 0) - (a.mvps ?? 0))[0];
   const bestRating = [...match.players].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
+  const mostDamage = match.players.some((p) => p.damage != null)
+    ? [...match.players].sort((a, b) => (b.damage ?? 0) - (a.damage ?? 0))[0]
+    : null;
+  const mostFirstKills = match.players.some((p) => p.multiKills != null)
+    ? [...match.players].sort((a, b) => b.firstKills - a.firstKills)[0]
+    : null;
 
   const aWon = match.teamAScore > match.teamBScore || match.winner === "A";
   const flat = useMemo(
@@ -413,6 +470,39 @@ function Stats({ match }: { match: MatchDetail }) {
                   {(selected.headshotPercent || 0).toFixed(1)}%
                 </div>
               </div>
+              {selected.damage != null && (
+                <div>
+                  <div className="text-[#8a8a8a] text-[0.75rem]">Damage · ADR</div>
+                  <div className="font-bold text-white tabular-nums">
+                    {selected.damage}
+                    {selected.adr != null && <span className="text-[#8a8a8a] font-normal"> · {selected.adr}</span>}
+                  </div>
+                </div>
+              )}
+              {selected.multiKills && (
+                <>
+                  <div>
+                    <div className="text-[#8a8a8a] text-[0.75rem]">First kills</div>
+                    <div className="font-bold text-white tabular-nums">{selected.firstKills}</div>
+                  </div>
+                  <div>
+                    <div className="text-[#8a8a8a] text-[0.75rem]">Rounds played</div>
+                    <div className="font-bold text-white tabular-nums">{selected.roundsPlayed ?? "—"}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-[#8a8a8a] text-[0.75rem]">Multi-kill rounds</div>
+                    <div className="font-bold text-white tabular-nums">
+                      {MULTI_KILLS.map(({ key, label }, i) => (
+                        <span key={key}>
+                          {i > 0 && <span className="text-[#5a5a5a]"> · </span>}
+                          <span className="text-[#8a8a8a] font-normal">{label}</span>{" "}
+                          {selected.multiKills![key]}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -422,6 +512,10 @@ function Stats({ match }: { match: MatchDetail }) {
               { label: "Most score", player: mostScore, value: mostScore?.score },
               { label: "Most MVPs", player: mostMvps, value: mostMvps?.mvps ?? 0 },
               { label: "Best rating", player: bestRating, value: (bestRating?.rating ?? 0).toFixed(2) },
+              ...(mostDamage ? [{ label: "Most damage", player: mostDamage, value: mostDamage.damage ?? 0 }] : []),
+              ...(mostFirstKills
+                ? [{ label: "Most first kills", player: mostFirstKills, value: mostFirstKills.firstKills }]
+                : []),
             ].map((row) => (
               <button
                 key={row.label}

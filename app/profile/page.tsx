@@ -475,6 +475,45 @@ function ProfileContent() {
     </div>
   );
 
+  // This season's totals from games ranked off Counter Blox's own scoreboard
+  // (/cbrmresult). Hidden until the player has one.
+  const cb = player.cbStats;
+  const cbStatsBlock = cb ? (
+    <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-4">
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-sm font-bold text-white">Counter Blox stats</h2>
+        <span className="text-[0.75rem] text-[#8a8a8a]">
+          {cb.matches} {cb.matches === 1 ? "match" : "matches"} this season
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "ADR", value: cb.adr ?? "—" },
+          { label: "First kills", value: cb.firstKills },
+          { label: "Rounds played", value: cb.roundsPlayed },
+        ].map((t) => (
+          <div key={t.label} className="bg-[#161616] border border-white/[0.06] rounded-lg p-3">
+            <div className="stat-number text-xl text-white">{t.value}</div>
+            <div className="text-[0.75rem] text-[#8a8a8a] mt-1">{t.label}</div>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+        {[
+          { label: "2K rounds", value: cb.rounds2k },
+          { label: "3K rounds", value: cb.rounds3k },
+          { label: "4K rounds", value: cb.rounds4k },
+          { label: "Aces", value: cb.rounds5k },
+        ].map((t) => (
+          <div key={t.label} className="bg-[#161616] border border-white/[0.06] rounded-lg p-3">
+            <div className="stat-number text-lg text-white">{t.value}</div>
+            <div className="text-[0.75rem] text-[#8a8a8a] mt-1">{t.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="relative min-h-full">
       <ProfilePageBackdrop color={bgColor} />
@@ -939,6 +978,8 @@ function ProfileContent() {
                 </div>
 
                 {statTileRow}
+
+                {cbStatsBlock}
 
                 {/* Per-match metric chart */}
                 <Card className="bg-hl-panel border-hl-border p-5">

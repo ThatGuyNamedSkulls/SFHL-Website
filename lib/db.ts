@@ -583,7 +583,22 @@ export interface DbMatch {
   /** Perceived pre-match rating the win-chance math used (seed / hidden
    *  placement rating for unranked players, never 0). */
   skill_before?: number | null;
+  /** Counter Blox DMG column. Null when it wasn't entered. */
+  damage?: number | null;
+  /** Counter Blox's own stats, only on games ranked with the bot's
+   *  /cbrmresult (read from playcbrm.xyz). Null on every other game. */
+  first_kills?: number | null;
+  rounds_2k?: number | null;
+  rounds_3k?: number | null;
+  rounds_4k?: number | null;
+  rounds_5k?: number | null;
+  rounds_played?: number | null;
 }
+
+/** Match-page stats beyond K/D/A. The bot adds these columns on startup, so a
+ *  not-yet-restarted bot means they may be missing: getMatchesByMatchId falls
+ *  back to selects without them. */
+const MATCH_CB_COLS = "damage, first_kills, rounds_2k, rounds_3k, rounds_4k, rounds_5k, rounds_played";
 
 const MATCH_BASE_COLS = `id, player_name, map_name, region, kills, deaths, assists,
                  hs_percentage, elo_change, result, points, mvps, match_id,
@@ -774,6 +789,8 @@ export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
   // the team column (it backfills via ALTER, but a not-yet-restarted bot
   // means the column may not exist — fall back to a team-less select).
   const variants = [
+    `${MATCH_ODDS_COLS}, team, mode, ${MATCH_CB_COLS}`,
+    `${MATCH_ODDS_COLS}, team, mode, damage`,
     `${MATCH_ODDS_COLS}, team, mode`,
     `${MATCH_ELO_COLS}, team, mode`,
     `${MATCH_RANK_COLS}, team, mode`,
@@ -796,6 +813,55 @@ export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
     }
   }
   throw lastErr;
+}
+
+/** A player's totals from games ranked with /cbrmresult (Counter Blox's own
+ *  scoreboard). */
+export interface CbStats {
+  matches: number;
+  roundsPlayed: number;
+  damage: number;
+  firstKills: number;
+  rounds2k: number;
+  rounds3k: number;
+  rounds4k: number;
+  rounds5k: number;
+}
+
+/** Totals over this player's ranked (non-placement, non-test) games that have
+ *  Counter Blox stats, from `since` (a match_history timestamp, e.g. the last
+ *  season reset) on. Null when there are none, or before the bot has added
+ *  the columns. */
+export async function getCbStats(playerName: string, since?: string | null): Promise<CbStats | null> {
+  try {
+    const rs = await client.execute({
+      sql: `SELECT COUNT(*) AS matches, SUM(rounds_played) AS rounds,
+                   SUM(COALESCE(damage, 0)) AS damage, SUM(COALESCE(first_kills, 0)) AS fk,
+                   SUM(COALESCE(rounds_2k, 0)) AS k2, SUM(COALESCE(rounds_3k, 0)) AS k3,
+                   SUM(COALESCE(rounds_4k, 0)) AS k4, SUM(COALESCE(rounds_5k, 0)) AS k5
+            FROM match_history
+            WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)
+              AND rounds_played IS NOT NULL
+              AND COALESCE(is_placement, 0) = 0 AND COALESCE(is_test, 0) = 0
+              AND timestamp >= ?`,
+      args: [playerName, playerName, since ?? ""],
+    });
+    const r = rs.rows[0];
+    const matches = Number(r?.matches ?? 0);
+    if (!matches) return null;
+    return {
+      matches,
+      roundsPlayed: Number(r.rounds ?? 0),
+      damage: Number(r.damage ?? 0),
+      firstKills: Number(r.fk ?? 0),
+      rounds2k: Number(r.k2 ?? 0),
+      rounds3k: Number(r.k3 ?? 0),
+      rounds4k: Number(r.k4 ?? 0),
+      rounds5k: Number(r.k5 ?? 0),
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
