@@ -24,11 +24,11 @@ import { perceivedSkill } from "@/lib/win-chance";
 import { SubRequestView } from "@/types";
 
 /** `[seconds open, Elo band]`, mirroring `elo.sub.band_steps`. Past the last
- *  step (7:00) the slot is open to everyone; the bot expires it at 10:00. */
+ *  step (5:00) the slot is open to everyone; the bot expires it at 10:00. */
 export const SUB_BAND_STEPS: [number, number][] = [
   [60, 100],
-  [180, 200],
-  [420, 350],
+  [150, 200],
+  [300, 350],
 ];
 
 /** Mirrors `elo.sub.max_per_day`. */
