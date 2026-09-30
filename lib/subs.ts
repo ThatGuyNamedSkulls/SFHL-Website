@@ -16,16 +16,19 @@
  * `config/games/counterstrike.toml`.
  */
 
-import { client, getPlayer, mapRank } from "@/lib/db";
+import { client, getPlayer, isPlacementComplete } from "@/lib/db";
 import { getActiveLobbyMemberIds, resolveTeamSides, type TeamSides } from "@/lib/lobby";
 import { prettyMap } from "@/lib/format";
+import { ddlBatch, missingColumns, schemaOnce } from "@/lib/schema-once";
+import { perceivedSkill } from "@/lib/win-chance";
 import { SubRequestView } from "@/types";
 
-/** `[seconds open, Elo band]`, mirroring `elo.sub.band_steps`. */
+/** `[seconds open, Elo band]`, mirroring `elo.sub.band_steps`. Past the last
+ *  step (7:00) the slot is open to everyone; the bot expires it at 10:00. */
 export const SUB_BAND_STEPS: [number, number][] = [
   [60, 100],
   [180, 200],
-  [360, 350],
+  [420, 350],
 ];
 
 /** Mirrors `elo.sub.max_per_day`. */
@@ -45,6 +48,8 @@ interface SubRequestRow {
   sub_discord_id: string | null;
   status: string;
   target_elo: number | null;
+  /** 1 when target_elo is a placement player's hidden rating — never shown. */
+  target_hidden: number | null;
   swap_score: string | null;
   applied: number;
   match_id: number | null;
@@ -55,7 +60,25 @@ interface SubRequestRow {
 const COLUMNS = `id, channel_id, CAST(guild_id AS TEXT) AS guild_id, region, mode, team,
                  map_name, leaver_name, CAST(leaver_discord_id AS TEXT) AS leaver_discord_id,
                  sub_name, CAST(sub_discord_id AS TEXT) AS sub_discord_id, status,
-                 target_elo, swap_score, applied, match_id, created_at, filled_at`;
+                 target_elo, target_hidden, swap_score, applied, match_id, created_at, filled_at`;
+
+/** The bot adds `target_hidden` on startup; add it here too, so a website
+ *  deployed first doesn't lose every slot to a missing-column error. */
+const ensureSubColumns = schemaOnce("sub_requests_target_hidden", async () => {
+  const missing = await missingColumns({ sub_requests: ["target_hidden"] });
+  await ddlBatch(
+    missing.sub_requests.map(
+      () => "ALTER TABLE sub_requests ADD COLUMN target_hidden INTEGER NOT NULL DEFAULT 0"
+    )
+  );
+});
+
+/** The slot's Elo range as players see it. A hidden target just says Unranked. */
+function rangeLabel(row: SubRequestRow, band: number | null): string {
+  if (band === null) return "open to everyone";
+  if (Number(row.target_hidden) === 1) return "Unranked";
+  return `${row.target_elo} ± ${band}`;
+}
 
 // ---------------------------------------------------------------------------
 // Band math (mirrors core/subs.py)
@@ -109,6 +132,7 @@ export function secondsUntilEligible(
 
 async function loadOpenRows(): Promise<SubRequestRow[]> {
   try {
+    await ensureSubColumns();
     const rs = await client.execute(
       `SELECT ${COLUMNS} FROM sub_requests WHERE status = 'open' ORDER BY created_at ASC`
     );
@@ -121,6 +145,7 @@ async function loadOpenRows(): Promise<SubRequestRow[]> {
 
 async function loadRow(id: number): Promise<SubRequestRow | null> {
   try {
+    await ensureSubColumns();
     const rs = await client.execute({
       sql: `SELECT ${COLUMNS} FROM sub_requests WHERE id = ?`,
       args: [id],
@@ -185,18 +210,30 @@ interface Blocker {
  */
 interface ViewerContext {
   claimer: Claimer | null;
+  /** The rating held to the band: Elo, or the hidden placement rating. */
   elo: number;
+  /** False while placing — `elo` is then hidden and must never be shown. */
+  placementDone: boolean;
   /** A reason that rules the viewer out of every slot, if any. */
   blocked: string | null;
 }
 
-function isRanked(placementDone: unknown, rank: string | null | undefined): boolean {
-  if (!placementDone) return false;
-  return mapRank(rank || "") !== "UNRANKED";
+/** The hidden placement rating (`mmr`). Only ever compared, never shown. */
+async function placementRating(playerId: number): Promise<number | null> {
+  try {
+    const rs = await client.execute({
+      sql: "SELECT mmr FROM players WHERE id = ?",
+      args: [playerId],
+    });
+    const mmr = rs.rows[0]?.mmr;
+    return mmr == null ? null : Number(mmr);
+  } catch {
+    return null; // no mmr column yet: they count as the seed
+  }
 }
 
 async function viewerContext(claimer: Claimer | null): Promise<ViewerContext> {
-  const ctx: ViewerContext = { claimer, elo: 0, blocked: null };
+  const ctx: ViewerContext = { claimer, elo: 0, placementDone: false, blocked: null };
 
   if (!claimer) {
     ctx.blocked = "Log in to join a match as a substitute.";
@@ -217,12 +254,15 @@ async function viewerContext(claimer: Claimer | null): Promise<ViewerContext> {
     ctx.blocked = "You're not registered in the league yet, so you can't sub.";
     return ctx;
   }
-  ctx.elo = Number(player.elo ?? 0);
-  if (!isRanked(player.placement_done, player.rank)) {
-    ctx.blocked =
-      "Unranked players can't join as a substitute. Finish your placement matches first.";
-    return ctx;
-  }
+  // Placement players may sub, banded on their hidden placement rating — the
+  // same rule as `_band_rating` in the bot's subs cog. /rank gives them a
+  // stats-only row and still settles the player who left.
+  ctx.placementDone = isPlacementComplete(player.placement_done);
+  ctx.elo = perceivedSkill({
+    placementDone: ctx.placementDone,
+    elo: Number(player.elo ?? 0),
+    mmr: ctx.placementDone ? null : await placementRating(Number(player.id)),
+  });
 
   const inMatch = await getActiveLobbyMemberIds();
   if (inMatch.has(claimer.discordId)) {
@@ -257,8 +297,9 @@ function claimBlocker(ctx: ViewerContext, row: SubRequestRow): Blocker | null {
   const openSeconds = (Date.now() - Number(row.created_at)) / 1000;
   const band = bandFor(openSeconds);
   if (!inBand(ctx.elo, row.target_elo, band)) {
+    const yours = ctx.placementDone ? `Your Elo (${ctx.elo})` : "Your placement rating";
     return {
-      reason: `Your Elo (${ctx.elo}) is outside this slot's current range (${row.target_elo} ± ${band}) — it keeps the teams balanced.`,
+      reason: `${yours} is outside this slot's current range (${rangeLabel(row, band)}) — it keeps the teams balanced.`,
       eligibleInSeconds: secondsUntilEligible(ctx.elo, row.target_elo, openSeconds),
     };
   }
@@ -298,7 +339,10 @@ function toView(row: SubRequestRow, blocker: Blocker | null, sides?: TeamSides):
     side: sides ? (Number(row.team) === 1 ? sides.team1 : sides.team2) : null,
     map: prettyMap(row.map_name),
     leaver: row.leaver_name,
-    targetElo: row.target_elo === null ? null : Number(row.target_elo),
+    // A hidden target (placement player's rating) never leaves the server.
+    targetElo:
+      row.target_elo === null || Number(row.target_hidden) === 1 ? null : Number(row.target_elo),
+    targetHidden: Number(row.target_hidden) === 1,
     swapScore: row.swap_score,
     openedAt: Number(row.created_at),
     openSeconds,

@@ -398,8 +398,12 @@ export interface SubRequestView {
   map: string;
   /** The player being replaced. */
   leaver: string;
-  /** Their Elo — the centre of the band a claimer must fall inside. */
+  /** Their Elo — the centre of the band a claimer must fall inside. Null
+   *  when `targetHidden`. */
   targetElo: number | null;
+  /** The leaver is still in placements: the band uses their hidden rating,
+   *  which is never sent — show "Unranked" instead. */
+  targetHidden: boolean;
   /** Round score when they left, e.g. "7,4". */
   swapScore: string | null;
   openedAt: number;

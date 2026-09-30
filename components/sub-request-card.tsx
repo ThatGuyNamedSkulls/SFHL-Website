@@ -69,7 +69,12 @@ export function SubRequestCard({
           <div className="text-sm text-hl-muted mt-1">
             Replacing <b className="text-white">{request.leaver}</b> on{" "}
             <b className="text-white">{request.side ?? `Team ${request.team}`}</b>
-            {request.targetElo ? (
+            {request.targetHidden ? (
+              <>
+                {" "}
+                · <span className="text-white">Unranked</span>
+              </>
+            ) : request.targetElo ? (
               <>
                 {" "}
                 · <span className="stat-number text-white">{request.targetElo}</span> Elo
