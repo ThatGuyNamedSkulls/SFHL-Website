@@ -165,16 +165,17 @@ function StatsTable({
   won,
   selectedId,
   onSelect,
+  showCb,
 }: {
   title: string;
   players: MatchPlayerStats[];
   won: boolean;
   selectedId: string;
   onSelect: (id: string) => void;
+  /** Show the Counter Blox extras (FK, 2K-5K, rounds): "More info" is on. */
+  showCb: boolean;
 }) {
-  // DMG was entered for this match; FK / 2K-5K come only from /rankgame games.
   const hasDamage = players.some((p) => p.damage != null);
-  const hasCb = players.some((p) => p.multiKills != null);
   return (
     <div className="rounded-xl border border-white/[0.08] overflow-hidden mb-3">
       <div className="flex items-center justify-between px-4 py-2.5 bg-[#161616]">
@@ -217,7 +218,7 @@ function StatsTable({
                   </th>
                 </>
               )}
-              {hasCb && (
+              {showCb && (
                 <>
                   <th className="font-semibold px-2 py-2 cursor-help" title="First kills (opening kill of a round)">
                     FK
@@ -231,6 +232,9 @@ function StatsTable({
                       {label}
                     </th>
                   ))}
+                  <th className="font-semibold px-2 py-2 cursor-help" title="Rounds played">
+                    Rounds
+                  </th>
                 </>
               )}
             </tr>
@@ -305,7 +309,7 @@ function StatsTable({
                       <td className="px-2 py-2 text-white tabular-nums">{p.adr ?? "—"}</td>
                     </>
                   )}
-                  {hasCb && (
+                  {showCb && (
                     <>
                       <td className="px-2 py-2 text-white tabular-nums">{p.multiKills ? p.firstKills : "—"}</td>
                       {MULTI_KILLS.map(({ key }) => (
@@ -313,6 +317,7 @@ function StatsTable({
                           {p.multiKills ? p.multiKills[key] : "—"}
                         </td>
                       ))}
+                      <td className="px-2 py-2 text-white tabular-nums">{p.roundsPlayed ?? "—"}</td>
                     </>
                   )}
                 </tr>
@@ -337,6 +342,11 @@ function Stats({ match }: { match: MatchDetail }) {
   const mvp = match.players.find((p) => p.mvp) ?? teamA[0] ?? match.players[0];
   const [selectedId, setSelectedId] = useState(mvp?.playerId ?? "");
   const [sort, setSort] = useState<"team" | "players">("team");
+  // Counter Blox's extra stats (games ranked with /rankgame) stay hidden until
+  // "More info" is pressed, so the scoreboard looks the same as every match.
+  const hasCb = match.players.some((p) => p.multiKills != null);
+  const [moreInfo, setMoreInfo] = useState(false);
+  const showCb = hasCb && moreInfo;
   const selected = match.players.find((p) => p.playerId === selectedId) ?? mvp;
 
   const mostKills = [...match.players].sort((a, b) => b.kills - a.kills)[0];
@@ -346,7 +356,7 @@ function Stats({ match }: { match: MatchDetail }) {
   const mostDamage = match.players.some((p) => p.damage != null)
     ? [...match.players].sort((a, b) => (b.damage ?? 0) - (a.damage ?? 0))[0]
     : null;
-  const mostFirstKills = match.players.some((p) => p.multiKills != null)
+  const mostFirstKills = showCb
     ? [...match.players].sort((a, b) => b.firstKills - a.firstKills)[0]
     : null;
 
@@ -479,7 +489,7 @@ function Stats({ match }: { match: MatchDetail }) {
                   </div>
                 </div>
               )}
-              {selected.multiKills && (
+              {showCb && selected.multiKills && (
                 <>
                   <div>
                     <div className="text-[#8a8a8a] text-[0.75rem]">First kills</div>
@@ -567,6 +577,20 @@ function Stats({ match }: { match: MatchDetail }) {
         >
           Sort by players
         </button>
+        {hasCb && (
+          <button
+            type="button"
+            onClick={() => setMoreInfo((on) => !on)}
+            aria-pressed={moreInfo}
+            title="First kills, 2K-5K rounds and rounds played, from Counter Blox"
+            className={cn(
+              "h-7 px-3 rounded text-[0.75rem] font-semibold",
+              moreInfo ? "bg-[#ff5500] text-white" : "bg-[#1c1c1c] text-[#8a8a8a]"
+            )}
+          >
+            More info
+          </button>
+        )}
       </div>
 
       {sort === "team" ? (
@@ -577,6 +601,7 @@ function Stats({ match }: { match: MatchDetail }) {
             won={aWon}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            showCb={showCb}
           />
           <StatsTable
             title={match.teamBName}
@@ -584,6 +609,7 @@ function Stats({ match }: { match: MatchDetail }) {
             won={!aWon}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            showCb={showCb}
           />
         </>
       ) : (
@@ -593,6 +619,7 @@ function Stats({ match }: { match: MatchDetail }) {
           won={aWon}
           selectedId={selectedId}
           onSelect={setSelectedId}
+          showCb={showCb}
         />
       )}
     </div>
