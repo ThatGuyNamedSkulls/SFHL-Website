@@ -1,7 +1,7 @@
 /**
  * League Stats (docs/LEAGUE_UI_PLAN.md step 9): one scoreboard per map of a
  * league match (BO3 playoffs have up to 3), entered by Match Staff with the
- * same fields as /rank. Pure: validation, reading pasted /rankscreenshot output,
+ * same fields as /rank manual. Pure: validation, reading pasted /rank screenshot output,
  * and the per-player totals the Stats tab shows. League stats never touch
  * ranked stats.
  */
@@ -106,7 +106,7 @@ export function validateScoreboard(raw: Record<string, unknown>, m: MatchForStat
   return { mapNo, mapName, roundsA, roundsB, players };
 }
 
-// --- /rankscreenshot paste ---------------------------------------------------------------------
+// --- /rank screenshot paste ---------------------------------------------------------------------
 
 export interface PastedLine {
   name: string;
@@ -130,7 +130,7 @@ export interface PastedScoreboard {
 const KEYS = ["player_names", "match_results", "scores", "kills", "deaths", "assists", "mvps", "hs", "points", "map_name", "region", "play_time"];
 
 /**
- * Read what /rankscreenshot prints ("/rank player_names: a,b kills: 3,4 …") or the
+ * Read what /rank screenshot prints ("/rank manual player_names: a,b kills: 3,4 …") or the
  * raw OCR JSON, so staff don't retype the scoreboard. Returns null if it
  * doesn't look like either.
  */

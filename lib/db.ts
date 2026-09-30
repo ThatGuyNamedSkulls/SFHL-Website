@@ -140,7 +140,7 @@ export function publicRating(player: {
   return {
     elo,
     // Peak can't be below the current Elo. The bot only raises peak_elo on
-    // ranked results, so /addelo or placement graduation could leave it behind.
+    // ranked results, so /elo add or placement graduation could leave it behind.
     peakElo: done ? Math.max(Number(player.peak_elo) || 0, elo) : 0,
     rank: done ? mapRank(player.rank) : "UNRANKED",
     placementDone: done,
@@ -578,7 +578,7 @@ export interface DbMatch {
   player_rank?: string | null;
   /** Elo the player had when this match started. Null on legacy rows. */
   elo_before?: number | null;
-  /** This row's TEAM win chance (%) frozen at /rank time. Null on legacy rows. */
+  /** This row's TEAM win chance (%) frozen at /rank manual time. Null on legacy rows. */
   win_chance?: number | null;
   /** Perceived pre-match rating the win-chance math used (seed / hidden
    *  placement rating for unranked players, never 0). */
@@ -586,7 +586,7 @@ export interface DbMatch {
   /** Counter Blox DMG column. Null when it wasn't entered. */
   damage?: number | null;
   /** Counter Blox's own stats, only on games ranked with the bot's
-   *  /rankgame (read from playcbrm.xyz). Null on every other game. */
+   *  /rank cbrm (read from playcbrm.xyz). Null on every other game. */
   first_kills?: number | null;
   rounds_2k?: number | null;
   rounds_3k?: number | null;
@@ -631,7 +631,7 @@ export async function getMatchesForPlayer(playerName: string, limit = 100): Prom
   // graph — the graph then starts at the player's post-placement ELO instead of
   // reconstructing the 0 → 0 → 0 → <graduation ELO> placement climb. COALESCE
   // covers legacy rows written before the column existed. Mirrors the bot's
-  // /matchhistory + /checkperformance filters. Dummy /testrankdummies rows are
+  // /player matches + /player performance filters. Dummy /rank testdummies rows are
   // hidden unless staff passed history=True (is_test=0).
   // Matches by player_id when the row has one, falling back to player_name —
   // see docs/DATABASE_PK_FK_RELATIONSHIPS.docx.
@@ -746,7 +746,7 @@ export async function getSeasonFinalElos(
   return out;
 }
 
-/** Lifetime match count (placements included). Survives /seasonreset. */
+/** Lifetime match count (placements included). Survives /season reset. */
 export async function getCareerMatchCount(playerName: string): Promise<number> {
   try {
     const rs = await client.execute({
@@ -760,7 +760,7 @@ export async function getCareerMatchCount(playerName: string): Promise<number> {
   }
 }
 
-/** Most recently archived season for a player (the one /seasonreset just ended). */
+/** Most recently archived season for a player (the one /season reset just ended). */
 export async function getLastSeasonArchive(
   playerName: string
 ): Promise<{ season_name: string; elo: number; rank: string } | null> {
@@ -815,7 +815,7 @@ export async function getMatchesByMatchId(matchId: number): Promise<DbMatch[]> {
   throw lastErr;
 }
 
-/** A player's totals from games ranked with /rankgame (Counter Blox's own
+/** A player's totals from games ranked with /rank cbrm (Counter Blox's own
  *  scoreboard). */
 export interface CbStats {
   matches: number;
@@ -1238,7 +1238,7 @@ export async function leaveWebQueueMany(discordUserIds: string[]): Promise<void>
   }
 }
 
-/** Live queue format: the team size the bot's /gamemode saved (bot_state.queue_mode). */
+/** Live queue format: the team size the bot's /queue mode saved (bot_state.queue_mode). */
 export async function getQueueTeamSize(): Promise<number> {
   try {
     const rs = await client.execute("SELECT value FROM bot_state WHERE key = 'queue_mode'");

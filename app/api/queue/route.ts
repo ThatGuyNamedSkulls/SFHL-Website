@@ -208,7 +208,7 @@ export async function POST(request: Request) {
     }
 
     // If the user is in a party, queue the whole party together — only the
-    // captain can start that. Matches Discord: `/setcaptain` / party leader.
+    // captain can start that. Matches Discord: `/party captain` / party leader.
     const party = await getPartyForMember(session.discordId);
     if (party && party.leaderId !== session.discordId) {
       return NextResponse.json(

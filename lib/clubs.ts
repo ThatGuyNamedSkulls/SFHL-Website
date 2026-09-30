@@ -15,12 +15,20 @@ import { isQueueRegion, type QueueRegionId } from "@/lib/regions";
 import { forget, remember } from "@/lib/server-cache";
 import { schemaOnce } from "@/lib/schema-once";
 import { deleteBlobIf, mutateBlob } from "@/lib/blob-cas";
+import { addNotification, enqueueDM } from "@/lib/social";
+import { discordSafe } from "@/lib/discord-safe";
 
 export const OWNER_ROLE_ID = "owner";
 export const MEMBER_ROLE_ID = "member";
 export const MAX_CLUB_ROLES = 7;
 export const MAX_OWNED_CLUBS = 3;
 export const CLUB_CREATE_COST = 2000;
+/** Pending join requests one clan can hold. */
+export const MAX_CLUB_REQUESTS = 50;
+/** How long a declined player waits before asking again. */
+export const REQUEST_DECLINE_COOLDOWN_MS = 24 * 60 * 60_000;
+/** How long a player who cancelled waits before asking again (stops cancel/re-ask spam). */
+export const REQUEST_CANCEL_COOLDOWN_MS = 10 * 60_000;
 /** Stored preference: show no club tag. Null / missing preference = auto. */
 export const HIDE_CLUB_TAG_ID = "none";
 
@@ -50,6 +58,21 @@ export interface ClubMember {
   joinedAt: number;
 }
 
+/** A player asking to join an invite-only clan. */
+export interface ClubJoinRequest {
+  discordId: string;
+  username: string;
+  playerName: string | null;
+  avatar: string | null;
+  createdAt: number;
+}
+
+/** No new request from this player before `until` (after a decline or a cancel). */
+export interface ClubRequestCooldown {
+  discordId: string;
+  until: number;
+}
+
 export interface Club {
   id: string;
   name: string;
@@ -66,6 +89,10 @@ export interface Club {
   roles: ClubRoleDef[];
   invites: ClubInvite[];
   members: ClubMember[];
+  /** Pending join requests (invite-only clans). Seen by members who can invite. */
+  requests: ClubJoinRequest[];
+  /** Server-only: never sent to the browser (see clubForClient). */
+  requestCooldowns: ClubRequestCooldown[];
   createdAt: number;
   updatedAt: number;
 }
@@ -322,6 +349,8 @@ function parseClub(raw: unknown): Club | null {
       roles,
       invites: Array.isArray(club.invites) ? club.invites : [],
       members,
+      requests: Array.isArray(club.requests) ? club.requests : [],
+      requestCooldowns: Array.isArray(club.requestCooldowns) ? club.requestCooldowns : [],
     };
   } catch {
     return null;
@@ -416,10 +445,15 @@ export function summarizeClub(club: Club) {
 
 export function clubForClient(club: Club, viewerId?: string | null) {
   const canSeeInvites = viewerId ? actorCan(club, viewerId, "canInvite") : false;
+  const { requestCooldowns: _cooldowns, ...rest } = club;
+  void _cooldowns;
   return {
-    ...club,
+    ...rest,
     members: sortMembersByRole(club),
     invites: canSeeInvites ? club.invites : [],
+    requests: canSeeInvites ? club.requests : [],
+    /** The viewer has a pending request to join. */
+    requested: !!viewerId && club.requests.some((r) => r.discordId === viewerId),
   };
 }
 
@@ -463,6 +497,8 @@ export async function createClub(input: {
     roles: defaultClubRoles(),
     invites: [],
     members: [owner],
+    requests: [],
+    requestCooldowns: [],
     createdAt: now,
     updatedAt: now,
   };
@@ -528,6 +564,8 @@ export async function updateClub(id: string, discordId: string, patch: ClubPatch
     if (typeof patch.private === "boolean") {
       if (!ownerOnly) throw new Error("Only the owner can change clan privacy.");
       club.private = patch.private;
+      // An open clan needs no requests: those players can just join now.
+      if (!club.private) club.requests = [];
     }
   });
 }
@@ -549,7 +587,166 @@ export async function joinClub(
       }
     }
     club.members.push({ ...member, role: MEMBER_ROLE_ID, joinedAt: Date.now() });
+    club.requests = club.requests.filter((r) => r.discordId !== member.discordId);
   });
+}
+
+// --- join requests (invite-only clans) -----------------------------------------------
+
+function dropExpiredCooldowns(club: Club, now: number): void {
+  club.requestCooldowns = club.requestCooldowns.filter((c) => c.until > now);
+}
+
+function setCooldown(club: Club, discordId: string, until: number): void {
+  club.requestCooldowns = [
+    ...club.requestCooldowns.filter((c) => c.discordId !== discordId),
+    { discordId, until },
+  ];
+}
+
+function waitText(ms: number): string {
+  const minutes = Math.ceil(ms / 60_000);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  const hours = Math.ceil(minutes / 60);
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
+}
+
+/** Everyone who can answer requests: the owner and roles that can invite. */
+export function requestManagers(club: Club): ClubMember[] {
+  return club.members.filter((m) => actorCan(club, m.discordId, "canInvite"));
+}
+
+/**
+ * Ask to join an invite-only clan. Asking twice is harmless. Returns the clan
+ * and whether this was a new request (only a new one notifies the managers).
+ */
+export async function requestToJoin(
+  id: string,
+  member: Omit<ClubMember, "role" | "joinedAt">
+): Promise<{ club: Club; created: boolean }> {
+  let created = false;
+  const club = await mutateClub(id, (c) => {
+    created = false; // mutateClub re-runs this on a write race
+    const now = Date.now();
+    dropExpiredCooldowns(c, now);
+    if (c.members.some((m) => m.discordId === member.discordId)) {
+      throw new Error("You are already in this clan.");
+    }
+    if (!c.private) throw new Error("This clan is open: join it directly.");
+    if (c.requests.some((r) => r.discordId === member.discordId)) return;
+    const cooldown = c.requestCooldowns.find((cd) => cd.discordId === member.discordId);
+    if (cooldown) {
+      throw new Error(`You can ask to join this clan again in ${waitText(cooldown.until - now)}.`);
+    }
+    if (c.requests.length >= MAX_CLUB_REQUESTS) {
+      throw new Error("This clan has too many pending requests. Try again later.");
+    }
+    c.requests.push({
+      discordId: member.discordId,
+      username: member.username,
+      playerName: member.playerName,
+      avatar: member.avatar,
+      createdAt: now,
+    });
+    created = true;
+  });
+  return { club, created };
+}
+
+/** Take back your own pending request. */
+export async function cancelJoinRequest(id: string, discordId: string): Promise<Club> {
+  return mutateClub(id, (c) => {
+    const now = Date.now();
+    dropExpiredCooldowns(c, now);
+    if (!c.requests.some((r) => r.discordId === discordId)) return;
+    c.requests = c.requests.filter((r) => r.discordId !== discordId);
+    setCooldown(c, discordId, now + REQUEST_CANCEL_COOLDOWN_MS);
+  });
+}
+
+/**
+ * Accept (the player joins as a Member) or decline (they wait
+ * REQUEST_DECLINE_COOLDOWN_MS before asking again) a pending request.
+ * Needs the invite permission. Returns the clan and the request answered.
+ */
+export async function answerJoinRequest(
+  id: string,
+  actorId: string,
+  targetId: string,
+  accept: boolean
+): Promise<{ club: Club; request: ClubJoinRequest }> {
+  let answered: ClubJoinRequest | null = null;
+  const club = await mutateClub(id, (c) => {
+    answered = null; // mutateClub re-runs this on a write race
+    const now = Date.now();
+    dropExpiredCooldowns(c, now);
+    if (!actorCan(c, actorId, "canInvite")) throw new Error("You cannot answer join requests.");
+    const request = c.requests.find((r) => r.discordId === targetId);
+    if (!request) throw new Error("That request is gone (cancelled or already answered).");
+    c.requests = c.requests.filter((r) => r.discordId !== targetId);
+    if (accept) {
+      if (!c.members.some((m) => m.discordId === targetId)) {
+        c.members.push({
+          discordId: request.discordId,
+          username: request.username,
+          playerName: request.playerName,
+          avatar: request.avatar,
+          role: MEMBER_ROLE_ID,
+          joinedAt: now,
+        });
+      }
+    } else {
+      setCooldown(c, targetId, now + REQUEST_DECLINE_COOLDOWN_MS);
+    }
+    answered = { ...request };
+  });
+  return { club, request: answered! };
+}
+
+function siteUrl(path: string): string {
+  const base = (process.env.NEXT_PUBLIC_BASE_URL || "").replace(/\/$/, "");
+  return base ? `${base}${path}` : path;
+}
+
+/** Bell + Discord DM to everyone who can answer, for a new request. Clan and
+ *  player names are user-written, so the DM escapes them. */
+export async function notifyJoinRequest(club: Club, requester: ClubJoinRequest): Promise<void> {
+  const who = requester.playerName || requester.username;
+  const path = `/clans/${club.id}`;
+  for (const manager of requestManagers(club)) {
+    if (!manager.playerName) continue;
+    await addNotification(
+      manager.playerName, "clan_request", `${who} asked to join ${club.name}.`, requester.playerName, path
+    );
+    await enqueueDM(
+      manager.playerName,
+      `📨 **${discordSafe(who, 40)}** asked to join your clan **${discordSafe(club.name, 40)}**. ` +
+        `Accept or decline it here: ${siteUrl(path)}`,
+      who
+    );
+  }
+}
+
+/** Tell the player how their request went: bell always, a DM when accepted. */
+export async function notifyRequestAnswer(
+  club: Club,
+  request: ClubJoinRequest,
+  accepted: boolean,
+  actorName: string | null
+): Promise<void> {
+  if (!request.playerName) return;
+  const path = `/clans/${club.id}`;
+  const message = accepted
+    ? `You're in! ${club.name} accepted your request to join.`
+    : `${club.name} declined your request to join.`;
+  await addNotification(request.playerName, "clan_request", message, actorName, path);
+  if (accepted) {
+    await enqueueDM(
+      request.playerName,
+      `✅ You're in! **${discordSafe(club.name, 40)}** accepted your request to join. ${siteUrl(path)}`,
+      actorName
+    );
+  }
 }
 
 export async function leaveClub(id: string, discordId: string): Promise<Club | null> {

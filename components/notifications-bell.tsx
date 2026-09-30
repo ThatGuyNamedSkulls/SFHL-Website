@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Bell, UserPlus, Users, Check, X, Swords, Headphones, Trophy, MessageSquare } from "lucide-react";
+import { Bell, UserPlus, Users, Check, X, Swords, Headphones, Trophy, MessageSquare, Shield } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
 import { usePolling } from "@/components/use-polling";
 import { STATUS_TTL_MS } from "@/components/status-poller";
@@ -190,6 +190,8 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
                       <Trophy className="w-4 h-4 text-[#ff5500] shrink-0 mt-0.5" />
                     ) : n.type === "league_message" ? (
                       <MessageSquare className="w-4 h-4 text-[#ff5500] shrink-0 mt-0.5" />
+                    ) : n.type === "clan_request" ? (
+                      <Shield className="w-4 h-4 text-hl-gold shrink-0 mt-0.5" />
                     ) : (
                       <UserPlus className="w-4 h-4 text-hl-teal shrink-0 mt-0.5" />
                     )}
@@ -235,7 +237,8 @@ export function NotificationsBell({ variant = "sidebar" }: { variant?: "sidebar"
                       </a>
                     </div>
                   )}
-                  {(n.type === "league" || n.type === "league_message") && n.refId?.startsWith("/") && (
+                  {(n.type === "league" || n.type === "league_message" || n.type === "clan_request") &&
+                    n.refId?.startsWith("/") && (
                     <div className="flex gap-2 pl-6">
                       <button
                         onClick={() => {

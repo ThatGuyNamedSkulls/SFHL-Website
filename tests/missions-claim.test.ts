@@ -38,7 +38,7 @@ describe("mission claims", () => {
   });
 
   it("a renamed player can't claim the same mission again", async () => {
-    // A rename that didn't touch web_mission_claims (the old /renameplayer).
+    // A rename that didn't touch web_mission_claims (the old /player rename).
     await client.execute("UPDATE players SET name = 'ana2' WHERE name = 'ana'");
     const views = await missions.listMissionsForPlayer("ana2");
     assert.equal(views.find((m) => m.id === "s1-placements")?.claimed, true);

@@ -1,5 +1,5 @@
 /**
- * Team titles — trophies Match Staff award with the bot's /awardtitle.
+ * Team titles — trophies Match Staff award with the bot's /teamtitle award.
  * The bot writes team_titles; the website only reads it.
  */
 import { client } from "@/lib/db";

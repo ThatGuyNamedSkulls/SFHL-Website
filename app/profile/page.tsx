@@ -476,7 +476,7 @@ function ProfileContent() {
   );
 
   // This season's totals from games ranked off Counter Blox's own scoreboard
-  // (/rankgame). Hidden until the player has one.
+  // (/rank cbrm). Hidden until the player has one.
   const cb = player.cbStats;
   const cbStatsBlock = cb ? (
     <div className="rounded-xl border border-white/[0.08] bg-[#1c1c1c] p-4">

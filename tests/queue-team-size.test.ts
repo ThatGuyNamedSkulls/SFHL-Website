@@ -1,5 +1,5 @@
 /**
- * The website follows the bot's /gamemode: getQueueTeamSize reads the team
+ * The website follows the bot's /queue mode: getQueueTeamSize reads the team
  * size the bot saved in bot_state.queue_mode (2v2, 3v3 or 5v5).
  */
 import { after, before, describe, it } from "node:test";
@@ -29,13 +29,13 @@ describe("live queue team size", () => {
   it("is 5v5 until the bot saves a format", async () => {
     assert.equal(await db.getQueueTeamSize(), 5);
   });
-  it("follows /gamemode", async () => {
+  it("follows /queue mode", async () => {
     for (const size of [2, 3, 5]) {
       await save(String(size));
       assert.equal(await db.getQueueTeamSize(), size);
     }
   });
-  it("ignores formats /gamemode doesn't offer", async () => {
+  it("ignores formats /queue mode doesn't offer", async () => {
     await save("1");
     assert.equal(await db.getQueueTeamSize(), 5);
     await save("junk");

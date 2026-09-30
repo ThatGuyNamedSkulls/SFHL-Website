@@ -151,7 +151,7 @@ function Num({
   );
 }
 
-/** Multi-kill round columns, in order (games ranked with /rankgame). */
+/** Multi-kill round columns, in order (games ranked with /rank cbrm). */
 const MULTI_KILLS = [
   { key: "k2", label: "2K" },
   { key: "k3", label: "3K" },
@@ -342,7 +342,7 @@ function Stats({ match }: { match: MatchDetail }) {
   const mvp = match.players.find((p) => p.mvp) ?? teamA[0] ?? match.players[0];
   const [selectedId, setSelectedId] = useState(mvp?.playerId ?? "");
   const [sort, setSort] = useState<"team" | "players">("team");
-  // Counter Blox's extra stats (games ranked with /rankgame) stay hidden until
+  // Counter Blox's extra stats (games ranked with /rank cbrm) stay hidden until
   // "More info" is pressed, so the scoreboard looks the same as every match.
   const hasCb = match.players.some((p) => p.multiKills != null);
   const [moreInfo, setMoreInfo] = useState(false);

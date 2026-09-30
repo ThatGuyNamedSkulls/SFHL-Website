@@ -8,9 +8,10 @@ import { Card } from "@/components/ui/card";
 import { RankBadge } from "@/components/rank-badge";
 import { ClubColorPicker, ClubMark, ClubTaggedName } from "@/components/club-identity";
 import { ClubTournaments } from "@/components/club-tournaments";
-import { Lock, MessageSquare, Users } from "lucide-react";
+import { Check, Lock, MessageSquare, Users, X } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { regionMeta } from "@/lib/regions";
+import { timeAgo } from "@/lib/format";
 import type { RankTierLetter } from "@/types";
 import { startPolling } from "@/lib/poll-gate";
 
@@ -47,6 +48,16 @@ interface Club {
     role: string;
     clubTag?: string | null;
   }[];
+  /** Pending join requests; only sent to members who can invite. */
+  requests: {
+    discordId: string;
+    username: string;
+    playerName: string | null;
+    avatar: string | null;
+    createdAt: number;
+  }[];
+  /** The viewer has asked to join and is waiting for an answer. */
+  requested?: boolean;
 }
 
 interface BoardRow {
@@ -215,9 +226,33 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
             <div className="mt-3 flex flex-col items-stretch gap-1.5 [&_a]:whitespace-nowrap [&_button]:whitespace-nowrap [&_span]:whitespace-nowrap">
               {!member && session ? (
                 club.private && !inviteFromUrl ? (
-                  <span className="h-9 inline-flex items-center rounded-xl border border-hl-border px-4 text-sm font-bold text-hl-muted">
-                    Invite only
-                  </span>
+                  club.requested ? (
+                    <>
+                      <span className="h-9 inline-flex items-center justify-center rounded-xl border border-hl-gold/40 px-4 text-sm font-bold text-hl-gold">
+                        Request sent
+                      </span>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => act(`/api/clubs/${id}/join-request`, "DELETE")}
+                        className="text-xs font-bold text-hl-muted hover:text-white disabled:opacity-50"
+                      >
+                        Cancel request
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => act(`/api/clubs/${id}/join-request`)}
+                        className="find-match-btn h-9 rounded-xl px-4 text-sm font-black header-caps text-hl-base disabled:opacity-50"
+                      >
+                        Request to join
+                      </button>
+                      <span className="text-[0.75rem] text-hl-muted">Invite only: the clan&apos;s staff review requests.</span>
+                    </>
+                  )
                 ) : (
                   <button
                     type="button"
@@ -541,6 +576,64 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
               New invite
             </button>
           ) : null}
+        </Card>
+      ) : null}
+
+      {canInvite && club.requests.length > 0 ? (
+        <Card className="bg-hl-panel border-hl-border p-0 mb-6 overflow-hidden">
+          <div className="border-b border-hl-border px-4 py-3 text-sm font-bold text-white">
+            Join requests ({club.requests.length})
+          </div>
+          <div className="divide-y divide-hl-border">
+            {club.requests.map((req) => {
+              const label = req.playerName || req.username;
+              return (
+                <div key={req.discordId} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <Avatar className="h-8 w-8 border border-hl-border">
+                    {req.avatar ? <AvatarImage src={req.avatar} alt="" /> : null}
+                    <AvatarFallback className="bg-hl-panel-light text-[0.6875rem] font-bold text-hl-gold">
+                      {label.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    {req.playerName ? (
+                      <Link
+                        href={`/profile?player=${encodeURIComponent(req.playerName)}`}
+                        className="truncate text-sm font-semibold text-white hover:text-hl-gold block"
+                      >
+                        {label}
+                      </Link>
+                    ) : (
+                      <div className="truncate text-sm font-semibold text-white">{label}</div>
+                    )}
+                    <div className="text-xs text-hl-muted">Asked {timeAgo(req.createdAt)}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        act(`/api/clubs/${id}/join-requests`, "POST", { discordId: req.discordId, accept: true })
+                      }
+                      className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-md bg-hl-green/15 text-hl-green border border-hl-green/30 hover:bg-hl-green/25 disabled:opacity-50"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Accept
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        act(`/api/clubs/${id}/join-requests`, "POST", { discordId: req.discordId, accept: false })
+                      }
+                      className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-md bg-hl-red/10 text-hl-red border border-hl-red/30 hover:bg-hl-red/20 disabled:opacity-50"
+                    >
+                      <X className="w-3.5 h-3.5" /> Decline
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </Card>
       ) : null}
 

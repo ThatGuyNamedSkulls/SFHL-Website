@@ -1,6 +1,6 @@
 /**
  * League UI step 9 (docs/LEAGUE_UI_PLAN.md): league stats — scoreboard
- * validation, reading /rankscreenshot output, per-player totals, and Match Staff
+ * validation, reading /rank screenshot output, per-player totals, and Match Staff
  * saving / replacing / deleting a map scoreboard on a real (temp) season.
  */
 import { after, before, describe, it } from "node:test";
@@ -73,9 +73,9 @@ describe("scoreboard rules", () => {
     assert.equal(rules.validateScoreboard(board({ mapNo: 3, roundsA: 5, roundsB: 13 }), bo3).mapNo, 3);
   });
 
-  it("reads /rankscreenshot output and raw OCR JSON", () => {
+  it("reads /rank screenshot output and raw OCR JSON", () => {
     const cmd =
-      "/rank player_names: alpha,@bravo one,Charlie match_results: W,W,L scores: 30,20,10 kills: 20,15,NONE " +
+      "/rank manual player_names: alpha,@bravo one,Charlie match_results: W,W,L scores: 30,20,10 kills: 20,15,NONE " +
       "deaths: 10,12,18 assists: 1,2,3 mvps: 3,1,0 hs: 55.5,40,33.3 points: 13,9 map_name: de_dust2 region: EU";
     const p = rules.parseOcrPaste(cmd)!;
     assert.deepEqual([p.mapName, p.winnerRounds, p.loserRounds], ["de_dust2", 13, 9]);

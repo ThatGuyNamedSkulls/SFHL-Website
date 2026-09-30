@@ -5,7 +5,7 @@
  * `prestige:<season>:<playerId>:<level>`) and grants the "Prestige N" badge,
  * which the player keeps.
  *
- * Wins are counted from match_history since the last /seasonreset, because
+ * Wins are counted from match_history since the last /season reset, because
  * players.matches_won is a career total that survives resets. Placement and
  * test (dummy) matches don't count.
  */
@@ -50,7 +50,7 @@ export function prestigeFromWins(rawWins: number): PrestigeProgress {
 }
 
 export interface SeasonInfo {
-  /** 1 before any /seasonreset, then +1 per reset. */
+  /** 1 before any /season reset, then +1 per reset. */
   number: number;
   label: string;
   /** UTC "YYYY-MM-DD HH:MM:SS" of the last reset (the season's start), or null. */

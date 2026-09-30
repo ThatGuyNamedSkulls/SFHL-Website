@@ -3,7 +3,7 @@
 /**
  * League match scoreboards (docs/LEAGUE_UI_PLAN.md step 9): the saved map
  * scoreboards everyone sees on the match page, and the Match Staff editor
- * (one map at a time; paste /rankscreenshot output to fill it).
+ * (one map at a time; paste /rank screenshot output to fill it).
  */
 import { useState } from "react";
 import { ClipboardPaste, Trash2 } from "lucide-react";
@@ -221,7 +221,7 @@ function MapEditor({
   const fillFromPaste = () => {
     const parsed = parseOcrPaste(paste);
     if (!parsed) {
-      setNote("That doesn't look like /rankscreenshot output (it needs at least player_names).");
+      setNote("That doesn't look like /rank screenshot output (it needs at least player_names).");
       return;
     }
     const next: Draft = { ...d, lines: { ...d.lines } };
@@ -298,14 +298,14 @@ function MapEditor({
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
         <div>
           <label className="mb-1 block text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/55">
-            Paste /rankscreenshot output (optional)
+            Paste /rank screenshot output (optional)
           </label>
           <div className="flex gap-2">
             <textarea
               rows={2}
               value={paste}
               onChange={(e) => setPaste(e.target.value)}
-              placeholder="/rank player_names: … kills: … deaths: …   (run /rankscreenshot with the screenshot in Discord)"
+              placeholder="/rank manual player_names: … kills: … deaths: …   (run /rank screenshot with the screenshot in Discord)"
               className="min-w-0 flex-1 rounded-md border border-white/[0.12] bg-[#1b1b1b] px-2 py-1.5 font-mono text-xs text-white outline-none focus:border-[#ff5500]"
             />
             <button

@@ -75,7 +75,7 @@ export interface Player {
   eloResets?: { index: number; label: string }[];
   /** Lifetime match count (not reset with the season). */
   careerMatchesPlayed?: number;
-  /** This season's totals from games ranked with /rankgame (Counter Blox's
+  /** This season's totals from games ranked with /rank cbrm (Counter Blox's
    *  own scoreboard). Null until the player has one. */
   cbStats?: {
     matches: number;
@@ -244,9 +244,9 @@ export interface MatchPlayerStats {
   damage?: number | null;
   /** Damage per round played. */
   adr?: number | null;
-  /** Rounds played, from Counter Blox (games ranked with /rankgame only). */
+  /** Rounds played, from Counter Blox (games ranked with /rank cbrm only). */
   roundsPlayed?: number | null;
-  /** Rounds with 2/3/4/5 kills (games ranked with /rankgame only). */
+  /** Rounds with 2/3/4/5 kills (games ranked with /rank cbrm only). */
   multiKills?: { k2: number; k3: number; k4: number; k5: number } | null;
 }
 

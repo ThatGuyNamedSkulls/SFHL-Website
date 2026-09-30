@@ -245,7 +245,7 @@ export async function endSeason(seasonId: number, confirmName: string, actor: Ac
     ),
     "write"
   );
-  // Champion titles — same table as /awardtitle (lib/team-titles.ts reads it).
+  // Champion titles — same table as /teamtitle award (lib/team-titles.ts reads it).
   await ensureTeamTitlesSchema();
   const now = Date.now();
   await client.batch(

@@ -147,7 +147,7 @@ export async function GET(
       players.map((p) => {
         const info = playerInfo.get(p.player_name);
         // Counter Blox's own rounds-played count when the game came from
-        // /rankgame (subs played fewer), else the match's round total.
+        // /rank cbrm (subs played fewer), else the match's round total.
         const roundsPlayed = p.rounds_played == null ? null : Number(p.rounds_played);
         const damage = p.damage == null ? null : Number(p.damage);
         const rating = performanceRating({
@@ -230,7 +230,7 @@ export async function GET(
     }
 
     // Win chance as it stood when the match was played. The bot freezes it on
-    // every row at /rank time; older rows fall back to the frozen per-player
+    // every row at /rank manual time; older rows fall back to the frozen per-player
     // skill_before (backfilled from the pre-match snapshot), then elo_before.
     // Live ratings are never used — they move after the match.
     const withSkill = (players: typeof rows) =>

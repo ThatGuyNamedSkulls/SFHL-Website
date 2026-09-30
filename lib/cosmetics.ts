@@ -9,7 +9,7 @@
  * atomically removes the equip too. Single-equip for card/title is enforced at
  * write time; badges allow up to MAX_EQUIPPED_BADGES equipped at once.
  *
- * The equipped title is mirrored into players.title so the bot's /checkplayer
+ * The equipped title is mirrored into players.title so the bot's /player stats
  * embed keeps showing it.
  */
 
@@ -267,7 +267,7 @@ export async function setEquipped(
     },
   ];
   if (type === "title") {
-    // Mirror into players.title so the bot's /checkplayer shows it.
+    // Mirror into players.title so the bot's /player stats shows it.
     stmts.push({ sql: "UPDATE players SET title = ? WHERE name = ?", args: [name, playerName] });
   }
   await client.batch(stmts);

@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { Bell, UserPlus, Users, Check, X, Swords } from "lucide-react";
+import { Bell, UserPlus, Users, Check, X, Swords, Shield } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { startPolling } from "@/lib/poll-gate";
+import { timeAgo } from "@/lib/format";
 
 interface NotificationView {
   id: number;
@@ -17,16 +18,6 @@ interface NotificationView {
   refId: string | null;
   read: boolean;
   createdAt: number;
-}
-
-function timeAgo(ts: number): string {
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
 }
 
 export default function AlertsPage() {
@@ -121,6 +112,8 @@ export default function AlertsPage() {
                   <Users className="w-5 h-5 text-hl-gold shrink-0 mt-0.5" />
                 ) : n.type === "match_found" ? (
                   <Swords className="w-5 h-5 text-hl-gold shrink-0 mt-0.5" />
+                ) : n.type === "clan_request" ? (
+                  <Shield className="w-5 h-5 text-hl-gold shrink-0 mt-0.5" />
                 ) : (
                   <UserPlus className="w-5 h-5 text-hl-teal shrink-0 mt-0.5" />
                 )}
@@ -150,6 +143,13 @@ export default function AlertsPage() {
                 <div className="flex gap-2 pl-8">
                   <Link href="/match/live" className="text-xs font-bold px-4 py-1.5 rounded-md bg-gold-gradient text-hl-base hover:opacity-90">
                     Open match room
+                  </Link>
+                </div>
+              )}
+              {n.type === "clan_request" && n.refId?.startsWith("/") && (
+                <div className="flex gap-2 pl-8">
+                  <Link href={n.refId} className="text-xs font-bold px-4 py-1.5 rounded-md bg-gold-gradient text-hl-base hover:opacity-90">
+                    Open clan
                   </Link>
                 </div>
               )}

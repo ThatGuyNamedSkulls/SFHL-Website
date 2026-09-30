@@ -1,7 +1,7 @@
 /**
  * Substitute slots — the website half of a flow the bot owns.
  *
- * The bot writes `sub_requests` when Match Staff run `/opensubslot` (see the project's
+ * The bot writes `sub_requests` when Match Staff run `/sub open` (see the project's
  * `cogs/subs.py` and `core/sub_requests.py`). The site lists the open ones and
  * can claim one, which is a single conditional UPDATE — `WHERE status = 'open'`
  * — so two people clicking at the same instant can never both win the slot.
@@ -255,7 +255,7 @@ async function viewerContext(claimer: Claimer | null): Promise<ViewerContext> {
     return ctx;
   }
   // Placement players may sub, banded on their hidden placement rating — the
-  // same rule as `_band_rating` in the bot's subs cog. /rank gives them a
+  // same rule as `_band_rating` in the bot's subs cog. /rank manual gives them a
   // stats-only row and still settles the player who left.
   ctx.placementDone = isPlacementComplete(player.placement_done);
   ctx.elo = perceivedSkill({
@@ -432,7 +432,7 @@ export async function claimSubRequest(
 /**
  * Give a slot back, only while the bot hasn't acted on it yet. Once access has
  * been granted and the match channel knows about the sub, withdrawing is a
- * staff decision (`/closesubslot`), not a self-service one.
+ * staff decision (`/sub close`), not a self-service one.
  */
 export async function withdrawSubClaim(
   claimer: Claimer,
