@@ -1,3 +1,4 @@
+import { maskProfanity } from "@/lib/content-moderation";
 import { client } from "@/lib/db";
 import { getParty } from "@/lib/parties";
 import { schemaOnce } from "@/lib/schema-once";
@@ -58,7 +59,7 @@ function rowToMessage(row: Record<string, unknown>): PartyChatMessage {
     username: String(row.username),
     playerName: row.player_name == null ? null : String(row.player_name),
     avatar: row.avatar == null ? null : String(row.avatar),
-    message: String(row.message),
+    message: maskProfanity(String(row.message)), // saved before a word was blocked
     createdAt: Number(row.created_at),
   };
 }

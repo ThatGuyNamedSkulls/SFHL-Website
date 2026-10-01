@@ -1,5 +1,6 @@
 import { client } from "@/lib/db";
 import { getClub, memberOf } from "@/lib/clubs";
+import { maskProfanity } from "@/lib/content-moderation";
 import { schemaOnce } from "@/lib/schema-once";
 
 export const CLUB_CHAT_MAX_LENGTH = 250;
@@ -57,7 +58,7 @@ function rowToMessage(row: Record<string, unknown>): ClubChatMessage {
     username: String(row.username),
     playerName: row.player_name == null ? null : String(row.player_name),
     avatar: row.avatar == null ? null : String(row.avatar),
-    message: String(row.message),
+    message: maskProfanity(String(row.message)), // saved before a word was blocked
     createdAt: Number(row.created_at),
   };
 }

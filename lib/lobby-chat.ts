@@ -2,6 +2,7 @@
  * Match-channel chat stored in Turso and mirrored with Discord.
  */
 
+import { maskProfanity } from "@/lib/content-moderation";
 import { client } from "@/lib/db";
 import { discordSafe } from "@/lib/discord-safe";
 import { schemaOnce } from "@/lib/schema-once";
@@ -55,7 +56,9 @@ export async function listLobbyChat(channelId: string, limit = 80): Promise<Chat
     id: Number(r.id),
     authorId: String(r.discord_id),
     authorName: String(r.author_name),
-    content: String(r.content),
+    // Messages typed on the site were checked when sent; the ones the bot
+    // mirrors in from the Discord match channel never were.
+    content: maskProfanity(String(r.content)),
     source: r.source === "website" ? "website" : "discord",
     createdAt: Number(r.created_at ?? 0),
   }));
