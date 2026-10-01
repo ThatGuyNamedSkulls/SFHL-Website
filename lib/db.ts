@@ -209,6 +209,8 @@ export function ensurePlayerDiscordColumns(): Promise<void> {
         discord_avatar: "TEXT DEFAULT NULL",
         country: "TEXT DEFAULT NULL",
         mm_access: "INTEGER DEFAULT 0",
+        // Match Staff role, synced by the bot (lib/name-badge.ts: the Mod Pin).
+        match_staff: "INTEGER DEFAULT 0",
       };
       const missing = await missingColumns({ players: Object.keys(ddl) }).catch(() => ({ players: [] as string[] }));
       await ddlBatch(missing.players.map((c) => `ALTER TABLE players ADD COLUMN ${c} ${ddl[c]}`));

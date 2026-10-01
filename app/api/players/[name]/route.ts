@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, getCbStats, mapRank, publicRating } from "@/lib/db";
 import { buildEloTimeline } from "@/lib/elo-timeline";
 import { damagePerRound } from "@/lib/match-stats";
+import { badgeIndex, nameBadgeFor } from "@/lib/name-badge";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
 import { pickAvatar, resolveAvatarMap } from "@/lib/avatar";
@@ -54,6 +55,10 @@ export async function GET(
     // Stored flag only: the bot syncs it hourly and every login refreshes it.
     // A public GET must not call Discord or write (security report M1).
     const mmAccess = Number(player.mm_access) === 1;
+    const badge = nameBadgeFor(await badgeIndex(), {
+      discordId: player.discord_id != null ? String(player.discord_id) : null,
+      playerName: player.name,
+    });
 
     // These are all independent of one another — fetch them concurrently
     // instead of one sequential await per data source.
@@ -145,6 +150,7 @@ export async function GET(
       countryName: isValidCountry(player.country) ? countryName(player.country) : null,
       countryFlag: isValidCountry(player.country) ? flagPath(player.country) : null,
       mmAccess,
+      badge,
       clubTag: lookupClubTag(
         await clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
         player.name,

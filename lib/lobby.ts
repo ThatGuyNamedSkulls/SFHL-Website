@@ -10,6 +10,7 @@ import { perceivedSkill, teamWinChances } from "@/lib/win-chance";
 import { ChatMessage, listLobbyChat } from "@/lib/lobby-chat";
 import { pickAvatar, resolveAvatarsByDiscordId } from "@/lib/avatar";
 import { BusyError, mutateBlob } from "@/lib/blob-cas";
+import { isValidCountry } from "@/lib/countries";
 
 /** 3 hours: a match is long over by then, so old lobby rows are ignored/pruned. */
 const LOBBY_TTL_MS = 3 * 60 * 60 * 1000;
@@ -23,6 +24,8 @@ export interface LobbyMemberView {
   elo: number;
   /** False while the player is still in placements. Their Elo is not shown. */
   placementDone: boolean;
+  /** ISO country code (lowercase) from the player's profile, if set. */
+  country: string | null;
   left?: boolean;
   sub?: boolean;
 }
@@ -219,7 +222,7 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
   const names = raw.members.map((m) => m.name);
   const byName = new Map<
     string,
-    { avatar: string | null; rank: string; elo: number; placementDone: boolean; skill: number }
+    { avatar: string | null; rank: string; elo: number; placementDone: boolean; skill: number; country: string | null }
   >();
   if (names.length > 0) {
     const placeholders = names.map(() => "?").join(",");
@@ -229,7 +232,7 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
       try {
         const rs = await client.execute({
           sql: `SELECT name, rank, elo, mmr, placement_done, roblox_avatar_image, discord_avatar,
-                       discord_id
+                       discord_id, country
                 FROM players WHERE name IN (${placeholders})`,
           args: names,
         });
@@ -237,7 +240,7 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
       } catch {
         const rs = await client.execute({
           sql: `SELECT name, rank, elo, placement_done, roblox_avatar_image, discord_avatar,
-                       discord_id
+                       discord_id, country
                 FROM players WHERE name IN (${placeholders})`,
           args: names,
         });
@@ -264,6 +267,7 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
             elo: Number(r.elo ?? 0),
             mmr: r.mmr == null ? null : Number(r.mmr),
           }),
+          country: isValidCountry(r.country as string | null) ? String(r.country).toLowerCase() : null,
         });
       }
     } catch {
@@ -288,6 +292,7 @@ async function enrich(raw: RawLobby, viewerDiscordId?: string | null): Promise<L
     rank: byName.get(m.name)?.rank ?? "UNRANKED",
     elo: byName.get(m.name)?.elo ?? 0,
     placementDone: byName.get(m.name)?.placementDone ?? false,
+    country: byName.get(m.name)?.country ?? null,
     skill: byName.get(m.name)?.skill ?? 1200,
     left: !!m.left,
     sub: !!m.sub,

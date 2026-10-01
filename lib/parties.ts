@@ -52,6 +52,8 @@ export interface PartyMember {
   canQueue?: boolean;
   /** Get Matchmaking Access Discord role (read time). */
   mmAccess?: boolean | null;
+  /** Badge above Verified: Mod Pin or Top 10 (read time, lib/name-badge.ts). */
+  badge?: "staff" | "top10" | null;
   /** Club tag shown in front of the username. */
   clubTag?: string | null;
 }

@@ -9,6 +9,7 @@ import { PartyView, PartyMemberView, RankTierLetter } from "@/types";
 import { getRankForElo, getRankByLetter } from "@/data/ranks";
 import { flagPath, countryName } from "@/lib/countries";
 import { ClubTaggedName } from "@/components/club-identity";
+import { NameBadge } from "@/components/name-badge";
 import { OnlineBadge, useOnline } from "@/components/online-status";
 import {
   Crown,
@@ -109,11 +110,13 @@ function MemberSlot({
             discordUsername={member.discordUsername}
           />
         </span>
-        {member.verified !== null && member.verified !== undefined && (
+        {member.badge || member.mmAccess ? (
+          <NameBadge tier={member.badge} verified={member.mmAccess} className="!h-3.5 !w-3.5" />
+        ) : member.verified !== null && member.verified !== undefined ? (
           <span title={member.verified ? "Verified — in the Discord server" : "Not verified — not in the Discord server"}>
             <BadgeCheck className={`w-3.5 h-3.5 shrink-0 ${member.verified ? "text-hl-green" : "text-hl-red"}`} />
           </span>
-        )}
+        ) : null}
         {member.country && <Flag src={flagPath(member.country)} name={countryName(member.country)} className="w-4 h-3 shrink-0" />}
       </div>
       <div className="relative z-10 flex items-center gap-1.5">

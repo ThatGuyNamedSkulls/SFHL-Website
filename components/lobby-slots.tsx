@@ -10,7 +10,7 @@ import { getRankByLetter } from "@/data/ranks";
 import { rankRing } from "@/lib/player-card";
 import { RankTierLetter } from "@/types";
 import { Plus, Search, Crown, BadgeCheck, CircleAlert, UserRound } from "lucide-react";
-import { MmAccessBadge } from "@/components/mm-access-badge";
+import { NameBadge, type NameBadgeTier } from "@/components/name-badge";
 import { optimizedAsset } from "@/lib/optimized-asset";
 
 export interface LobbyMember {
@@ -32,6 +32,8 @@ export interface LobbyMember {
   verified?: boolean | null;
   /** Get Matchmaking Access Discord role. */
   mmAccess?: boolean | null;
+  /** Mod Pin / Top 10 (beats the Verified badge). */
+  badge?: NameBadgeTier | null;
   /** False → this member blocks the queue; shows the warning on their slot. */
   canQueue?: boolean;
   clubTag?: string | null;
@@ -130,8 +132,8 @@ function LobbyCard({ member, center }: { member: LobbyMember; center: boolean })
             {member.clubTag ? <span className="text-[#ff5500]">[{member.clubTag}] </span> : null}
             {member.username}
           </span>
-          {member.mmAccess ? (
-            <MmAccessBadge />
+          {member.badge || member.mmAccess ? (
+            <NameBadge tier={member.badge} verified={member.mmAccess} />
           ) : member.verified != null ? (
             <span title={member.verified ? "Verified — in the Discord server" : "Not verified — not in the Discord server"}>
               <BadgeCheck className={`h-3.5 w-3.5 shrink-0 ${member.verified ? "text-hl-green" : "text-hl-red"}`} />

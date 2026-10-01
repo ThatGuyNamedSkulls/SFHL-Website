@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { Calendar, Star, Swords } from "lucide-react";
 import { SubRolePill } from "@/components/sub-role-pill";
 import { WinChanceBar } from "@/components/win-chance-bar";
+import { Flag } from "@/components/flag";
 
 function initials(name: string) {
   return (name || "?").slice(0, 2).toUpperCase();
@@ -266,6 +267,9 @@ function StatsTable({
                           {initials(p.username)}
                         </AvatarFallback>
                       </Avatar>
+                      {p.countryFlag ? (
+                        <Flag src={p.countryFlag} name={p.country} className="h-3 w-4 shrink-0" />
+                      ) : null}
                       <span className="text-white font-semibold truncate max-w-[8.75rem]">
                         {p.username}
                       </span>

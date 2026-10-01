@@ -15,7 +15,7 @@ import { ConsistencyDonut } from "@/components/consistency-donut";
 import { MapStatsTable } from "@/components/map-stats-table";
 import { ProfileInventory } from "@/components/profile-inventory";
 import { ProfilePageBackdrop } from "@/components/profile-background";
-import { MmAccessBadge } from "@/components/mm-access-badge";
+import { NameBadge } from "@/components/name-badge";
 import { EmptyState } from "@/components/empty-state";
 import { ClubMark, ClubTaggedName } from "@/components/club-identity";
 import { Flag } from "@/components/flag";
@@ -557,7 +557,7 @@ function ProfileContent() {
                     discordUsername={player.discordUsername}
                   />
                 </span>
-                {player.mmAccess ? <MmAccessBadge /> : null}
+                <NameBadge tier={player.badge} verified={player.mmAccess} />
               </h1>
               {player.cosmetics?.title && (
                 <div className="text-xs font-semibold italic text-[#ff5500] mt-1">{player.cosmetics.title}</div>

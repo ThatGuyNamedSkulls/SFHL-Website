@@ -13,6 +13,8 @@ import { ExternalLink, Mic, Crown, Calendar, Send, Gamepad2 } from "lucide-react
 import { SubRolePill } from "@/components/sub-role-pill";
 import { WinChanceBar } from "@/components/win-chance-bar";
 import { startPolling } from "@/lib/poll-gate";
+import { Flag } from "@/components/flag";
+import { countryName, flagPath } from "@/lib/countries";
 
 export interface LiveLobbyMember {
   discordId: string;
@@ -22,6 +24,8 @@ export interface LiveLobbyMember {
   rank: string;
   elo?: number;
   placementDone?: boolean;
+  /** ISO country code (lowercase), when the player set one. */
+  country?: string | null;
   left?: boolean;
   sub?: boolean;
 }
@@ -164,7 +168,12 @@ function PlayerRow({
           {member.name.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
-      <span className="text-sm font-semibold text-white truncate flex-1">{member.name}</span>
+      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        {member.country ? (
+          <Flag src={flagPath(member.country)} name={countryName(member.country)} className="h-3 w-4 shrink-0" />
+        ) : null}
+        <span className="truncate text-sm font-semibold text-white">{member.name}</span>
+      </span>
       <SubRolePill isSub={member.sub} leftEarly={member.left} compact />
       {captain && <Crown className="w-3.5 h-3.5 text-[#ff5500] shrink-0" />}
       {member.placementDone !== false && typeof member.elo === "number" && member.elo > 0 && (

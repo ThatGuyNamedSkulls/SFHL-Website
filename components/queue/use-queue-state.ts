@@ -57,6 +57,8 @@ export interface MeView {
     card: string | null;
     frame: string | null;
     mmAccess: boolean;
+    /** Mod Pin / Top 10 badge (lib/name-badge.ts). */
+    badge?: "staff" | "top10" | null;
     position?: number | null;
   } | null;
   season: { number: number; label: string };
@@ -79,6 +81,7 @@ interface PartyMemberLite {
   verified?: boolean | null;
   canQueue?: boolean;
   mmAccess?: boolean | null;
+  badge?: "staff" | "top10" | null;
   clubTag?: string | null;
 }
 interface PartyLite {
@@ -318,6 +321,7 @@ export function useQueueState() {
         self: true,
         verified: verified && !!session.inGuild,
         mmAccess: !!(mine?.mmAccess || session.mmAccess),
+        badge: mine?.badge ?? null,
         canQueue: canQueueSelf,
         clubTag: session.clubTag ?? null,
       }
@@ -343,6 +347,7 @@ export function useQueueState() {
         self: false,
         verified: m.verified ?? null,
         mmAccess: m.mmAccess ?? null,
+        badge: m.badge ?? null,
         canQueue: m.canQueue,
         clubTag: m.clubTag,
       };

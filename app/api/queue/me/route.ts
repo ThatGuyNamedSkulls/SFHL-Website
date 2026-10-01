@@ -12,6 +12,7 @@ import { getEquippedCosmetics } from "@/lib/cosmetics";
 import { countryToPlayRegion } from "@/lib/country-regions";
 import { isValidCountry } from "@/lib/countries";
 import { currentSeason, prestigeFromWins, seasonWins, syncPrestige } from "@/lib/prestige";
+import { badgeIndex, nameBadgeFor } from "@/lib/name-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export async function GET() {
   if (!player) return NextResponse.json({ player: null, season: seasonOut, placementTotal });
 
   const rating = publicRating(player);
-  const [prestige, cosmetics, lastRegion, rankings] = await Promise.all([
+  const [prestige, cosmetics, lastRegion, rankings, badges] = await Promise.all([
     syncPrestige(player.name).catch(async (error) => {
       console.error("prestige sync failed", error);
       return { ...prestigeFromWins(await seasonWins(player.name, season.startedAt).catch(() => 0)), newlyReached: [] };
@@ -41,6 +42,7 @@ export async function GET() {
     rating.placementDone
       ? getPlayerRankings(player.name).catch(() => null)
       : Promise.resolve(null),
+    badgeIndex(),
   ]);
   const country = isValidCountry(player.country) ? player.country!.toLowerCase() : null;
 
@@ -58,6 +60,7 @@ export async function GET() {
         card: cosmetics?.card?.asset ?? null,
         frame: cosmetics?.frame?.asset ?? null,
         mmAccess: Number(player.mm_access) === 1,
+        badge: nameBadgeFor(badges, { discordId: session.discordId, playerName: player.name }),
         /** Overall leaderboard position (graduated players only). */
         position: rankings?.overall ?? null,
       },

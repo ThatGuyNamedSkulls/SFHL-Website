@@ -75,6 +75,8 @@ export interface Player {
   eloResets?: { index: number; label: string }[];
   /** Lifetime match count (not reset with the season). */
   careerMatchesPlayed?: number;
+  /** Mod Pin / Top 10 badge (beats Verified). */
+  badge?: "staff" | "top10" | null;
   /** This season's totals from games ranked with /rank cbrm (Counter Blox's
    *  own scoreboard). Null until the player has one. */
   cbStats?: {
@@ -348,6 +350,8 @@ export interface PartyMemberView {
   canQueue?: boolean;
   /** Get Matchmaking Access Discord role. */
   mmAccess?: boolean | null;
+  /** Mod Pin / Top 10 badge (beats Verified). */
+  badge?: "staff" | "top10" | null;
   clubTag?: string | null;
 }
 

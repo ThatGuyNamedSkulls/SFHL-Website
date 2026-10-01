@@ -5,6 +5,7 @@ import { getEquippedCosmetics, getEquippedVisualsMap, EquippedVisuals } from "@/
 import { getGuildPresenceCached } from "@/lib/auth";
 import { resolvePlayerAvatar } from "@/lib/avatar";
 import { isValidCountry } from "@/lib/countries";
+import { badgeIndex, nameBadgeFor } from "@/lib/name-badge";
 import { UserSession } from "@/types";
 
 /** Build a party member record from the logged-in session + DB profile. */
@@ -107,6 +108,8 @@ export async function withMemberStatus<T extends Party>(parties: T[], live = tru
   } catch {
     /* clubs table may be empty */
   }
+  // DB only (no Discord calls), so anonymous viewers get the badges too.
+  const badges = await badgeIndex();
   return parties.map((p) => ({
     ...p,
     members: p.members.map((m) => {
@@ -119,7 +122,8 @@ export async function withMemberStatus<T extends Party>(parties: T[], live = tru
         (m.discordId && tags.byDiscord[m.discordId]) ||
         (m.playerName ? tags.byName[m.playerName.toLowerCase()] : null) ||
         null;
-      return { ...m, verified, mmAccess, canQueue, clubTag };
+      const badge = nameBadgeFor(badges, { discordId: m.discordId, playerName: m.playerName });
+      return { ...m, verified, mmAccess, canQueue, clubTag, badge };
     }),
   }));
 }
