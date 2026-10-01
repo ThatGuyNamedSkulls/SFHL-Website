@@ -2,6 +2,19 @@
    HyperLeague — Core Type Definitions
    ============================================================ */
 
+/** A badge the player equipped from their inventory (cosmetic_items type "badge"). */
+export interface EquippedNameBadge {
+  name: string;
+  asset: string | null;
+}
+
+/**
+ * The one badge next to a player's name (lib/name-badge.ts), highest first:
+ * the Mod Pin ("staff"), Top 10 ("top10"), then the first badge they equipped.
+ * Verified (matchmaking access) shows only when none of these apply.
+ */
+export type NameBadgeValue = "staff" | "top10" | EquippedNameBadge;
+
 /** Rank tier letters matching the real SFHL 10-tier system */
 export type RankTierLetter =
   | "D"
@@ -75,8 +88,8 @@ export interface Player {
   eloResets?: { index: number; label: string }[];
   /** Lifetime match count (not reset with the season). */
   careerMatchesPlayed?: number;
-  /** Mod Pin / Top 10 badge (beats Verified). */
-  badge?: "staff" | "top10" | null;
+  /** Mod Pin / Top 10 / first equipped badge (beats Verified). */
+  badge?: NameBadgeValue | null;
   /** This season's totals from games ranked with /rank cbrm (Counter Blox's
    *  own scoreboard). Null until the player has one. */
   cbStats?: {
@@ -350,8 +363,8 @@ export interface PartyMemberView {
   canQueue?: boolean;
   /** Get Matchmaking Access Discord role. */
   mmAccess?: boolean | null;
-  /** Mod Pin / Top 10 badge (beats Verified). */
-  badge?: "staff" | "top10" | null;
+  /** Mod Pin / Top 10 / first equipped badge (beats Verified). */
+  badge?: NameBadgeValue | null;
   clubTag?: string | null;
 }
 

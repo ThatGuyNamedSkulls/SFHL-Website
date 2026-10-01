@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { getInventory, setEquipped, MAX_EQUIPPED_BADGES } from "@/lib/cosmetics";
+import { forgetNameBadges } from "@/lib/name-badge";
 
 /**
  * POST { itemId, equip } — equip/unequip an owned cosmetic item.
@@ -39,6 +40,9 @@ export async function POST(request: Request) {
         { status: 409 }
       );
     }
+    // The badge next to the name follows the first equipped badge: show the
+    // change now instead of when the name-badge cache next expires.
+    forgetNameBadges();
     // Return the refreshed inventory so the client updates in one round trip.
     const items = await getInventory(session.playerName);
     return NextResponse.json({ ok: true, items });

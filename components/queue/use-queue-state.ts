@@ -20,7 +20,7 @@ import { QUEUE_REGIONS, isQueueRegion, regionMeta } from "@/lib/regions";
 import { SUPER_PARTY_MAX, parseQueueMode, queueModeLabel } from "@/lib/queue-modes";
 import { queueUiState } from "@/lib/queue-ui-state";
 import { useReadyCheck } from "@/components/use-ready-check";
-import type { RankTierLetter } from "@/types";
+import type { NameBadgeValue, RankTierLetter } from "@/types";
 
 export interface QueueEntryView {
   id: number;
@@ -57,8 +57,8 @@ export interface MeView {
     card: string | null;
     frame: string | null;
     mmAccess: boolean;
-    /** Mod Pin / Top 10 badge (lib/name-badge.ts). */
-    badge?: "staff" | "top10" | null;
+    /** Mod Pin / Top 10 / first equipped badge (lib/name-badge.ts). */
+    badge?: NameBadgeValue | null;
     position?: number | null;
   } | null;
   season: { number: number; label: string };
@@ -81,7 +81,7 @@ interface PartyMemberLite {
   verified?: boolean | null;
   canQueue?: boolean;
   mmAccess?: boolean | null;
-  badge?: "staff" | "top10" | null;
+  badge?: NameBadgeValue | null;
   clubTag?: string | null;
 }
 interface PartyLite {

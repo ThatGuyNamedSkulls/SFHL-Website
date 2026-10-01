@@ -15,6 +15,7 @@
 
 import { randomUUID } from "crypto";
 import { client } from "@/lib/db";
+import type { NameBadgeValue } from "@/types";
 import { clearInvitesForParties } from "@/lib/social";
 import { partyMaxForMatchType } from "@/lib/queue-modes";
 import {
@@ -52,8 +53,9 @@ export interface PartyMember {
   canQueue?: boolean;
   /** Get Matchmaking Access Discord role (read time). */
   mmAccess?: boolean | null;
-  /** Badge above Verified: Mod Pin or Top 10 (read time, lib/name-badge.ts). */
-  badge?: "staff" | "top10" | null;
+  /** Badge in place of Verified: Mod Pin, Top 10 or the first equipped badge
+   *  (read time, lib/name-badge.ts). */
+  badge?: NameBadgeValue | null;
   /** Club tag shown in front of the username. */
   clubTag?: string | null;
 }

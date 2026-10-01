@@ -557,7 +557,7 @@ function ProfileContent() {
                     discordUsername={player.discordUsername}
                   />
                 </span>
-                <NameBadge tier={player.badge} verified={player.mmAccess} />
+                <NameBadge badge={player.badge} verified={player.mmAccess} size="lg" />
               </h1>
               {player.cosmetics?.title && (
                 <div className="text-xs font-semibold italic text-[#ff5500] mt-1">{player.cosmetics.title}</div>
