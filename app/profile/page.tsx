@@ -839,7 +839,7 @@ function ProfileContent() {
                           <span>Date</span>
                           <span />
                           <span>Elo</span>
-                          <span>Rating</span>
+                          <span>K/D</span>
                           <span className="text-right">K/D/A</span>
                         </div>
                         {matches.slice(0, 8).map((m) => (
@@ -867,7 +867,7 @@ function ProfileContent() {
                         <span>Date</span>
                         <span />
                         <span>Elo</span>
-                        <span>Rating</span>
+                        <span>K/D</span>
                         <span className="text-right">K/D/A</span>
                       </div>
                       {filteredMatches.map((m) => (
