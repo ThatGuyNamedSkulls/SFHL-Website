@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { DEFAULT_PROFILE_BACKGROUNDS } from "@/lib/profile-backgrounds";
 
+/**
+ * A clan's logo: its image, or its tag on a deep tint of the clan color
+ * (docs/CLANS_UI_PLAN.md). Two letters from 28 px up, one below.
+ */
 export function ClubMark({
   tag,
   accentColor,
@@ -16,20 +20,20 @@ export function ClubMark({
   size?: number;
   className?: string;
 }) {
-  const [failed, setFailed] = useState(false);
-  const letter = (tag || "?").slice(0, 1).toUpperCase();
-  const showImg = !!logoUrl && !failed;
-  const light = accentColor === "#f1c40f" || accentColor === "#c4b5fd" || accentColor === "#f5f5f5";
+  const [failed, setFailed] = useState<string | null>(null);
+  const letters = (tag || "?").slice(0, size >= 28 ? 2 : 1).toUpperCase();
+  const showImg = !!logoUrl && failed !== logoUrl;
+  const color = accentColor || "#ff7a18";
 
   return (
     <div
-      className={`shrink-0 overflow-hidden rounded-lg flex items-center justify-center font-black select-none ${className}`}
+      className={`shrink-0 overflow-hidden rounded-lg flex items-center justify-center font-bold tracking-[0.02em] select-none text-white ${className}`}
       style={{
         width: size,
         height: size,
-        backgroundColor: accentColor || "#ff7a18",
-        color: light ? "#111111" : "#ffffff",
-        fontSize: Math.max(12, Math.round(size * 0.42)),
+        background: showImg ? "#141414" : `color-mix(in srgb, ${color} 58%, #121212)`,
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)",
+        fontSize: Math.max(10, Math.round(size * (letters.length > 1 ? 0.34 : 0.42))),
       }}
       aria-hidden
     >
@@ -39,10 +43,10 @@ export function ClubMark({
           src={logoUrl!}
           alt=""
           className="h-full w-full object-cover"
-          onError={() => setFailed(true)}
+          onError={() => setFailed(logoUrl!)}
         />
       ) : (
-        letter
+        letters
       )}
     </div>
   );

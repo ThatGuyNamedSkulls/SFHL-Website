@@ -3,51 +3,19 @@ import { publicErrorMessage } from "@/lib/route-errors";
 import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { containsProfanity } from "@/lib/content-moderation";
-import {
-  clubForClient,
-  clubLeaderboard,
-  clubTagIndex,
-  deleteClub,
-  getClub,
-  lookupClubTag,
-  updateClub,
-} from "@/lib/clubs";
+import { clanPayload } from "@/lib/clan-payload";
+import { deleteClub, getClub, getClubByIdOrTag, updateClub } from "@/lib/clubs";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-async function payload(clubId: string, viewerId?: string | null) {
-  const club = await getClub(clubId);
-  if (!club) return null;
-  let leaderboard: Awaited<ReturnType<typeof clubLeaderboard>> = [];
-  try {
-    leaderboard = await clubLeaderboard(club);
-  } catch (error) {
-    console.error("clan leaderboard", error);
-  }
-  const tags = await clubTagIndex();
-  const clientClub = clubForClient(club, viewerId);
-  return {
-    club: {
-      ...clientClub,
-      members: clientClub.members.map((member) => ({
-        ...member,
-        clubTag: lookupClubTag(tags, member.playerName, member.discordId),
-      })),
-    },
-    leaderboard: leaderboard.map((row) => ({
-      ...row,
-      clubTag: lookupClubTag(tags, row.playerName, row.discordId),
-    })),
-  };
-}
-
+/** GET /api/clubs/<id or TAG> — the clan page's data (docs/CLANS_UI_PLAN.md §5). */
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const session = await getSession();
-  const data = await payload(id, session?.discordId);
-  if (!data) return NextResponse.json({ error: "Clan not found." }, { status: 404 });
-  return NextResponse.json(data);
+  const club = await getClubByIdOrTag(decodeURIComponent(id));
+  if (!club) return NextResponse.json({ error: "Clan not found." }, { status: 404 });
+  return NextResponse.json(await clanPayload(club, session?.discordId));
 }
 
 export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -83,8 +51,9 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
       logoUrl,
       private: isPrivate,
     });
-    const data = await payload(id, session.discordId);
-    return NextResponse.json(data);
+    const club = await getClub(id);
+    if (!club) return NextResponse.json({ error: "Clan not found." }, { status: 404 });
+    return NextResponse.json(await clanPayload(club, session.discordId));
   } catch (error) {
     return NextResponse.json(
       { error: publicErrorMessage(error, "Failed to update clan.") },

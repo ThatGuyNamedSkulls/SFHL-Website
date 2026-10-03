@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BadgeCheck, CalendarDays, Crown, Lock, Swords, Trophy } from "lucide-react";
 import { ClubMark } from "@/components/club-identity";
+import { MapThumb } from "@/components/map-thumb";
 import { Flag } from "@/components/flag";
 import { TeamCell } from "@/components/league-standings";
 import { PlayerCard } from "@/components/player-card";
@@ -114,60 +115,95 @@ function MemberRow({ m }: { m: MemberCard }) {
   );
 }
 
+const MATCH_COLS =
+  "grid-cols-[auto_minmax(0,1fr)] [grid-template-areas:'score_opp'_'meta_meta'] md:grid-cols-[6rem_5.5rem_minmax(10rem,1.3fr)_minmax(9rem,1fr)_9rem] md:[grid-template-areas:none]";
+
+/**
+ * League match history in the profile's match-row style
+ * (components/profile/match-row.tsx): a result-colored edge, date, W/L and
+ * score, opponent, competition and map.
+ */
 function MatchRows({ matches }: { matches: TeamMatch[] }) {
   if (!matches.length) return <p className="py-6 text-center text-sm text-white/50">No league matches yet.</p>;
-  const th = "px-3 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-white/50";
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm md:min-w-[45rem]">
-        <thead>
-          <tr className="border-b border-white/[0.08] text-left">
-            <th className={`${th} hidden pl-0 sm:table-cell`}>Date</th>
-            <th className={`${th} hidden md:table-cell`}>Competition</th>
-            <th className={`${th} pl-0 sm:pl-3`}>Opponent</th>
-            <th className={`${th} text-center`}>Result</th>
-            <th className={`${th} text-center`}>Score</th>
-            <th className={`${th} hidden pr-0 lg:table-cell`}>Map</th>
-          </tr>
-        </thead>
-        <tbody>
-          {matches.map((m) => (
-            <tr key={m.id} className="border-t border-white/[0.05] first:border-t-0 hover:bg-white/[0.02]">
-              <td className="hidden whitespace-nowrap py-2.5 pr-3 text-xs text-white/65 sm:table-cell">{day(m.date)}</td>
-              <td className="hidden px-3 py-2.5 md:table-cell">
-                <Link href={`/league/match/${m.id}`} className="block text-xs font-bold text-white hover:text-[#ff5500]">
-                  {m.seasonName}
-                  <span className="block font-semibold text-white/50">
-                    {m.division ?? "League"} · {m.round ? ROUND[m.round] ?? m.round : "Regular season"}
-                  </span>
-                </Link>
-              </td>
-              <td className="max-w-0 py-2.5 pr-2 sm:px-3 md:max-w-none">
-                <TeamCell team={m.opponent} size={24} />
-              </td>
-              <td className="px-2 py-2.5 text-center">
-                {m.result ? (
+    <div className="-mx-4 overflow-hidden border-y border-white/[0.06] sm:-mx-5 md:mx-0 md:rounded-[0.625rem] md:border">
+      <div className={`hidden gap-2.5 border-b border-white/[0.06] bg-[#1a1a1a] px-4 py-2.5 text-[0.75rem] font-semibold text-[#6a6a6a] md:grid ${MATCH_COLS}`}>
+        <span>Date</span>
+        <span>Score</span>
+        <span>Opponent</span>
+        <span>Competition</span>
+        <span>Map</span>
+      </div>
+      <div className="divide-y divide-white/[0.05]">
+        {matches.map((m) => {
+          const win = m.result === "W";
+          const played = m.result !== null;
+          const edge = !played ? "border-l-white/15" : win ? "border-l-[#2ecc71]" : "border-l-[#e74c3c]";
+          const stage = m.round ? ROUND[m.round] ?? m.round : "Regular season";
+          const when = m.date
+            ? new Date(m.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
+            : "Date TBD";
+          const map = m.maps[0] ?? null;
+          return (
+            <div key={m.id} className={`grid ${MATCH_COLS} items-center gap-x-2.5 gap-y-1.5 border-l-[3px] px-3 py-2.5 hover:bg-white/[0.02] md:px-4 ${edge}`}>
+              <span className="hidden min-w-0 leading-tight md:block">
+                <span className="block truncate text-[0.875rem] font-semibold text-white">{when}</span>
+                <span className="block text-[0.75rem] text-[#8a8a8a]">{played ? stage : "Upcoming"}</span>
+              </span>
+              <Link
+                href={`/league/match/${m.id}`}
+                className="flex items-center font-semibold tabular-nums text-[#9a9a9a] [grid-area:score] hover:text-white md:[grid-area:auto]"
+                aria-label={`Match page vs ${m.opponent.name}`}
+              >
+                {played ? (
                   <span
-                    className={`inline-flex rounded px-2 py-0.5 text-[0.75rem] font-black ${
-                      m.result === "W" ? "bg-hl-green/15 text-hl-green" : "bg-hl-red/15 text-hl-red"
+                    className={`mr-2 inline-flex h-5 w-5 items-center justify-center rounded-[5px] text-[0.75rem] font-extrabold ${
+                      win ? "bg-[#2ecc71]/15 text-[#2ecc71]" : "bg-[#e74c3c]/15 text-[#e74c3c]"
                     }`}
                   >
-                    {m.result === "W" ? "Win" : "Loss"}
+                    {win ? "W" : "L"}
                   </span>
+                ) : null}
+                {m.forfeit ? (
+                  <span className="font-extrabold text-white">FF</span>
+                ) : m.scoreFor !== null && played ? (
+                  <>
+                    <span className={win ? "font-extrabold text-white" : ""}>{m.scoreFor}</span>
+                    <span className="mx-1">:</span>
+                    <span className={win ? "" : "font-extrabold text-white"}>{m.scoreAgainst}</span>
+                  </>
                 ) : (
-                  <span className="text-[0.75rem] font-bold text-white/45">Upcoming</span>
+                  <span className="text-[0.8125rem] font-bold text-white/45">vs</span>
                 )}
-              </td>
-              <td className="px-2 py-2.5 text-center tabular-nums">
-                <Link href={`/league/match/${m.id}`} className="font-bold text-white hover:text-[#ff5500]" aria-label={`Match page vs ${m.opponent.name}`}>
-                  {m.forfeit ? (m.result === "W" ? "W – FF" : "FF – W") : m.scoreFor !== null && m.result ? `${m.scoreFor} – ${m.scoreAgainst}` : "vs"}
-                </Link>
-              </td>
-              <td className="hidden py-2.5 pl-3 text-xs text-white/65 lg:table-cell">{m.maps.join(", ") || "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </Link>
+              <span className="min-w-0 [grid-area:opp] md:[grid-area:auto]">
+                <TeamCell team={m.opponent} size={24} />
+              </span>
+              <Link href={`/league/match/${m.id}`} className="hidden min-w-0 leading-tight hover:[&_span]:text-white md:block">
+                <span className="block truncate text-[0.8125rem] font-semibold text-[#e8e8e8]">{m.seasonName}</span>
+                <span className="block truncate text-[0.75rem] text-[#8a8a8a]">{m.division ?? "League"}</span>
+              </Link>
+              <span className="hidden min-w-0 items-center gap-2.5 text-[0.875rem] text-[#e8e8e8] md:flex">
+                {map ? (
+                  <>
+                    <MapThumb map={map} className="h-[1.625rem] w-10" />
+                    <span className="truncate">
+                      {map}
+                      {m.maps.length > 1 ? <span className="text-[#8a8a8a]"> +{m.maps.length - 1}</span> : null}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[#6a6a6a]">—</span>
+                )}
+              </span>
+              <span className="truncate text-[0.75rem] text-[#8a8a8a] [grid-area:meta] md:hidden">
+                {when} · {played ? stage : "Upcoming"} · {m.seasonName}
+                {map ? ` · ${m.maps.join(", ")}` : ""}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

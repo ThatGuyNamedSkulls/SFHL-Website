@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { getMatchesForPlayer, getAllMatchIds } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { getMatchesForPlayer } from "@/lib/db";
 import { prettyMap, prettyRegion } from "@/lib/format";
+import { recentMatches } from "@/lib/match-list";
 
 export async function GET(request: Request) {
   try {
@@ -30,16 +32,13 @@ export async function GET(request: Request) {
       return NextResponse.json(mapped);
     }
 
-    // Return all distinct matches (most recent first), with clean labels.
-    const allMatches = await getAllMatchIds();
-    const matchIds = allMatches.map((m) => ({
-      matchId: m.match_id,
-      date: m.timestamp?.split(" ")[0] || "",
-      map: prettyMap(m.map_name),
-      region: prettyRegion(m.region),
-    }));
-    return NextResponse.json(matchIds);
-    
+    // Site-wide list (/matches, dashboard, landing): newest first, in pages.
+    // ?limit=1..100 (default 50) &offset=; the viewer's own line comes along.
+    const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 50));
+    const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
+    const session = await getSession().catch(() => null);
+    const page = await recentMatches({ limit, offset, viewer: session?.playerName ?? null });
+    return NextResponse.json(page);
   } catch (error) {
     console.error("Error fetching matches:", error);
     return NextResponse.json(

@@ -15,11 +15,11 @@ import {
   ArrowUpRight,
   Crosshair,
   Target,
-  MapPin,
-  Swords,
 } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
 import { profileHref } from "@/lib/profile-link";
+import { MatchListHeader, MatchListRow } from "@/components/match-list-row";
+import type { MatchSummary } from "@/lib/match-list";
 
 interface ApiPlayer {
   id: string;
@@ -37,17 +37,10 @@ interface ApiStats {
   totalKills: number;
 }
 
-interface ApiMatch {
-  matchId: number;
-  date: string;
-  map: string;
-  region: string;
-}
-
 /** Marketing / landing page shown to logged-out visitors. */
 export function LandingPage() {
   const [topPlayers, setTopPlayers] = useState<ApiPlayer[]>([]);
-  const [recentMatches, setRecentMatches] = useState<ApiMatch[]>([]);
+  const [recentMatches, setRecentMatches] = useState<MatchSummary[]>([]);
   const [stats, setStats] = useState<ApiStats>({ activePlayers: 0, totalMatches: 0, totalKills: 0 });
 
   useEffect(() => {
@@ -59,8 +52,8 @@ export function LandingPage() {
         if (ok && json && typeof json.activePlayers === "number") setStats(json);
       })
       .catch(console.error);
-    apiGetJson<ApiMatch[]>("/api/matches")
-      .then(({ json: data }) => setRecentMatches(Array.isArray(data) ? data.slice(0, 6) : []))
+    apiGetJson<{ matches?: MatchSummary[] }>("/api/matches?limit=6")
+      .then(({ json: data }) => setRecentMatches(Array.isArray(data?.matches) ? data.matches : []))
       .catch(console.error);
   }, []);
 
@@ -156,29 +149,13 @@ export function LandingPage() {
             No matches recorded yet.
           </Card>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recentMatches.map((match) => (
-              <Link href={`/match/${match.matchId}`} key={match.matchId}>
-                <Card className="bg-hl-panel border-hl-border p-5 card-hover-glow group cursor-pointer">
-                  <div className="flex items-center justify-between mb-3">
-                    <Badge className="bg-hl-gold/10 text-hl-gold border-hl-gold/30 text-xs">
-                      <Swords className="w-3 h-3 mr-1" /> Match
-                    </Badge>
-                    <span className="text-xs text-hl-muted">{match.date}</span>
-                  </div>
-                  <h3 className="text-lg font-bold text-white mb-2 group-hover:text-hl-gold transition-colors flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-hl-muted" />
-                    {match.map}
-                  </h3>
-                  <div className="flex items-center justify-between text-sm text-hl-muted">
-                    <span>{match.region}</span>
-                    <span className="flex items-center gap-1 text-hl-gold group-hover:underline">
-                      View scoreboard <ArrowUpRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                </Card>
-              </Link>
-            ))}
+          <div className="overflow-hidden rounded-[0.875rem] border border-white/[0.08] bg-[#1c1c1c]">
+            <MatchListHeader />
+            <div className="divide-y divide-white/[0.05]">
+              {recentMatches.map((match) => (
+                <MatchListRow key={match.matchId} match={match} />
+              ))}
+            </div>
           </div>
         )}
       </section>

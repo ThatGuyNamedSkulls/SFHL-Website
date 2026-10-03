@@ -36,6 +36,11 @@ export function formatMemberSince(raw: string | null | undefined): string | null
 export function formatMatchWhen(raw: string | null | undefined): { day: string; time: string } {
   const ms = parseDbTime(raw);
   if (ms == null) return { day: raw ?? "", time: "" };
+  return formatWhen(ms);
+}
+
+/** formatMatchWhen for a timestamp in ms. */
+export function formatWhen(ms: number): { day: string; time: string } {
   const d = new Date(ms);
   return {
     day: d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }),

@@ -14,13 +14,14 @@ import {
   ChevronRight,
   Globe,
   Megaphone,
-  ArrowUpRight,
   Zap,
   UserPlus,
   Gem,
 } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
 import { PRO_QUEUE_ENABLED } from "@/lib/queue-modes";
+import { MatchListHeader, MatchListRow } from "@/components/match-list-row";
+import type { MatchSummary } from "@/lib/match-list";
 
 interface DashboardProps {
   session: UserSession;
@@ -42,13 +43,6 @@ interface Announcement {
   attachments: string[];
 }
 
-interface RecentMatch {
-  matchId: number;
-  date: string;
-  map: string;
-  region: string;
-}
-
 interface LiveLobbyHint {
   channelName: string;
   voiceChannelUrl: string | null;
@@ -67,7 +61,7 @@ export function Dashboard({ session }: DashboardProps) {
   const [partyAvatars, setPartyAvatars] = useState<PartyAvatar[]>([]);
   const [partyLooking, setPartyLooking] = useState(0);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
-  const [matches, setMatches] = useState<RecentMatch[]>([]);
+  const [matches, setMatches] = useState<MatchSummary[]>([]);
   const [liveLobby, setLiveLobby] = useState<LiveLobbyHint | null>(null);
   // Pro Matchmaking is shown to everyone; below S2 the card is locked.
   const [proEligible, setProEligible] = useState(false);
@@ -101,8 +95,8 @@ export function Dashboard({ session }: DashboardProps) {
     apiGetJson<{ proEligible?: boolean }>("/api/queue")
       .then(({ json: d }) => setProEligible(d?.proEligible === true))
       .catch(() => {});
-    apiGetJson<RecentMatch[]>("/api/matches")
-      .then(({ json: d }) => setMatches(Array.isArray(d) ? d.slice(0, 4) : []))
+    apiGetJson<{ matches?: MatchSummary[] }>("/api/matches?limit=5")
+      .then(({ json: d }) => setMatches(Array.isArray(d?.matches) ? d.matches : []))
       .catch(() => {});
     apiGetJson<{ lobby?: { channelName: string; voiceChannelUrl?: string | null } | null }>("/api/lobby")
       .then(({ json: d }) => {
@@ -312,24 +306,13 @@ export function Dashboard({ session }: DashboardProps) {
                 No matches recorded yet.
               </Card>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-3">
-                {matches.map((m) => (
-                  <Link key={m.matchId} href={`/match/${m.matchId}`}>
-                    <Card className="bg-hl-panel border-hl-border p-4 card-hover-glow group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-bold text-white group-hover:text-hl-gold transition-colors">
-                            {m.map}
-                          </div>
-                          <div className="text-xs text-hl-muted mt-0.5">
-                            {m.region} · {m.date}
-                          </div>
-                        </div>
-                        <ArrowUpRight className="w-4 h-4 text-hl-muted group-hover:text-hl-gold" />
-                      </div>
-                    </Card>
-                  </Link>
-                ))}
+              <div className="overflow-hidden rounded-[0.875rem] border border-white/[0.08] bg-[#1c1c1c]">
+                <MatchListHeader />
+                <div className="divide-y divide-white/[0.05]">
+                  {matches.map((m) => (
+                    <MatchListRow key={m.matchId} match={m} />
+                  ))}
+                </div>
               </div>
             )}
           </div>

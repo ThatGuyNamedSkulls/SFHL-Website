@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { publicErrorMessage } from "@/lib/route-errors";
 import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
+import { clanPayload } from "@/lib/clan-payload";
 import {
   cancelJoinRequest,
-  clubForClient,
-  clubLeaderboard,
   notifyJoinRequest,
   requestToJoin,
 } from "@/lib/clubs";
@@ -36,8 +35,7 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
         console.error("clan join request notify", error);
       }
     }
-    const leaderboard = await clubLeaderboard(club);
-    return NextResponse.json({ club: clubForClient(club, session.discordId), leaderboard });
+    return NextResponse.json(await clanPayload(club, session.discordId));
   } catch (error) {
     return NextResponse.json(
       { error: publicErrorMessage(error, "Failed to send the request.") },
@@ -57,8 +55,7 @@ export async function DELETE(_request: Request, ctx: { params: Promise<{ id: str
   const { id } = await ctx.params;
   try {
     const club = await cancelJoinRequest(id, session.discordId);
-    const leaderboard = await clubLeaderboard(club);
-    return NextResponse.json({ club: clubForClient(club, session.discordId), leaderboard });
+    return NextResponse.json(await clanPayload(club, session.discordId));
   } catch (error) {
     return NextResponse.json(
       { error: publicErrorMessage(error, "Failed to cancel the request.") },

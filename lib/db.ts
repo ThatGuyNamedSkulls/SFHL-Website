@@ -957,33 +957,6 @@ export async function getPlacementGamesTotal(): Promise<number> {
   }
 }
 
-export async function getAllMatchIds(): Promise<{ match_id: number; timestamp: string; map_name: string; region: string }[]> {
-  const sql = `SELECT DISTINCT match_id,
-            MIN(timestamp) as timestamp,
-            map_name,
-            region
-     FROM match_history
-     WHERE match_id IS NOT NULL AND COALESCE(is_test, 0) = 0
-     GROUP BY match_id
-     ORDER BY MIN(timestamp) DESC`;
-  try {
-    const rs = await client.execute(sql);
-    return rs.rows as unknown as { match_id: number; timestamp: string; map_name: string; region: string }[];
-  } catch {
-    const rs = await client.execute(
-      `SELECT DISTINCT match_id,
-              MIN(timestamp) as timestamp,
-              map_name,
-              region
-       FROM match_history
-       WHERE match_id IS NOT NULL
-       GROUP BY match_id
-       ORDER BY MIN(timestamp) DESC`
-    );
-    return rs.rows as unknown as { match_id: number; timestamp: string; map_name: string; region: string }[];
-  }
-}
-
 export interface PlayedWithRow {
   name: string;
   /** Matches played on the same side. */

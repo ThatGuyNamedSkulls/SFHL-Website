@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { publicErrorMessage } from "@/lib/route-errors";
 import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
-import { clubForClient, clubLeaderboard, leaveClub } from "@/lib/clubs";
+import { clanPayload } from "@/lib/clan-payload";
+import { leaveClub } from "@/lib/clubs";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,7 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
   try {
     const club = await leaveClub(id, session.discordId);
     if (!club) return NextResponse.json({ ok: true });
-    const leaderboard = await clubLeaderboard(club);
-    return NextResponse.json({ club: clubForClient(club, session.discordId), leaderboard });
+    return NextResponse.json(await clanPayload(club, session.discordId));
   } catch (error) {
     return NextResponse.json(
       { error: publicErrorMessage(error, "Failed to leave.") },

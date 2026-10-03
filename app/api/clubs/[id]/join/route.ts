@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { publicErrorMessage } from "@/lib/route-errors";
 import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
-import { clubForClient, clubLeaderboard, joinClub } from "@/lib/clubs";
+import { clanPayload } from "@/lib/clan-payload";
+import { joinClub } from "@/lib/clubs";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +31,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       },
       invite
     );
-    const leaderboard = await clubLeaderboard(club);
-    return NextResponse.json({ club: clubForClient(club, session.discordId), leaderboard });
+    return NextResponse.json(await clanPayload(club, session.discordId));
   } catch (error) {
     return NextResponse.json(
       { error: publicErrorMessage(error, "Failed to join.") },

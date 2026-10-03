@@ -10,9 +10,13 @@ import {
   createClub,
   listClubs,
   ownedClubCount,
+  roleById,
+  sortMembersByRole,
   summarizeClub,
 } from "@/lib/clubs";
 import { refundPlayerCoins, spendPlayerCoins } from "@/lib/db";
+import { clanListStats, type ClanListStats } from "@/lib/clan-stats";
+import { remember } from "@/lib/server-cache";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -23,15 +27,28 @@ export async function GET(request: Request) {
     const player = new URL(request.url).searchParams.get("player")?.trim();
     const clubs = player ? await clubsForPlayer(player) : await listClubs();
     const mineId = session?.discordId ?? null;
+    // Card numbers for the list (docs/CLANS_UI_PLAN.md §4.4), kept for a minute:
+    // members' ranks and the matches they played together this week.
+    const ordered = clubs.map((club) => ({ id: club.id, members: sortMembersByRole(club) }));
+    const statsKey = `clan-list-stats:${ordered.map((c) => `${c.id}.${c.members.length}`).join(",")}`;
+    const stats = await remember(statsKey, 60_000, () => clanListStats(ordered)).catch(
+      () => new Map<string, ClanListStats>()
+    );
     return NextResponse.json({
       count: clubs.length,
       createCost: CLUB_CREATE_COST,
       maxOwned: MAX_OWNED_CLUBS,
       ownedCount: mineId ? await ownedClubCount(mineId) : 0,
-      clubs: clubs.map((club) => ({
-        ...summarizeClub(club),
-        mine: mineId ? club.members.some((m) => m.discordId === mineId) : false,
-      })),
+      clubs: clubs.map((club) => {
+        const role = mineId ? club.members.find((m) => m.discordId === mineId)?.role ?? null : null;
+        return {
+          ...summarizeClub(club),
+          createdAt: club.createdAt,
+          mine: !!role,
+          myRole: role ? roleById(club, role).name : null,
+          stats: stats.get(club.id) ?? null,
+        };
+      }),
     });
   } catch (error) {
     console.error("clans GET", error);

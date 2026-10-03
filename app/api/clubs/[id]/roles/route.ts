@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import { publicErrorMessage } from "@/lib/route-errors";
 import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
+import { clanPayload } from "@/lib/clan-payload";
 import { containsProfanity } from "@/lib/content-moderation";
 import {
   addClubRole,
-  clubForClient,
-  clubLeaderboard,
   deleteClubRole,
   getClub,
   setMemberRole,
@@ -18,8 +17,7 @@ export const dynamic = "force-dynamic";
 async function ok(id: string, viewerId: string) {
   const club = await getClub(id);
   if (!club) return NextResponse.json({ error: "Clan not found." }, { status: 404 });
-  const leaderboard = await clubLeaderboard(club);
-  return NextResponse.json({ club: clubForClient(club, viewerId), leaderboard });
+  return NextResponse.json(await clanPayload(club, viewerId));
 }
 
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {

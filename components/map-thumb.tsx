@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { prettyMap } from "@/lib/format";
 
 const WASH: Record<string, [string, string]> = {
@@ -38,6 +38,13 @@ export function MapThumb({ map, className = "w-14 h-9" }: { map: string; classNa
   const label = prettyMap(map);
   const slug = mapImageSlug(map);
   const [attempt, setAttempt] = useState(0);
+  // Only probe for the image once hydrated: on a server-rendered page a 404
+  // before hydration skips onError and leaves a broken image with its alt text.
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const [from, to] = WASH[label.toLowerCase()] ?? ["#6a6a6a", "#222"];
   const known = resolved.get(slug);
   const src =
@@ -53,7 +60,7 @@ export function MapThumb({ map, className = "w-14 h-9" }: { map: string; classNa
         style={{ background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` }}
       />
       <span className="absolute inset-0 bg-[radial-gradient(circle_at_30%_35%,rgba(255,255,255,0.28),transparent_55%)]" />
-      {src ? (
+      {src && hydrated ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={src}

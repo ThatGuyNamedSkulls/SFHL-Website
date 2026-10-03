@@ -373,6 +373,22 @@ export async function getClub(id: string): Promise<Club | null> {
   return parseClub(rs.rows[0].data);
 }
 
+/** The clan using a tag (case and symbols ignored), or null. */
+export async function getClubByTag(raw: string): Promise<Club | null> {
+  const tag = normalizeClubTag(raw);
+  if (!TAG_RE.test(tag)) return null;
+  const clubs = await listClubs();
+  return clubs.find((club) => club.tag === tag) ?? null;
+}
+
+/** A clan by its id, or by its tag (/clans/NOVA, docs/CLANS_UI_PLAN.md Q2). Ids
+ *  are 8 characters and tags at most 5, so the two never collide. */
+export async function getClubByIdOrTag(idOrTag: string): Promise<Club | null> {
+  const key = idOrTag.trim();
+  if (!key) return null;
+  return (await getClub(key)) ?? (await getClubByTag(key));
+}
+
 export async function clubsForMember(discordId: string): Promise<Club[]> {
   const clubs = await listClubs();
   return clubs.filter((club) => club.members.some((m) => m.discordId === discordId));
@@ -784,6 +800,14 @@ export async function createInvite(id: string, discordId: string): Promise<Club>
       { token: randomUUID().replace(/-/g, "").slice(0, 10), createdBy: discordId, createdAt: Date.now() },
       ...club.invites,
     ].slice(0, 5);
+  });
+}
+
+/** Turn off one invite link. Needs the invite permission. */
+export async function revokeInvite(id: string, actorId: string, token: string): Promise<Club> {
+  return mutateClub(id, (club) => {
+    if (!actorCan(club, actorId, "canInvite")) throw new Error("You cannot manage invite links.");
+    club.invites = club.invites.filter((inv) => inv.token !== token);
   });
 }
 
