@@ -2,8 +2,10 @@
  * Season prestige (docs/QUEUE_UI_PLAN.md, Q4): every 20 ranked wins in a season
  * is one prestige level, up to Prestige 5 (100 wins). It starts again each
  * season. Each level reached pays HL Coins once (coin ledger key
- * `prestige:<season>:<playerId>:<level>`) and grants the "Prestige N" badge,
- * which the player keeps.
+ * `prestige:<season>:<playerId>:<level>`) and upgrades the player's one
+ * Prestige badge to that level: the same inventory row changes item, so an
+ * equipped badge stays equipped and in its place. It never goes down — a
+ * Prestige 3 from last season stays when Prestige 1 comes round again.
  *
  * Wins are counted from match_history since the last /season reset, because
  * players.matches_won is a career total that survives resets. Placement and
@@ -11,7 +13,8 @@
  */
 import { client, getSeasonResets } from "@/lib/db";
 import { coinMoveStatements, ensureCoinLedger, isDuplicateKeyError, type Stmt } from "@/lib/coin-ledger";
-import { ensureCosmeticsSchema } from "@/lib/cosmetics";
+import { PRESTIGE_BADGE_SLUGS, ensureCosmeticsSchema } from "@/lib/cosmetics";
+import { forgetNameBadges } from "@/lib/name-badge";
 import { addNotification } from "@/lib/social";
 
 export const PRESTIGE_WINS_PER_LEVEL = 20;
@@ -103,6 +106,46 @@ function badgeItemStatement(level: number): Stmt {
   };
 }
 
+/**
+ * Give the player the level's badge, or upgrade the Prestige badge they have
+ * (only from a lower level). Runs inside the level's payment transaction.
+ */
+function badgeUpgradeStatements(playerName: string, playerId: number, level: number, now: number): Stmt[] {
+  const all = PRESTIGE_BADGE_SLUGS.map(() => "?").join(",");
+  const lower = PRESTIGE_BADGE_SLUGS.slice(0, level - 1);
+  const stmts: Stmt[] = [
+    {
+      sql: `INSERT OR IGNORE INTO cosmetic_inventory
+            (player_name, player_id, item_id, granted_by, granted_at)
+            SELECT ?, ?, id, 'system:prestige', ? FROM cosmetic_items WHERE slug = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM cosmetic_inventory v JOIN cosmetic_items i ON i.id = v.item_id
+                WHERE v.player_name = ? AND i.slug IN (${all}))`,
+      args: [playerName, playerId, now, badgeSlug(level), playerName, ...PRESTIGE_BADGE_SLUGS],
+    },
+  ];
+  if (lower.length) {
+    stmts.push({
+      sql: `UPDATE cosmetic_inventory
+            SET item_id = (SELECT id FROM cosmetic_items WHERE slug = ?), granted_at = ?, granted_by = 'system:prestige'
+            WHERE player_name = ?
+              AND item_id IN (SELECT id FROM cosmetic_items WHERE slug IN (${lower.map(() => "?").join(",")}))`,
+      args: [badgeSlug(level), now, playerName, ...lower],
+    });
+  }
+  return stmts;
+}
+
+/** The level of the Prestige badge a player owns (0 for none). */
+async function ownedBadgeLevel(playerName: string): Promise<number> {
+  const rs = await client.execute({
+    sql: `SELECT i.slug FROM cosmetic_inventory v JOIN cosmetic_items i ON i.id = v.item_id
+          WHERE v.player_name = ? AND i.slug IN (${PRESTIGE_BADGE_SLUGS.map(() => "?").join(",")})`,
+    args: [playerName, ...PRESTIGE_BADGE_SLUGS],
+  });
+  return Math.max(0, ...rs.rows.map((r) => PRESTIGE_BADGE_SLUGS.indexOf(String(r.slug)) + 1));
+}
+
 export interface PrestigeStatus extends PrestigeProgress {
   season: SeasonInfo;
   /** Levels whose reward was paid by this call. */
@@ -112,7 +155,7 @@ export interface PrestigeStatus extends PrestigeProgress {
 /**
  * The player's prestige this season, paying any level not yet rewarded: HL
  * Coins (once per season, level and player — the ledger key makes parallel
- * calls safe) and the "Prestige N" badge. Sends a site notification per new level.
+ * calls safe) and the Prestige badge upgrade. Sends a site notification per new level.
  */
 export async function syncPrestige(playerName: string): Promise<PrestigeStatus> {
   const season = await currentSeason();
@@ -135,6 +178,7 @@ export async function syncPrestige(playerName: string): Promise<PrestigeStatus> 
   const missing = levels.filter((level) => !paid.has(keyFor(level)));
   if (!missing.length) return status;
 
+  let badgeLevel = await ownedBadgeLevel(playerName);
   for (const level of missing) {
     try {
       // One transaction: the coins (once, by ledger key), the catalog row, the badge.
@@ -147,12 +191,7 @@ export async function syncPrestige(playerName: string): Promise<PrestigeStatus> 
             reason: `Prestige ${level} · ${season.label}`,
           }),
           badgeItemStatement(level),
-          {
-            sql: `INSERT OR IGNORE INTO cosmetic_inventory
-                  (player_name, player_id, item_id, granted_by, granted_at)
-                  SELECT ?, ?, id, 'system:prestige', ? FROM cosmetic_items WHERE slug = ?`,
-            args: [playerName, Number(playerId), Date.now(), badgeSlug(level)],
-          },
+          ...badgeUpgradeStatements(playerName, Number(playerId), level, Date.now()),
         ],
         "write"
       );
@@ -161,11 +200,16 @@ export async function syncPrestige(playerName: string): Promise<PrestigeStatus> 
       throw error;
     }
     status.newlyReached.push(level);
+    const upgraded = level > badgeLevel;
+    badgeLevel = Math.max(badgeLevel, level);
     await addNotification(
       playerName,
       "prestige",
-      `You reached Prestige ${level} in ${season.label}! +${PRESTIGE_COINS_PER_LEVEL} HL Coins and the Prestige ${level} badge.`
+      `You reached Prestige ${level} in ${season.label}! +${PRESTIGE_COINS_PER_LEVEL} HL Coins` +
+        (upgraded ? ` and your Prestige badge is now Prestige ${level}.` : ".")
     ).catch(() => undefined);
   }
+  // An equipped Prestige badge shows next to the name: drop the cached lookup.
+  if (status.newlyReached.length) forgetNameBadges();
   return status;
 }

@@ -26,7 +26,9 @@ import {
   MapPin,
   Sparkles,
   Tag,
+  PenLine,
 } from "lucide-react";
+import { profileHref as profileUrl } from "@/lib/profile-link";
 
 interface TagClub {
   id: string;
@@ -49,6 +51,32 @@ export default function SettingsPage() {
   const [displayedTag, setDisplayedTag] = useState<string | null>(null);
   const [savingTag, setSavingTag] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
+  const [bio, setBio] = useState("");
+  const [bioDraft, setBioDraft] = useState("");
+  const [bioMax, setBioMax] = useState(160);
+  const [savingBio, setSavingBio] = useState(false);
+  const [bioNote, setBioNote] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!session?.playerName) return;
+    fetch("/api/me/bio")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        setBio(typeof d.bio === "string" ? d.bio : "");
+        setBioDraft(typeof d.bio === "string" ? d.bio : "");
+        if (typeof d.max === "number") setBioMax(d.max);
+      })
+      .catch(() => {});
+  }, [session?.playerName]);
+
+  // The profile's "Write a bio" links to /settings#bio, but the card only
+  // renders once the session has loaded — too late for the browser's own jump.
+  useEffect(() => {
+    if (session?.playerName && window.location.hash === "#bio") {
+      document.getElementById("bio")?.scrollIntoView({ block: "start" });
+    }
+  }, [session?.playerName]);
 
   useEffect(() => {
     fetch("/api/players/country")
@@ -112,6 +140,29 @@ export default function SettingsPage() {
     }
   };
 
+  const saveBio = async () => {
+    setSavingBio(true);
+    setBioNote(null);
+    try {
+      const res = await fetch("/api/me/bio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bio: bioDraft }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBioNote({ ok: false, text: typeof data.error === "string" ? data.error : "Could not save your bio" });
+        return;
+      }
+      const saved = typeof data.bio === "string" ? data.bio : "";
+      setBio(saved);
+      setBioDraft(saved);
+      setBioNote({ ok: true, text: saved ? "Saved — it's on your profile now." : "Bio removed." });
+    } finally {
+      setSavingBio(false);
+    }
+  };
+
   const saveClubTag = async (clubId: string | null) => {
     setSavingTag(true);
     setTagError(null);
@@ -162,9 +213,7 @@ export default function SettingsPage() {
     );
   }
 
-  const profileHref = `/profile?player=${encodeURIComponent(
-    session.playerName || session.username
-  )}`;
+  const profileHref = profileUrl(session.playerName || session.username);
 
   return (
     <div className="hl-page">
@@ -296,6 +345,47 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </Card>
+      )}
+
+      {/* About me (only when linked to a player) */}
+      {session.playerName && (
+        <Card id="bio" className="bg-hl-panel border-hl-border p-4 md:p-6 mb-6 scroll-mt-20">
+          <h2 className="text-sm font-bold text-white header-caps mb-1 flex items-center gap-2">
+            <PenLine className="w-4 h-4 text-hl-gold" /> About me
+          </h2>
+          <p className="text-xs text-hl-muted mb-4">
+            A short line about you, shown on your profile. Keep it friendly — the same word filter as the guestbook applies.
+          </p>
+          <textarea
+            value={bioDraft}
+            onChange={(e) => {
+              setBioDraft(e.target.value.slice(0, bioMax));
+              setBioNote(null);
+            }}
+            rows={3}
+            maxLength={bioMax}
+            placeholder="Entry for my clan. Mirage enjoyer. Add me for 5-stacks after 20:00."
+            className="w-full resize-none rounded-lg border border-hl-border bg-hl-base px-3 py-2 text-sm text-white placeholder:text-hl-muted focus:border-hl-gold/50 focus:outline-none"
+          />
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <span className="text-[0.75rem] text-hl-muted tabular-nums">
+              {bioDraft.length}/{bioMax}
+            </span>
+            <div className="flex items-center gap-3">
+              {bioNote ? (
+                <span className={`text-xs ${bioNote.ok ? "text-hl-green" : "text-hl-red"}`}>{bioNote.text}</span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void saveBio()}
+                disabled={savingBio || bioDraft.trim() === bio.trim()}
+                className="px-4 py-1.5 rounded-md bg-gold-gradient text-hl-base text-xs font-black header-caps disabled:opacity-40"
+              >
+                {savingBio ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
         </Card>
       )}
 

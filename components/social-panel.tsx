@@ -23,6 +23,7 @@ import { useMyParty } from "@/components/use-my-party";
 import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
 import { RAIL_CHAT_MESSAGES, onlineBadgeCount } from "@/lib/chat-limits";
 import { startPolling } from "@/lib/poll-gate";
+import { profileHref } from "@/lib/profile-link";
 
 const OPEN_POLL_MS = 15000;
 const CLOSED_POLL_MS = 30000;
@@ -234,7 +235,7 @@ function SocialDrawer({
       <li key={f.name} className="group flex items-center gap-3 px-4 py-2 hover:bg-white/[0.03]">
         <StatusAvatar name={f.name} avatar={f.avatar} online={on} />
         <Link
-          href={`/profile?player=${encodeURIComponent(f.name)}`}
+          href={profileHref(f.name)}
           className={`min-w-0 flex-1 truncate text-[0.875rem] font-semibold hover:underline ${on ? "text-white" : "text-[#bdbdbd]"}`}
         >
           {f.name}

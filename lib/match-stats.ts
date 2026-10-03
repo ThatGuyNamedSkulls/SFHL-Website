@@ -121,10 +121,10 @@ const COLOR_GREEN = "#2ecc71";
 const COLOR_RED = "#e74c3c";
 const COLOR_NEUTRAL = "#8a8a8a";
 const COLOR_WHITE = "#e8e8e8";
-const COLOR_ORANGE = "#ff5500";
 
+/** Great (≥ 1.40) = gold, like an extra-good swing; good = green; average = white; poor = red. */
 export function ratingColor(rating: number): string {
-  if (rating >= RATING_GREAT) return COLOR_ORANGE;
+  if (rating >= RATING_GREAT) return COLOR_GOLD;
   if (rating >= 1.25) return COLOR_GREEN;
   if (rating >= 0.8) return COLOR_WHITE;
   return COLOR_RED;

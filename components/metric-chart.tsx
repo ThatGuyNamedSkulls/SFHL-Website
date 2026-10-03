@@ -19,7 +19,8 @@ interface MetricChartProps {
 
 const METRICS = [
   { id: "kd", label: "K/D", pick: (m: Match) => m.kdr, decimals: 2 },
-  { id: "swing", label: "Swing", pick: (m: Match) => m.eloChange, decimals: 0 },
+  // Elo gained or lost (not the rating "swing" on the Summary cards).
+  { id: "elo", label: "Elo ±", pick: (m: Match) => m.eloChange, decimals: 0 },
   { id: "hs", label: "HS %", pick: (m: Match) => m.headshotPercent, decimals: 0 },
   { id: "score", label: "Score", pick: (m: Match) => m.score, decimals: 0 },
 ] as const;
@@ -27,8 +28,9 @@ const METRICS = [
 type MetricId = (typeof METRICS)[number]["id"];
 
 /**
- * FACEIT-style per-match metric chart: pill selector (K/D, Swing, HS %, Score)
- * over a line chart, with highest/lowest chips on the side.
+ * FACEIT-style per-match metric chart: pill selector (K/D, Elo ±, HS %, Score)
+ * over a line chart, with highest/lowest chips on the side. Straight lines:
+ * a smoothed curve suggests values between matches.
  */
 export function MetricChart({ matches }: MetricChartProps) {
   const [metricId, setMetricId] = useState<MetricId>("kd");
@@ -77,7 +79,7 @@ export function MetricChart({ matches }: MetricChartProps) {
                 labelFormatter={(v) => `Match ${v}`}
                 formatter={(value) => [fmt(Number(value)), metric.label]}
               />
-              <Line type="monotone" dataKey="value" stroke="#8884ff" strokeWidth={2} dot={false} activeDot={{ r: 3, fill: "#8884ff" }} />
+              <Line type="linear" dataKey="value" stroke="#8884ff" strokeWidth={2} dot={false} activeDot={{ r: 3, fill: "#8884ff" }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

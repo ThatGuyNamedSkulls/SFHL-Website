@@ -8,37 +8,38 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Filter } from "lucide-react";
+import {
+  RANGE_LABELS,
+  RESULT_LABELS,
+  type MatchFilters,
+} from "@/lib/match-filters";
 
-export interface MatchFilters {
-  map: string; // "ALL" or a map name
-  result: "ALL" | "W" | "L";
-  range: "ALL" | "30d" | "90d";
-}
-
-export const DEFAULT_FILTERS: MatchFilters = {
-  map: "ALL",
-  result: "ALL",
-  range: "ALL",
-};
+export { DEFAULT_FILTERS, applyMatchFilters, type MatchFilters } from "@/lib/match-filters";
 
 interface StatsFiltersProps {
   maps: string[];
+  /** Gamemodes present in the list; the Mode filter hides with fewer than two. */
+  modes?: string[];
   value: MatchFilters;
   onChange: (next: MatchFilters) => void;
   count?: number;
+  total?: number;
 }
 
-/** FACEIT-style filters bar: map, result, and time range. */
-export function StatsFilters({ maps, value, onChange, count }: StatsFiltersProps) {
+const TRIGGER = "bg-hl-panel border-hl-border text-white text-sm h-9";
+
+/** FACEIT-style filters bar: map, result, mode and time range. */
+export function StatsFilters({ maps, modes = [], value, onChange, count, total }: StatsFiltersProps) {
   const set = (patch: Partial<MatchFilters>) => onChange({ ...value, ...patch });
 
   return (
-    <div className="flex flex-wrap items-center gap-3 mb-4">
-      <Filter className="w-4 h-4 text-hl-muted" />
+    <div className="flex flex-wrap items-center gap-2.5">
+      <Filter className="w-4 h-4 text-hl-muted" aria-hidden />
 
       <Select value={value.map} onValueChange={(v) => set({ map: v ?? "ALL" })}>
-        <SelectTrigger className="w-full min-w-[8.75rem] sm:w-[9.375rem] bg-hl-panel border-hl-border text-white text-sm">
-          <SelectValue placeholder="Map" />
+        <SelectTrigger className={`${TRIGGER} min-w-[8.75rem]`} aria-label="Map">
+          {/* Labels come from here: a bare <SelectValue /> printed the raw value ("ALL"). */}
+          <SelectValue>{(v: string) => (v === "ALL" ? "All maps" : v)}</SelectValue>
         </SelectTrigger>
         <SelectContent className="bg-hl-panel border-hl-border text-white">
           <SelectItem value="ALL">All maps</SelectItem>
@@ -50,58 +51,55 @@ export function StatsFilters({ maps, value, onChange, count }: StatsFiltersProps
         </SelectContent>
       </Select>
 
-      <Select
-        value={value.result}
-        onValueChange={(v) => set({ result: v as MatchFilters["result"] })}
-      >
-        <SelectTrigger className="w-full min-w-[7.5rem] sm:w-[8.125rem] bg-hl-panel border-hl-border text-white text-sm">
-          <SelectValue placeholder="Result" />
+      <Select value={value.result} onValueChange={(v) => set({ result: (v ?? "ALL") as MatchFilters["result"] })}>
+        <SelectTrigger className={`${TRIGGER} min-w-[8rem]`} aria-label="Result">
+          <SelectValue>{(v: MatchFilters["result"]) => RESULT_LABELS[v] ?? v}</SelectValue>
         </SelectTrigger>
         <SelectContent className="bg-hl-panel border-hl-border text-white">
-          <SelectItem value="ALL">All results</SelectItem>
-          <SelectItem value="W">Wins</SelectItem>
-          <SelectItem value="L">Losses</SelectItem>
+          {(Object.keys(RESULT_LABELS) as MatchFilters["result"][]).map((k) => (
+            <SelectItem key={k} value={k}>
+              {RESULT_LABELS[k]}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
-      <Select
-        value={value.range}
-        onValueChange={(v) => set({ range: v as MatchFilters["range"] })}
-      >
-        <SelectTrigger className="w-full min-w-[8.75rem] sm:w-[8.75rem] bg-hl-panel border-hl-border text-white text-sm">
-          <SelectValue placeholder="Time range" />
+      {modes.length > 1 ? (
+        <Select value={value.mode} onValueChange={(v) => set({ mode: v ?? "ALL" })}>
+          <SelectTrigger className={`${TRIGGER} min-w-[7.5rem]`} aria-label="Mode">
+            <SelectValue>{(v: string) => (v === "ALL" ? "All modes" : v)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent className="bg-hl-panel border-hl-border text-white">
+            <SelectItem value="ALL">All modes</SelectItem>
+            {modes.map((m) => (
+              <SelectItem key={m} value={m}>
+                {m}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
+
+      <Select value={value.range} onValueChange={(v) => set({ range: (v ?? "ALL") as MatchFilters["range"] })}>
+        <SelectTrigger className={`${TRIGGER} min-w-[8.75rem]`} aria-label="Time range">
+          <SelectValue>{(v: MatchFilters["range"]) => RANGE_LABELS[v] ?? v}</SelectValue>
         </SelectTrigger>
         <SelectContent className="bg-hl-panel border-hl-border text-white">
-          <SelectItem value="ALL">All time</SelectItem>
-          <SelectItem value="30d">Last 30 days</SelectItem>
-          <SelectItem value="90d">Last 90 days</SelectItem>
+          {(Object.keys(RANGE_LABELS) as MatchFilters["range"][]).map((k) => (
+            <SelectItem key={k} value={k}>
+              {RANGE_LABELS[k]}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
       {typeof count === "number" && (
-        <span className="text-xs text-hl-muted ml-auto">
-          {count} match{count === 1 ? "" : "es"}
+        <span className="text-xs text-hl-muted ml-auto tabular-nums">
+          {typeof total === "number" && total !== count
+            ? `${count} of ${total} matches`
+            : `${count} ${count === 1 ? "match" : "matches"}`}
         </span>
       )}
     </div>
   );
-}
-
-/** Apply a MatchFilters set to a list of matches (with a `date`, `map`, `result`). */
-export function applyMatchFilters<
-  T extends { map: string; result: string; date: string }
->(matches: T[], f: MatchFilters): T[] {
-  const now = Date.now();
-  const rangeMs =
-    f.range === "30d" ? 30 * 864e5 : f.range === "90d" ? 90 * 864e5 : null;
-
-  return matches.filter((m) => {
-    if (f.map !== "ALL" && m.map !== f.map) return false;
-    if (f.result !== "ALL" && m.result !== f.result) return false;
-    if (rangeMs !== null) {
-      const t = Date.parse(m.date);
-      if (!Number.isNaN(t) && now - t > rangeMs) return false;
-    }
-    return true;
-  });
 }

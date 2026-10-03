@@ -185,6 +185,15 @@ export interface Match {
   rank?: RankTierLetter;
   /** Elo the player had when this match started. */
   elo?: number;
+  /** Elo right after this match (elo + eloChange), when the start is known. */
+  eloAfter?: number;
+  /** match_history row id: the cursor for loading older matches. */
+  rowId?: number;
+  /** Counter Blox DMG and the round count, for ADR. Null when not recorded. */
+  damage?: number | null;
+  roundsPlayed?: number | null;
+  /** "5v5" / "3v3" / "2v2" / "1v1". Null on legacy rows (the main ladder). */
+  gameMode?: string | null;
 }
 
 /** Tournament status */

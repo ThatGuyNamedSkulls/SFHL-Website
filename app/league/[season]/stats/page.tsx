@@ -11,6 +11,7 @@ import { getSeason } from "@/lib/league";
 import { seasonStats, statsDivisions } from "@/lib/league-stats";
 import { parseSort, sortTotals, type SortKey } from "@/lib/league-stats-rules";
 import { conferenceGroups, filterPicker, parseDivisionFilter } from "@/lib/league-standings";
+import { profileHref } from "@/lib/profile-link";
 
 export const dynamic = "force-dynamic";
 
@@ -115,7 +116,7 @@ export default async function SeasonStatsPage({
                   <tr key={r.discordId} className={`border-t border-white/[0.05] first:border-t-0 ${me ? "bg-[#ff5500]/[0.07]" : "hover:bg-white/[0.02]"}`}>
                     <td className={`hidden py-2.5 pl-5 pr-2 font-black tabular-nums sm:table-cell ${i < 3 ? "text-[#ff5500]" : "text-white/50"}`}>{i + 1}</td>
                     <td className="sticky left-0 z-10 bg-[#121212] py-2.5 pl-4 pr-2.5 sm:static sm:bg-transparent sm:pl-2.5">
-                      <Link href={`/profile?player=${encodeURIComponent(r.name)}`} className="inline-flex items-center gap-2 font-bold text-white hover:underline">
+                      <Link href={profileHref(r.name)} className="inline-flex items-center gap-2 font-bold text-white hover:underline">
                         {r.country ? <Flag src={flagPath(r.country)} name={countryName(r.country)} className="h-3.5 w-5" /> : null}
                         {r.name}
                       </Link>

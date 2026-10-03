@@ -7,6 +7,7 @@ import { ChevronsRight, SendHorizontal, Trash2 } from "lucide-react";
 import { OnlineBadge, useOnline } from "@/components/online-status";
 import { RAIL_CHAT_MESSAGES, lastMessages as keepLast } from "@/lib/chat-limits";
 import { startPolling } from "@/lib/poll-gate";
+import { profileHref } from "@/lib/profile-link";
 
 const MAX_LENGTH = 250;
 const POLL_MS = 3000;
@@ -161,7 +162,7 @@ export function ChatThread({
           <div className="flex items-baseline gap-2">
             {m.profileName ? (
               <Link
-                href={`/profile?player=${encodeURIComponent(m.profileName)}`}
+                href={profileHref(m.profileName)}
                 className={`text-[0.8125rem] font-bold truncate hover:underline ${mine ? "text-[#ff5500]" : "text-white"}`}
               >
                 {m.name}

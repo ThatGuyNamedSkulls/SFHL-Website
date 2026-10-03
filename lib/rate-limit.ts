@@ -52,6 +52,8 @@ export const LIMITS = {
   invitePair: { limit: 1, windowMs: 10 * 60_000 },
   friendRequest: { limit: 10, windowMs: 10 * 60_000 },
   guestbook: { limit: 5, windowMs: 10 * 60_000 },
+  /** Saving your profile bio. */
+  profileEdit: { limit: 10, windowMs: 10 * 60_000 },
   groupWrite: { limit: 60, windowMs: 10 * 60_000 },
   shop: { limit: 20, windowMs: 60_000 },
   general: { limit: 60, windowMs: 60_000 },

@@ -18,12 +18,15 @@ export function PlacementTrack({
   games,
   rank,
   ranked,
+  seasonLabel = "Season 1",
 }: {
   total: number;
   played: number;
   games: PlacementGame[];
   rank?: RankTierLetter | null;
   ranked?: boolean;
+  /** "Season 2" — the live season from season_resets. */
+  seasonLabel?: string;
 }) {
   const slots = Math.max(1, total);
   const nodes = Array.from({ length: slots }, (_, i) => {
@@ -35,7 +38,7 @@ export function PlacementTrack({
   return (
     <div className="pt-2 pb-1">
       <div className="text-[0.75rem] font-bold tracking-[0.18em] text-[#6a6a6a] uppercase mb-4">
-        Season 1 placements
+        {seasonLabel} placements
       </div>
       <div className="flex items-start overflow-x-auto pb-2">
         <div className="flex flex-col items-center shrink-0 w-12">

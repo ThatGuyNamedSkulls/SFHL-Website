@@ -20,6 +20,7 @@ import { regionMeta } from "@/lib/regions";
 import { teamPageData, type MemberCard } from "@/lib/team-page";
 import { ROLE_LIMITS, slotCounts } from "@/lib/team-roster";
 import type { TeamMatch } from "@/lib/team-stats";
+import { profileHref } from "@/lib/profile-link";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +93,7 @@ function MemberRow({ m }: { m: MemberCard }) {
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
           {m.playerName ? (
-            <Link href={`/profile?player=${encodeURIComponent(m.playerName)}`} className="truncate text-sm font-bold text-white hover:underline">
+            <Link href={profileHref(m.playerName)} className="truncate text-sm font-bold text-white hover:underline">
               {m.name}
             </Link>
           ) : (
@@ -323,7 +324,7 @@ export default async function TeamPage({
               <div className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-2">
                 {starters.map((c, i) =>
                   c?.playerName ? (
-                    <Link key={i} href={`/profile?player=${encodeURIComponent(c.playerName)}`} aria-label={`${c.name}'s profile`}>
+                    <Link key={i} href={profileHref(c.playerName)} aria-label={`${c.name}'s profile`}>
                       <PlayerCard card={c} size="md" highlight={c.me} />
                     </Link>
                   ) : (

@@ -11,6 +11,7 @@ import { UserPlus, Users, Check, X, Search, UserMinus, Clock } from "lucide-reac
 import { useSession } from "@/components/session-provider";
 import { OnlineBadge, OnlineLabel, useOnline } from "@/components/online-status";
 import { startPolling } from "@/lib/poll-gate";
+import { profileHref } from "@/lib/profile-link";
 
 interface Friend {
   name: string;
@@ -47,7 +48,7 @@ function FriendRow({
       </OnlineBadge>
       <div className="min-w-0 flex-1 flex flex-col">
         <Link
-          href={`/profile?player=${encodeURIComponent(friend.name)}`}
+          href={profileHref(friend.name)}
           className="text-sm font-semibold text-white truncate hover:text-hl-gold"
         >
           {friend.name}

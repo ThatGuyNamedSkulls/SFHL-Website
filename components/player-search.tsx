@@ -8,6 +8,7 @@ import { RankBadgeInline } from "@/components/rank-badge";
 import { RankTierLetter } from "@/types";
 import { ClubTaggedName } from "@/components/club-identity";
 import { apiGetJson } from "@/lib/client-api";
+import { profileHref } from "@/lib/profile-link";
 
 interface SearchPlayer {
   id: string;
@@ -121,7 +122,7 @@ export function PlayerSearch({
       setActive(0);
       return;
     }
-    router.push(`/profile?player=${encodeURIComponent(name)}`);
+    router.push(profileHref(name));
     changeQuery("");
     setOpen(false);
     setActive(0);

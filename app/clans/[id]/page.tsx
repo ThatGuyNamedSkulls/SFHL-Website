@@ -14,6 +14,7 @@ import { regionMeta } from "@/lib/regions";
 import { timeAgo } from "@/lib/format";
 import type { RankTierLetter } from "@/types";
 import { startPolling } from "@/lib/poll-gate";
+import { profileHref } from "@/lib/profile-link";
 
 interface ClubRoleDef {
   id: string;
@@ -598,7 +599,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                   <div className="min-w-0 flex-1">
                     {req.playerName ? (
                       <Link
-                        href={`/profile?player=${encodeURIComponent(req.playerName)}`}
+                        href={profileHref(req.playerName)}
                         className="truncate text-sm font-semibold text-white hover:text-hl-gold block"
                       >
                         {label}
@@ -728,7 +729,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                     <div className="min-w-0 flex-1">
                       {row.playerName ? (
                         <Link
-                          href={`/profile?player=${encodeURIComponent(row.playerName)}`}
+                          href={profileHref(row.playerName)}
                           className="truncate text-sm font-semibold text-white hover:text-hl-gold block"
                         >
                           <ClubTaggedName name={label} tag={row.clubTag} />
@@ -835,7 +836,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                     <div className="min-w-0 flex-1">
                       {row.playerName ? (
                         <Link
-                          href={`/profile?player=${encodeURIComponent(row.playerName)}`}
+                          href={profileHref(row.playerName)}
                           className="truncate text-sm font-semibold text-white hover:text-hl-gold block"
                         >
                           <ClubTaggedName name={label} tag={row.clubTag} />
@@ -1001,7 +1002,7 @@ function ClubChat({
                       <div className="flex items-baseline gap-2">
                         {row.playerName ? (
                           <Link
-                            href={`/profile?player=${encodeURIComponent(row.playerName)}`}
+                            href={profileHref(row.playerName)}
                             className="text-xs font-bold text-white hover:text-hl-gold truncate"
                           >
                             {label}

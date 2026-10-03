@@ -1,13 +1,13 @@
-import { profileBackgroundImage, isProfileBackgroundColor } from "@/lib/profile-backgrounds";
+import { profileBackgroundImage, profileBandImage, isProfileBackgroundColor } from "@/lib/profile-backgrounds";
 
-/** Full-page fade behind a player's profile. */
+/** The equipped background's tint across the top of a player's profile. */
 export function ProfilePageBackdrop({ color }: { color: string | null | undefined }) {
-  const image = profileBackgroundImage(color);
+  const image = profileBandImage(color);
   if (!image) return null;
   return (
     <div
       aria-hidden
-      className="absolute inset-0 pointer-events-none"
+      className="absolute inset-x-0 top-0 h-[29rem] pointer-events-none"
       style={{ backgroundImage: image }}
     />
   );

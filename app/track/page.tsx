@@ -7,6 +7,7 @@ import { RankBadge } from "@/components/rank-badge";
 import { RankTierLetter } from "@/types";
 import { TrendingUp } from "lucide-react";
 import { useSession } from "@/components/session-provider";
+import { profileHref } from "@/lib/profile-link";
 
 interface TrackStats {
   rank: RankTierLetter;
@@ -110,7 +111,7 @@ export default function TrackPage() {
       </div>
 
       <div className="mt-6">
-        <Link href={`/profile?player=${encodeURIComponent(session.playerName)}`} className="text-sm text-hl-gold hover:underline">
+        <Link href={profileHref(session.playerName)} className="text-sm text-hl-gold hover:underline">
           Open full profile
         </Link>
       </div>

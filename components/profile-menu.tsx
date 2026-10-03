@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogoutButton } from "@/components/logout-button";
 import { useSession } from "@/components/session-provider";
 import { formatUsername } from "@/lib/format";
+import { profileHref as profileUrl } from "@/lib/profile-link";
 
 /** FACEIT-style avatar popover: online, HL Coins, View Profile, Settings. */
 export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
@@ -24,7 +25,7 @@ export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
   }, [open]);
 
   const profileHref = session
-    ? `/profile?player=${encodeURIComponent(session.playerName || session.username)}`
+    ? profileUrl(session.playerName || session.username)
     : "/login";
   const label = session
     ? formatUsername(session.username, session.discordUsername, session.clubTag)

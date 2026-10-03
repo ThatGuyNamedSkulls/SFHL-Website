@@ -19,6 +19,7 @@ import {
   Swords,
 } from "lucide-react";
 import { apiGetJson } from "@/lib/client-api";
+import { profileHref } from "@/lib/profile-link";
 
 interface ApiPlayer {
   id: string;
@@ -195,7 +196,7 @@ export function LandingPage() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {topPlayers.map((player, idx) => (
-            <Link href={`/profile?player=${encodeURIComponent(player.username)}`} key={player.id}>
+            <Link href={profileHref(player.username)} key={player.id}>
               <Card className="bg-hl-panel border-hl-border p-4 card-hover-glow group cursor-pointer">
                 <div className="flex items-center gap-4">
                   <div

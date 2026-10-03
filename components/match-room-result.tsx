@@ -20,6 +20,7 @@ import { Calendar, Star, Swords } from "lucide-react";
 import { SubRolePill } from "@/components/sub-role-pill";
 import { WinChanceBar } from "@/components/win-chance-bar";
 import { Flag } from "@/components/flag";
+import { profileHref } from "@/lib/profile-link";
 
 function initials(name: string) {
   return (name || "?").slice(0, 2).toUpperCase();
@@ -34,7 +35,7 @@ function PlayerCard({
 }) {
   return (
     <Link
-      href={`/profile?player=${encodeURIComponent(player.username)}`}
+      href={profileHref(player.username)}
       className={cn(
         "flex items-center gap-2.5 rounded-lg bg-[#1c1c1c] border border-white/[0.06] px-2.5 py-2 hover:border-white/15 transition-colors",
         align === "right" && "flex-row-reverse text-right"
@@ -257,7 +258,7 @@ function StatsTable({
                 >
                   <td className="text-left px-3 py-2">
                     <Link
-                      href={`/profile?player=${encodeURIComponent(p.username)}`}
+                      href={profileHref(p.username)}
                       className="flex items-center gap-2 hover:text-[#ff5500]"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -409,7 +410,7 @@ function Stats({ match }: { match: MatchDetail }) {
               </Avatar>
               <div>
                 <Link
-                  href={`/profile?player=${encodeURIComponent(selected.username)}`}
+                  href={profileHref(selected.username)}
                   className="text-base font-bold text-white hover:text-[#ff5500]"
                 >
                   {selected.username}

@@ -45,6 +45,55 @@ export interface ProfileCosmetics {
 
 export const MAX_EQUIPPED_BADGES = 5;
 
+/** The season prestige badges (lib/prestige.ts), lowest first. A player owns at most one. */
+export const PRESTIGE_BADGE_SLUGS = ["prestige-1", "prestige-2", "prestige-3", "prestige-4", "prestige-5"];
+
+/**
+ * Prestige used to grant a new badge item for every level, so players piled up
+ * "Prestige 1", "Prestige 2", … Now each player has one Prestige badge that
+ * upgrades. This folds older inventories down to their highest level, equipped
+ * if any of the old ones was (keeping the earliest equip time, so the badge
+ * keeps its place next to the name). Idempotent.
+ */
+export async function mergePrestigeBadges(): Promise<void> {
+  const rs = await client.execute({
+    sql: `SELECT v.id, v.player_name, v.equipped, v.equipped_at, i.slug
+          FROM cosmetic_inventory v JOIN cosmetic_items i ON i.id = v.item_id
+          WHERE i.slug IN (${PRESTIGE_BADGE_SLUGS.map(() => "?").join(",")})`,
+    args: PRESTIGE_BADGE_SLUGS,
+  });
+  const byPlayer = new Map<string, { id: number; level: number; equipped: boolean; equippedAt: number | null }[]>();
+  for (const r of rs.rows) {
+    const name = String(r.player_name);
+    const list = byPlayer.get(name) ?? [];
+    list.push({
+      id: Number(r.id),
+      level: PRESTIGE_BADGE_SLUGS.indexOf(String(r.slug)) + 1,
+      equipped: Number(r.equipped) === 1,
+      equippedAt: r.equipped_at == null ? null : Number(r.equipped_at),
+    });
+    byPlayer.set(name, list);
+  }
+  const stmts: { sql: string; args: (number | null)[] }[] = [];
+  for (const rows of byPlayer.values()) {
+    if (rows.length < 2) continue;
+    const keep = rows.reduce((best, r) => (r.level > best.level ? r : best));
+    const equippedAts = rows.filter((r) => r.equipped).map((r) => r.equippedAt ?? Date.now());
+    if (equippedAts.length) {
+      stmts.push({
+        sql: "UPDATE cosmetic_inventory SET equipped = 1, equipped_at = ? WHERE id = ?",
+        args: [Math.min(...equippedAts), keep.id],
+      });
+    }
+    const drop = rows.filter((r) => r.id !== keep.id).map((r) => r.id);
+    stmts.push({
+      sql: `DELETE FROM cosmetic_inventory WHERE id IN (${drop.map(() => "?").join(",")})`,
+      args: drop,
+    });
+  }
+  if (stmts.length) await client.batch(stmts, "write");
+}
+
 let schemaReady: Promise<void> | null = null;
 
 /** Create the cosmetics tables once per process (idempotent, mirrors
@@ -96,6 +145,8 @@ export function ensureCosmeticsSchema(): Promise<void> {
       if (!has(inventory, "player_id")) stmts.push("ALTER TABLE cosmetic_inventory ADD COLUMN player_id INTEGER");
       stmts.push("CREATE INDEX IF NOT EXISTS idx_cosmetic_inventory_player_id ON cosmetic_inventory(player_id)");
       await client.batch([...stmts, ...defaultBackgroundStatements()], "write");
+      // One Prestige badge per player (it upgrades) — fold the old one-per-level items.
+      await mergePrestigeBadges();
     })().catch((e) => {
       schemaReady = null;
       throw e;

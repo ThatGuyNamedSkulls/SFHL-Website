@@ -17,6 +17,7 @@ import { DAYS, LANGUAGES, ROLES, TARGET_DIVISIONS, TIMES, labelOf, rangeLabel } 
 import { shortSpan } from "@/lib/league-standings";
 import type { PlayerCardData } from "@/lib/player-card";
 import { ROLE_LIMITS } from "@/lib/team-roster";
+import { profileHref } from "@/lib/profile-link";
 
 const TIME_ICON: Record<string, LucideIcon> = { morning: Sunrise, afternoon: Sun, evening: Sunset, night: Moon };
 const ago = (ts: number) => `${shortSpan(ts)} ago`;
@@ -216,7 +217,7 @@ export function PlayerPostCard({ post: p, seasonId, loggedIn }: { post: PlayerPo
         p.mine ? "border-[#ff5500]/40" : "border-white/[0.08]"
       }`}
     >
-      <Link href={`/profile?player=${encodeURIComponent(p.playerName)}`} className="mx-auto block sm:mx-0" aria-label={`${p.playerName}'s profile`}>
+      <Link href={profileHref(p.playerName)} className="mx-auto block sm:mx-0" aria-label={`${p.playerName}'s profile`}>
         <PlayerCard card={p.card} size="md" highlight={p.mine} />
       </Link>
 

@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { profileHref as profileUrl } from "@/lib/profile-link";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,7 +33,7 @@ export function Navbar() {
   ];
 
   const profileHref = session
-    ? `/profile?player=${encodeURIComponent(session.playerName || session.username)}`
+    ? profileUrl(session.playerName || session.username)
     : "/login";
 
   return (

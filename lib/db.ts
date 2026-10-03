@@ -609,9 +609,11 @@ const MATCH_SUB_COLS = `${MATCH_BASE_COLS}, COALESCE(is_sub, 0) AS is_sub, COALE
 const MATCH_RANK_COLS = `${MATCH_SUB_COLS}, player_rank`;
 const MATCH_ELO_COLS = `${MATCH_RANK_COLS}, elo_before`;
 const MATCH_ODDS_COLS = `${MATCH_ELO_COLS}, win_chance, skill_before`;
+/** Profile rows: + damage and rounds (ADR) and the gamemode. */
+const MATCH_PROFILE_COLS = `${MATCH_ELO_COLS}, damage, rounds_played, mode`;
 
 async function selectMatchRows(whereSql: string, args: InArgs): Promise<DbMatch[]> {
-  const variants = [MATCH_ELO_COLS, MATCH_RANK_COLS, MATCH_SUB_COLS, MATCH_BASE_COLS];
+  const variants = [MATCH_PROFILE_COLS, MATCH_ELO_COLS, MATCH_RANK_COLS, MATCH_SUB_COLS, MATCH_BASE_COLS];
   let lastErr: unknown;
   for (const cols of variants) {
     try {
@@ -627,7 +629,12 @@ async function selectMatchRows(whereSql: string, args: InArgs): Promise<DbMatch[
   throw lastErr;
 }
 
-export async function getMatchesForPlayer(playerName: string, limit = 100): Promise<DbMatch[]> {
+export async function getMatchesForPlayer(
+  playerName: string,
+  limit = 100,
+  /** Only rows older than this match_history id (the profile's "Load more"). */
+  beforeId?: number
+): Promise<DbMatch[]> {
   // Exclude placement games (is_placement=1): they don't count toward stats, so
   // they're kept out of the profile match list, the region tally, and the ELO
   // graph — the graph then starts at the player's post-placement ELO instead of
@@ -637,17 +644,20 @@ export async function getMatchesForPlayer(playerName: string, limit = 100): Prom
   // hidden unless staff passed history=True (is_test=0).
   // Matches by player_id when the row has one, falling back to player_name —
   // see docs/DATABASE_PK_FK_RELATIONSHIPS.docx.
+  const before = beforeId != null && Number.isFinite(beforeId) ? Math.floor(beforeId) : null;
   const where =
     "FROM match_history " +
     "WHERE (player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?) " +
-    "AND COALESCE(is_placement, 0) = 0";
+    "AND COALESCE(is_placement, 0) = 0" +
+    (before != null ? " AND id < ?" : "");
+  const args: (string | number)[] = before != null ? [playerName, playerName, before] : [playerName, playerName];
   try {
     return await selectMatchRows(
       `${where} AND COALESCE(is_test, 0) = 0 ORDER BY id DESC LIMIT ?`,
-      [playerName, playerName, limit]
+      [...args, limit]
     );
   } catch {
-    return selectMatchRows(`${where} ORDER BY id DESC LIMIT ?`, [playerName, playerName, limit]);
+    return selectMatchRows(`${where} ORDER BY id DESC LIMIT ?`, [...args, limit]);
   }
 }
 
@@ -970,49 +980,292 @@ export async function getAllMatchIds(): Promise<{ match_id: number; timestamp: s
   }
 }
 
-export async function getMostPlayedWith(
-  playerName: string,
-  limit = 10
-): Promise<{
+export interface PlayedWithRow {
   name: string;
+  /** Matches played on the same side. */
   count: number;
+  /** Of those, how many they won together. */
+  wins: number;
   discordUsername: string | null;
   roblox_avatar_image: string | null;
   discord_avatar: string | null;
   discord_id: string | null;
-}[]> {
+  /** Public rank letter (UNRANKED mid-placement). */
+  rank: string;
+  country: string | null;
+}
+
+/**
+ * The players someone has played the most matches WITH: same match and same
+ * side. `team` (1 = winners, 2 = losers) is on every row since the bot's tie
+ * overhaul; older rows fall back to the same result. Dummy (/rank testdummies)
+ * matches don't count.
+ */
+export async function getMostPlayedWith(playerName: string, limit = 10): Promise<PlayedWithRow[]> {
+  const select = (sameSide: string, notTest: (alias: string) => string) => `
+    SELECT other.player_name AS name,
+           p.discord_username AS discordUsername,
+           p.roblox_avatar_image AS roblox_avatar_image,
+           p.discord_avatar AS discord_avatar,
+           CAST(p.discord_id AS TEXT) AS discord_id,
+           p.rank AS rank,
+           p.placement_done AS placement_done,
+           p.country AS country,
+           COUNT(*) AS count,
+           SUM(CASE WHEN me.result = 'W' THEN 1 ELSE 0 END) AS wins
+    FROM match_history me
+    JOIN match_history other
+      ON me.match_id = other.match_id
+     AND other.player_name <> me.player_name
+     AND ${sameSide}
+     ${notTest("other")}
+    LEFT JOIN players p ON other.player_name = p.name
+    WHERE (me.player_id = (SELECT id FROM players WHERE name = ?) OR me.player_name = ?)
+      AND me.match_id IS NOT NULL
+      ${notTest("me")}
+    GROUP BY other.player_name
+    ORDER BY count DESC, wins DESC, lower(other.player_name) ASC
+    LIMIT ?`;
+  const withTeam = select(
+    `(CASE WHEN me.team IS NOT NULL AND other.team IS NOT NULL
+           THEN other.team = me.team ELSE other.result = me.result END)`,
+    (alias) => `AND COALESCE(${alias}.is_test, 0) = 0`
+  );
+  // Databases from before the bot added `team` / `is_test`.
+  const legacy = select("other.result = me.result", () => "");
+  let rs: ResultSet | null = null;
+  for (const sql of [withTeam, legacy]) {
+    try {
+      rs = await client.execute({ sql, args: [playerName, playerName, limit] });
+      break;
+    } catch {
+      /* try the next shape */
+    }
+  }
+  if (!rs) return [];
+  return rs.rows
+    .map((r) => ({
+      name: String(r.name ?? ""),
+      count: Number(r.count ?? 0),
+      wins: Number(r.wins ?? 0),
+      discordUsername: (r.discordUsername as string) ?? null,
+      roblox_avatar_image: (r.roblox_avatar_image as string) ?? null,
+      discord_avatar: (r.discord_avatar as string) ?? null,
+      discord_id: (r.discord_id as string) ?? null,
+      rank: isPlacementComplete(r.placement_done) ? mapRank(String(r.rank ?? "")) : "UNRANKED",
+      country: r.country == null || r.country === "" ? null : String(r.country).toLowerCase(),
+    }))
+    .filter((r) => r.name);
+}
+
+// ---------------------------------------------------------------------------
+// Profile summaries and stat totals
+// ---------------------------------------------------------------------------
+
+/** Rounds in one match: Counter Blox's own count (/rank cbrm) when stored, else
+ *  the two numbers of round_score ("13,9" or "13:9"). NULL when neither is known. */
+const ROUNDS_SQL = `COALESCE(rounds_played,
+  CASE WHEN instr(replace(COALESCE(round_score, ''), ':', ','), ',') > 1
+       THEN CAST(substr(replace(round_score, ':', ','), 1, instr(replace(round_score, ':', ','), ',') - 1) AS INTEGER)
+          + CAST(substr(replace(round_score, ':', ','), instr(replace(round_score, ':', ','), ',') + 1) AS INTEGER)
+  END)`;
+
+const PLAYER_ROWS = `(player_id = (SELECT id FROM players WHERE name = ?) OR player_name = ?)`;
+
+export interface ProfileSummary {
+  /** Oldest match of any kind (placements included), UTC "YYYY-MM-DD HH:MM:SS". */
+  firstMatchAt: string | null;
+  /** Newest match of any kind. */
+  lastMatchAt: string | null;
+  /** Ranked (non-placement) matches since `seasonStart`. */
+  seasonMatches: number;
+  /** Ranked wins since `seasonStart`, one per match (the prestige count). */
+  seasonWins: number;
+}
+
+/**
+ * First/last match and this season's record in one round trip. Not capped
+ * like the profile's match list (100 rows), so busy players' records stay
+ * exact. Dummy matches are left out.
+ */
+export async function getProfileSummary(
+  playerName: string,
+  seasonStart: string | null
+): Promise<ProfileSummary> {
+  const since = seasonStart ?? "";
+  const query = (notTest: string) => `
+    SELECT MIN(timestamp) AS first_at,
+           MAX(timestamp) AS last_at,
+           SUM(CASE WHEN COALESCE(is_placement, 0) = 0 AND timestamp >= ? THEN 1 ELSE 0 END) AS season_matches,
+           COUNT(DISTINCT CASE WHEN COALESCE(is_placement, 0) = 0 AND timestamp >= ? AND result = 'W'
+                               THEN COALESCE(match_id, -id) END) AS season_wins
+    FROM match_history
+    WHERE ${PLAYER_ROWS} ${notTest}`;
+  const args = [since, since, playerName, playerName];
+  let rs: ResultSet;
   try {
-    const rs = await client.execute({
-      sql: `SELECT other.player_name AS name,
-                   p.discord_username AS discordUsername,
-                   p.roblox_avatar_image AS roblox_avatar_image,
-                   p.discord_avatar AS discord_avatar,
-                   CAST(p.discord_id AS TEXT) AS discord_id,
-                   COUNT(*) AS count
-            FROM match_history me
-            JOIN match_history other
-              ON me.match_id = other.match_id
-             AND other.player_name <> me.player_name
-            LEFT JOIN players p ON other.player_name = p.name
-            WHERE (me.player_id = (SELECT id FROM players WHERE name = ?) OR me.player_name = ?)
-              AND me.match_id IS NOT NULL
-            GROUP BY other.player_name
-            ORDER BY count DESC
-            LIMIT ?`,
-      args: [playerName, playerName, limit]
-    });
-    return rs.rows
-      .map((r) => ({
-        name: String(r.name ?? ""),
-        count: Number(r.count ?? 0),
-        discordUsername: (r.discordUsername as string) ?? null,
-        roblox_avatar_image: (r.roblox_avatar_image as string) ?? null,
-        discord_avatar: (r.discord_avatar as string) ?? null,
-        discord_id: (r.discord_id as string) ?? null,
-      }))
-      .filter((r) => r.name);
+    rs = await client.execute({ sql: query("AND COALESCE(is_test, 0) = 0"), args });
+  } catch {
+    try {
+      rs = await client.execute({ sql: query(""), args });
+    } catch {
+      return { firstMatchAt: null, lastMatchAt: null, seasonMatches: 0, seasonWins: 0 };
+    }
+  }
+  const r = rs.rows[0];
+  return {
+    firstMatchAt: r?.first_at ? String(r.first_at) : null,
+    lastMatchAt: r?.last_at ? String(r.last_at) : null,
+    seasonMatches: Number(r?.season_matches ?? 0),
+    seasonWins: Number(r?.season_wins ?? 0),
+  };
+}
+
+/** UTC "YYYY-MM-DD HH:MM:SS" for a Date, the format match_history uses. */
+export function toDbTimestamp(date: Date): string {
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+/** Timestamps of every match (placements included, dummies not) since `since`,
+ *  for the profile's activity heatmap. */
+export async function getMatchTimestamps(playerName: string, since: string): Promise<string[]> {
+  const query = (notTest: string) => `
+    SELECT timestamp FROM match_history
+    WHERE ${PLAYER_ROWS} AND timestamp >= ? ${notTest}
+    ORDER BY id DESC LIMIT 2000`;
+  const args = [playerName, playerName, since];
+  try {
+    let rs: ResultSet;
+    try {
+      rs = await client.execute({ sql: query("AND COALESCE(is_test, 0) = 0"), args });
+    } catch {
+      rs = await client.execute({ sql: query(""), args });
+    }
+    return rs.rows.map((r) => String(r.timestamp ?? "")).filter(Boolean);
   } catch {
     return [];
+  }
+}
+
+export interface StatTotals {
+  matches: number;
+  wins: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  mvps: number;
+  /** Average of each match's headshot %. */
+  hsPercent: number;
+  /** Rounds over matches whose round count is known, and the kills in them (K/R). */
+  rounds: number;
+  roundKills: number;
+  /** Damage over matches with both damage and a round count (ADR). */
+  damage: number;
+  damageRounds: number;
+  /** Sum of |elo_change|, for the average Elo swing per match. */
+  absElo: number;
+  /** Sum of elo_change. */
+  elo: number;
+}
+
+const TOTALS_SELECT = `
+  COUNT(*) AS matches,
+  SUM(CASE WHEN result = 'W' THEN 1 ELSE 0 END) AS wins,
+  SUM(COALESCE(kills, 0)) AS kills,
+  SUM(COALESCE(deaths, 0)) AS deaths,
+  SUM(COALESCE(assists, 0)) AS assists,
+  SUM(COALESCE(mvps, 0)) AS mvps,
+  AVG(COALESCE(hs_percentage, 0)) AS hs,
+  SUM(rr) AS rounds,
+  SUM(CASE WHEN rr IS NOT NULL THEN COALESCE(kills, 0) END) AS round_kills,
+  SUM(CASE WHEN rr IS NOT NULL AND damage IS NOT NULL THEN damage END) AS damage,
+  SUM(CASE WHEN rr IS NOT NULL AND damage IS NOT NULL THEN rr END) AS damage_rounds,
+  SUM(ABS(COALESCE(elo_change, 0))) AS abs_elo,
+  SUM(COALESCE(elo_change, 0)) AS elo`;
+
+function totalsFromRow(r: Record<string, unknown> | undefined): StatTotals {
+  const n = (v: unknown) => Number(v ?? 0) || 0;
+  return {
+    matches: n(r?.matches),
+    wins: n(r?.wins),
+    kills: n(r?.kills),
+    deaths: n(r?.deaths),
+    assists: n(r?.assists),
+    mvps: n(r?.mvps),
+    hsPercent: n(r?.hs),
+    rounds: n(r?.rounds),
+    roundKills: n(r?.round_kills),
+    damage: n(r?.damage),
+    damageRounds: n(r?.damage_rounds),
+    absElo: n(r?.abs_elo),
+    elo: n(r?.elo),
+  };
+}
+
+/** Ranked rows (no placements, no dummies) since `since` — every season when null. */
+function rankedRows(cols: string): string {
+  return `SELECT ${cols}, ${ROUNDS_SQL} AS rr FROM match_history
+          WHERE ${PLAYER_ROWS}
+            AND COALESCE(is_placement, 0) = 0
+            AND COALESCE(is_test, 0) = 0
+            AND timestamp >= ?`;
+}
+
+const TOTALS_COLS = "result, kills, deaths, assists, mvps, hs_percentage, damage, elo_change, map_name";
+
+/** Totals for the profile's Stats tab ("This season" / "Career"). */
+export async function getStatTotals(playerName: string, since: string | null): Promise<StatTotals> {
+  try {
+    const rs = await client.execute({
+      sql: `SELECT ${TOTALS_SELECT} FROM (${rankedRows(TOTALS_COLS)})`,
+      args: [playerName, playerName, since ?? ""],
+    });
+    return totalsFromRow(rs.rows[0] as unknown as Record<string, unknown>);
+  } catch {
+    return totalsFromRow(undefined);
+  }
+}
+
+/** The same totals per map (raw map_name), most played first. */
+export async function getMapTotals(
+  playerName: string,
+  since: string | null
+): Promise<(StatTotals & { map: string })[]> {
+  try {
+    const rs = await client.execute({
+      sql: `SELECT COALESCE(map_name, '') AS map, ${TOTALS_SELECT}
+            FROM (${rankedRows(TOTALS_COLS)})
+            GROUP BY COALESCE(map_name, '')
+            ORDER BY matches DESC, map ASC`,
+      args: [playerName, playerName, since ?? ""],
+    });
+    return rs.rows.map((r) => ({
+      map: String(r.map ?? ""),
+      ...totalsFromRow(r as unknown as Record<string, unknown>),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Longest run of ranked wins in a row since `since` (every season when null). */
+export async function getLongestWinStreak(playerName: string, since: string | null): Promise<number> {
+  try {
+    const rs = await client.execute({
+      sql: `SELECT MAX(run) AS best FROM (
+              SELECT COUNT(*) AS run FROM (
+                SELECT result,
+                       ROW_NUMBER() OVER (ORDER BY id) - ROW_NUMBER() OVER (PARTITION BY result ORDER BY id) AS grp
+                FROM (${rankedRows("id, result")})
+              )
+              WHERE result = 'W'
+              GROUP BY grp
+            )`,
+      args: [playerName, playerName, since ?? ""],
+    });
+    return Number(rs.rows[0]?.best ?? 0) || 0;
+  } catch {
+    return 0;
   }
 }
 

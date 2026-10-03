@@ -31,6 +31,9 @@ export interface EloTimeline {
    *  season's final Elo and the new season's starting Elo are unrelated values,
    *  so the line is broken there rather than drawn as a plunge to zero. */
   history: (number | null)[];
+  /** Same length as `history`: the timestamp of the match that produced each
+   *  point (null for a segment's starting point and for the breaks). */
+  times: (string | null)[];
   /** Where a season ended: the index of the break + the season's name. */
   resets: { index: number; label: string }[];
 }
@@ -67,11 +70,17 @@ export function buildEloTimeline(
   seasonFinalElos: Map<string, number>
 ): EloTimeline {
   const changes = [...changesNewestFirst].reverse(); // oldest → newest
+  // A segment's points are its start + one per match, so its times are the same.
+  const segmentTimes = (seg: EloChange[]) => [null, ...seg.map((c) => c.timestamp || null)];
 
   // No reset has ever happened: the original single-anchor reconstruction is
   // correct (and cheapest).
   if (resets.length === 0) {
-    return { history: segmentPoints(changes.map((c) => c.eloChange), currentElo), resets: [] };
+    return {
+      history: segmentPoints(changes.map((c) => c.eloChange), currentElo),
+      times: segmentTimes(changes),
+      resets: [],
+    };
   }
 
   // Bucket each match into the season it belongs to: the first reset that
@@ -85,6 +94,7 @@ export function buildEloTimeline(
   }
 
   const history: (number | null)[] = [];
+  const times: (string | null)[] = [];
   const markers: { index: number; label: string }[] = [];
 
   resets.forEach((reset, i) => {
@@ -97,17 +107,20 @@ export function buildEloTimeline(
       seasonFinalElos.get(reset.season_name) ??
       deltas.reduce((a, b) => a + b, 0);
     history.push(...segmentPoints(deltas, endElo));
+    times.push(...segmentTimes(seg));
     // Break the line at the boundary: the next season restarts from a fresh
     // Elo, so joining the two would draw a meaningless cliff.
     markers.push({ index: history.length, label: reset.season_name });
     history.push(null);
+    times.push(null);
   });
 
   // Current season, anchored on the live Elo. Its own start point is kept — it
   // IS the post-reset starting Elo (0 until placements graduate them).
   if (current.length > 0 || history.length === 0) {
     history.push(...segmentPoints(current.map((c) => c.eloChange), currentElo));
+    times.push(...segmentTimes(current));
   }
 
-  return { history, resets: markers };
+  return { history, times, resets: markers };
 }

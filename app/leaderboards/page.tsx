@@ -18,6 +18,7 @@ import { apiGetJson } from "@/lib/client-api";
 import { ClubTaggedName } from "@/components/club-identity";
 import { PRO_DIVISION_WEIGHTS } from "@/lib/pro-league";
 import { LEVEL_NAMES } from "@/lib/league-standings";
+import { profileHref } from "@/lib/profile-link";
 
 interface ApiPlayer {
   id: string;
@@ -371,7 +372,7 @@ function LeaderboardsInner() {
               return (
                 <Link
                   key={player.id}
-                  href={`/profile?player=${encodeURIComponent(player.username)}`}
+                  href={profileHref(player.username)}
                   className={`grid grid-cols-[2rem_1fr_auto] md:grid-cols-[3.5rem_1fr_10rem_6.875rem_4.375rem_7.5rem] gap-2 items-center px-1 min-h-14 py-2 md:h-16 md:py-0 border-b border-white/[0.04] ${
                     isMe ? "bg-[#ff5500]/10" : "hover:bg-white/[0.03]"
                   }`}
@@ -431,7 +432,7 @@ function LeaderboardsInner() {
             return (
               <Link
                 key={player.id}
-                href={`/profile?player=${encodeURIComponent(player.username)}`}
+                href={profileHref(player.username)}
                 className={`grid grid-cols-[2rem_1fr_auto] md:grid-cols-[3.5rem_1fr_5.625rem_8.75rem_5.5rem] gap-2 items-center px-1 min-h-14 py-2 md:h-16 md:py-0 border-b border-white/[0.04] ${
                   isMe ? "bg-[#ff5500]/10" : "hover:bg-white/[0.03]"
                 }`}

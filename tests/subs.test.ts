@@ -1,6 +1,6 @@
 /**
  * Substitute slots on the website: the band schedule must match the bot's
- * `[elo.sub]` (open to everyone at 7:00), and placement players may sub,
+ * `[elo.sub]` (open to everyone at 5:00), and placement players may sub,
  * held to the band by their hidden placement rating — which is never shown.
  */
 import { after, before, describe, it } from "node:test";
@@ -63,11 +63,12 @@ describe("schema", () => {
 });
 
 describe("band schedule", () => {
-  it("opens to everyone at 7:00, matching the bot's band_steps", () => {
+  it("opens to everyone at 5:00, matching the CBL bot's band_steps", () => {
     assert.equal(subs.bandFor(0), 100);
-    assert.equal(subs.bandFor(419), 350);
-    assert.equal(subs.bandFor(420), null);
-    assert.equal(subs.secondsUntilEligible(2400, 1200, 0), 420);
+    assert.equal(subs.bandFor(149), 200);
+    assert.equal(subs.bandFor(299), 350);
+    assert.equal(subs.bandFor(300), null);
+    assert.equal(subs.secondsUntilEligible(2400, 1200, 0), 300);
   });
 });
 
@@ -84,14 +85,14 @@ describe("placement players as substitutes", () => {
     assert.equal(view.eligible, false);
     assert.match(view.reason ?? "", /placement rating/);
     assert.doesNotMatch(view.reason ?? "", /1900/);
-    assert.ok(Math.abs((view.eligibleInSeconds ?? 0) - 420) < 5, "eligible when it opens at 7:00");
+    assert.ok(Math.abs((view.eligibleInSeconds ?? 0) - 300) < 5, "eligible when it opens at 5:00");
     assert.match((await viewAs("ranked", "204")).reason ?? "", /Your Elo \(1500\)/);
   });
 
-  it("lets anyone in once the slot has been open for 7 minutes", async () => {
-    await openSlot(415);
+  it("lets anyone in once the slot has been open for 5 minutes", async () => {
+    await openSlot(295);
     assert.equal((await viewAs("faroff", "203")).eligible, false);
-    await openSlot(425);
+    await openSlot(305);
     assert.equal((await viewAs("faroff", "203")).eligible, true);
   });
 });

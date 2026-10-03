@@ -58,7 +58,7 @@ export default function MatchesPage() {
               <Filter className="w-4 h-4 text-hl-muted" />
               <Select value={mapFilter} onValueChange={(v) => setMapFilter(v ?? "ALL")}>
                 <SelectTrigger className="w-[9.375rem] bg-hl-panel border-hl-border text-white text-sm">
-                  <SelectValue placeholder="Map" />
+                  <SelectValue>{(v: string) => (v === "ALL" ? "All maps" : v)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-hl-panel border-hl-border text-white">
                   <SelectItem value="ALL">All maps</SelectItem>

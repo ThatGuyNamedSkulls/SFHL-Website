@@ -1,17 +1,46 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getPlayer, getPlayerByDiscordId, getMatchesForPlayer, getPlacementMatchesForPlayer, getEloChanges, getModeRatings, getMostPlayedWith, getPlayerRankings, getPlacementGamesTotal, getSeasonResets, getSeasonFinalElos, getCareerMatchCount, getLastSeasonArchive, getCbStats, mapRank, publicRating } from "@/lib/db";
+import {
+  getPlayer,
+  getPlayerByDiscordId,
+  getMatchesForPlayer,
+  getPlacementMatchesForPlayer,
+  getEloChanges,
+  getModeRatings,
+  getMostPlayedWith,
+  getPlayerRankings,
+  getPlacementGamesTotal,
+  getSeasonResets,
+  getSeasonFinalElos,
+  getCareerMatchCount,
+  getLastSeasonArchive,
+  getCbStats,
+  getProfileSummary,
+  getMatchTimestamps,
+  toDbTimestamp,
+  mapRank,
+  publicRating,
+} from "@/lib/db";
 import { buildEloTimeline } from "@/lib/elo-timeline";
 import { damagePerRound } from "@/lib/match-stats";
 import { badgeIndex, nameBadgeFor } from "@/lib/name-badge";
 import { getEquippedCosmetics, getInventory } from "@/lib/cosmetics";
 import { getFriends } from "@/lib/social";
 import { pickAvatar, resolveAvatarMap } from "@/lib/avatar";
-import { prettyMap, prettyRegion, formatRoundScore } from "@/lib/format";
 import { countryName, flagPath, isValidCountry } from "@/lib/countries";
 import { countryToPlayRegion } from "@/lib/country-regions";
 import { regionMeta } from "@/lib/regions";
 import { clubTagIndex, lookupClubTag } from "@/lib/clubs";
+import { prestigeFromWins } from "@/lib/prestige";
+import { getBio } from "@/lib/player-bios";
+import { summarizeTeam, teamsForMember } from "@/lib/teams";
+import { titleCounts } from "@/lib/team-titles";
+import { toProfileMatch } from "@/lib/profile-match";
+
+/** Matches sent with the profile; older ones come from ./matches ("Load more"). */
+const MATCH_PAGE = 100;
+/** The activity heatmap covers 13 weeks; a few extra days fill its first column. */
+const ACTIVITY_DAYS = 98;
 
 export async function GET(
   _request: Request,
@@ -52,45 +81,79 @@ export async function GET(
     }
 
     const playerName = player.name;
+    const discordId = player.discord_id != null ? String(player.discord_id) : null;
     // Stored flag only: the bot syncs it hourly and every login refreshes it.
     // A public GET must not call Discord or write (security report M1).
     const mmAccess = Number(player.mm_access) === 1;
-    const badge = nameBadgeFor(await badgeIndex(), {
-      discordId: player.discord_id != null ? String(player.discord_id) : null,
-      playerName: player.name,
-    });
+    const badge = nameBadgeFor(await badgeIndex(), { discordId, playerName: player.name });
+    const activitySince = toDbTimestamp(new Date(Date.now() - ACTIVITY_DAYS * 86_400_000));
 
     // These are all independent of one another — fetch them concurrently
     // instead of one sequential await per data source.
-    const [matches, placementRows, eloChanges, avatar, playedWithRaw, rankings, cosmetics, friends, inventory, placementGamesTotal, modeRatings, seasonResets, seasonFinalElos, careerMatchesPlayed, lastSeasonArchive] =
-      await Promise.all([
-        getMatchesForPlayer(playerName),
-        getPlacementMatchesForPlayer(playerName),
-        getEloChanges(playerName),
-        pickAvatar(player.roblox_avatar_image, player.discord_avatar, player.discord_id),
-        getMostPlayedWith(playerName, 10),
-        getPlayerRankings(playerName).catch(() => ({ overall: null, country: null, region: null })),
-        getEquippedCosmetics(playerName).catch(() => ({
-          card: null,
-          frame: null,
-          background: null,
-          title: null,
-          badges: [],
-        })),
-        getFriends(playerName).catch(() => []),
-        getInventory(playerName).catch(() => []),
-        getPlacementGamesTotal(),
-        getModeRatings(playerName),
-        getSeasonResets(),
-        getSeasonFinalElos(playerName),
-        getCareerMatchCount(playerName),
-        getLastSeasonArchive(playerName),
-      ]);
+    const [
+      matches,
+      placementRows,
+      eloChanges,
+      avatar,
+      playedWithRaw,
+      rankings,
+      cosmetics,
+      friends,
+      inventory,
+      placementGamesTotal,
+      modeRatings,
+      seasonResets,
+      seasonFinalElos,
+      careerMatchesPlayed,
+      lastSeasonArchive,
+      activity,
+      bio,
+      teams,
+    ] = await Promise.all([
+      getMatchesForPlayer(playerName, MATCH_PAGE),
+      getPlacementMatchesForPlayer(playerName),
+      getEloChanges(playerName),
+      pickAvatar(player.roblox_avatar_image, player.discord_avatar, player.discord_id),
+      getMostPlayedWith(playerName, 10),
+      getPlayerRankings(playerName).catch(() => ({ overall: null, country: null, region: null })),
+      getEquippedCosmetics(playerName).catch(() => ({
+        card: null,
+        frame: null,
+        background: null,
+        title: null,
+        badges: [],
+      })),
+      getFriends(playerName).catch(() => []),
+      getInventory(playerName).catch(() => []),
+      getPlacementGamesTotal(),
+      getModeRatings(playerName),
+      getSeasonResets(),
+      getSeasonFinalElos(playerName),
+      getCareerMatchCount(playerName),
+      getLastSeasonArchive(playerName),
+      getMatchTimestamps(playerName, activitySince),
+      getBio(Number(player.id)),
+      discordId ? teamsForMember(discordId).catch(() => []) : Promise.resolve([]),
+    ]);
 
-    const playedAvatars = await resolveAvatarMap(playedWithRaw);
+    const lastResetAt = seasonResets.length
+      ? seasonResets[seasonResets.length - 1].reset_at
+      : null;
+    const [playedAvatars, summary, cb, clubTags, teamTitles] = await Promise.all([
+      resolveAvatarMap(playedWithRaw),
+      getProfileSummary(playerName, lastResetAt),
+      getCbStats(playerName, lastResetAt),
+      clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
+      teams.length
+        ? titleCounts(teams.map((t) => t.id)).catch(() => new Map<string, number>())
+        : Promise.resolve(new Map<string, number>()),
+    ]);
     const playedWith = playedWithRaw.map((p) => ({
       name: p.name,
       count: p.count,
+      wins: p.wins,
+      rank: p.rank,
+      country: isValidCountry(p.country) ? p.country : null,
       discordUsername: p.discordUsername,
       avatar: playedAvatars.get(p.name) || null,
     }));
@@ -104,24 +167,16 @@ export async function GET(
     // to 0, so past matches march negative); instead each past season is anchored
     // to the final Elo /resetdb archived for it, and the line is broken at every
     // reset boundary so the new season starts fresh.
-    const { history: eloHistory, resets: eloResets } = buildEloTimeline(
+    const { history: eloHistory, times: eloTimes, resets: eloResets } = buildEloTimeline(
       rating.elo,
       eloChanges,
       seasonResets,
       seasonFinalElos
     );
 
-    const lastResetAt = seasonResets.length
-      ? seasonResets[seasonResets.length - 1].reset_at
-      : null;
     const placementThisSeason = lastResetAt
       ? placementRows.filter((m) => (m.timestamp || "") >= lastResetAt)
       : placementRows;
-    const seasonRanked = lastResetAt
-      ? matches.filter((m) => (m.timestamp || "") >= lastResetAt)
-      : matches;
-    const seasonMatchesPlayed = seasonRanked.length;
-    const cb = await getCbStats(playerName, lastResetAt);
     const cbStats = cb && {
       matches: cb.matches,
       roundsPlayed: cb.roundsPlayed,
@@ -132,9 +187,7 @@ export async function GET(
       rounds4k: cb.rounds4k,
       rounds5k: cb.rounds5k,
     };
-    const seasonWins = seasonRanked.filter((m) => m.result === "W").length;
-    const seasonWinPercent =
-      seasonMatchesPlayed > 0 ? (seasonWins / seasonMatchesPlayed) * 100 : 0;
+    const seasonNumber = seasonResets.length + 1;
 
     const mapped = {
       id: `p${player.id}`,
@@ -151,11 +204,8 @@ export async function GET(
       countryFlag: isValidCountry(player.country) ? flagPath(player.country) : null,
       mmAccess,
       badge,
-      clubTag: lookupClubTag(
-        await clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
-        player.name,
-        player.discord_id != null ? String(player.discord_id) : null
-      ),
+      clubTag: lookupClubTag(clubTags, player.name, discordId),
+      bio,
       stats: {
         wins: player.matches_won,
         losses: player.matches_played - player.matches_won,
@@ -180,12 +230,23 @@ export async function GET(
         playtimeHours: Math.round(player.total_play_time / 3600),
       },
       eloHistory,
+      /** Timestamp of the match behind each eloHistory point (null for starts and breaks). */
+      eloTimes,
       /** Season boundaries in eloHistory (index of the break + season name). */
       eloResets,
       careerMatchesPlayed,
       cbStats,
-      seasonMatchesPlayed,
-      seasonWinPercent,
+      season: { number: seasonNumber, label: `Season ${seasonNumber}`, startedAt: lastResetAt },
+      /** This season's ranked record, counted in the database (not from the 100 rows below). */
+      seasonMatchesPlayed: summary.seasonMatches,
+      seasonWins: summary.seasonWins,
+      seasonWinPercent:
+        summary.seasonMatches > 0 ? (summary.seasonWins / summary.seasonMatches) * 100 : 0,
+      prestige: prestigeFromWins(summary.seasonWins),
+      firstMatchAt: summary.firstMatchAt,
+      lastMatchAt: summary.lastMatchAt,
+      /** Match times (UTC) of the last ACTIVITY_DAYS days, for the heatmap. */
+      activity,
       lastResetAt,
       lastSeason: lastSeasonArchive
         ? {
@@ -197,25 +258,7 @@ export async function GET(
       placementDone: rating.placementDone,
       placementGamesPlayed: player.placement_games_played,
       placementGamesTotal,
-      placementMatches: placementThisSeason.map((m) => ({
-        id: `M-${m.id}`,
-        date: m.timestamp || "",
-        region: prettyRegion(m.region),
-        map: prettyMap(m.map_name),
-        mode: "Competitive" as const,
-        result: m.result as "W" | "L",
-        kills: m.kills,
-        deaths: m.deaths,
-        assists: m.assists,
-        kdr: m.deaths > 0 ? +(m.kills / m.deaths).toFixed(2) : m.kills,
-        headshotPercent: m.hs_percentage,
-        eloChange: m.elo_change,
-        score: m.points,
-        rounds: formatRoundScore(m.round_score, m.result),
-        mvp: (m.mvps || 0) > 0,
-        matchId: m.match_id,
-        mvps: m.mvps || 0,
-      })),
+      placementMatches: placementThisSeason.map((m) => toProfileMatch(m, player.rank)),
       // Own-ladder gamemode ratings (e.g. the separate 1v1 ladder).
       modes: modeRatings.map((mr) => {
         const modeRating = publicRating(mr);
@@ -233,33 +276,24 @@ export async function GET(
       playedWith,
       rankings,
       cosmetics,
+      teams: teams.map((team) => {
+        const me = team.members.find((m) => m.discordId === discordId);
+        return {
+          ...summarizeTeam(team),
+          role: team.captainId === discordId ? "captain" : me?.role ?? "starter",
+          titles: teamTitles.get(team.id) ?? 0,
+          roster: team.members
+            .filter((m) => m.status === "accepted")
+            .slice(0, 8)
+            .map((m) => ({ name: m.playerName || m.username, avatar: m.avatar })),
+        };
+      }),
       // Public social/inventory data for the FACEIT-style profile tabs.
       friends,
       inventory,
-      matchHistory: matches.map((m) => ({
-        id: `M-${m.id}`,
-        date: m.timestamp || "",
-        region: prettyRegion(m.region),
-        map: prettyMap(m.map_name),
-        mode: "Competitive" as const,
-        result: m.result as "W" | "L",
-        kills: m.kills,
-        deaths: m.deaths,
-        assists: m.assists,
-        kdr: m.deaths > 0 ? +(m.kills / m.deaths).toFixed(2) : m.kills,
-        headshotPercent: m.hs_percentage,
-        eloChange: m.elo_change,
-        score: m.points,
-        rounds: formatRoundScore(m.round_score, m.result),
-        mvp: (m.mvps || 0) > 0,
-        matchId: m.match_id,
-        mvps: m.mvps || 0,
-        isSub: Number(m.is_sub) === 1,
-        leftEarly: Number(m.left_early) === 1,
-        subShare: m.sub_share == null ? null : Number(m.sub_share),
-        rank: mapRank(m.player_rank || player.rank),
-        elo: m.elo_before == null ? undefined : Number(m.elo_before),
-      })),
+      matchHistory: matches.map((m) => toProfileMatch(m, player.rank)),
+      /** True when older matches exist beyond matchHistory. */
+      hasMoreMatches: matches.length === MATCH_PAGE,
     };
 
     return NextResponse.json(mapped);

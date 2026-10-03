@@ -8,6 +8,7 @@ import { apiGetJson, invalidateClientApi } from "@/lib/client-api";
 import type { MatchProElo } from "@/lib/league-stats";
 import type { MapScoreboard } from "@/lib/league-stats-rules";
 import { ArrowLeft, CalendarDays, Crown, Flag, ShieldCheck, Swords } from "lucide-react";
+import { profileHref } from "@/lib/profile-link";
 
 interface TeamView {
   id: string;
@@ -560,7 +561,7 @@ export default function LeagueMatchPage({ params }: { params: Promise<{ id: stri
                 {t.roster.map((p) => (
                   <Link
                     key={p.discordId}
-                    href={`/profile?player=${encodeURIComponent(p.name)}`}
+                    href={profileHref(p.name)}
                     className="flex items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm font-bold text-white hover:bg-white/[0.06]"
                   >
                     {p.discordId === t.captainId ? <Crown className="h-3.5 w-3.5 text-[#ff5500]" aria-label="Captain" /> : null}
