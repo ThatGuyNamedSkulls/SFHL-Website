@@ -7,17 +7,10 @@ import { useNow } from "@/components/use-now";
 import { StatsFilters, DEFAULT_FILTERS, applyMatchFilters, type MatchFilters } from "@/components/stats-filters";
 import { MatchRow, MatchTableHeader } from "@/components/profile/match-row";
 import { formatSigned, ratingColor } from "@/lib/match-stats";
-import { formatMatchWhen, localDayKey, parseDbTime, windowTotals } from "@/lib/profile-stats";
+import { dayLabel, localDayKey, parseDbTime, windowTotals } from "@/lib/profile-stats";
 import type { Match } from "@/types";
 
 const PAGE = 50;
-
-function dayLabel(ms: number, now: number): string {
-  const key = localDayKey(ms);
-  if (key === localDayKey(now)) return "Today";
-  if (key === localDayKey(now - 864e5)) return "Yesterday";
-  return formatMatchWhen(new Date(ms).toISOString()).day;
-}
 
 function SummaryCell({ value, label, className = "" }: { value: React.ReactNode; label: string; className?: string }) {
   return (

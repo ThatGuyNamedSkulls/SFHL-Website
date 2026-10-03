@@ -1,119 +1,88 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
-import { RankBadge } from "@/components/rank-badge";
-import { RankTierLetter } from "@/types";
-import { TrendingUp } from "lucide-react";
-import { useSession } from "@/components/session-provider";
-import { profileHref } from "@/lib/profile-link";
+import { redirect } from "next/navigation";
+import { CalendarDays, Gauge, LineChart, Map as MapIcon } from "lucide-react";
+import { getSession } from "@/lib/auth";
+import { getAllPlayers } from "@/lib/db";
+import { trackHref } from "@/lib/track-link";
 
-interface TrackStats {
-  rank: RankTierLetter;
-  elo: number;
-  placementDone: boolean;
-  stats: {
-    wins: number;
-    matchesPlayed: number;
-    kd: number;
-    winPercent: number;
-    headshotPercent: number;
-  };
-}
+const FEATURES = [
+  { icon: Gauge, title: "Performance", text: "Win rate, rating, K/D, ADR and more — each with its change since the period before." },
+  { icon: LineChart, title: "Against your tier", text: "Bars that show where you sit among players at your skill level this season." },
+  { icon: CalendarDays, title: "Form and sessions", text: "A bar per match, your play days, and your best and worst games." },
+  { icon: MapIcon, title: "Maps", text: "Your numbers on every map, with your best map and the one that needs work." },
+];
 
-export default function TrackPage() {
-  const { session, loaded } = useSession();
-  const [player, setPlayer] = useState<TrackStats | null>(null);
-
-  useEffect(() => {
-    if (!session?.playerName) return;
-    fetch(`/api/players/${encodeURIComponent(session.playerName)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!d) return;
-        setPlayer({
-          rank: d.rank,
-          elo: d.elo,
-          placementDone: d.placementDone !== false,
-          stats: {
-            wins: d.stats?.wins ?? 0,
-            matchesPlayed: d.stats?.matchesPlayed ?? 0,
-            kd: d.stats?.kd ?? 0,
-            winPercent: d.stats?.winPercent ?? 0,
-            headshotPercent: d.stats?.headshotPercent ?? 0,
-          },
-        });
-      })
-      .catch(() => {});
-  }, [session?.playerName]);
-
-  if (!loaded) {
-    return (
-      <div className="flex items-center justify-center h-full py-24">
-        <div className="w-10 h-10 rounded-full border-2 border-hl-border border-t-hl-gold animate-spin" />
-      </div>
-    );
+/**
+ * /track opens your own tracker (docs/TRACK_UI_PLAN.md Q1); anyone's is at
+ * /track/<name>. Not linked: the Bloxlink step. Logged out: what Track shows.
+ */
+export default async function TrackIndex({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const session = await getSession();
+  if (session?.playerName) {
+    const query = await searchParams;
+    const params = new URLSearchParams();
+    for (const k of ["tab", "range", "map", "mode"]) {
+      const v = query[k];
+      if (typeof v === "string" && v) params.set(k, v);
+    }
+    const rest = params.toString();
+    redirect(`${trackHref(session.playerName)}${rest ? `?${rest}` : ""}`);
   }
 
-  if (!session) {
+  if (session) {
     return (
-      <div className="hl-page py-16 text-center">
-        <TrendingUp className="w-8 h-8 text-hl-gold mx-auto mb-3" />
-        <h1 className="text-2xl font-black text-white mb-2">Track</h1>
-        <p className="text-sm text-hl-muted mb-6">Log in to see your Counter Blox stats.</p>
-        <Link href="/login" className="inline-flex px-5 py-2.5 rounded-lg bg-gold-gradient text-hl-base font-black text-sm header-caps">
-          Log in
+      <div className="hl-page-wide py-16 text-center">
+        <h1 className="mb-4 text-2xl font-bold text-white">
+          Your Discord account isn&apos;t linked to a HyperLeague player yet.
+        </h1>
+        <p className="mb-6 text-hl-muted">Join the Discord server and verify with Bloxlink first.</p>
+        <Link href="/leaderboards" className="text-hl-gold hover:underline">
+          Return to Rankings
         </Link>
       </div>
     );
   }
 
-  if (!session.playerName) {
-    return (
-      <div className="hl-page py-16 text-center">
-        <h1 className="text-2xl font-black text-white mb-2">Track</h1>
-        <p className="text-sm text-hl-muted">
-          Your Discord account isn&apos;t linked to a HyperLeague player yet. Ask an admin to add you.
+  const [top] = await getAllPlayers(1).catch(() => []);
+  return (
+    <div className="hl-page-wide max-w-[56rem] py-10 md:py-14">
+      <div className="text-center">
+        <div className="header-caps text-xs tracking-[0.14em] text-[#ff5500]">Counter Blox</div>
+        <h1 className="mt-1 text-[1.875rem] font-black text-white">Track</h1>
+        <p className="mx-auto mt-2 max-w-[34rem] text-sm text-[#8a8a8a]">
+          Are you getting better, and at what? Track compares your recent matches with the ones before and with
+          players at your skill level.
         </p>
       </div>
-    );
-  }
-
-  const s = player?.stats;
-  const tiles = [
-    { label: "Elo", value: player?.placementDone ? String(player.elo) : "—" },
-    { label: "Win %", value: s ? `${s.winPercent.toFixed(0)}%` : "—" },
-    { label: "K/D", value: s ? s.kd.toFixed(2) : "—" },
-    { label: "HS %", value: s ? `${s.headshotPercent.toFixed(0)}%` : "—" },
-    { label: "Matches", value: s ? String(s.matchesPlayed) : "—" },
-    { label: "Wins", value: s ? String(s.wins) : "—" },
-  ];
-
-  return (
-    <div className="hl-page">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="text-xs header-caps text-hl-gold mb-1">Counter Blox</div>
-          <h1 className="text-2xl font-black text-white">Track</h1>
-          <p className="text-sm text-hl-muted mt-1">Your recorded matchmaking stats.</p>
-        </div>
-        {player && <RankBadge rank={player.rank} size="lg" />}
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {tiles.map((t) => (
-          <Card key={t.label} className="bg-hl-panel border-hl-border p-4">
-            <div className="text-[0.75rem] header-caps text-hl-muted">{t.label}</div>
-            <div className="stat-number text-2xl text-white mt-1">{t.value}</div>
-          </Card>
+      <div className="mt-8 grid gap-3.5 sm:grid-cols-2">
+        {FEATURES.map(({ icon: Icon, title, text }) => (
+          <div key={title} className="flex gap-3.5 rounded-[0.875rem] border border-white/[0.08] bg-[#1c1c1c] p-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.625rem] bg-[#ff5500]/15">
+              <Icon className="h-5 w-5 text-[#ff5500]" />
+            </span>
+            <span>
+              <b className="block text-[0.9375rem] text-white">{title}</b>
+              <span className="mt-0.5 block text-[0.8125rem] leading-relaxed text-[#8a8a8a]">{text}</span>
+            </span>
+          </div>
         ))}
       </div>
-
-      <div className="mt-6">
-        <Link href={profileHref(session.playerName)} className="text-sm text-hl-gold hover:underline">
-          Open full profile
+      <div className="mt-8 flex flex-col items-center gap-3">
+        <Link
+          href="/login"
+          className="inline-flex rounded-lg bg-gold-gradient px-5 py-2.5 text-sm font-black text-hl-base header-caps"
+        >
+          Log in to see yours
         </Link>
+        {top ? (
+          <Link href={trackHref(top.name)} className="text-[0.8125rem] font-bold text-[#8a8a8a] hover:text-white">
+            Or look at {top.name}&apos;s tracker (#1)
+          </Link>
+        ) : null}
       </div>
     </div>
   );

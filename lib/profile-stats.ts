@@ -65,6 +65,14 @@ export function localDayKey(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** "Today", "Yesterday" or "Fri 2 Oct" for a time, in the viewer's calendar. */
+export function dayLabel(ms: number, now = Date.now()): string {
+  const key = localDayKey(ms);
+  if (key === localDayKey(now)) return "Today";
+  if (key === localDayKey(now - 864e5)) return "Yesterday";
+  return new Date(ms).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+}
+
 /** The run of equal results at the newest end (matches newest first). */
 export function currentStreak(newestFirst: { result: string }[]): { result: "W" | "L"; count: number } | null {
   const first = newestFirst[0]?.result;
@@ -136,8 +144,22 @@ export interface WindowTotals {
   swings: number[];
   /** 0–100: how steady the per-match K/D is. */
   consistency: number;
-  /** Sum of the Elo changes. */
+  /** Sum of the Elo changes, and its average per match. */
   eloChange: number;
+  eloPerMatch: number;
+  mvpsPerMatch: number;
+  /** Totals over the window. */
+  totalKills: number;
+  totalMvps: number;
+  /** Counter Blox's own scoreboard (/rank cbrm games only): how many matches
+   *  have it, first kills per such match, and their totals. */
+  scoreboardMatches: number;
+  firstKillsPerMatch: number | null;
+  firstKills: number;
+  rounds2k: number;
+  rounds3k: number;
+  rounds4k: number;
+  rounds5k: number;
 }
 
 /** Totals over a set of matches (any order; sparklines come out oldest → newest by date). */
@@ -155,6 +177,9 @@ export function windowTotals(list: Match[]): WindowTotals {
   const meanKd = avg(kds);
   const sd = n > 1 ? Math.sqrt(kds.reduce((s, v) => s + (v - meanKd) ** 2, 0) / n) : 0;
   const rating = avg(ratings);
+  const fkMatches = chrono.filter((m) => m.firstKills != null);
+  const mk = chrono.filter((m) => m.multiKills != null);
+  const mkSum = (k: "k2" | "k3" | "k4" | "k5") => mk.reduce((s, m) => s + (m.multiKills?.[k] ?? 0), 0);
   return {
     matches: n,
     wins,
@@ -173,6 +198,17 @@ export function windowTotals(list: Match[]): WindowTotals {
     swings: ratings.map(swingPercent),
     consistency: n > 1 ? Math.max(0, Math.min(100, 100 - sd * 60)) : 0,
     eloChange: sum((m) => m.eloChange || 0),
+    eloPerMatch: n ? sum((m) => m.eloChange || 0) / n : 0,
+    mvpsPerMatch: n ? sum((m) => m.mvps ?? 0) / n : 0,
+    totalKills: sum((m) => m.kills),
+    totalMvps: sum((m) => m.mvps ?? 0),
+    scoreboardMatches: Math.max(fkMatches.length, mk.length),
+    firstKillsPerMatch: fkMatches.length ? fkMatches.reduce((s, m) => s + (m.firstKills ?? 0), 0) / fkMatches.length : null,
+    firstKills: fkMatches.reduce((s, m) => s + (m.firstKills ?? 0), 0),
+    rounds2k: mkSum("k2"),
+    rounds3k: mkSum("k3"),
+    rounds4k: mkSum("k4"),
+    rounds5k: mkSum("k5"),
   };
 }
 

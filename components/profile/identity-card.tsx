@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AtSign, Globe, MoreHorizontal, Pencil, Share2, UserCheck, UserPlus, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AtSign, Globe, LineChart, MoreHorizontal, Pencil, Share2, UserCheck, UserPlus, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -17,6 +18,7 @@ import { RankBadge } from "@/components/rank-badge";
 import { useSession } from "@/components/session-provider";
 import { useMyParty } from "@/components/use-my-party";
 import { optimizedAsset } from "@/lib/optimized-asset";
+import { trackHref } from "@/lib/track-link";
 import type { RankTierLetter } from "@/types";
 import type { ProfilePlayer } from "@/components/profile/types";
 
@@ -42,6 +44,7 @@ export function IdentityCard({
   onAddFriend: () => Promise<string>;
 }) {
   const { session } = useSession();
+  const router = useRouter();
   const { party, refresh: refreshParty } = useMyParty(session?.discordId);
   const [message, setMessage] = useState<string | null>(null);
   const cardArt = player.cosmetics?.card?.asset ?? null;
@@ -216,6 +219,12 @@ export function IdentityCard({
                 <AtSign className="h-4 w-4" /> Copy Discord @
               </DropdownMenuItem>
             ) : null}
+            <DropdownMenuItem
+              className="cursor-pointer gap-2.5 px-2.5 py-2"
+              onClick={() => router.push(trackHref(player.username))}
+            >
+              <LineChart className="h-4 w-4" /> Open tracker
+            </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer gap-2.5 px-2.5 py-2"
               onClick={() => void copy(window.location.href.split("?")[0], "Profile link copied")}

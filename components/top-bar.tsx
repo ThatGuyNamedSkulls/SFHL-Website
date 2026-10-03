@@ -23,7 +23,7 @@ const PAGE_TITLE: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/friends", label: "Friends" },
   { test: (p) => p === "/shop", label: "Shop" },
   { test: (p) => p === "/profile" || p.startsWith("/profile/"), label: "Profile" },
-  { test: (p) => p === "/track", label: "Track" },
+  { test: (p) => p === "/track" || p.startsWith("/track/"), label: "Track" },
   { test: (p) => p === "/feed", label: "Feed" },
   { test: (p) => p === "/settings", label: "Settings" },
   { test: (p) => p === "/clans" || p.startsWith("/clans/"), label: "Clans" },

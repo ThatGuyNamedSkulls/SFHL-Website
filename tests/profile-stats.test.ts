@@ -165,6 +165,27 @@ describe("windowTotals", () => {
     assert.equal(e.kr, null);
     assert.equal(e.adr, null);
     assert.equal(e.consistency, 0);
+    assert.equal(e.eloPerMatch, 0);
+    assert.equal(e.firstKillsPerMatch, null);
+  });
+
+  it("per-match Elo and MVPs, and totals for the window", () => {
+    assert.equal(t.eloPerMatch, 8);
+    assert.equal(t.mvpsPerMatch, 3);
+    assert.equal(t.totalKills, 60);
+    assert.equal(t.totalMvps, 9);
+  });
+
+  it("first kills and 2K–5K rounds only from Counter Blox scoreboard games", () => {
+    const cb = windowTotals([
+      match({ firstKills: 3, multiKills: { k2: 4, k3: 1, k4: 1, k5: 0 } }),
+      match({ firstKills: 1, multiKills: { k2: 2, k3: 0, k4: 0, k5: 1 } }),
+      match({ firstKills: null, multiKills: null }),
+    ]);
+    assert.equal(cb.scoreboardMatches, 2);
+    assert.equal(cb.firstKillsPerMatch, 2); // 4 over 2 games, not 3
+    assert.equal(cb.firstKills, 4);
+    assert.deepEqual([cb.rounds2k, cb.rounds3k, cb.rounds4k, cb.rounds5k], [6, 1, 1, 1]);
   });
 });
 

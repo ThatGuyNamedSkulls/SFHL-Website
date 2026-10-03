@@ -609,11 +609,15 @@ const MATCH_SUB_COLS = `${MATCH_BASE_COLS}, COALESCE(is_sub, 0) AS is_sub, COALE
 const MATCH_RANK_COLS = `${MATCH_SUB_COLS}, player_rank`;
 const MATCH_ELO_COLS = `${MATCH_RANK_COLS}, elo_before`;
 const MATCH_ODDS_COLS = `${MATCH_ELO_COLS}, win_chance, skill_before`;
-/** Profile rows: + damage and rounds (ADR) and the gamemode. */
-const MATCH_PROFILE_COLS = `${MATCH_ELO_COLS}, damage, rounds_played, mode`;
+/** Profile / Track rows: + damage and rounds (ADR), the gamemode, and Counter
+ *  Blox's own first kills and multi-kill rounds (/rank cbrm games only). */
+const MATCH_PROFILE_COLS = `${MATCH_ELO_COLS}, damage, rounds_played, mode, first_kills, rounds_2k, rounds_3k, rounds_4k, rounds_5k`;
+const MATCH_PROFILE_COLS_NO_CB = `${MATCH_ELO_COLS}, damage, rounds_played, mode`;
 
-async function selectMatchRows(whereSql: string, args: InArgs): Promise<DbMatch[]> {
-  const variants = [MATCH_PROFILE_COLS, MATCH_ELO_COLS, MATCH_RANK_COLS, MATCH_SUB_COLS, MATCH_BASE_COLS];
+/** `SELECT <columns> <whereSql>`, trying older column sets on a database the
+ *  bot hasn't migrated yet. `whereSql` starts at FROM. */
+export async function selectMatchRows(whereSql: string, args: InArgs): Promise<DbMatch[]> {
+  const variants = [MATCH_PROFILE_COLS, MATCH_PROFILE_COLS_NO_CB, MATCH_ELO_COLS, MATCH_RANK_COLS, MATCH_SUB_COLS, MATCH_BASE_COLS];
   let lastErr: unknown;
   for (const cols of variants) {
     try {
@@ -1064,7 +1068,7 @@ export async function getMostPlayedWith(playerName: string, limit = 10): Promise
 
 /** Rounds in one match: Counter Blox's own count (/rank cbrm) when stored, else
  *  the two numbers of round_score ("13,9" or "13:9"). NULL when neither is known. */
-const ROUNDS_SQL = `COALESCE(rounds_played,
+export const ROUNDS_SQL = `COALESCE(rounds_played,
   CASE WHEN instr(replace(COALESCE(round_score, ''), ':', ','), ',') > 1
        THEN CAST(substr(replace(round_score, ':', ','), 1, instr(replace(round_score, ':', ','), ',') - 1) AS INTEGER)
           + CAST(substr(replace(round_score, ':', ','), instr(replace(round_score, ':', ','), ',') + 1) AS INTEGER)

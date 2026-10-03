@@ -194,6 +194,9 @@ export interface Match {
   roundsPlayed?: number | null;
   /** "5v5" / "3v3" / "2v2" / "1v1". Null on legacy rows (the main ladder). */
   gameMode?: string | null;
+  /** Counter Blox's own scoreboard (/rank cbrm games only; null otherwise). */
+  firstKills?: number | null;
+  multiKills?: { k2: number; k3: number; k4: number; k5: number } | null;
 }
 
 /** Tournament status */

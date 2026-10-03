@@ -46,5 +46,15 @@ export function toProfileMatch(m: DbMatch, currentRank: string): Match {
     damage: m.damage == null ? null : Number(m.damage),
     roundsPlayed: rounds && rounds > 0 ? rounds : null,
     gameMode: m.mode ? String(m.mode) : null,
+    firstKills: m.first_kills == null ? null : Number(m.first_kills),
+    multiKills:
+      m.rounds_2k == null
+        ? null
+        : {
+            k2: Number(m.rounds_2k) || 0,
+            k3: Number(m.rounds_3k) || 0,
+            k4: Number(m.rounds_4k) || 0,
+            k5: Number(m.rounds_5k) || 0,
+          },
   };
 }
