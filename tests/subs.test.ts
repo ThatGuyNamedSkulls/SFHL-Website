@@ -37,7 +37,7 @@ before(async () => {
 });
 
 after(async () => {
-  await tmp.cleanup(["sub_requests", "players"]);
+  await tmp.cleanup(["sub_requests", "players", "player_bans"]);
 });
 
 async function openSlot(openedSecondsAgo: number, hidden = false): Promise<void> {
@@ -94,6 +94,29 @@ describe("placement players as substitutes", () => {
     assert.equal((await viewAs("faroff", "203")).eligible, false);
     await openSlot(305);
     assert.equal((await viewAs("faroff", "203")).eligible, true);
+  });
+});
+
+describe("a banned player (/player ban)", () => {
+  it("can't claim a slot; a lifted ban or no bans table blocks nobody", async () => {
+    const { bannedDiscordIds } = await import("@/lib/bans");
+    assert.equal((await bannedDiscordIds(["201"])).size, 0, "no player_bans table yet");
+    await client.execute(`CREATE TABLE player_bans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, discord_id TEXT NOT NULL, roblox_user_id INTEGER,
+      player_name TEXT, reason TEXT NOT NULL, banned_by TEXT NOT NULL, banned_at TEXT NOT NULL,
+      lifted_at TEXT, lifted_by TEXT)`);
+    await client.execute(`INSERT INTO player_bans (discord_id, reason, banned_by, banned_at, lifted_at) VALUES
+      ('201', 'cheating', 'staff', '2026-10-03 18:00:00', NULL),
+      ('204', 'old one', 'staff', '2026-09-01 00:00:00', '2026-09-02 00:00:00')`);
+    assert.deepEqual([...(await bannedDiscordIds(["201", "204", "202"]))], ["201"]);
+
+    await openSlot(0);
+    const slot = Number((await client.execute("SELECT id FROM sub_requests")).rows[0].id);
+    const res = await subs.claimSubRequest({ discordId: "201", playerName: "placing", inGuild: true }, slot);
+    assert.equal(res.ok, false);
+    if (!res.ok) assert.match(res.error, /banned/);
+    const open = await client.execute("SELECT status FROM sub_requests WHERE id = ?", [slot]);
+    assert.equal(String(open.rows[0].status), "open");
   });
 });
 

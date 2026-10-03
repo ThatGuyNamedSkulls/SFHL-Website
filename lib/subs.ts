@@ -16,6 +16,7 @@
  * `config/games/counterstrike.toml`.
  */
 
+import { isBanned } from "@/lib/bans";
 import { client, getPlayer, isPlacementComplete } from "@/lib/db";
 import { getActiveLobbyMemberIds, resolveTeamSides, type TeamSides } from "@/lib/lobby";
 import { prettyMap } from "@/lib/format";
@@ -388,6 +389,9 @@ export async function claimSubRequest(
 
   const blocker = claimBlocker(await viewerContext(claimer), row);
   if (blocker) return { ok: false, error: blocker.reason, status: 403 };
+  if (await isBanned(claimer.discordId)) {
+    return { ok: false, error: "You're banned from HyperLeague matchmaking.", status: 403 };
+  }
   if (!claimer.playerName) {
     return { ok: false, error: "Your Discord account isn't linked to a HyperLeague player.", status: 403 };
   }

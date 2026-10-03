@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { LIMITS, limited } from "@/lib/rate-limit";
 import { getSession, getGuildPresenceCached } from "@/lib/auth";
+import { bannedDiscordIds } from "@/lib/bans";
 import {
   getWebQueue,
   joinWebQueue,
@@ -222,6 +223,18 @@ export async function POST(request: Request) {
     // can't join a new queue. One member in a match blocks the whole party.
     const inMatch = await getActiveLobbyMemberIds();
     const toCheck = party ? party.members.map((m) => m.discordId) : [session.discordId];
+    // /player ban: a banned account can't queue, alone or in a party.
+    const banned = await bannedDiscordIds(toCheck);
+    if (banned.size > 0) {
+      return NextResponse.json(
+        {
+          error: banned.has(session.discordId)
+            ? "You're banned from HyperLeague matchmaking."
+            : "A party member is banned from matchmaking, so this party can't queue.",
+        },
+        { status: 403 }
+      );
+    }
     if (toCheck.some((id) => inMatch.has(id))) {
       const self = inMatch.has(session.discordId);
       return NextResponse.json(
