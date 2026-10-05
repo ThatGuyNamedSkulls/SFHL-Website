@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AtSign, Globe, LineChart, MoreHorizontal, Pencil, Share2, UserCheck, UserPlus, Users } from "lucide-react";
+import { AtSign, Flag, Globe, LineChart, MoreHorizontal, Pencil, Share2, ShieldCheck, UserCheck, UserPlus, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -15,8 +15,10 @@ import { AvatarFrame } from "@/components/avatar-frame";
 import { NameBadge } from "@/components/name-badge";
 import { OnlineBadge, OnlineLabel } from "@/components/online-status";
 import { RankBadge } from "@/components/rank-badge";
+import { ReportDialog } from "@/components/profile/report-dialog";
 import { useSession } from "@/components/session-provider";
 import { useMyParty } from "@/components/use-my-party";
+import { apiGetJson } from "@/lib/client-api";
 import { optimizedAsset } from "@/lib/optimized-asset";
 import { trackHref } from "@/lib/track-link";
 import type { RankTierLetter } from "@/types";
@@ -47,6 +49,15 @@ export function IdentityCard({
   const router = useRouter();
   const { party, refresh: refreshParty } = useMyParty(session?.discordId);
   const [message, setMessage] = useState<string | null>(null);
+  const [isStaff, setIsStaff] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  // Asked only when the More menu opens, so viewing a profile costs nothing extra.
+  const checkStaff = (open: boolean) => {
+    if (!open || !session || isStaff) return;
+    apiGetJson<{ staff?: boolean; admin?: boolean; manager?: boolean }>("/api/staff/me", { ttlMs: 5 * 60_000 })
+      .then(({ ok, json }) => setIsStaff(ok && !!(json?.staff || json?.admin || json?.manager)))
+      .catch(() => undefined);
+  };
   const cardArt = player.cosmetics?.card?.asset ?? null;
   const handle = (player.discordUsername ?? "").trim();
   const showHandle = !!handle && handle.toLowerCase() !== player.username.toLowerCase();
@@ -198,7 +209,7 @@ export function IdentityCard({
         >
           <Share2 className="h-4 w-4" />
         </button>
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={checkStaff}>
           <DropdownMenuTrigger
             aria-label="More"
             className="flex h-[2.375rem] w-[2.375rem] shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#232323] text-[#c8c8c8] outline-none hover:border-white/20 hover:text-white"
@@ -231,9 +242,25 @@ export function IdentityCard({
             >
               <Share2 className="h-4 w-4" /> Copy profile link
             </DropdownMenuItem>
+            {session && !isOwn ? (
+              <DropdownMenuItem className="cursor-pointer gap-2.5 px-2.5 py-2 text-hl-red" onClick={() => setReporting(true)}>
+                <Flag className="h-4 w-4" /> Report player
+              </DropdownMenuItem>
+            ) : null}
+            {isStaff ? (
+              <DropdownMenuItem
+                className="cursor-pointer gap-2.5 px-2.5 py-2"
+                onClick={() => router.push(`/staff?player=${encodeURIComponent(player.username)}`)}
+              >
+                <ShieldCheck className="h-4 w-4 text-hl-gold" /> Manage as staff
+              </DropdownMenuItem>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {session && !isOwn ? (
+        <ReportDialog player={player.username} open={reporting} onOpenChange={setReporting} onSent={flash} />
+      ) : null}
       {message ? <div className="border-t border-white/[0.08] px-4 py-2 text-xs text-[#ff5500]">{message}</div> : null}
     </section>
   );

@@ -150,6 +150,8 @@ export const BLOXLINK_VERIFIED_ROLE_ID = "1554232318044930099";
 export const MM_ACCESS_ROLE_ID = "1554232616603885638";
 /** Match Staff ("Ranked Staff" in CB Looters). MATCH_STAFF_ROLE_ID overrides it. */
 export const MATCH_STAFF_ROLE_ID = "1543883820879585343";
+/** MatchMaking Manager (the CBL bot's MM_MANAGER_ROLE_ID: /season reset). MM_MANAGER_ROLE_ID overrides it. */
+export const MM_MANAGER_ROLE_ID = "1554231558485839943";
 const LEAGUE_ACCESS_ROLE_IDS = [BLOXLINK_VERIFIED_ROLE_ID, MM_ACCESS_ROLE_ID];
 
 export type GuildPresence = {

@@ -57,6 +57,10 @@ export const LIMITS = {
   groupWrite: { limit: 60, windowMs: 10 * 60_000 },
   shop: { limit: 20, windowMs: 60_000 },
   general: { limit: 60, windowMs: 60_000 },
+  /** Reporting a player (app/api/reports). */
+  report: { limit: 5, windowMs: 60 * 60_000 },
+  /** Staff panel actions sent to the bot (app/api/staff/jobs). */
+  staffAction: { limit: 30, windowMs: 60_000 },
 } as const;
 
 /**

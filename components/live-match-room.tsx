@@ -12,6 +12,8 @@ import { queueModeLabel } from "@/lib/queue-modes";
 import { ExternalLink, Mic, Crown, Calendar, Send, Gamepad2 } from "lucide-react";
 import { SubRolePill } from "@/components/sub-role-pill";
 import { WinChanceBar } from "@/components/win-chance-bar";
+import { OvertimeVoteCard } from "@/components/overtime-vote-card";
+import type { OvertimeVoteView } from "@/lib/overtime-votes";
 import { startPolling } from "@/lib/poll-gate";
 import { Flag } from "@/components/flag";
 import { countryName, flagPath } from "@/lib/countries";
@@ -60,6 +62,8 @@ export interface LiveLobby {
   queueMode?: string | null;
   leagueMatchId?: number | null;
   teamNames?: { team1: string; team2: string } | null;
+  /** The match's overtime tie vote, while open or just after (app/api/lobby). */
+  overtimeVote?: OvertimeVoteView | null;
   seriesMaps?: string[] | null;
   messages?: ChatLine[];
 }
@@ -679,6 +683,13 @@ export function LiveMatchRoom({
           Connect
         </div>
         <div className="p-4 space-y-2 shrink-0">
+          {lobby.overtimeVote ? (
+            <OvertimeVoteCard
+              vote={lobby.overtimeVote}
+              now={now}
+              onVoted={(vote) => onLobby({ ...lobby, overtimeVote: vote })}
+            />
+          ) : null}
           {lobby.server?.url ? (
             <a
               href={lobby.server.url}

@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Coins, Settings, UserRound, X } from "lucide-react";
+import { Coins, Settings, ShieldCheck, UserRound, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogoutButton } from "@/components/logout-button";
+import { apiGetJson } from "@/lib/client-api";
 import { useSession } from "@/components/session-provider";
 import { formatUsername } from "@/lib/format";
 import { profileHref as profileUrl } from "@/lib/profile-link";
@@ -13,7 +14,20 @@ import { profileHref as profileUrl } from "@/lib/profile-link";
 export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
   const { session, coins } = useSession();
   const [open, setOpen] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const signedIn = !!session;
+  // Asked only when the menu opens (one Discord role check, cached 5 min here).
+  useEffect(() => {
+    if (!open || !signedIn) return;
+    let alive = true;
+    apiGetJson<{ staff?: boolean; admin?: boolean; manager?: boolean }>("/api/staff/me", { ttlMs: 5 * 60_000 })
+      .then(({ ok, json }) => alive && setIsStaff(ok && !!(json?.staff || json?.admin || json?.manager)))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [open, signedIn]);
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
@@ -128,6 +142,16 @@ export function ProfileMenu({ variant = "bar" }: { variant?: "bar" | "rail" }) {
                   <Settings className="w-4 h-4 text-hl-muted" />
                   Account Settings
                 </Link>
+                {isStaff ? (
+                  <Link
+                    href="/staff"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-hl-panel-light/50"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-hl-gold" />
+                    Staff panel
+                  </Link>
+                ) : null}
                 <LogoutButton
                   onBeforeLogout={() => setOpen(false)}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-hl-muted hover:text-white hover:bg-hl-panel-light/50 text-left"

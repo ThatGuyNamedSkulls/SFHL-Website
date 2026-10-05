@@ -5,8 +5,9 @@
  */
 
 import { cache } from "react";
-import { DISCORD_CONFIG, MATCH_STAFF_ROLE_ID } from "@/lib/auth";
+import { DISCORD_CONFIG, MATCH_STAFF_ROLE_ID, MM_MANAGER_ROLE_ID } from "@/lib/auth";
 import { remember } from "@/lib/server-cache";
+import { hasAdministrator, type GuildPermissionInfo } from "@/lib/discord-permissions";
 import { addNotification, enqueueDM } from "@/lib/social";
 
 const VIEW_CHANNEL = 1 << 10;
@@ -53,6 +54,23 @@ async function matchStaffRoleId(): Promise<string | null> {
   return /^\d{15,22}$/.test(pinned) ? pinned : MATCH_STAFF_ROLE_ID;
 }
 
+/** The MatchMaking Manager role id (pinned like Match Staff); MM_MANAGER_ROLE_ID overrides it. */
+function mmManagerRoleId(): string {
+  const pinned = (process.env.MM_MANAGER_ROLE_ID || "").trim();
+  return /^\d{15,22}$/.test(pinned) ? pinned : MM_MANAGER_ROLE_ID;
+}
+
+/** This member's role ids in the league server, or null when they aren't in it / Discord can't say.
+ *  One Discord call per user per minute, shared by the role checks below. */
+async function memberRoleIds(userId: string): Promise<string[] | null> {
+  return remember(`member-roles:${userId}`, 60_000, async () => {
+    const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/members/${userId}`);
+    if (!res?.ok) return null;
+    const member = (await res.json()) as { roles?: string[] };
+    return member.roles ?? [];
+  });
+}
+
 /** The league server's text + announcement channels, in sidebar order (empty without a bot token). */
 export async function listGuildTextChannels(): Promise<{ id: string; name: string }[]> {
   const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/channels`);
@@ -73,12 +91,35 @@ export const isMatchStaff = cache(async function isMatchStaff(userId: string): P
   if (!userId) return false;
   const roleId = await matchStaffRoleId();
   if (!roleId) return false;
-  return remember(`match-staff:${userId}`, 60_000, async () => {
-    const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}/members/${userId}`);
-    if (!res?.ok) return false;
-    const member = (await res.json()) as { roles?: string[] };
-    return (member.roles ?? []).includes(roleId);
+  return ((await memberRoleIds(userId)) ?? []).includes(roleId);
+});
+
+/** True when this Discord user has the MatchMaking Manager role (/season reset). */
+export const isMmManager = cache(async function isMmManager(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  return ((await memberRoleIds(userId)) ?? []).includes(mmManagerRoleId());
+});
+
+/** The server's owner and role permissions, for isGuildAdmin (5 minutes per instance). */
+async function guildPermissionInfo(): Promise<GuildPermissionInfo | null> {
+  return remember("guild-permission-info", 5 * 60_000, async () => {
+    const res = await discordApi(`/guilds/${DISCORD_CONFIG.guildId}`);
+    if (!res?.ok) return null;
+    const guild = (await res.json()) as { id: string; owner_id: string; roles?: { id: string; permissions: string }[] };
+    return { id: guild.id, ownerId: guild.owner_id, roles: guild.roles ?? [] };
   });
+}
+
+/**
+ * True for the server owner or a member with the Administrator permission —
+ * the bot's rule for admin commands (/item, /coins, /seasonreward). Used by
+ * the staff panel's Admin-only actions; the bot checks again when it runs them.
+ */
+export const isGuildAdmin = cache(async function isGuildAdmin(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  const [roles, guild] = await Promise.all([memberRoleIds(userId), guildPermissionInfo()]);
+  if (!roles || !guild) return false;
+  return hasAdministrator(userId, roles, guild);
 });
 
 function channelUrl(channelId: string) {
