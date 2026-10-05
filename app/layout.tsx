@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SessionProvider } from "@/components/session-provider";
@@ -69,6 +70,7 @@ export default function RootLayout({
             <PresenceHeartbeat />
           </SessionProvider>
         </TooltipProvider>
+        <Analytics />
         <SpeedInsights />
       </body>
     </html>
