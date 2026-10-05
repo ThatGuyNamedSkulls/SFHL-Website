@@ -59,7 +59,7 @@ export function ChatTab({ invite }: { invite: string }) {
     for (const m of messages) {
       const key = localDayKey(m.createdAt);
       let day = out[out.length - 1];
-      if (!day || day.day !== key) {
+      if (!day || day.day !== key) { 
         day = { day: key, label: dayLabel(m.createdAt, now), runs: [] };
         out.push(day);
       }
