@@ -143,7 +143,7 @@ export function MatchReadyModal() {
           <p className="mx-auto mt-2 max-w-sm text-sm text-white/65">
             {check.iWasRemoved
               ? `The ${ACCEPT_WINDOW_SECONDS} seconds ran out, so you were removed from the queue. Find a match again when you're ready.`
-              : "Not everyone accepted. You kept your place and are still searching."}
+              : "Someone didn't accept or left the queue. You kept your place and are still searching."}
           </p>
           <button
             type="button"
