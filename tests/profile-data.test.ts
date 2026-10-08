@@ -109,7 +109,7 @@ before(async () => {
 });
 
 after(async () => {
-  await tmp.cleanup(["match_history", "players", "season_resets", "player_bios"]);
+  await tmp.cleanup(["match_history", "players", "season_resets", "player_bios", "player_bans"]);
 });
 
 describe("getMostPlayedWith", () => {
@@ -286,6 +286,7 @@ describe("/api/players routes", () => {
     assert.equal(p.matchHistory[0].eloAfter, 1600);
     assert.equal(p.hasMoreMatches, false);
     assert.deepEqual(p.teams, []);
+    assert.equal(p.ban, null, "no player_bans table yet");
   });
 
   it("GET …/stats sums the scope in the database", async () => {
@@ -310,6 +311,32 @@ describe("/api/players routes", () => {
     const data = await res.json();
     assert.deepEqual(data.matches.map((m: { matchId: number }) => m.matchId), [2]);
     assert.equal(data.hasMore, true);
+  });
+
+  it("marks an active /player ban on the profile, the leaderboard and search — not a lifted one", async () => {
+    await db.client.execute("UPDATE players SET discord_id = '301' WHERE name = 'ana'");
+    await db.client.execute("UPDATE players SET discord_id = '302' WHERE name = 'bo'");
+    await db.client.execute(`CREATE TABLE player_bans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, discord_id TEXT NOT NULL, roblox_user_id INTEGER,
+      player_name TEXT, reason TEXT NOT NULL, banned_by TEXT NOT NULL, banned_at TEXT NOT NULL,
+      lifted_at TEXT, lifted_by TEXT)`);
+    await db.client.execute(`INSERT INTO player_bans (discord_id, reason, banned_by, banned_at, lifted_at) VALUES
+      ('301', 'cheating', 'staff', '2026-10-03 18:00:00', NULL),
+      ('302', 'old one', 'staff', '2026-09-01 00:00:00', '2026-09-02 00:00:00')`);
+    (await import("@/lib/server-cache")).forget("bans:shown");
+
+    const profile = (await import("@/app/api/players/[name]/route")).GET;
+    const ana = await (await profile(new Request("http://localhost/api/players/ana"), params("ana"))).json();
+    assert.deepEqual(ana.ban, { since: "2026-10-03T18:00:00.000Z" });
+    assert.equal(JSON.stringify(ana).includes("cheating"), false, "the reason stays staff-only");
+    const bo = await (await profile(new Request("http://localhost/api/players/bo"), params("bo"))).json();
+    assert.equal(bo.ban, null);
+
+    const { GET } = await import("@/app/api/players/route");
+    const board: { username: string; banned: boolean }[] = await (await GET(new Request("http://localhost/api/players"))).json();
+    assert.deepEqual(board.filter((p) => p.banned).map((p) => p.username), ["ana"]);
+    const found: { username: string; banned: boolean }[] = await (await GET(new Request("http://localhost/api/players?q=an"))).json();
+    assert.deepEqual(found.map((p) => [p.username, p.banned]), [["ana", true]]);
   });
 
   it("404s for an unknown player", async () => {

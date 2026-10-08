@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadgeInline } from "@/components/rank-badge";
 import { RankTierLetter } from "@/types";
 import { ClubTaggedName } from "@/components/club-identity";
+import { BannedTag } from "@/components/banned-tag";
 import { apiGetJson } from "@/lib/client-api";
 import { profileHref } from "@/lib/profile-link";
 
@@ -18,6 +19,7 @@ interface SearchPlayer {
   rank: string;
   elo: number;
   clubTag?: string | null;
+  banned?: boolean;
 }
 
 interface PlayerSearchProps {
@@ -202,6 +204,7 @@ export function PlayerSearch({
                 <span className="flex-1 min-w-0 truncate text-sm font-medium text-white">
                   <ClubTaggedName name={p.username} tag={p.clubTag} discordUsername={p.discordUsername} />
                 </span>
+                {p.banned ? <BannedTag /> : null}
                 <RankBadgeInline rank={p.rank as RankTierLetter} />
                 <span className="text-xs stat-number text-hl-gold w-12 text-right">
                   {p.elo}

@@ -82,6 +82,8 @@ export interface ProfilePlayer extends Player {
   lastMatchAt?: string | null;
   activity?: string[];
   teams?: ProfileTeam[];
+  /** An active matchmaking ban (/player ban); `since` is ISO, or null if unknown. */
+  ban?: { since: string | null } | null;
 }
 
 /** GET /api/players/[name]/stats. */

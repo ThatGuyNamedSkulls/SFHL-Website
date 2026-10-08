@@ -19,6 +19,7 @@ import { ClubTaggedName } from "@/components/club-identity";
 import { PRO_DIVISION_WEIGHTS } from "@/lib/pro-league";
 import { LEVEL_NAMES } from "@/lib/league-standings";
 import { profileHref } from "@/lib/profile-link";
+import { BannedTag } from "@/components/banned-tag";
 
 interface ApiPlayer {
   id: string;
@@ -37,6 +38,8 @@ interface ApiPlayer {
   countryFlag: string | null;
   placementDone?: boolean;
   clubTag?: string | null;
+  /** An active /player ban. */
+  banned?: boolean;
   stats: { wins: number; kd: number; winPercent: number; headshotPercent: number; matchesPlayed: number };
   /** Pro ladder only: the league matches that earned it (league v2 C6). */
   league?: {
@@ -399,6 +402,7 @@ function LeaderboardsInner() {
                         <span className="text-[0.9375rem] font-medium text-white truncate">
                           <ClubTaggedName name={player.username} tag={player.clubTag} />
                         </span>
+                        {player.banned ? <BannedTag /> : null}
                       </span>
                       <span className="block truncate text-[0.75rem] text-[#8a8a8a]">
                         {lg?.team ? `${lg.team.name} [${lg.team.tag}]` : "League player"}
@@ -454,6 +458,7 @@ function LeaderboardsInner() {
                   <span className="text-[0.9375rem] font-medium text-white truncate">
                     <ClubTaggedName name={player.username} tag={player.clubTag} />
                   </span>
+                  {player.banned ? <BannedTag /> : null}
                   <span className="md:hidden shrink-0">
                     <RankBadge rank={displayRank} size="sm" showGlow={false} className="!w-5 !h-5" />
                   </span>

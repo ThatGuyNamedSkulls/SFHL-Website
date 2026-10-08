@@ -8,6 +8,7 @@ import { regionMeta } from "@/lib/regions";
 import { remember } from "@/lib/server-cache";
 import { clubTagIndex, lookupClubTag } from "@/lib/clubs";
 import { proLeagueInfo, type ProLeagueView } from "@/lib/pro-ladder";
+import { shownBans } from "@/lib/bans";
 
 export async function GET(request: Request) {
   try {
@@ -20,9 +21,10 @@ export async function GET(request: Request) {
     if (q !== null) {
       const query = q.trim().slice(0, 40);
       if (!query) return NextResponse.json([]);
-      const [rows, tags] = await Promise.all([
+      const [rows, tags, bans] = await Promise.all([
         searchPlayers(query),
         clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
+        shownBans(),
       ]);
       return NextResponse.json(
         rows.map((p) => {
@@ -35,6 +37,7 @@ export async function GET(request: Request) {
             rank: rating.rank,
             elo: rating.elo,
             clubTag: lookupClubTag(tags, p.name, p.discord_id != null ? String(p.discord_id) : null),
+            banned: p.discord_id != null && bans.has(String(p.discord_id)),
           };
         })
       );
@@ -47,7 +50,7 @@ export async function GET(request: Request) {
     const modeParam = searchParams.get("mode");
     if (modeParam && modeParam !== "5v5") {
       const mappedModes = await remember(`players:mode:${modeParam}`, 8000, async () => {
-        const [rows, cards, tags, league] = await Promise.all([
+        const [rows, cards, tags, league, bans] = await Promise.all([
           getModeLeaderboard(modeParam),
           getEquippedVisualsMap().catch(() => new Map<string, EquippedVisuals>()),
           clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
@@ -55,6 +58,7 @@ export async function GET(request: Request) {
           modeParam === "pro"
             ? proLeagueInfo().catch(() => new Map<string, ProLeagueView>())
             : Promise.resolve(new Map<string, ProLeagueView>()),
+          shownBans(),
         ]);
         return rows.map((r, idx) => {
           const hasCountry = isValidCountry(r.country);
@@ -88,6 +92,7 @@ export async function GET(request: Request) {
               playtimeHours: 0,
             },
             clubTag: lookupClubTag(tags, r.player_name, r.discord_id != null ? String(r.discord_id) : null),
+            banned: r.discord_id != null && bans.has(String(r.discord_id)),
             placementDone: rating.placementDone,
             placementGamesPlayed: r.placement_games_played,
             league: league.get(String(r.player_name).toLowerCase()) ?? null,
@@ -101,11 +106,12 @@ export async function GET(request: Request) {
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.floor(limitRaw) : undefined;
 
     const mapped = await remember(`players:${cacheKey}`, 8000, async () => {
-      const [players, cards, placementGamesTotal, tags] = await Promise.all([
+      const [players, cards, placementGamesTotal, tags, bans] = await Promise.all([
         getAllPlayers(limit),
         getEquippedVisualsMap().catch(() => new Map<string, EquippedVisuals>()),
         getPlacementGamesTotal(),
         clubTagIndex().catch(() => ({ byName: {}, byDiscord: {} })),
+        shownBans(),
       ]);
 
       return players.map((p, idx) => {
@@ -129,6 +135,7 @@ export async function GET(request: Request) {
         countryFlag: hasCountry ? flagPath(p.country) : null,
         position: idx + 1,
         clubTag: lookupClubTag(tags, p.name, p.discord_id != null ? String(p.discord_id) : null),
+        banned: p.discord_id != null && bans.has(String(p.discord_id)),
         stats: {
           wins: p.matches_won,
           losses: p.matches_played - p.matches_won,

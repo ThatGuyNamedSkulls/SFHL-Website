@@ -36,6 +36,7 @@ import { getBio } from "@/lib/player-bios";
 import { summarizeTeam, teamsForMember } from "@/lib/teams";
 import { titleCounts } from "@/lib/team-titles";
 import { toProfileMatch } from "@/lib/profile-match";
+import { shownBans } from "@/lib/bans";
 
 /** Matches sent with the profile; older ones come from ./matches ("Load more"). */
 const MATCH_PAGE = 100;
@@ -109,6 +110,7 @@ export async function GET(
       activity,
       bio,
       teams,
+      bans,
     ] = await Promise.all([
       getMatchesForPlayer(playerName, MATCH_PAGE),
       getPlacementMatchesForPlayer(playerName),
@@ -134,6 +136,7 @@ export async function GET(
       getMatchTimestamps(playerName, activitySince),
       getBio(Number(player.id)),
       discordId ? teamsForMember(discordId).catch(() => []) : Promise.resolve([]),
+      shownBans(),
     ]);
 
     const lastResetAt = seasonResets.length
@@ -205,6 +208,8 @@ export async function GET(
       mmAccess,
       badge,
       clubTag: lookupClubTag(clubTags, player.name, discordId),
+      /** An active /player ban: shown as "Banned" (the reason is staff-only). */
+      ban: discordId && bans.has(discordId) ? { since: bans.get(discordId) ?? null } : null,
       bio,
       stats: {
         wins: player.matches_won,

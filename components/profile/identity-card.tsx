@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AtSign, Flag, Globe, LineChart, MoreHorizontal, Pencil, Share2, ShieldCheck, UserCheck, UserPlus, Users } from "lucide-react";
+import { AtSign, Ban, Flag, Globe, LineChart, MoreHorizontal, Pencil, Share2, ShieldCheck, UserCheck, UserPlus, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AvatarFrame } from "@/components/avatar-frame";
+import { BannedTag } from "@/components/banned-tag";
+import { LocalTime } from "@/components/local-time";
 import { NameBadge } from "@/components/name-badge";
 import { OnlineBadge, OnlineLabel } from "@/components/online-status";
 import { RankBadge } from "@/components/rank-badge";
@@ -137,6 +139,7 @@ export function IdentityCard({
             ) : null}
             <span className="truncate">{player.username}</span>
             <NameBadge badge={player.badge} verified={player.mmAccess} size="lg" />
+            {player.ban ? <BannedTag size="md" /> : null}
           </h1>
           {showHandle ? <div className="mt-0.5 truncate text-[0.8125rem] text-[#a0a0a0]">@{handle}</div> : null}
           {player.cosmetics?.title ? (
@@ -172,6 +175,20 @@ export function IdentityCard({
           ) : null}
         </div>
       </div>
+
+      {player.ban ? (
+        <div className="relative flex items-center gap-2 border-t border-hl-red/30 bg-hl-red/10 px-4 py-2 text-xs font-semibold text-hl-red lg:justify-center">
+          <Ban className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span>
+            Banned from HyperLeague matchmaking
+            {player.ban.since ? (
+              <>
+                {" "}since <LocalTime ts={Date.parse(player.ban.since)} format="date" fallback={player.ban.since.slice(0, 10)} />
+              </>
+            ) : null}
+          </span>
+        </div>
+      ) : null}
 
       <div className="relative flex gap-2 border-t border-white/[0.08] p-3">
         {isOwn ? (
